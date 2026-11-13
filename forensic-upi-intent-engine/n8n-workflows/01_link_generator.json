@@ -1,5 +1,5 @@
 {
-  "name": "A - Create UPI session (authenticated merchant webhook)",
+  "name": "01 Link Generator",
   "nodes": [
     {
       "parameters": {
@@ -10,11 +10,11 @@
         "options": {}
       },
       "id": "4c6204d2-1b53-4eb2-bd49-010000000001",
-      "name": "Authenticated Session Request",
+      "name": "Authenticated Webhook",
       "type": "n8n-nodes-base.webhook",
       "typeVersion": 2,
       "position": [
-        240,
+        250,
         300
       ],
       "webhookId": "forensic-upi-create-session"
@@ -22,7 +22,7 @@
     {
       "parameters": {
         "method": "POST",
-        "url": "http://worker:8000/v1/sessions",
+        "url": "http://127.0.0.1:8000/v1/sessions",
         "authentication": "genericCredentialType",
         "genericAuthType": "httpHeaderAuth",
         "sendBody": true,
@@ -37,11 +37,11 @@
         }
       },
       "id": "4c6204d2-1b53-4eb2-bd49-010000000002",
-      "name": "Allocate VPA via Worker",
+      "name": "Get Healthy VPA and Lease Atomically",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [
-        480,
+        490,
         300
       ]
     },
@@ -52,32 +52,32 @@
         "options": {}
       },
       "id": "4c6204d2-1b53-4eb2-bd49-010000000003",
-      "name": "Reply with session",
+      "name": "Respond to Webhook",
       "type": "n8n-nodes-base.respondToWebhook",
       "typeVersion": 1.1,
       "position": [
-        720,
+        740,
         300
       ]
     }
   ],
   "connections": {
-    "Authenticated Session Request": {
+    "Authenticated Webhook": {
       "main": [
         [
           {
-            "node": "Allocate VPA via Worker",
+            "node": "Get Healthy VPA and Lease Atomically",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Allocate VPA via Worker": {
+    "Get Healthy VPA and Lease Atomically": {
       "main": [
         [
           {
-            "node": "Reply with session",
+            "node": "Respond to Webhook",
             "type": "main",
             "index": 0
           }

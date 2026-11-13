@@ -1,11 +1,16 @@
--- Phase 1: paste ONLY your own verified, authorized merchant VPAs below.
--- No actual VPA inventory was provided. The example addresses in the user guide
--- are placeholders and must not be inserted into a payment-acceptance pool.
+-- database/seed_vpas.sql
+-- Replace the examples with your 1,000 REAL, verified, merchant-owned UPI IDs.
+-- IMPORTANT: the five example VPAs below are NOT verified accounts.
+-- They are commented out to prevent accidental insertion or attempted collection.
 --
 -- INSERT INTO upi_vpa_pool (vpa_address) VALUES
--- ('your_real_id_1@oksbi'),
--- ('your_real_id_2@ybl')
+-- ('merchant001@oksbi'),
+-- ('merchant002@ybl'),
+-- ('merchant003@axl'),
+-- ('merchant004@ptsbi'),
+-- ('merchant005@upi')
 -- ON CONFLICT (vpa_address) DO NOTHING;
 --
--- Do not activate collection until the PSP/bank has confirmed the VPAs.
-SELECT 'No real VPAs inserted: populate this file with your verified 1,000 IDs before execution.' AS seed_status;
+-- Once real, authorized VPAs are provided, replace this commented example
+-- with a valid INSERT statement. Validate ownership and provider approval.
+SELECT 'No real VPAs loaded: provide 1,000 authorized merchant UPI IDs.' AS seed_status;

@@ -1,6 +1,30 @@
-# Forensic UPI Intent Engine
+# Zero-Trust-Fintech — Forensic UPI Intent Engine
 
 Defense-oriented prototype that separates **payment initiation**, **forensic triage**, **bank reconciliation**, and **financial accounting**.
+
+## Phase 1 — Operational Foundation (native, no Docker)
+
+The requested Phase 1 files are maintained in these **separate, native-host** paths:
+
+- [`database/schema.sql`](database/schema.sql) — rotating VPA pool, forensic payment session with `telemetry_data`, `extracted_status`, `fraud_flags`, `updated_at`, and append-only ledger constraints.
+- [`database/seed_vpas.sql`](database/seed_vpas.sql) — SQL template with the five example IDs **commented out**; the actual 1,000 verified merchant VPAs have **not** been supplied or imported.
+- [`python-forensics/ela_analysis.py`](python-forensics/ela_analysis.py) — `calculate_ela(image_path)` and a CLI compatible with the supplied usage, using in-memory JPEG recompression and returning advisory (not conclusive) scores.
+- [`n8n-workflows/01_link_generator.json`](n8n-workflows/01_link_generator.json) — importable inactive, header-authenticated webhook; delegates **atomic** VPA leasing to the existing worker to avoid races from separate SQL steps. In a native deployment the worker URL is `http://127.0.0.1:8000/v1/sessions`.
+- [`docs/phase1_bare_metal.md`](docs/phase1_bare_metal.md) — Ubuntu/macOS native PostgreSQL, Node/n8n, Python and systemd instructions.
+
+**Do not point the existing FastAPI worker at `database/schema.sql`.** It uses the different merchant-scoped schema under `infra/postgres/init.sql`. They are alternative Phase 1 and engine schemas and are not interchangeable. The new link generator works only when the backend worker and its corresponding `infra/` database have been started and configured. The native database and n8n can be installed separately without enabling any collection flow.
+
+**Financial truth:** ELA, OCR, app switching, telemetry and screenshots do not verify UPI credit. A signed mock callback alone is also insufficient. Real settlement requires an authenticated bank/PSP data source plus reconciliation. The bare-metal ledger rejects mutation by ordinary triggers but is **not** a full production-grade balanced accounting system.
+
+### Quick Phase 1 checks
+
+```bash
+psql -h 127.0.0.1 -U forensic_user -d forensic_db -v ON_ERROR_STOP=1 -f database/schema.sql
+psql -h 127.0.0.1 -U forensic_user -d forensic_db -v ON_ERROR_STOP=1 -f database/seed_vpas.sql
+python3 -m venv .venv
+.venv/bin/python -m pip install -r python-forensics/requirements.txt
+.venv/bin/python python-forensics/ela_analysis.py path/to/example.jpg
+```
 
 ## Included
 - PostgreSQL schema for merchant-scoped VPA leasing, session lifecycle, bank event inbox and immutable financial ledger.

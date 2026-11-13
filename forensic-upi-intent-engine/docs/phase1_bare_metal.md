@@ -45,7 +45,7 @@ GRANT USAGE, CREATE ON SCHEMA public TO forensic_user;
 \q
 ```
 
-Apply the **exact Phase 1 schema** supplied in the plan:
+Apply the updated Phase 1 schema, including additive columns and append-only ledger triggers:
 
 ```bash
 export PGPASSWORD='REPLACE_WITH_RANDOM_SECRET'
@@ -54,9 +54,9 @@ psql -h 127.0.0.1 -U forensic_user -d forensic_db -v ON_ERROR_STOP=1 -f database
 unset PGPASSWORD
 ```
 
-The `seed_vpas.sql` file is a safe blank template: no real VPAs were provided. Insert your own **verified, authorized** 1,000 IDs in the documented `INSERT ... ON CONFLICT` form. Do not insert `your_real_id_1@oksbi` placeholders or mark fake accounts as real.
+The `seed_vpas.sql` file is a safe template: five supplied merchant-style example addresses are **commented out**, and no real VPAs were provided. Insert your own **verified, authorized** 1,000 IDs in the documented `INSERT ... ON CONFLICT` form. Do not treat the example addresses as authorized accounts.
 
-**Compatibility limitation:** This user-supplied Phase 1 SQL schema is preserved literally, but it is *not compatible* with the richer, merchant-scoped FastAPI worker schema in `infra/postgres/init.sql`. Run Phase 1 setup on a **separate empty** `forensic_db`; use the `infra/` schema for the existing worker, not both in the same database. SQL here is a scaffold rather than a production-grade immutable financial ledger.
+**Compatibility limitation:** This Phase 1 SQL schema implements the requested fields, additive migrations, and update/delete/truncate guards for the ledger. It is *not compatible* with the richer, merchant-scoped FastAPI worker schema in `infra/postgres/init.sql`. Run Phase 1 on a **separate empty** `forensic_db`; use the `infra/` schema for the existing worker, not both in the same database. Ledger triggers are only one control, not proof of independent bank settlement or a complete production accounting implementation.
 
 On macOS, `brew install postgresql`, followed by the Homebrew service and equivalent role/database creation, is the native alternative. systemd commands in this guide apply to Linux.
 
@@ -103,7 +103,7 @@ sudo systemctl status forensic-n8n
 
 Make sure `/etc/forensic-upi-intent-engine/n8n.env` is populated **before** enabling the service. `n8n start` can also run in a terminal for a manual smoke test. Use `journalctl -u forensic-n8n -f` for errors.
 
-**n8n workflows:** `n8n-workflows/*.json` are byte-for-byte copies of the existing `backend/workflows/*.json`. They remain inactive until all webhook Header Auth and outbound worker API credentials are configured. Running n8n by itself does not start the Python worker; those workflows also require a reachable worker and their `http://worker:8000` URLs must be changed to the actual, secured native worker address before activation.
+**n8n workflows:** `02`–`04` are copies of the existing `backend/workflows/` exports. `01_link_generator.json` has been adapted for Phase 1 native deployment and points to `http://127.0.0.1:8000/v1/sessions`; it delegates both VPA selection and leasing to the worker **in one transaction**, rather than relying on unsafe separate SQL nodes. All workflows remain inactive until webhook Header Auth and outbound worker API credentials are configured. Running n8n alone does not start the Python worker; the native worker still requires its own supported schema under `infra/postgres/init.sql`. For workflows `02`–`04`, replace Docker hostnames with authorized native worker addresses before activation.
 
 ## Step C — Native Python forensics
 
@@ -113,6 +113,8 @@ python3 -m venv .venv
 .venv/bin/python -m pip install -r python-forensics/requirements.txt
 .venv/bin/python -m compileall -q python-forensics
 ```
+
+Example ELA CLI: `.venv/bin/python python-forensics/ela_analysis.py path/to/image.jpg`. This is a heuristic signal, not proof of Photoshop edits or a successful UPI credit.
 
 These are **libraries, not n8n Code-node modules**: run forensic scripts as isolated worker processes and call them through authenticated APIs rather than assuming n8n can import Python modules.
 
