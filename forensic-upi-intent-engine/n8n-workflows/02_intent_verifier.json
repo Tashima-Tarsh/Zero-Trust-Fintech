@@ -1,28 +1,28 @@
 {
-  "name": "B - Forensic triage (never confirms payment)",
+  "name": "02 Intent Verifier — Pending Reconciliation (Phase 2)",
   "nodes": [
     {
       "parameters": {
         "httpMethod": "POST",
-        "path": "forensic-upi/score",
+        "path": "verify-payment",
         "authentication": "headerAuth",
         "responseMode": "responseNode",
         "options": {}
       },
-      "id": "4c6204d2-1b53-4eb2-bd49-020000000001",
-      "name": "Authenticated Risk Request",
+      "id": "72951e2b-847c-456b-bf2e-020000000001",
+      "name": "Authenticated Evidence Webhook",
       "type": "n8n-nodes-base.webhook",
       "typeVersion": 2,
       "position": [
-        240,
+        220,
         300
       ],
-      "webhookId": "forensic-upi-score"
+      "webhookId": "forensic-upi-native-verify"
     },
     {
       "parameters": {
         "method": "POST",
-        "url": "http://worker:8000/v1/forensics/score",
+        "url": "http://127.0.0.1:8000/v1/intent/evaluate",
         "authentication": "genericCredentialType",
         "genericAuthType": "httpHeaderAuth",
         "sendBody": true,
@@ -36,12 +36,12 @@
           }
         }
       },
-      "id": "4c6204d2-1b53-4eb2-bd49-020000000002",
-      "name": "Score by Python Worker",
+      "id": "72951e2b-847c-456b-bf2e-020000000002",
+      "name": "Analyze and Hold in Queue",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [
-        480,
+        470,
         300
       ]
     },
@@ -51,8 +51,8 @@
         "responseBody": "={{ JSON.stringify($json) }}",
         "options": {}
       },
-      "id": "4c6204d2-1b53-4eb2-bd49-020000000003",
-      "name": "Reply with advisory",
+      "id": "72951e2b-847c-456b-bf2e-020000000003",
+      "name": "Return Pending Reconciliation",
       "type": "n8n-nodes-base.respondToWebhook",
       "typeVersion": 1.1,
       "position": [
@@ -62,22 +62,22 @@
     }
   ],
   "connections": {
-    "Authenticated Risk Request": {
+    "Authenticated Evidence Webhook": {
       "main": [
         [
           {
-            "node": "Score by Python Worker",
+            "node": "Analyze and Hold in Queue",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Score by Python Worker": {
+    "Analyze and Hold in Queue": {
       "main": [
         [
           {
-            "node": "Reply with advisory",
+            "node": "Return Pending Reconciliation",
             "type": "main",
             "index": 0
           }
@@ -87,7 +87,10 @@
   },
   "active": false,
   "settings": {
-    "executionOrder": "v1"
+    "executionOrder": "v1",
+    "saveDataSuccessExecution": "none",
+    "saveDataErrorExecution": "none",
+    "saveManualExecutions": false
   },
   "tags": [],
   "meta": {

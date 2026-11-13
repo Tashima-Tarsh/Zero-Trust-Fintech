@@ -26,6 +26,16 @@ python3 -m venv .venv
 .venv/bin/python python-forensics/ela_analysis.py path/to/example.jpg
 ```
 
+## Phase 2 — The Forensic Brain (holding-queue safety)
+
+Phase 2 is implemented in [`phase-2/`](phase-2/README.md). The native n8n verifier is [`n8n-workflows/02_intent_verifier.json`](n8n-workflows/02_intent_verifier.json), with an authenticated Python worker endpoint at `/v1/intent/evaluate`, an immutable evidence-submission table, and a durable `phase2_reconciliation_queue`. The revised [04 statement workflow](n8n-workflows/04_statement_parser.json) includes an **hourly, read-only** queue monitor; no payments are credited by this monitoring.
+
+- [Five fraud scenarios](phase-2/threat_model.md)
+- [Verifier API and sample payload](phase-2/api_contracts.md)
+- [Bare-metal Phase 2 deployment and SQL migration](phase-2/operational_runbook.md)
+
+**Important:** This phase rejects the unsafe `OCR success + forensic score >= 95 => credit` rule. A high score is *risk*, not proof of transferred funds. Screenshots, app package reports, UTR strings and OCR are untrusted. Every accepted submission returns `PENDING_RECONCILIATION` and posts **zero** ledger entries. Phase 2 cannot independently confirm bank funds.
+
 ## Included
 - PostgreSQL schema for merchant-scoped VPA leasing, session lifecycle, bank event inbox and immutable financial ledger.
 - Redis for fail-closed API rate limiting (internal network).

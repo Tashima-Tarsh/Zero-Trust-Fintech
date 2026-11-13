@@ -29,6 +29,8 @@ jobs:
         run: python scripts/validate_structure.py
       - name: Native Phase 1 schema, workflow, and ELA smoke check
         run: python scripts/validate_phase1.py
+      - name: Phase 2 workflow, migration and no-credit validation
+        run: python scripts/validate_phase2.py
       - name: Docker Compose configuration
         run: docker compose -f infra/docker-compose.yml --env-file .env.example config --quiet
       - uses: actions/setup-node@v4

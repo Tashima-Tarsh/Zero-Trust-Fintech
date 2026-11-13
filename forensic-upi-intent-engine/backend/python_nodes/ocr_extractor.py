@@ -24,8 +24,10 @@ def extract_screen_text(image_data: bytes) -> dict:
     normalized = " ".join(text.split())
     ref = UTR.search(normalized)
     amount = AMOUNT.search(normalized)
-    matches = [key for key in ("success", "failed", "pending") if re.search(r"\b" + key + r"\b", normalized, re.I)]
+    matches = [key for key in ("success", "failed", "pending", "processing") if re.search(r"\b" + key + r"\b", normalized, re.I)]
+    vpas = re.findall(r"(?<![\\w.-])[A-Za-z0-9._-]{2,64}@[A-Za-z0-9.-]{2,64}(?![\\w.-])", normalized)
     return {
+        "vpa_candidates": vpas[:10],
         "utr_candidate": ref.group(0) if ref else None,
         "amount_text_candidate": amount.group(1) if amount else None,
         "status_keywords": matches,

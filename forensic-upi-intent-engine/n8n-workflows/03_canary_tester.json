@@ -1,5 +1,5 @@
 {
-  "name": "03 - Passive merchant VPA health (no transfers)",
+  "name": "03 Canary - Passive Merchant VPA Health (No Test Payments)",
   "nodes": [
     {
       "parameters": {
@@ -22,7 +22,7 @@
     {
       "parameters": {
         "method": "POST",
-        "url": "http://worker:8000/v1/vpas/canary",
+        "url": "http://127.0.0.1:8000/v1/vpas/canary",
         "authentication": "genericCredentialType",
         "genericAuthType": "httpHeaderAuth",
         "sendBody": true,
@@ -87,7 +87,10 @@
   },
   "active": false,
   "settings": {
-    "executionOrder": "v1"
+    "executionOrder": "v1",
+    "saveDataSuccessExecution": "none",
+    "saveDataErrorExecution": "none",
+    "saveManualExecutions": false
   },
   "tags": [],
   "meta": {

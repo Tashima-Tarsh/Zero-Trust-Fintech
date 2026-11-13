@@ -23,6 +23,8 @@ from python_nodes.statement_parser import preview_bank_statement
 
 from python_nodes.behavior_scorer import score_behavior
 from python_nodes.utl_validator import validate_utr
+from psycopg.types.json import Jsonb
+from worker.phase2 import IntentEvidence, decode_consent_image, analyze_intent
 
 app = FastAPI(title="Forensic UPI Engine", version="0.1.0", docs_url=None, redoc_url=None)
 SESSION_TTL_MINUTES = 10
@@ -207,6 +209,142 @@ def forensic_score(body: ForensicRequest, authorization: str | None = Header(def
     )
     result["utr_format"] = utr_result
     return result
+
+
+
+@app.post("/v1/intent/evaluate")
+def evaluate_intent(body: IntentEvidence, authorization: str | None = Header(default=None)):
+    """Authenticated evidence intake. Never credit an account from client signals."""
+    check_api_key(authorization)
+    try:
+        image = decode_consent_image(body)
+    except ValueError as exc:
+        raise HTTPException(422, str(exc)) from exc
+    image_hash = hashlib.sha256(image).hexdigest() if image is not None else None
+    request_hash = hashlib.sha256(body.model_dump_json().encode()).hexdigest()
+
+    with database() as conn, conn.cursor() as cur:
+        cur.execute(
+            "SELECT session_id, request_hash, response FROM phase2_forensic_submissions "
+            "WHERE submission_id = %s FOR UPDATE",
+            (body.submission_id,),
+        )
+        old = cur.fetchone()
+        if old is not None:
+            if old["request_hash"] != request_hash or old["session_id"] != body.session_id:
+                raise HTTPException(409, "Submission ID reused with different evidence")
+            return old["response"]
+
+        cur.execute(
+            """SELECT id, merchant_id, status, expires_at, amount_paise, vpa
+               FROM payment_sessions
+               WHERE id = %s AND merchant_id = %s FOR UPDATE""",
+            (body.session_id, body.merchant_id),
+        )
+        session = cur.fetchone()
+        if session is None:
+            raise HTTPException(404, "Session not found for merchant")
+        if session["status"] not in ("PENDING", "REVIEW"):
+            raise HTTPException(409, "Session not open for evidence")
+        if session["expires_at"] <= datetime.now(timezone.utc):
+            raise HTTPException(409, "Session expired; bank reconciliation required")
+
+        reused = False
+        if image_hash:
+            cur.execute(
+                """SELECT EXISTS (
+                    SELECT 1 FROM phase2_forensic_submissions
+                    WHERE image_sha256 = %s AND session_id <> %s
+                ) AS reused""",
+                (image_hash, body.session_id),
+            )
+            reused = cur.fetchone()["reused"]
+        try:
+            result = analyze_intent(body, session, image=image, previous_image_seen=reused)
+        except (ValueError, OSError, RuntimeError) as exc:
+            raise HTTPException(422, "Image could not be analyzed safely") from exc
+
+        cur.execute(
+            """INSERT INTO phase2_forensic_submissions
+                 (submission_id, session_id, merchant_id, request_hash,
+                  image_sha256, risk_score, decision, response)
+               VALUES (%s,%s,%s,%s,%s,%s,%s,%s)""",
+            (
+                body.submission_id, body.session_id, body.merchant_id,
+                request_hash, image_hash, result["risk_score"],
+                result["decision"], Jsonb(result),
+            ),
+        )
+        cur.execute(
+            """INSERT INTO phase2_reconciliation_queue
+                 (session_id,merchant_id,reason_codes)
+               VALUES (%s,%s,%s)
+               ON CONFLICT (session_id) DO UPDATE
+               SET updated_at = now(), reason_codes = EXCLUDED.reason_codes,
+                   queue_status = 'OPEN'""",
+            (body.session_id, body.merchant_id, Jsonb(result["risk_flags"])),
+        )
+        cur.execute(
+            """UPDATE payment_sessions
+               SET forensic_score = GREATEST(forensic_score, %s),
+                   fraud_flags = CASE WHEN %s >= forensic_score
+                                      THEN %s ELSE fraud_flags END,
+                   extracted_utr = COALESCE(%s, extracted_utr),
+                   target_package = COALESCE(%s, target_package),
+                   time_in_app_ms = COALESCE(%s, time_in_app_ms)
+               WHERE id = %s""",
+            (
+                result["risk_score"], result["risk_score"],
+                Jsonb(result["risk_flags"]), body.claimed_utr,
+                body.target_package, body.time_in_app_ms, body.session_id,
+            ),
+        )
+        return result
+
+
+@app.get("/v1/reconciliation/queue/summary")
+def reconciliation_queue_summary(authorization: str | None = Header(default=None)):
+    """Read-only scheduled count; does not reconcile or release any payment."""
+    check_api_key(authorization)
+    with database() as conn, conn.cursor() as cur:
+        cur.execute(
+            "SELECT queue_status, count(*) AS total FROM phase2_reconciliation_queue "
+            "GROUP BY queue_status ORDER BY queue_status"
+        )
+        records = cur.fetchall()
+    return {
+        "queue_counts": {r["queue_status"]: r["total"] for r in records},
+        "bank_feed_connected": False,
+        "ledger_entries_posted": 0,
+        "note": "Independent authenticated bank reconciliation not implemented.",
+    }
+
+
+@app.get("/v1/reconciliation/queue")
+def reconciliation_queue(
+    merchant_id: str,
+    authorization: str | None = Header(default=None),
+):
+    check_api_key(authorization)
+    if not merchant_id or len(merchant_id) > 80 or not all(
+        c.isascii() and (c.isalnum() or c in "_-") for c in merchant_id
+    ):
+        raise HTTPException(422, "Invalid merchant identifier")
+    with database() as conn, conn.cursor() as cur:
+        cur.execute(
+            """SELECT session_id, queue_status, reason_codes, first_seen_at, updated_at
+               FROM phase2_reconciliation_queue
+               WHERE merchant_id = %s AND queue_status IN ('OPEN','INVESTIGATING')
+               ORDER BY first_seen_at ASC LIMIT 100""",
+            (merchant_id,),
+        )
+        records = cur.fetchall()
+    return {
+        "merchant_id": merchant_id,
+        "items": records,
+        "bank_feed_connected": False,
+        "can_confirm_payment": False,
+    }
 
 
 @app.post("/v1/provider-events")

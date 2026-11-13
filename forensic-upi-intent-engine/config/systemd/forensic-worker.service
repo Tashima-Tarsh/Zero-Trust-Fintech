@@ -1,0 +1,20 @@
+[Unit]
+Description=Forensic UPI Intent Engine - Python Worker
+After=network-online.target postgresql.service redis-server.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=forensic
+Group=forensic
+WorkingDirectory=/opt/forensic-upi-intent-engine/backend
+EnvironmentFile=/etc/forensic-upi-intent-engine/worker.env
+ExecStart=/opt/forensic-upi-intent-engine/.venv/bin/uvicorn worker.app:app --host 127.0.0.1 --port 8000
+Restart=on-failure
+RestartSec=5
+UMask=0077
+NoNewPrivileges=true
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target

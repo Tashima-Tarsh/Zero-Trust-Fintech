@@ -1,5 +1,5 @@
 {
-  "name": "04 - Statement preview (never settles)",
+  "name": "04 Statement Parser + Hourly Reconciliation Monitor (No Settlement)",
   "nodes": [
     {
       "parameters": {
@@ -22,7 +22,7 @@
     {
       "parameters": {
         "method": "POST",
-        "url": "http://worker:8000/v1/statements/preview",
+        "url": "http://127.0.0.1:8000/v1/statements/preview",
         "authentication": "genericCredentialType",
         "genericAuthType": "httpHeaderAuth",
         "sendBody": true,
@@ -59,6 +59,49 @@
         720,
         300
       ]
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "hours",
+              "hoursInterval": 1
+            }
+          ]
+        }
+      },
+      "id": "72951e2b-847c-456b-bf2e-040000000001",
+      "name": "Every Hour — Queue Count",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        240,
+        560
+      ]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "http://127.0.0.1:8000/v1/reconciliation/queue/summary",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "options": {
+          "response": {
+            "response": {
+              "neverError": true
+            }
+          }
+        }
+      },
+      "id": "72951e2b-847c-456b-bf2e-040000000002",
+      "name": "Read Open Queue Summary (No Credits)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        500,
+        560
+      ]
     }
   ],
   "connections": {
@@ -83,11 +126,25 @@
           }
         ]
       ]
+    },
+    "Every Hour — Queue Count": {
+      "main": [
+        [
+          {
+            "node": "Read Open Queue Summary (No Credits)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     }
   },
   "active": false,
   "settings": {
-    "executionOrder": "v1"
+    "executionOrder": "v1",
+    "saveDataSuccessExecution": "none",
+    "saveDataErrorExecution": "none",
+    "saveManualExecutions": false
   },
   "tags": [],
   "meta": {
