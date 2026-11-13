@@ -1,0 +1,75 @@
+name: forensic-upi-intent-engine
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: fintech
+      POSTGRES_DB: fintech
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD}
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U fintech -d fintech"]
+      interval: 10s
+      timeout: 3s
+      retries: 10
+    volumes:
+      - pg_data:/var/lib/postgresql/data
+      - ./postgres/init.sql:/docker-entrypoint-initdb.d/00_init.sql:ro
+      - ./postgres/seed_vpas.sql:/docker-entrypoint-initdb.d/01_seed.sql:ro
+    networks: [private]
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    command: ["redis-server","--save","","--appendonly","no","--maxmemory","64mb","--maxmemory-policy","noeviction"]
+    healthcheck:
+      test: ["CMD","redis-cli","ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 10
+    networks: [private]
+  worker:
+    build:
+      context: ..
+      dockerfile: backend/worker/Dockerfile
+    restart: unless-stopped
+    environment:
+      PGHOST: postgres
+      PGPORT: "5432"
+      PGUSER: fintech
+      PGDATABASE: fintech
+      PGPASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD}
+      REDIS_URL: redis://redis:6379/0
+      WORKER_API_KEY: ${WORKER_API_KEY:?Set WORKER_API_KEY}
+      PROVIDER_WEBHOOK_SECRET: ${PROVIDER_WEBHOOK_SECRET:?Set PROVIDER_WEBHOOK_SECRET}
+    depends_on:
+      postgres: {condition: service_healthy}
+      redis: {condition: service_healthy}
+    ports: ["127.0.0.1:8000:8000"]
+    networks: [private]
+  n8n:
+    build: ./n8n
+    restart: unless-stopped
+    environment:
+      DB_TYPE: postgresdb
+      DB_POSTGRESDB_HOST: postgres
+      DB_POSTGRESDB_PORT: "5432"
+      DB_POSTGRESDB_DATABASE: n8n
+      DB_POSTGRESDB_USER: fintech
+      DB_POSTGRESDB_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD}
+      N8N_ENCRYPTION_KEY: ${N8N_ENCRYPTION_KEY:?Set N8N_ENCRYPTION_KEY}
+      N8N_HOST: localhost
+      N8N_PORT: "5678"
+      N8N_PROTOCOL: http
+      GENERIC_TIMEZONE: Asia/Kolkata
+    depends_on:
+      postgres: {condition: service_healthy}
+      worker: {condition: service_started}
+    ports: ["127.0.0.1:5678:5678"]
+    volumes:
+      - n8n_data:/home/node/.n8n
+    networks: [private]
+networks:
+  private: {driver: bridge}
+volumes:
+  pg_data:
+  n8n_data:
