@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="en"><head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Forensic UPI Engine | Intent Demo</title>
+  <link rel="stylesheet" href="./style.css">
+  <!-- CDN only for this static demo. Self-host, pin and review the library for production. -->
+  <script defer src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+  <script defer src="./script.js"></script>
+</head><body>
+<main class="shell">
+  <header><div class="eyebrow">ZERO-TRUST FINTECH / PROTOTYPE</div><h1>Payment intent, not payment proof.</h1>
+    <p>Generate a UPI link and QR locally. No data is sent to this demo's server. Only your bank or PSP can confirm a credit.</p>
+  </header>
+  <section class="layout">
+    <form id="upi-form" class="panel">
+      <h2>Configure an intent</h2>
+      <label>Authorized merchant VPA<input id="vpa" placeholder="merchant@psp" required autocomplete="off"></label>
+      <label>Amount in INR<input id="amount" type="number" min="1" max="9999999.99" step="0.01" value="1.00" required></label>
+      <label>Payment note<input id="note" maxlength="100" value="Demo payment"></label>
+      <button type="submit">Generate payment intent</button>
+      <p class="hint">Use only a VPA you own or are authorized to collect into.</p>
+    </form>
+    <article class="panel receipt" aria-live="polite">
+      <h2>UPI intent preview</h2>
+      <div id="qr" aria-label="Payment QR placeholder"></div>
+      <p id="message">Provide merchant details to display a QR code.</p>
+      <a id="open-upi" class="open-upi hidden" href="#" rel="nofollow">Open a UPI app</a>
+      <div class="pending">Status: <strong>NOT VERIFIED</strong></div>
+      <p class="hint">Do not release goods based on this page, a screenshot, or an app return.</p>
+    </article>
+  </section>
+</main>
+</body></html>

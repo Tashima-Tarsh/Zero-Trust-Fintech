@@ -1,0 +1,96 @@
+{
+  "name": "A - Create UPI session (authenticated merchant webhook)",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "forensic-upi/create-session",
+        "authentication": "headerAuth",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "4c6204d2-1b53-4eb2-bd49-010000000001",
+      "name": "Authenticated Session Request",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        240,
+        300
+      ],
+      "webhookId": "forensic-upi-create-session"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://worker:8000/v1/sessions",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json.body) }}",
+        "options": {
+          "response": {
+            "response": {
+              "neverError": true
+            }
+          }
+        }
+      },
+      "id": "4c6204d2-1b53-4eb2-bd49-010000000002",
+      "name": "Allocate VPA via Worker",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        480,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify($json) }}",
+        "options": {}
+      },
+      "id": "4c6204d2-1b53-4eb2-bd49-010000000003",
+      "name": "Reply with session",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        720,
+        300
+      ]
+    }
+  ],
+  "connections": {
+    "Authenticated Session Request": {
+      "main": [
+        [
+          {
+            "node": "Allocate VPA via Worker",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Allocate VPA via Worker": {
+      "main": [
+        [
+          {
+            "node": "Reply with session",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "tags": [],
+  "meta": {
+    "templateCredsSetupCompleted": false
+  }
+}
