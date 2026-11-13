@@ -44,6 +44,10 @@ assert hooks[0]["parameters"]["authentication"] == "headerAuth"
 requests = [n for n in verifier["nodes"] if n["type"] == "n8n-nodes-base.httpRequest"]
 assert len(requests) == 1
 assert requests[0]["parameters"]["url"].endswith("/v1/intent/evaluate")
+assert requests[0]["parameters"].get("options", {}).get("response", {}).get(
+    "response", {}
+).get("neverError") is not True, "Do not disguise worker errors as HTTP 200"
+
 
 canary = json.loads((root / "n8n-workflows/03_canary_tester.json").read_text())
 assert not any(n["type"] in ("n8n-nodes-base.executeCommand", "n8n-nodes-base.postgres") for n in canary["nodes"])

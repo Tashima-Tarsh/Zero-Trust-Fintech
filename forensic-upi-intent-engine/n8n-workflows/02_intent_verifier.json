@@ -28,13 +28,7 @@
         "sendBody": true,
         "specifyBody": "json",
         "jsonBody": "={{ JSON.stringify($json.body) }}",
-        "options": {
-          "response": {
-            "response": {
-              "neverError": true
-            }
-          }
-        }
+        "options": {}
       },
       "id": "72951e2b-847c-456b-bf2e-020000000002",
       "name": "Analyze and Hold in Queue",
