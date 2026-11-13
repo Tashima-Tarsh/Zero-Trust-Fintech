@@ -1,0 +1,46 @@
+# backend/python_nodes/vpa_rotator.py
+import psycopg2
+import random
+from datetime import datetime, timedelta
+
+def get_healthy_vpa():
+    conn = psycopg2.connect("dbname=forensic_db user=forensic_user password=secure_password_123")
+    cur = conn.cursor()
+    
+    # Logic: Find a VPA that is available, not in cooldown, and has low daily usage
+    query = """
+    SELECT vpa_address FROM upi_vpa_pool 
+    WHERE status = 'available' 
+    AND (cooldown_until IS NULL OR cooldown_until < NOW())
+    AND daily_tx_count < 50
+    ORDER BY last_used_at ASC 
+    LIMIT 1;
+    """
+    
+    cur.execute(query)
+    vpa = cur.fetchone()
+    
+    if vpa:
+        # Mark as in_use immediately to prevent race conditions
+        update_query = """
+        UPDATE upi_vpa_pool 
+        SET status = 'in_use', last_used_at = NOW(), daily_tx_count = daily_tx_count + 1
+        WHERE vpa_address = %s;
+        """
+        cur.execute(update_query, (vpa[0],))
+        conn.commit()
+        return vpa[0]
+    else:
+        # Emergency Fallback: Reset a few cooldown VPAs if pool is exhausted
+        reset_query = """
+        UPDATE upi_vpa_pool 
+        SET status = 'available', cooldown_until = NULL 
+        WHERE cooldown_until < NOW() - INTERVAL '1 hour'
+        LIMIT 10;
+        """
+        cur.execute(reset_query)
+        conn.commit()
+        return "MERCHANT_EMERGENCY_BACKUP@UPI"
+
+if __name__ == "__main__":
+    print(get_healthy_vpa())
