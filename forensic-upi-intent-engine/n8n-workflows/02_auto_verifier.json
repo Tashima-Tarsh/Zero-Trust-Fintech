@@ -1,0 +1,200 @@
+{
+  "name": "02 Auto Verifier (Zero-Touch)",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "auto-verify",
+        "responseMode": "lastNode"
+      },
+      "name": "Webhook Trigger",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [250, 300]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT * FROM payment_sessions WHERE session_id = '{{ $json.body.session_id }}' AND status = 'pending';"
+      },
+      "name": "Validate Session",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 1,
+      "position": [450, 300],
+      "credentials": {
+        "postgres": {
+          "id": "1",
+          "name": "PostgreSQL account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "// Super Intelligence Scoring Logic\nlet score = 0;\nlet flags = {};\nconst telemetry = $json.body.telemetry;\n\n// 1. Time-in-App Heuristic (from Browser Visibility API)\n// If user was 'hidden' (in UPI app) for > 8 seconds, it's likely real.\nif (telemetry.time_in_upi_app_ms > 8000) {\n  score += 40;\n} else {\n  flags.time_too_short = true;\n}\n\n// 2. Device Fingerprint Check\n// Check if this device has a history of fraud\nconst deviceHash = $json.body.device_fingerprint;\n// (In a real scenario, you'd query a 'device_reputation' table here)\nscore += 20; // Base trust for known browser\n\n// 3. Transaction Ref Validation\nif ($json.body.transaction_ref && $json.body.transaction_ref.startsWith('TR-')) {\n  score += 30;\n} else {\n  flags.invalid_ref = true;\n}\n\nreturn { \n  session_id: $json.session_id, \n  final_score: score, \n  flags: flags,\n  tr: $json.body.transaction_ref\n};"
+      },
+      "name": "Calculate Trust Score",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 1,
+      "position": [650, 300]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "number": [
+            {
+              "value1": "={{ $json.final_score }}",
+              "operation": "largerEqual",
+              "value2": 85
+            }
+          ]
+        }
+      },
+      "name": "IF Score > 85",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [850, 300]
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "table": "payment_sessions",
+        "columns": "status,forensic_score,extracted_utr,updated_at",
+        "where": "session_id = '{{ $json.session_id }}'"
+      },
+      "name": "Mark as Verified",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 1,
+      "position": [1050, 200]
+    },
+    {
+      "parameters": {
+        "operation": "insert",
+        "table": "financial_ledger",
+        "columns": "session_id,utr,amount,type"
+      },
+      "name": "Credit Ledger",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 1,
+      "position": [1250, 200]
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "table": "payment_sessions",
+        "columns": "status,forensic_score,fraud_flags,updated_at",
+        "where": "session_id = '{{ $json.session_id }}'"
+      },
+      "name": "Mark as Pending/Fallback",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 1,
+      "position": [1050, 400]
+    },
+    {
+      "parameters": {
+        "content": "{\"status\": \"verified\", \"score\": {{ $json.final_score }}}",
+        "options": {}
+      },
+      "name": "Respond Success",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [1450, 200]
+    },
+    {
+      "parameters": {
+        "content": "{\"status\": \"fallback_required\", \"reason\": \"Low trust score\"}",
+        "options": {}
+      },
+      "name": "Respond Fallback",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [1250, 400]
+    }
+  ],
+  "connections": {
+    "Webhook Trigger": {
+      "main": [
+        [
+          {
+            "node": "Validate Session",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validate Session": {
+      "main": [
+        [
+          {
+            "node": "Calculate Trust Score",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Calculate Trust Score": {
+      "main": [
+        [
+          {
+            "node": "IF Score > 85",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "IF Score > 85": {
+      "main": [
+        [
+          {
+            "node": "Mark as Verified",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Mark as Pending/Fallback",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Mark as Verified": {
+      "main": [
+        [
+          {
+            "node": "Credit Ledger",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Credit Ledger": {
+      "main": [
+        [
+          {
+            "node": "Respond Success",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Mark as Pending/Fallback": {
+      "main": [
+        [
+          {
+            "node": "Respond Fallback",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}
