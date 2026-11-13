@@ -1,0 +1,11 @@
+-- Phase 1: paste ONLY your own verified, authorized merchant VPAs below.
+-- No actual VPA inventory was provided. The example addresses in the user guide
+-- are placeholders and must not be inserted into a payment-acceptance pool.
+--
+-- INSERT INTO upi_vpa_pool (vpa_address) VALUES
+-- ('your_real_id_1@oksbi'),
+-- ('your_real_id_2@ybl')
+-- ON CONFLICT (vpa_address) DO NOTHING;
+--
+-- Do not activate collection until the PSP/bank has confirmed the VPAs.
+SELECT 'No real VPAs inserted: populate this file with your verified 1,000 IDs before execution.' AS seed_status;

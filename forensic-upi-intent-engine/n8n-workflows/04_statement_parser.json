@@ -1,0 +1,96 @@
+{
+  "name": "04 - Statement preview (never settles)",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "forensic-upi/statement-preview",
+        "authentication": "headerAuth",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "9b829eca-cc73-4a6b-ab83-000000040001",
+      "name": "Authenticated Statement Preview",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        240,
+        300
+      ],
+      "webhookId": "forensic-upi-4"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://worker:8000/v1/statements/preview",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json.body) }}",
+        "options": {
+          "response": {
+            "response": {
+              "neverError": true
+            }
+          }
+        }
+      },
+      "id": "9b829eca-cc73-4a6b-ab83-000000040002",
+      "name": "Parse Bank Statement as Untrusted CSV",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        480,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify($json) }}",
+        "options": {}
+      },
+      "id": "9b829eca-cc73-4a6b-ab83-000000040003",
+      "name": "Reply with Review Candidates",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        720,
+        300
+      ]
+    }
+  ],
+  "connections": {
+    "Authenticated Statement Preview": {
+      "main": [
+        [
+          {
+            "node": "Parse Bank Statement as Untrusted CSV",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse Bank Statement as Untrusted CSV": {
+      "main": [
+        [
+          {
+            "node": "Reply with Review Candidates",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "tags": [],
+  "meta": {
+    "templateCredsSetupCompleted": false
+  }
+}
