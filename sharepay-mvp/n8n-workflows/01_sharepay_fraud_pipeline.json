@@ -1,0 +1,153 @@
+{
+  "name": "01 SharePay Zero-Trust Fraud Pipeline",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "sharepay-verify",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "e1f10001-0001-4000-8000-000000000001",
+      "name": "Receive SharePay Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        200,
+        300
+      ],
+      "webhookId": "sharepay-verify"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Step 1: Normalize & Extract Receipt Data\nconst body = $input.first().json.body || $input.first().json;\nconst rawReceipt = body.receipt || body.text || '';\nconst orderId = body.orderId || '';\nconst expectedAmount = Number(body.expectedAmount || 0);\n\n// 12-digit UTR Regex\nconst utrMatch = rawReceipt.match(/\\b\\d{12}\\b/);\nconst utr = utrMatch ? utrMatch[0] : null;\n\n// Amount Regex\nconst amountMatch = rawReceipt.match(/(?:(?:₹|Rs\\.?|INR)\\s*|paid\\s+|amount\\s*:?\\s*)([0-9]+(?:\\.[0-9]{1,2})?)/i) ||\n                    rawReceipt.match(/\\b([0-9]+\\.[0-9]{2})\\b/);\nconst parsedAmount = amountMatch ? parseFloat(amountMatch[1]) : null;\n\n// Note Regex\nconst noteMatch = rawReceipt.match(/\\b(Order_[A-Za-z0-9_-]+)\\b/i);\nconst parsedNote = noteMatch ? noteMatch[1] : null;\n\nreturn [{\n  json: {\n    rawReceipt,\n    orderId,\n    expectedAmount,\n    utr,\n    parsedAmount,\n    parsedNote,\n    sessionToken: body.sessionToken || null,\n    receivedAt: new Date().toISOString()\n  }\n}];"
+      },
+      "id": "e1f10001-0001-4000-8000-000000000002",
+      "name": "Extract & Normalize Receipt",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        420,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Step 2: NPCI UTR Forensic Freshness & Mathematical Validation\nconst data = $input.first().json;\nconst utr = data.utr;\n\nif (!utr || data.parsedAmount === null) {\n  return [{ json: { ...data, isValid: false, reason: 'PARSE_ERROR' } }];\n}\n\n// IST Date calculation\nconst now = new Date();\nconst istOffset = 5.5 * 60 * 60 * 1000;\nconst istNow = new Date(now.getTime() + istOffset);\nconst curYearDigit = istNow.getUTCFullYear() % 10;\nconst startOfYear = new Date(Date.UTC(istNow.getUTCFullYear(), 0, 1));\nconst curJulianDay = Math.floor((istNow - startOfYear) / (24 * 60 * 60 * 1000)) + 1;\nconst curHour = istNow.getUTCHours();\n\nconst utrYear = parseInt(utr[0], 10);\nconst utrJulian = parseInt(utr.substring(1, 4), 10);\nconst utrHour = parseInt(utr.substring(4, 6), 10);\n\n// Check 1: Year match\nif (utrYear !== curYearDigit) {\n  return [{ json: { ...data, isValid: false, reason: 'STALE_UTR_YEAR_MISMATCH' } }];\n}\n\n// Check 2: Julian day match\nconst isToday = utrJulian === curJulianDay;\nconst isYesterday = (curJulianDay - utrJulian === 1) || (curJulianDay === 1 && utrJulian >= 365);\nif (!isToday && !isYesterday) {\n  return [{ json: { ...data, isValid: false, reason: 'STALE_UTR_DATE_MISMATCH' } }];\n}\n\n// Check 3: Hour window\nconst hourDiff = isToday ? (curHour - utrHour) : ((curHour + 24) - utrHour);\nif (hourDiff < 0 || hourDiff > 1) {\n  return [{ json: { ...data, isValid: false, reason: 'STALE_UTR_HOURLY_WINDOW_EXPIRED' } }];\n}\n\n// Check 4: Amount match\nif (data.expectedAmount > 0 && Math.abs(data.parsedAmount - data.expectedAmount) > 0.009) {\n  return [{ json: { ...data, isValid: false, reason: 'AMOUNT_MISMATCH' } }];\n}\n\n// Check 5: Transaction Note match\nif (data.parsedNote && data.orderId && data.parsedNote !== data.orderId) {\n  return [{ json: { ...data, isValid: false, reason: 'NOTE_MISMATCH' } }];\n}\n\nreturn [{\n  json: {\n    ...data,\n    isValid: true,\n    reason: 'VERIFIED_FRESH'\n  }\n}];"
+      },
+      "id": "e1f10001-0001-4000-8000-000000000003",
+      "name": "Verify 5-Layer Forensic Rules",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        640,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "boolean": [
+            {
+              "value1": "={{ $json.isValid }}",
+              "value2": true
+            }
+          ]
+        }
+      },
+      "id": "e1f10001-0001-4000-8000-000000000004",
+      "name": "Check Verification Result",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        860,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({\n  success: true,\n  status: 'SETTLED',\n  orderId: $json.orderId,\n  utr: $json.utr,\n  amount: $json.parsedAmount,\n  verifiedAt: $json.receivedAt\n}) }}",
+        "options": {}
+      },
+      "id": "e1f10001-0001-4000-8000-000000000005",
+      "name": "Return Verified Settlement",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        1100,
+        200
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({\n  success: false,\n  status: 'REJECTED',\n  reason: $json.reason,\n  orderId: $json.orderId,\n  rejectedAt: $json.receivedAt\n}) }}",
+        "options": {
+          "responseCode": 400
+        }
+      },
+      "id": "e1f10001-0001-4000-8000-000000000006",
+      "name": "Return Rejection Decision",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        1100,
+        420
+      ]
+    }
+  ],
+  "connections": {
+    "Receive SharePay Webhook": {
+      "main": [
+        [
+          {
+            "node": "Extract & Normalize Receipt",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract & Normalize Receipt": {
+      "main": [
+        [
+          {
+            "node": "Verify 5-Layer Forensic Rules",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Verify 5-Layer Forensic Rules": {
+      "main": [
+        [
+          {
+            "node": "Check Verification Result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Verification Result": {
+      "main": [
+        [
+          {
+            "node": "Return Verified Settlement",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Return Rejection Decision",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}

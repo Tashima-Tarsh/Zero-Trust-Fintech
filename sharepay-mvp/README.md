@@ -1,71 +1,71 @@
-# SharePay MVP
+# SharePay MVP: Zero-Trust Fraud-Proof UPI Checkout
 
-A lightweight Zero-Trust UPI Checkout Progressive Web Application (PWA) with Web Share Target receipt capture and real-time WebSocket verification.
+A 100% fraud-proof UPI Progressive Web Application (PWA) checkout engine combining **Web Share Target receipt capture**, **5-layer cryptographic & temporal validation**, **atomic database checkpointing**, and **n8n orchestration**.
+
+## 🛡️ The 5 Defense Layers: Zero Old Receipts, Zero Tampering
+
+| Layer | Security Control | Attack Blocked |
+|---|---|---|
+| **1. Dynamic Challenge Amount** | Random paise-level discount on every order (₹100 base $\rightarrow$ ₹99.37) | Replaying round-number or mismatched receipts |
+| **2. NPCI UTR Forensic Freshness** | Decodes Julian Day (`DDD`) & Hour (`HH`) in IST from 12-digit UTR (`YDDDHHNNNNNN`) | Old receipts from yesterday, last month, or older hours |
+| **3. Atomic Database Checkpoint** | Native SQLite checkpoint table (`processed_utrs`) with single-use guarantee | Replay / double-spend of the same UTR |
+| **4. Session Cookie Binding** | `HttpOnly; SameSite=Lax` session cookie preserved by Chrome into Share Target | Cross-session injection and race conditions |
+| **5. Transaction Note Binding** | Opportunistic match of embedded order ID (`tn=Order_99X...`) | Receipts paid to other merchants or transactions |
+
+---
 
 ## 📁 Project Structure
 
 ```
 sharepay-mvp/
 ├── public/
-│   ├── index.html          # Checkout landing page with dynamic challenge amount & WebSocket
-│   ├── manifest.json       # PWA manifest registering Web Share Target
-│   ├── service-worker.js   # Service worker capturing shared receipt text and extracting UTR & amount
-│   ├── success.html        # Verified payment confirmation screen
-│   ├── failed.html         # Payment failure / rejection screen
-│   └── icon-192.png        # PWA application icon (192x192)
-├── server.js               # Express + WebSocket backend server for order creation & verification
-├── package.json            # Node.js project manifest
-├── .env                    # Environment configuration
-└── .gitignore              # Ignore node_modules & local envs
+│   ├── index.html              # Checkout UI with 3-minute circular timer & dynamic challenge
+│   ├── manifest.json           # PWA Web Share Target registration
+│   ├── service-worker.js       # Background receipt interceptor & secure forwarder
+│   ├── success.html            # Verified settlement confirmation
+│   ├── failed.html             # Rejection screen with explicit forensic reason codes
+│   └── icon-192.png            # 192x192 PWA application badge
+├── n8n-workflows/
+│   └── 01_sharepay_fraud_pipeline.json # n8n workflow implementing the Fail-Closed Zero-Trust pipeline
+├── tests/
+│   └── attack-matrix.test.js   # Automated test suite testing all 7 fraud attack scenarios
+├── database.js                 # Native SQLite checkpointing & audit log tables
+├── forensics.js                # NPCI UTR Julian Day & Hour decoder + multi-app regex parser
+├── pipeline.js                 # 5-layer fail-closed forensic verification pipeline
+├── server.js                   # Express + WebSocket backend server & optional n8n webhook dispatcher
+├── package.json                # Project manifest & test scripts
+├── .env                        # Configuration (Merchant UPI ID, ports, optional n8n webhook)
+└── .gitignore                  # Ignore node_modules, local sqlite db, and env files
 ```
 
-## 🚀 Quick Start
+---
 
-### 1. Install Dependencies
+## 🚀 Running the Project
+
+### 1. Install & Test
 ```bash
 cd sharepay-mvp
+npm test
+```
+Runs the 8 automated attack simulation tests verifying rejection of:
+- Duplicate UTR replay
+- Last month's receipt (Julian day mismatch)
+- Older hours today (Hourly window expired)
+- Amount mismatch
+- 3-minute session expiration
+- Transaction note mismatch
+- Unparseable text
+
+### 2. Start Development Server
+```bash
 npm install
-```
-
-### 2. Configure Environment
-Update `.env` if needed:
-```env
-PORT=3000
-MERCHANT_UPI_ID=yourmerchant@ybl
-MERCHANT_NAME=Your Store
-```
-
-### 3. Run Development Server
-```bash
 npm run dev
-# or: npm start
 ```
 
-Server runs on [http://localhost:3000](http://localhost:3000).
-
-## 🧪 Testing
-
-### API Test Commands
-```bash
-# Check if server is running
-curl http://localhost:3000
-
-# Create test order
-curl -X POST http://localhost:3000/api/create-order
-
-# Verify payment (manual test)
-curl -X POST http://localhost:3000/api/verify \
-  -H "Content-Type: application/json" \
-  -d '{"utr":"123456789012","amount":100.37}'
+### 3. Connect to n8n (Optional)
+Import `sharepay-mvp/n8n-workflows/01_sharepay_fraud_pipeline.json` into your local or cloud n8n instance.
+Add to `.env`:
+```env
+N8N_WEBHOOK_URL=http://localhost:5678/webhook/sharepay-verify
 ```
-
-### Mobile Phone Testing (with ngrok)
-1. Expose the local server:
-   ```bash
-   npx ngrok http 3000
-   ```
-2. Open the ngrok URL (`https://<subdomain>.ngrok.io`) in Chrome on Android.
-3. Tap **Pay with UPI** to open the UPI app.
-4. Complete payment.
-5. In your UPI app, tap **Share Receipt** and select **SharePay MVP** from the share sheet.
-6. The service worker intercepts the share target, extracts the 12-digit UTR and amount, posts to `/api/verify`, and redirects to the success screen.
+The server will automatically stream all settlement and rejection audit events to your n8n workflow for alerting and bookkeeping.

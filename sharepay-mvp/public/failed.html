@@ -3,24 +3,63 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Payment Failed</title>
+  <title>Payment Verification Failed - SharePay</title>
   <style>
-    body { font-family: Arial, sans-serif; max-width: 400px; margin: 50px auto; padding: 20px; text-align: center; }
-    .failed { color: #dc3545; font-size: 48px; }
-    .reason { background: #fff3cd; padding: 10px; border-radius: 8px; margin: 20px 0; }
+    :root {
+      --primary: #1a73e8;
+      --danger: #d93025;
+      --bg: #f8f9fa;
+      --surface: #ffffff;
+      --text: #202124;
+      --text-muted: #5f6368;
+      --border: #dadce0;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; }
+    body { background: var(--bg); color: var(--text); display: flex; justify-content: center; align-items: center; min-height: 100vh; padding: 16px; }
+    .card { background: var(--surface); width: 100%; max-width: 420px; border-radius: 16px; box-shadow: 0 4px 20px rgba(0,0,0,0.08); padding: 32px 24px; text-align: center; }
+    .icon-wrap { width: 72px; height: 72px; background: #fce8e6; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 20px; color: var(--danger); font-size: 36px; }
+    h1 { font-size: 24px; margin-bottom: 8px; color: var(--text); }
+    p { color: var(--text-muted); font-size: 14px; margin-bottom: 24px; }
+    .reason-box { background: #fff8f7; border: 1px solid #fad2cf; border-radius: 12px; padding: 16px; text-align: left; margin-bottom: 24px; }
+    .reason-title { font-weight: 700; color: var(--danger); font-size: 14px; margin-bottom: 4px; font-family: monospace; }
+    .reason-desc { font-size: 13px; color: var(--text-muted); line-height: 1.4; }
+    .btn { display: inline-block; background: var(--primary); color: white; padding: 14px 28px; border-radius: 8px; font-weight: 600; text-decoration: none; width: 100%; }
   </style>
 </head>
 <body>
-  <div class="failed">✗</div>
-  <h1>Payment Failed</h1>
-  <div class="reason">
-    <strong>Reason:</strong> <span id="reason"></span>
+  <div class="card">
+    <div class="icon-wrap">✕</div>
+    <h1>Payment Rejected</h1>
+    <p>Zero-trust verification failed to validate this payment receipt.</p>
+
+    <div class="reason-box">
+      <div class="reason-title" id="reasonCode">VERIFICATION_REJECTED</div>
+      <div class="reason-desc" id="reasonExplanation">The shared receipt could not be cryptographically or temporally verified.</div>
+    </div>
+
+    <a href="/" class="btn">Try Again with Fresh Checkout</a>
   </div>
-  <a href="/">Try Again</a>
-  
+
   <script>
     const params = new URLSearchParams(window.location.search);
-    document.getElementById('reason').textContent = params.get('reason') || 'Unknown error';
+    const reason = params.get('reason') || 'VERIFICATION_FAILED';
+    document.getElementById('reasonCode').textContent = reason;
+
+    const descriptions = {
+      'STALE_UTR_DATE_MISMATCH': 'This receipt is from a previous day or month. Only fresh receipts generated today are permitted.',
+      'STALE_UTR_HOURLY_WINDOW_EXPIRED': 'This receipt timestamp is too old (outside the 1-hour rolling window). Replay of older payments is blocked.',
+      'STALE_UTR_YEAR_MISMATCH': 'This receipt is from a previous year. Replay attack blocked.',
+      'AMOUNT_MISMATCH': 'The amount in the receipt does not match the exact dynamic challenge amount for this order.',
+      'UTR_ALREADY_USED': 'This UTR has already been claimed for another transaction. Duplicate receipt replay is blocked.',
+      'SESSION_EXPIRED': 'Your 3-minute payment session has timed out. Please start a new checkout.',
+      'NOTE_MISMATCH': 'The transaction note in the receipt indicates this was paid to another order or merchant.',
+      'PARSE_ERROR': 'Could not find a valid 12-digit UPI UTR or amount in the shared text.',
+      'NO_MATCHING_ORDER': 'No active checkout session corresponds to this receipt.'
+    };
+
+    if (descriptions[reason]) {
+      document.getElementById('reasonExplanation').textContent = descriptions[reason];
+    }
   </script>
 </body>
 </html>

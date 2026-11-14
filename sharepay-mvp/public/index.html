@@ -3,62 +3,180 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>SharePay - Pay with UPI</title>
+  <title>SharePay - Zero-Trust UPI Checkout</title>
   <link rel="manifest" href="/manifest.json">
   <style>
-    body { font-family: Arial, sans-serif; max-width: 400px; margin: 50px auto; padding: 20px; }
-    button { background: #1a73e8; color: white; padding: 15px 30px; border: none; border-radius: 8px; font-size: 18px; cursor: pointer; width: 100%; }
-    button:hover { background: #1557b0; }
-    .amount { font-size: 32px; font-weight: bold; text-align: center; margin: 20px 0; }
-    .status { text-align: center; margin-top: 20px; color: #666; }
+    :root {
+      --primary: #1a73e8;
+      --primary-dark: #1557b0;
+      --success: #1e8e3e;
+      --danger: #d93025;
+      --warning: #f9ab00;
+      --bg: #f8f9fa;
+      --surface: #ffffff;
+      --text: #202124;
+      --text-muted: #5f6368;
+      --border: #dadce0;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; }
+    body { background: var(--bg); color: var(--text); display: flex; justify-content: center; align-items: center; min-height: 100vh; padding: 16px; }
+    .card { background: var(--surface); width: 100%; max-width: 420px; border-radius: 16px; box-shadow: 0 4px 20px rgba(0,0,0,0.08); padding: 24px; }
+    .header { text-align: center; margin-bottom: 20px; }
+    .badge { display: inline-flex; align-items: center; gap: 6px; background: #e8f0fe; color: var(--primary); font-size: 12px; font-weight: 600; padding: 4px 10px; border-radius: 20px; margin-bottom: 8px; }
+    .order-id { font-size: 13px; color: var(--text-muted); font-family: monospace; }
+    
+    .timer-wrap { display: flex; justify-content: center; align-items: center; margin: 16px 0; }
+    .timer-box { font-size: 14px; font-weight: 600; color: #b06000; background: #fef7e0; padding: 6px 14px; border-radius: 24px; display: inline-flex; align-items: center; gap: 6px; }
+    
+    .price-box { background: #f8f9fa; border: 1px dashed var(--border); border-radius: 12px; padding: 16px; margin-bottom: 20px; }
+    .price-row { display: flex; justify-content: space-between; font-size: 14px; color: var(--text-muted); margin-bottom: 6px; }
+    .price-row.discount { color: var(--success); font-weight: 500; }
+    .price-row.total { font-size: 18px; font-weight: 700; color: var(--text); border-top: 1px solid var(--border); padding-top: 8px; margin-top: 6px; margin-bottom: 0; }
+    .price-total-val { color: var(--primary); font-size: 26px; }
+
+    .btn { background: var(--primary); color: white; border: none; border-radius: 10px; padding: 16px; font-size: 17px; font-weight: 600; width: 100%; cursor: pointer; transition: background 0.2s; display: flex; justify-content: center; align-items: center; gap: 8px; text-decoration: none; text-align: center; }
+    .btn:hover { background: var(--primary-dark); }
+    .btn:disabled { background: #bdc1c6; cursor: not-allowed; }
+
+    .instructions { margin-top: 24px; border-top: 1px solid var(--border); padding-top: 18px; font-size: 13px; color: var(--text-muted); line-height: 1.5; }
+    .instruction-step { display: flex; gap: 10px; margin-bottom: 10px; }
+    .step-num { width: 20px; height: 20px; border-radius: 50%; background: #e8f0fe; color: var(--primary); font-weight: 700; font-size: 12px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; margin-top: 1px; }
+
+    .status-alert { margin-top: 16px; padding: 12px; border-radius: 8px; font-size: 13px; text-align: center; display: none; }
+    .status-alert.info { background: #e8f0fe; color: var(--primary-dark); display: block; }
+    .status-alert.error { background: #fce8e6; color: var(--danger); display: block; }
   </style>
 </head>
 <body>
-  <h1>SharePay Checkout</h1>
-  <div class="amount" id="amount">Loading...</div>
-  <button id="payBtn" onclick="startPayment()">Pay with UPI</button>
-  <div class="status" id="status"></div>
-  
+  <div class="card">
+    <div class="header">
+      <div class="badge">🛡️ Zero-Trust Verification</div>
+      <h2>SharePay Checkout</h2>
+      <div class="order-id" id="orderIdText">Initializing session...</div>
+    </div>
+
+    <div class="timer-wrap">
+      <div class="timer-box" id="timerBox">
+        ⏱️ Session window: <span id="countdown">03:00</span>
+      </div>
+    </div>
+
+    <div class="price-box">
+      <div class="price-row">
+        <span>Order Base Total</span>
+        <span id="baseAmountText">₹100.00</span>
+      </div>
+      <div class="price-row discount">
+        <span>Instant UPI Dynamic Discount</span>
+        <span id="discountText">-₹0.00</span>
+      </div>
+      <div class="price-row total">
+        <span>Payable Amount</span>
+        <span class="price-total-val" id="totalAmountText">₹--.--</span>
+      </div>
+    </div>
+
+    <button id="payBtn" class="btn" onclick="openUpiApp()">
+      <span>Pay with any UPI App</span>
+    </button>
+
+    <div id="statusAlert" class="status-alert"></div>
+
+    <div class="instructions">
+      <div style="font-weight: 600; color: var(--text); margin-bottom: 8px;">How to complete payment:</div>
+      <div class="instruction-step">
+        <div class="step-num">1</div>
+        <div>Tap <strong>Pay with any UPI App</strong> above and complete payment using GPay, PhonePe, Paytm, or BHIM.</div>
+      </div>
+      <div class="instruction-step">
+        <div class="step-num">2</div>
+        <div>On the payment success screen, tap <strong>Share Receipt</strong>.</div>
+      </div>
+      <div class="instruction-step">
+        <div class="step-num">3</div>
+        <div>Select <strong>SharePay</strong> in your share sheet. It verifies automatically within 1 second!</div>
+      </div>
+    </div>
+  </div>
+
   <script>
-    let orderId, amount, upiLink;
-    
-    // Register service worker
+    let orderData = null;
+    let timerInterval = null;
+    let ws = null;
+
+    // Register Service Worker for Web Share Target
     if ('serviceWorker' in navigator) {
-      navigator.serviceWorker.register('/service-worker.js');
+      navigator.serviceWorker.register('/service-worker.js')
+        .then(reg => console.log('ServiceWorker registered:', reg.scope))
+        .catch(err => console.error('ServiceWorker registration failed:', err));
     }
-    
-    // Create order on page load
-    async function init() {
-      const response = await fetch('/api/create-order', { method: 'POST' });
-      const data = await response.json();
-      
-      orderId = data.orderId;
-      amount = data.amount;
-      upiLink = data.upiLink;
-      
-      document.getElementById('amount').textContent = '₹' + amount;
-      
-      // Connect WebSocket
-      const ws = new WebSocket(`ws://${location.host}?orderId=${orderId}`);
+
+    async function initOrder() {
+      try {
+        const res = await fetch('/api/create-order', { method: 'POST' });
+        orderData = await res.json();
+
+        document.getElementById('orderIdText').textContent = orderData.orderId;
+        document.getElementById('baseAmountText').textContent = '₹' + orderData.baseAmount.toFixed(2);
+        document.getElementById('discountText').textContent = '-₹' + orderData.discount.toFixed(2);
+        document.getElementById('totalAmountText').textContent = '₹' + orderData.amount.toFixed(2);
+
+        startCountdown(orderData.expiresAt);
+        connectWebSocket(orderData.orderId);
+      } catch (err) {
+        showStatus('Failed to create order session. Please refresh.', 'error');
+      }
+    }
+
+    function startCountdown(expiresAt) {
+      function updateTimer() {
+        const remaining = Math.max(0, Math.floor((expiresAt - Date.now()) / 1000));
+        const mins = String(Math.floor(remaining / 60)).padStart(2, '0');
+        const secs = String(remaining % 60).padStart(2, '0');
+        document.getElementById('countdown').textContent = `${mins}:${secs}`;
+
+        if (remaining <= 0) {
+          clearInterval(timerInterval);
+          document.getElementById('payBtn').disabled = true;
+          document.getElementById('payBtn').textContent = 'Session Expired';
+          showStatus('Payment session expired. Please refresh the page for a new challenge amount.', 'error');
+        }
+      }
+      updateTimer();
+      timerInterval = setInterval(updateTimer, 1000);
+    }
+
+    function connectWebSocket(orderId) {
+      const protocol = location.protocol === 'https:' ? 'wss:' : 'ws:';
+      ws = new WebSocket(`${protocol}//${location.host}?orderId=${encodeURIComponent(orderId)}`);
+
       ws.onmessage = (event) => {
-        const data = JSON.parse(event.data);
-        if (data.type === 'SUCCESS') {
-          window.location.href = `/success?utr=${data.utr}`;
+        try {
+          const msg = JSON.parse(event.data);
+          if (msg.type === 'SUCCESS') {
+            window.location.href = `/success?utr=${encodeURIComponent(msg.utr)}&orderId=${encodeURIComponent(orderId)}`;
+          } else if (msg.type === 'FAILED') {
+            showStatus(`Verification rejected: ${msg.reason}`, 'error');
+          }
+        } catch (e) {
+          console.error('WS parse error:', e);
         }
       };
-      
-      // Start 3-minute timeout
-      setTimeout(() => {
-        document.getElementById('status').textContent = 'Session expired';
-      }, 3 * 60 * 1000);
     }
-    
-    function startPayment() {
-      document.getElementById('status').textContent = 'Opening UPI app...';
-      window.location.href = upiLink;
+
+    function openUpiApp() {
+      if (!orderData || !orderData.upiLink) return;
+      showStatus('Opening your UPI app... After payment, tap Share Receipt and choose SharePay.', 'info');
+      window.location.href = orderData.upiLink;
     }
-    
-    init();
+
+    function showStatus(text, type = 'info') {
+      const el = document.getElementById('statusAlert');
+      el.className = `status-alert ${type}`;
+      el.textContent = text;
+    }
+
+    initOrder();
   </script>
 </body>
 </html>
