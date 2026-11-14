@@ -1,0 +1,1255 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>DISHA 8.2 — Production Ledger, Smart VPA Routing & Sovereign Fintech</title>
+  <meta name="description" content="DISHA 8.2 is an enterprise-grade sovereign payment rail featuring Double-Entry Bookkeeping, Smart VPA Rotation, Auto-GST Compliance, and Instant Interbank Voice Settlement.">
+
+  <!-- Production Typography: Space Grotesk + Inter + JetBrains Mono -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700;800&family=Space+Grotesk:wght@500;600;700;800&display=swap" rel="stylesheet">
+
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+  <!-- Film Grain Overlay -->
+  <div class="cinema-grain" aria-hidden="true"></div>
+
+  <!-- Ambient Dynamic Canvas Particles -->
+  <canvas id="ambientCanvas" aria-hidden="true"></canvas>
+
+  <!-- Realtime Scroll Progress Line -->
+  <div class="scroll-progress-line" id="scrollProgressLine"></div>
+
+  <!-- Realtime Interactive Toast HUD -->
+  <div class="disha-toast" id="dishaToast">
+    <span class="toast-dot"></span>
+    <span class="toast-msg">DISHA 8.2 Production Gateway Live</span>
+  </div>
+
+  <!-- ========================================================
+       FULL-BLEED PROFESSIONAL ENTERPRISE NAVIGATION
+  ======================================================== -->
+  <header class="disha-bleed-nav" id="bleedNav">
+    <div class="nav-bleed-container">
+      
+      <!-- Left: Sleek Brand Identity -->
+      <div class="brand-cluster">
+        <a href="#scene-hero" class="brand-logo-link" title="DISHA 8.2 Enterprise Rail">
+          <span class="brand-title">DISHA</span>
+          <span class="brand-badge-pro">8.2 PRO</span>
+        </a>
+        <div class="nav-system-status">
+          <span class="live-dot-pulse"></span>
+          <span class="status-label">NPCI DIRECT · 99.99% LIVE</span>
+        </div>
+      </div>
+
+      <!-- Center: Clean Enterprise Navigation Links -->
+      <nav class="nav-menu-links" id="navMenuLinks">
+        <a href="#scene-hero" class="nav-item active" data-act="scene-hero">Overview</a>
+        <a href="#scene-architecture" class="nav-item" data-act="scene-architecture">Architecture</a>
+        <a href="#scene-vpa-routing" class="nav-item" data-act="scene-vpa-routing">Smart VPA</a>
+        <a href="#scene-ledger" class="nav-item" data-act="scene-ledger">Double Ledger</a>
+        <a href="#scene-compliance" class="nav-item" data-act="scene-compliance">Compliance</a>
+        <a href="#scene-dashboard" class="nav-item" data-act="scene-dashboard">Console</a>
+      </nav>
+
+      <!-- Right: Telemetry & Actions -->
+      <div class="nav-actions">
+        <div class="nav-telemetry-pill">
+          <span class="pill-accent">&lt; 15ms</span>
+          <span class="pill-text">Voice Finality</span>
+        </div>
+
+        <button class="audio-toggle-btn active" id="audioSynthBtn" title="Toggle Synthesized Sound FX">
+          <span class="audio-waves">
+            <span class="wave-bar"></span>
+            <span class="wave-bar"></span>
+            <span class="wave-bar"></span>
+          </span>
+          <span class="audio-btn-text">Audio FX</span>
+        </button>
+
+        <a href="#scene-dashboard" class="btn-nav-primary">
+          <span>Open Console</span>
+          <span class="btn-glow-ring"></span>
+        </a>
+
+        <!-- Mobile Drawer Toggle -->
+        <button class="mobile-toggle-btn" id="mobileNavToggle" aria-label="Toggle Navigation">
+          <span></span>
+          <span></span>
+          <span></span>
+        </button>
+      </div>
+
+    </div>
+  </header>
+
+  <!-- Mobile Dropdown Navigation -->
+  <div class="mobile-menu-drawer" id="mobileDrawer">
+    <div class="mobile-menu-inner">
+      <a href="#scene-hero" class="mobile-link active">01. Product Overview</a>
+      <a href="#scene-crisis" class="mobile-link">02. The 2.36% Gateway Crisis</a>
+      <a href="#scene-architecture" class="mobile-link">03. Production Architecture Stack</a>
+      <a href="#scene-vpa-routing" class="mobile-link">04. Smart VPA Rotation Engine</a>
+      <a href="#scene-ledger" class="mobile-link">05. Double-Entry Accounting Ledger</a>
+      <a href="#scene-compliance" class="mobile-link">06. GST &amp; Immutable Audit Trail</a>
+      <a href="#scene-reconciliation" class="mobile-link">07. Daily Auto-Reconciliation</a>
+      <a href="#scene-dashboard" class="mobile-link">08. Live Merchant Dashboard</a>
+      <a href="#scene-calculator" class="mobile-link">09. P&amp;L ROI Calculator</a>
+      <a href="#scene-soundbox" class="mobile-link highlight">⚡ 10. Hardware Soundbox Test</a>
+    </div>
+  </div>
+
+  <!-- ========================================================
+       MAIN ENTERPRISE STORYBOARD & ARCHITECTURE CANVAS
+  ======================================================== -->
+  <main class="story-canvas">
+
+    <!-- ========================================================
+         ACT 1: THE OPENING (HERO & INTEGRATED MERCHANT CINEMA)
+    ======================================================== -->
+    <section class="story-scene scene-opening" id="scene-hero">
+      <div class="scene-inner-bounds">
+        
+        <!-- Hero Introduction Header -->
+        <div class="hero-intro-header">
+          <div class="enterprise-eyebrow eyebrow-teal">
+            <span class="pulse-live-dot"></span>
+            <span>ENTERPRISE-GRADE NPCI UPI 2.0 INFRASTRUCTURE</span>
+          </div>
+
+          <h1 class="hero-master-title">
+            Zero-Fee, Fraud-Proof UPI Checkout &amp; Double-Entry Ledger.
+          </h1>
+
+          <p class="hero-master-sub">
+            DISHA 8.2 protects merchant accounts with <strong>Smart VPA Rotation</strong>, ensures flawless tax books via <strong>Double-Entry Ledger</strong>, automates <strong>GST Invoicing</strong>, and eliminates the 2.36% gateway tax forever.
+          </p>
+
+          <div class="hero-action-group">
+            <a href="#scene-vpa-routing" class="btn-primary-hero magnetic-btn">
+              <span>Explore Smart VPA Engine</span>
+              <span class="btn-arrow">➔</span>
+            </a>
+            <a href="#scene-dashboard" class="btn-secondary-hero magnetic-btn">
+              <span>View Merchant Console</span>
+            </a>
+          </div>
+
+          <!-- Enterprise Metrics Pill Strip -->
+          <div class="hero-metrics-pill-strip">
+            <div class="h-metric-item">
+              <span class="h-val">0.00%</span>
+              <span class="h-lbl">MDR Commission</span>
+            </div>
+            <div class="h-metric-sep"></div>
+            <div class="h-metric-item">
+              <span class="h-val">&lt; 15ms</span>
+              <span class="h-lbl">Voice Finality</span>
+            </div>
+            <div class="h-metric-sep"></div>
+            <div class="h-metric-item">
+              <span class="h-val">T+0</span>
+              <span class="h-lbl">Direct Bank Settlement</span>
+            </div>
+            <div class="h-metric-sep"></div>
+            <div class="h-metric-item">
+              <span class="h-val">100%</span>
+              <span class="h-lbl">RBI &amp; GST Compliant</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Master Cinematic Screen: Ramesh Kirana with Text Overlaid Directly on Image -->
+        <div class="cinematic-overlay-stage morning-stage tilt-card" data-tilt>
+          <img src="assets/ramesh-kirana-morning.jpg" alt="Ramesh Kirana morning in Narayan Peth Pune" class="stage-bg-image">
+          <div class="stage-scim-gradient"></div>
+
+          <!-- Overlaid Content Layer -->
+          <div class="stage-overlay-content">
+            
+            <!-- Left Overlaid Story Narrative -->
+            <div class="stage-story-narrative">
+              <div class="location-badge">
+                <span class="hud-dot-live"></span>
+                <span>NARAYAN PETH, PUNE · 06:42 AM IST</span>
+              </div>
+              <h2 class="stage-story-title">
+                The Kirana Heart of Pune.
+              </h2>
+              <p class="stage-story-desc">
+                Ramesh Kaka opens his wooden shutter as the morning sunlight fills Narayan Peth. His hands are dusted with flour as a customer picks up pulses, tea, and milk.
+                <span class="story-quote">"Kaka, QR code scan karto,"</span> the customer says.
+              </p>
+
+              <div class="stage-tags-row">
+                <span class="tag-pill">☕ Morning Cutting Chai</span>
+                <span class="tag-pill">📖 Red Bahi-Khata Ledger</span>
+                <span class="tag-pill">⚖️ 6.2% Net Retail Margin</span>
+              </div>
+            </div>
+
+            <!-- Right Overlaid Live Checkout Terminal HUD -->
+            <div class="stage-terminal-hud">
+              <div class="hud-store-header">
+                <div>
+                  <div class="hud-store-name">Ramesh Provision Stores</div>
+                  <div class="hud-store-vpa">UPI VPA: <code>ramesh.store@okaxis</code></div>
+                </div>
+                <div class="hud-live-tag">
+                  <span class="pulse-live-dot"></span>
+                  <span>CASH REGISTER OPEN</span>
+                </div>
+              </div>
+
+              <div class="hud-due-box">
+                <span class="hud-due-lbl">Order Total Due</span>
+                <div class="hud-due-amt">₹1,000.00</div>
+              </div>
+
+              <!-- Live Interactive QR Code Container -->
+              <div class="hud-qr-wrapper" id="demoQrBox" title="Click to simulate customer scan">
+                <div class="hud-qr-frame">
+                  <svg class="qr-svg" viewBox="0 0 100 100" fill="none">
+                    <rect x="6" y="6" width="24" height="24" rx="4" stroke="#0B0E17" stroke-width="4"/>
+                    <rect x="11" y="11" width="14" height="14" fill="#0B0E17"/>
+                    <rect x="70" y="6" width="24" height="24" rx="4" stroke="#0B0E17" stroke-width="4"/>
+                    <rect x="75" y="11" width="14" height="14" fill="#0B0E17"/>
+                    <rect x="6" y="70" width="24" height="24" rx="4" stroke="#0B0E17" stroke-width="4"/>
+                    <rect x="11" y="75" width="14" height="14" fill="#0B0E17"/>
+                    <rect x="38" y="8" width="6" height="6" fill="#0B0E17"/>
+                    <rect x="50" y="8" width="8" height="6" fill="#0B0E17"/>
+                    <rect x="38" y="22" width="14" height="6" fill="#0B0E17"/>
+                    <rect x="8" y="38" width="20" height="6" fill="#0B0E17"/>
+                    <rect x="36" y="36" width="26" height="26" rx="4" fill="#F59E0B" id="qrCenterLogo"/>
+                    <rect x="68" y="44" width="8" height="14" fill="#0B0E17"/>
+                    <rect x="82" y="38" width="10" height="16" fill="#0B0E17"/>
+                    <rect x="38" y="68" width="8" height="18" fill="#0B0E17"/>
+                    <rect x="52" y="76" width="18" height="12" fill="#0B0E17"/>
+                    <rect x="78" y="72" width="14" height="18" fill="#0B0E17"/>
+                  </svg>
+                  <div class="scanner-laser" id="scannerLaser"></div>
+                </div>
+
+                <div class="hud-qr-actions">
+                  <div class="hud-prompt-text" id="scanPromptText">
+                    ⚡ Click QR code to simulate customer scan
+                  </div>
+                  <div class="hud-sub-text">
+                    Google Pay · PhonePe · Paytm · BHIM
+                  </div>
+                  <button class="hud-btn-tap magnetic-btn" onclick="document.getElementById('demoQrBox').click()">
+                    Simulate Customer UPI Tap
+                  </button>
+                </div>
+              </div>
+
+            </div>
+
+          </div>
+        </div>
+
+      </div>
+    </section>
+
+    <!-- ========================================================
+         ACT 2: THE 2.36% CRISIS (THE 3 FAILURE MODES)
+    ======================================================== -->
+    <section class="story-scene scene-crisis" id="scene-crisis">
+      <div class="scene-inner-bounds">
+        
+        <div class="scene-lead-header">
+          <div class="enterprise-eyebrow eyebrow-red">
+            <span>THE CORE PROBLEM MERCHANTS FACE</span>
+          </div>
+          <h2 class="scene-master-title">The Three Failure Modes of Legacy Aggregators.</h2>
+          <p class="scene-master-sub">
+            Legacy gateways extract 2.36% in predatory fees, leave static QR stickers exposed to Telegram spoof APKs, and trap funds in multi-day interbank escrow.
+          </p>
+        </div>
+
+        <!-- 3-Column Cinematic Cards with Text Overlaid on Images -->
+        <div class="crisis-trio-grid">
+          
+          <!-- Failure Mode 1: The Economic Bleed -->
+          <div class="trio-cinematic-card bleed-card tilt-card" data-tilt>
+            <div class="trio-media-wrapper">
+              <img src="assets/currency-bleed.jpg" alt="Currency disintegrating into glowing embers" class="trio-bg-img">
+              <div class="trio-gradient-scim"></div>
+
+              <div class="trio-overlay-content">
+                <div class="trio-top-bar">
+                  <span class="trio-number">01</span>
+                  <span class="trio-badge badge-red">THE ECONOMIC BLEED</span>
+                </div>
+
+                <div class="trio-main-info">
+                  <h3 class="trio-title">₹23.60 Siphoned on Every ₹1,000 Sale</h3>
+                  <p class="trio-desc">
+                    Aggregators quietly extract 1.8% MDR + 18% GST + monthly soundbox rental fees. Ramesh Kaka loses <strong>₹1,69,920 annually</strong> — equal to 7 months of shop rent.
+                  </p>
+
+                  <div class="trio-breakdown-table">
+                    <div class="t-row">
+                      <span>Aggregator Base MDR (1.80%)</span>
+                      <span class="text-loss">-₹18.00</span>
+                    </div>
+                    <div class="t-row">
+                      <span>18% Financial Intermediation GST</span>
+                      <span class="text-loss">-₹3.24</span>
+                    </div>
+                    <div class="t-row">
+                      <span>Monthly Soundbox Surcharge</span>
+                      <span class="text-loss">-₹2.36</span>
+                    </div>
+                    <div class="t-row total">
+                      <span>Net Received (T+2 Days)</span>
+                      <span class="text-net">₹976.40</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Failure Mode 2: The Spoof Exploit & Cyber Syndicate -->
+          <div class="trio-cinematic-card exploit-card tilt-card" data-tilt>
+            <div class="trio-media-wrapper">
+              <img src="assets/hacker-shadows.jpg" alt="Cyber syndicate trading forged payment receipts" class="trio-bg-img">
+              <div class="trio-gradient-scim"></div>
+
+              <div class="trio-overlay-content">
+                <div class="trio-top-bar">
+                  <span class="trio-number">02</span>
+                  <span class="trio-badge badge-purple">THE SPOOF EXPLOIT</span>
+                </div>
+
+                <div class="trio-main-info">
+                  <h3 class="trio-title">Static QR Stickers Are an Open Trap</h3>
+                  <p class="trio-desc">
+                    Underground Telegram rings weaponize spoofed APKs, forged payment receipts, and stale UTRs during busy rush hours when merchants cannot check passbooks.
+                  </p>
+
+                  <div class="specimen-interactive-box">
+                    <div class="specimen-entry forged" id="specimenA" title="Click to inspect exploit telemetry">
+                      <div class="s-head text-loss">⚠️ FORGED TELEGRAM RECEIPT</div>
+                      <div class="s-val">ICICI Bank · ₹5,000.00 (Doctored)</div>
+                      <div class="s-sub">Stale UTR 432109876543 · Kerning mismatch</div>
+                    </div>
+                    <div class="specimen-entry verified" id="specimenB" title="Click to inspect cryptographic attestation">
+                      <div class="s-head text-teal">🛡️ DISHA MATHEMATICAL PROOF</div>
+                      <div class="s-val">Dynamic Decimal: ₹100.37 · Axis Bank</div>
+                      <div class="s-sub">Julian Day 318 · Single-use atomic check</div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Failure Mode 3: The 7-Day Limbo -->
+          <div class="trio-cinematic-card limbo-card tilt-card" data-tilt>
+            <div class="trio-media-wrapper">
+              <img src="assets/priya-panic.jpg" alt="Student in distress over payment gateway timeout" class="trio-bg-img">
+              <div class="trio-gradient-scim"></div>
+
+              <div class="trio-overlay-content">
+                <div class="trio-top-bar">
+                  <span class="trio-number">03</span>
+                  <span class="trio-badge badge-amber">THE 7-DAY LIMBO</span>
+                </div>
+
+                <div class="trio-main-info">
+                  <h3 class="trio-title">₹5,000 Debited. Zero Seat. Pure Panic.</h3>
+                  <p class="trio-desc">
+                    Priya paid ₹5,000 for her certification seat. Her bank debited immediately, but the gateway timed out. The seat vanished, leaving her stranded with automated support bots.
+                  </p>
+
+                  <div class="panic-status-card" id="priyaPhoneBezel" title="Click to simulate gateway timeout alert">
+                    <div class="p-top-row">
+                      <span class="p-cross">✕</span>
+                      <div>
+                        <div class="p-head">Aggregator Timeout (180s)</div>
+                        <div class="p-sub text-loss">Status: HELD IN INTERBANK ESCROW</div>
+                      </div>
+                    </div>
+                    <div class="p-sms-quote">
+                      "Dear Customer, ₹5,000 debited from A/C XX8901. Resolution time: 5 to 7 banking days."
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+        </div>
+
+      </div>
+    </section>
+
+    <!-- ========================================================
+         ACT 3: SYSTEM ARCHITECTURE & 5-TIER TOPOLOGY
+    ======================================================== -->
+    <section class="story-scene scene-arch" id="scene-architecture">
+      <div class="scene-inner-bounds">
+        
+        <div class="scene-lead-header">
+          <div class="enterprise-eyebrow eyebrow-cyan">
+            <span>ENTERPRISE INFRASTRUCTURE SPECIFICATION</span>
+          </div>
+          <h2 class="scene-master-title">DISHA 8.2 Production Stack Architecture.</h2>
+          <p class="scene-master-sub">
+            A battle-tested financial infrastructure that keeps UPI accounts protected from bans, automates RBI compliance, and reconciles every single paisa.
+          </p>
+        </div>
+
+        <!-- Architectural Topology Diagram Grid -->
+        <div class="arch-topology-grid">
+          
+          <!-- Layer 1: API Gateway & Device Attestation -->
+          <div class="arch-layer-card">
+            <div class="arch-layer-header">
+              <span class="layer-step">01</span>
+              <div>
+                <h4 class="layer-name">API Gateway &amp; Zero-Trust Ingress</h4>
+                <p class="layer-desc">TLS 1.3 Terminated Ingress, Rate-Limiting &amp; Hardware Key Attestation</p>
+              </div>
+            </div>
+            <div class="arch-layer-chips">
+              <span class="chip-tech">Ed25519 Hardware Keys</span>
+              <span class="chip-tech">WAF Geo-Fencing (ap-south-1)</span>
+              <span class="chip-tech">Token Bucket Rate Limiter</span>
+            </div>
+          </div>
+
+          <!-- Layer 2: Core Business Logic -->
+          <div class="arch-layer-card highlight-card">
+            <div class="arch-layer-header">
+              <span class="layer-step">02</span>
+              <div>
+                <h4 class="layer-name">Core Business &amp; Fraud Engine</h4>
+                <p class="layer-desc">Dynamic Decimal Verification, Smart VPA Routing &amp; 7-Layer Forensic Scoring</p>
+              </div>
+            </div>
+            <div class="arch-layer-chips">
+              <span class="chip-tech">Julian Day Cent Routing</span>
+              <span class="chip-tech">Pattern Masking Engine</span>
+              <span class="chip-tech">Atomic Redis Lua Scripts</span>
+            </div>
+          </div>
+
+          <!-- Layer 3: Financial Layer -->
+          <div class="arch-layer-card highlight-card">
+            <div class="arch-layer-header">
+              <span class="layer-step">03</span>
+              <div>
+                <h4 class="layer-name">Double-Entry Ledger &amp; Compliance</h4>
+                <p class="layer-desc">Chart of Accounts, Balanced Debits/Credits, Auto-GST Invoicing &amp; TDS</p>
+              </div>
+            </div>
+            <div class="arch-layer-chips">
+              <span class="chip-tech">Strict Balanced DEBIT/CREDIT</span>
+              <span class="chip-tech">Auto-Generated GST Invoices</span>
+              <span class="chip-tech">Immutable PostgreSQL Audit Log</span>
+            </div>
+          </div>
+
+          <!-- Layer 4: Data Layer -->
+          <div class="arch-layer-card">
+            <div class="arch-layer-header">
+              <span class="layer-step">04</span>
+              <div>
+                <h4 class="layer-name">Data Persistence &amp; Merkle Proofs</h4>
+                <p class="layer-desc">ACID Transactions, SHA-256 Ledger Chaining &amp; Encrypted Receipts</p>
+              </div>
+            </div>
+            <div class="arch-layer-chips">
+              <span class="chip-tech">PostgreSQL 15 (ap-south-1)</span>
+              <span class="chip-tech">Redis 7 Cluster Cache</span>
+              <span class="chip-tech">S3 Encrypted Audit Storage</span>
+            </div>
+          </div>
+
+          <!-- Layer 5: Reconciliation & Monitoring -->
+          <div class="arch-layer-card">
+            <div class="arch-layer-header">
+              <span class="layer-step">05</span>
+              <div>
+                <h4 class="layer-name">Reconciliation &amp; Automated Alerting</h4>
+                <p class="layer-desc">Daily 06:00 IST Bank UTR Matching, PagerDuty Alerts &amp; Health Scoring</p>
+              </div>
+            </div>
+            <div class="arch-layer-chips">
+              <span class="chip-tech">Daily 06:00 Bank Statement Match</span>
+              <span class="chip-tech">VPA Health Score Tracking</span>
+              <span class="chip-tech">1-Click GSTR-1 &amp; 3B Export</span>
+            </div>
+          </div>
+
+        </div>
+
+      </div>
+    </section>
+
+    <!-- ========================================================
+         ACT 4: SMART VPA ROUTING ENGINE ("DON'T GET BANNED")
+    ======================================================== -->
+    <section class="story-scene scene-vpa" id="scene-vpa-routing">
+      <div class="scene-inner-bounds">
+        
+        <div class="scene-lead-header">
+          <div class="enterprise-eyebrow eyebrow-teal">
+            <span>SMART VPA ROTATION &amp; HEALTH SCORING</span>
+          </div>
+          <h2 class="scene-master-title">The "Don't Get Banned" VPA Routing Engine.</h2>
+          <p class="scene-master-sub">
+            Banks freeze merchant accounts when a single VPA exceeds 50+ daily transactions or exhibits repetitive patterns. DISHA 8.2 pools multiple VPAs and rotates them dynamically with mathematical health scoring.
+          </p>
+        </div>
+
+        <div class="vpa-engine-container">
+          
+          <!-- Live Interactive VPA Pool Grid -->
+          <div class="vpa-pool-panel">
+            <div class="vpa-panel-top">
+              <div>
+                <h3 class="panel-h3">Merchant VPA Pool Status</h3>
+                <p class="panel-sub">Live health metrics, daily caps, and cooldown timers</p>
+              </div>
+              <button class="btn-simulate-order" id="btnSimulateOrder">
+                ⚡ Simulate New Payment (₹1,249.37)
+              </button>
+            </div>
+
+            <div class="vpa-cards-grid" id="vpaCardsContainer">
+              
+              <!-- VPA Card 1 -->
+              <div class="vpa-status-card active-card" id="vpaCard007">
+                <div class="vpa-top-row">
+                  <span class="vpa-id-badge">VPA #01</span>
+                  <span class="vpa-state-tag tag-healthy">🟢 HEALTHY</span>
+                </div>
+                <div class="vpa-handle">merchant007@ybl</div>
+                <div class="vpa-bank-tag">YES Bank · Current A/C</div>
+                
+                <div class="vpa-stats-row">
+                  <div class="stat-col">
+                    <span class="s-label">Health Score</span>
+                    <span class="s-num text-teal" id="score007">95 / 100</span>
+                  </div>
+                  <div class="stat-col">
+                    <span class="s-label">Daily Txns</span>
+                    <span class="s-num" id="txCount007">12 / 30</span>
+                  </div>
+                  <div class="stat-col">
+                    <span class="s-label">Daily Volume</span>
+                    <span class="s-num">₹18.4k / ₹50k</span>
+                  </div>
+                </div>
+
+                <div class="vpa-cooldown-bar">
+                  <div class="cooldown-fill ready" style="width: 100%;"></div>
+                  <span class="cooldown-text">Status: Ready for Routing</span>
+                </div>
+              </div>
+
+              <!-- VPA Card 2 -->
+              <div class="vpa-status-card" id="vpaCard008">
+                <div class="vpa-top-row">
+                  <span class="vpa-id-badge">VPA #02</span>
+                  <span class="vpa-state-tag tag-warning">🟡 NEAR LIMIT</span>
+                </div>
+                <div class="vpa-handle">merchant008@oksbi</div>
+                <div class="vpa-bank-tag">State Bank of India · Current</div>
+                
+                <div class="vpa-stats-row">
+                  <div class="stat-col">
+                    <span class="s-label">Health Score</span>
+                    <span class="s-num text-amber" id="score008">88 / 100</span>
+                  </div>
+                  <div class="stat-col">
+                    <span class="s-label">Daily Txns</span>
+                    <span class="s-num text-loss" id="txCount008">28 / 30</span>
+                  </div>
+                  <div class="stat-col">
+                    <span class="s-label">Daily Volume</span>
+                    <span class="s-num">₹46.2k / ₹50k</span>
+                  </div>
+                </div>
+
+                <div class="vpa-cooldown-bar">
+                  <div class="cooldown-fill cooldown" style="width: 45%;"></div>
+                  <span class="cooldown-text">Cooldown: 2m 14s remaining</span>
+                </div>
+              </div>
+
+              <!-- VPA Card 3 -->
+              <div class="vpa-status-card" id="vpaCard009">
+                <div class="vpa-top-row">
+                  <span class="vpa-id-badge">VPA #03</span>
+                  <span class="vpa-state-tag tag-healthy">🟢 HEALTHY</span>
+                </div>
+                <div class="vpa-handle">merchant009@ibl</div>
+                <div class="vpa-bank-tag">ICICI Bank · Current A/C</div>
+                
+                <div class="vpa-stats-row">
+                  <div class="stat-col">
+                    <span class="s-label">Health Score</span>
+                    <span class="s-num text-teal" id="score009">72 / 100</span>
+                  </div>
+                  <div class="stat-col">
+                    <span class="s-label">Daily Txns</span>
+                    <span class="s-num" id="txCount009">5 / 30</span>
+                  </div>
+                  <div class="stat-col">
+                    <span class="s-label">Daily Volume</span>
+                    <span class="s-num">₹8.9k / ₹50k</span>
+                  </div>
+                </div>
+
+                <div class="vpa-cooldown-bar">
+                  <div class="cooldown-fill ready" style="width: 100%;"></div>
+                  <span class="cooldown-text">Status: Ready for Routing</span>
+                </div>
+              </div>
+
+              <!-- VPA Card 4 -->
+              <div class="vpa-status-card paused-card" id="vpaCard010">
+                <div class="vpa-top-row">
+                  <span class="vpa-id-badge">VPA #04</span>
+                  <span class="vpa-state-tag tag-danger">🔴 PAUSED</span>
+                </div>
+                <div class="vpa-handle">merchant010@paytm</div>
+                <div class="vpa-bank-tag">Paytm Payments Bank · Inactive</div>
+                
+                <div class="vpa-stats-row">
+                  <div class="stat-col">
+                    <span class="s-label">Health Score</span>
+                    <span class="s-num text-loss">45 / 100</span>
+                  </div>
+                  <div class="stat-col">
+                    <span class="s-label">Daily Txns</span>
+                    <span class="s-num">0 / 30</span>
+                  </div>
+                  <div class="stat-col">
+                    <span class="s-label">Daily Volume</span>
+                    <span class="s-num">₹0 / ₹50k</span>
+                  </div>
+                </div>
+
+                <div class="vpa-cooldown-bar">
+                  <div class="cooldown-fill paused" style="width: 0%;"></div>
+                  <span class="cooldown-text">Auto-Paused (Health &lt; 50)</span>
+                </div>
+              </div>
+
+            </div>
+
+            <!-- Algorithm Execution Console -->
+            <div class="vpa-algorithm-telemetry">
+              <div class="algo-header">
+                <span class="algo-title">⚡ REALTIME VPA ROUTING DECISION LOG</span>
+                <span class="algo-meta" id="algoTimestamp">00:05 IST Reset Scheduled</span>
+              </div>
+              <div class="algo-body" id="algoLogBody">
+                <div class="log-line text-teal">[INIT] Evaluating VPA candidate pool: 4 registered, 3 active, 1 auto-paused</div>
+                <div class="log-line">[FILTER] Excluded merchant010@paytm (Health 45 &lt; threshold 70)</div>
+                <div class="log-line">[SCORE] VPA-007: (95×0.4) + (1.0×0.3) + (0.8×0.3) = 84.4 | VPA-008: Cooldown active (penalized 50%)</div>
+                <div class="log-line text-gold">[MASKING] Pattern masking checked last 5 transactions: No sequence collisions</div>
+                <div class="log-line text-teal font-bold">[DISPATCH] Assigned VPA merchant007@ybl · Dynamic Decimal +₹0.37 applied</div>
+              </div>
+            </div>
+
+          </div>
+
+        </div>
+
+      </div>
+    </section>
+
+    <!-- ========================================================
+         ACT 5: DOUBLE-ENTRY LEDGER SYSTEM
+    ======================================================== -->
+    <section class="story-scene scene-ledger" id="scene-ledger">
+      <div class="scene-inner-bounds">
+        
+        <div class="scene-lead-header">
+          <div class="enterprise-eyebrow eyebrow-cyan">
+            <span>AUDIT-PROOF DOUBLE-ENTRY BOOKKEEPING</span>
+          </div>
+          <h2 class="scene-master-title">Every Paisa Balanced. Cryptographically.</h2>
+          <p class="scene-master-sub">
+            Single-entry payment apps fail tax audits because they cannot prove where money entered and where it was earned. DISHA 8.2 creates balanced, immutable double-entry records for every UPI transfer.
+          </p>
+        </div>
+
+        <div class="ledger-interactive-wrapper">
+          
+          <!-- Balance Summary Banner -->
+          <div class="ledger-balance-banner">
+            <div class="banner-stat">
+              <span class="b-label">Total Debits (Assets Inflow)</span>
+              <span class="b-val text-teal" id="totalDebitsVal">₹47,320.00</span>
+            </div>
+            <div class="banner-eq-sign">=</div>
+            <div class="banner-stat">
+              <span class="b-label">Total Credits (Revenue Earned)</span>
+              <span class="b-val text-teal" id="totalCreditsVal">₹47,320.00</span>
+            </div>
+            <div class="banner-status-chip">
+              <span class="live-dot-pulse"></span>
+              <span>100% BALANCED</span>
+            </div>
+          </div>
+
+          <!-- Double Entry Journal Table -->
+          <div class="ledger-table-card">
+            <div class="ledger-table-header">
+              <div class="col-time">Timestamp</div>
+              <div class="col-utr">NPCI UTR Ref</div>
+              <div class="col-account">Account (Chart of Accounts)</div>
+              <div class="col-type">Type</div>
+              <div class="col-debit">Debit (Dr)</div>
+              <div class="col-credit">Credit (Cr)</div>
+              <div class="col-status">Integrity</div>
+            </div>
+
+            <div class="ledger-table-rows" id="ledgerTableBody">
+              
+              <!-- Transaction 1: Entry A -->
+              <div class="ledger-row entry-dr">
+                <div class="col-time font-mono">14:32:01 IST</div>
+                <div class="col-utr font-mono">UTR 311400000123</div>
+                <div class="col-account"><strong>1001</strong> · HDFC Current Bank A/C (Asset)</div>
+                <div class="col-type"><span class="badge-debit">DEBIT</span></div>
+                <div class="col-debit font-mono text-teal">₹1,249.37</div>
+                <div class="col-credit font-mono">—</div>
+                <div class="col-status"><span class="chip-verified">✓ BALANCED</span></div>
+              </div>
+
+              <!-- Transaction 1: Entry B -->
+              <div class="ledger-row entry-cr">
+                <div class="col-time font-mono">14:32:01 IST</div>
+                <div class="col-utr font-mono">UTR 311400000123</div>
+                <div class="col-account"><strong>4001</strong> · Sales Revenue (Income)</div>
+                <div class="col-type"><span class="badge-credit">CREDIT</span></div>
+                <div class="col-debit font-mono">—</div>
+                <div class="col-credit font-mono text-gold">₹1,249.37</div>
+                <div class="col-status"><span class="chip-verified">✓ BALANCED</span></div>
+              </div>
+
+              <!-- Transaction 2: Entry A -->
+              <div class="ledger-row entry-dr">
+                <div class="col-time font-mono">14:28:45 IST</div>
+                <div class="col-utr font-mono">UTR 311400000122</div>
+                <div class="col-account"><strong>1001</strong> · HDFC Current Bank A/C (Asset)</div>
+                <div class="col-type"><span class="badge-debit">DEBIT</span></div>
+                <div class="col-debit font-mono text-teal">₹500.00</div>
+                <div class="col-credit font-mono">—</div>
+                <div class="col-status"><span class="chip-verified">✓ BALANCED</span></div>
+              </div>
+
+              <!-- Transaction 2: Entry B -->
+              <div class="ledger-row entry-cr">
+                <div class="col-time font-mono">14:28:45 IST</div>
+                <div class="col-utr font-mono">UTR 311400000122</div>
+                <div class="col-account"><strong>4001</strong> · Sales Revenue (Income)</div>
+                <div class="col-type"><span class="badge-credit">CREDIT</span></div>
+                <div class="col-debit font-mono">—</div>
+                <div class="col-credit font-mono text-gold">₹500.00</div>
+                <div class="col-status"><span class="chip-verified">✓ BALANCED</span></div>
+              </div>
+
+              <!-- Transaction 3: Entry A -->
+              <div class="ledger-row entry-dr">
+                <div class="col-time font-mono">14:15:22 IST</div>
+                <div class="col-utr font-mono">UTR 311400000121</div>
+                <div class="col-account"><strong>1001</strong> · HDFC Current Bank A/C (Asset)</div>
+                <div class="col-type"><span class="badge-debit">DEBIT</span></div>
+                <div class="col-debit font-mono text-teal">₹2,499.00</div>
+                <div class="col-credit font-mono">—</div>
+                <div class="col-status"><span class="chip-verified">✓ BALANCED</span></div>
+              </div>
+
+              <!-- Transaction 3: Entry B -->
+              <div class="ledger-row entry-cr">
+                <div class="col-time font-mono">14:15:22 IST</div>
+                <div class="col-utr font-mono">UTR 311400000121</div>
+                <div class="col-account"><strong>4001</strong> · Sales Revenue (Income)</div>
+                <div class="col-type"><span class="badge-credit">CREDIT</span></div>
+                <div class="col-debit font-mono">—</div>
+                <div class="col-credit font-mono text-gold">₹2,499.00</div>
+                <div class="col-status"><span class="chip-verified">✓ BALANCED</span></div>
+              </div>
+
+            </div>
+          </div>
+
+        </div>
+
+      </div>
+    </section>
+
+    <!-- ========================================================
+         ACT 6: COMPLIANCE ENGINE (GST & IMMUTABLE AUDIT TRAIL)
+    ======================================================== -->
+    <section class="story-scene scene-compliance" id="scene-compliance">
+      <div class="scene-inner-bounds">
+        
+        <div class="scene-lead-header">
+          <div class="enterprise-eyebrow eyebrow-teal">
+            <span>AUTOMATED TAX &amp; REGULATORY COMPLIANCE</span>
+          </div>
+          <h2 class="scene-master-title">One-Click GST Invoicing &amp; Immutable Audit.</h2>
+          <p class="scene-master-sub">
+            Automate mandatory GST invoice generation, monitor TDS deduction thresholds (0.1% above ₹50 lakh/yr), and protect your history with PostgreSQL append-only rules.
+          </p>
+        </div>
+
+        <div class="compliance-duo-grid">
+          
+          <!-- GST Auto-Invoice Generator Card -->
+          <div class="compliance-card">
+            <div class="card-head-row">
+              <span class="c-tag">GST TAX INVOICE #INV-2026-11-000123</span>
+              <span class="status-live">STATUS: GENERATED</span>
+            </div>
+
+            <div class="invoice-preview-box">
+              <div class="inv-merchant-header">
+                <div>
+                  <div class="inv-firm-name">Ramesh Provision Stores</div>
+                  <div class="inv-gstin">GSTIN: <code>27AABCV1234F1Z8</code> (Maharashtra)</div>
+                  <div class="inv-hsn">HSN Code: 997199 (Financial Retail Services)</div>
+                </div>
+                <div class="inv-stamp">
+                  <span>DISHA CERTIFIED</span>
+                  <span>NPCI VERIFIED</span>
+                </div>
+              </div>
+
+              <div class="inv-calc-table">
+                <div class="inv-row">
+                  <span>Gross Order Value</span>
+                  <span class="font-mono">₹1,000.00</span>
+                </div>
+                <div class="inv-row">
+                  <span>Central GST (CGST @ 0.0%)</span>
+                  <span class="font-mono">₹0.00</span>
+                </div>
+                <div class="inv-row">
+                  <span>State GST (SGST @ 0.0%)</span>
+                  <span class="font-mono">₹0.00</span>
+                </div>
+                <div class="inv-row total">
+                  <span>Total Taxable Amount</span>
+                  <span class="font-mono text-teal">₹1,000.00</span>
+                </div>
+              </div>
+
+              <div class="inv-actions-row">
+                <button class="btn-download-inv" onclick="showDishaToast('Generating GST-Compliant PDF Invoice...')">
+                  📥 Download GST Invoice PDF
+                </button>
+                <button class="btn-download-inv secondary" onclick="showDishaToast('Exporting GSTR-1 JSON Payload...')">
+                  📋 Export GSTR-1 Ready File
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <!-- TDS & Immutable Audit Trail Card -->
+          <div class="compliance-card">
+            <div class="card-head-row">
+              <span class="c-tag">TDS TRACKER &amp; IMMUTABLE AUDIT LOG</span>
+              <span class="status-live">RULE: NO-UPDATE / NO-DELETE</span>
+            </div>
+
+            <div class="tds-audit-box">
+              
+              <!-- TDS Threshold Meter -->
+              <div class="tds-meter-section">
+                <div class="meter-label-row">
+                  <span>FY 2026-27 Cumulative Turnover (Section 194Q)</span>
+                  <span class="font-mono text-gold">₹42,84,320 / ₹50,00,000</span>
+                </div>
+                <div class="meter-bar">
+                  <div class="meter-fill" style="width: 85.6%;"></div>
+                </div>
+                <div class="meter-caption">
+                  85.6% of ₹50 Lakh threshold reached. 0.1% TDS deduction inactive until threshold crossed.
+                </div>
+              </div>
+
+              <!-- Immutable Audit Log Stream -->
+              <div class="audit-log-stream">
+                <div class="stream-title">POSTGRESQL APPEND-ONLY AUDIT STREAM</div>
+                <div class="stream-log-entry">
+                  <span class="s-dot"></span>
+                  <span class="s-time font-mono">14:32:01.402</span>
+                  <span class="s-msg">TRANSACTION_CREATE · UTR 311400000123 · SHA256: 7f8a9...b12</span>
+                </div>
+                <div class="stream-log-entry">
+                  <span class="s-dot"></span>
+                  <span class="s-time font-mono">14:32:01.415</span>
+                  <span class="s-msg">LEDGER_BALANCED · 2 entries inserted · Invariant check PASSED</span>
+                </div>
+                <div class="stream-log-entry">
+                  <span class="s-dot"></span>
+                  <span class="s-time font-mono">14:32:01.488</span>
+                  <span class="s-msg">INVOICE_GENERATED · INV-2026-11-000123 · S3 PDF uploaded</span>
+                </div>
+              </div>
+
+            </div>
+          </div>
+
+        </div>
+
+      </div>
+    </section>
+
+    <!-- ========================================================
+         ACT 7: DAILY AUTO-RECONCILIATION ENGINE
+    ======================================================== -->
+    <section class="story-scene scene-reconcile" id="scene-reconciliation">
+      <div class="scene-inner-bounds">
+        
+        <div class="scene-lead-header">
+          <div class="enterprise-eyebrow eyebrow-cyan">
+            <span>AUTOMATED 06:00 AM IST BANK MATCHING</span>
+          </div>
+          <h2 class="scene-master-title">Zero Unreconciled Gaps. 100% Verified.</h2>
+          <p class="scene-master-sub">
+            Your ledger says ₹10,00,000 came in. Your bank statement confirms ₹10,00,000. Every single UTR is matched automatically at 06:00 IST to prevent audit notices and dispute chargebacks.
+          </p>
+        </div>
+
+        <div class="reconcile-card">
+          <div class="reconcile-top-summary">
+            <div class="r-metric">
+              <span class="r-lbl">Bank Statement Total</span>
+              <span class="r-val font-mono">₹10,00,000.00</span>
+            </div>
+            <div class="r-sep"></div>
+            <div class="r-metric">
+              <span class="r-lbl">DISHA Ledger Balance</span>
+              <span class="r-val font-mono text-teal">₹10,00,000.00</span>
+            </div>
+            <div class="r-sep"></div>
+            <div class="r-status-badge">
+              <span class="live-dot-pulse"></span>
+              <span>100% RECONCILED · ZERO VARIANCE</span>
+            </div>
+          </div>
+
+          <div class="reconcile-bars-grid">
+            <div class="r-bar-item matched">
+              <div class="r-b-header">
+                <span>✅ Reconciled Transactions</span>
+                <span class="font-mono">1,245 Txns (₹9,98,500.00)</span>
+              </div>
+              <div class="r-progress-bg"><div class="r-progress-fill" style="width: 99.8%;"></div></div>
+            </div>
+
+            <div class="r-bar-item pending">
+              <div class="r-b-header">
+                <span>⏳ In-Transit Bank Settlement</span>
+                <span class="font-mono">5 Txns (₹1,500.00)</span>
+              </div>
+              <div class="r-progress-bg"><div class="r-progress-fill warning" style="width: 0.2%;"></div></div>
+            </div>
+
+            <div class="r-bar-item discrepancy">
+              <div class="r-b-header">
+                <span>⚠️ Unreconciled Discrepancies</span>
+                <span class="font-mono">0 Txns (₹0.00)</span>
+              </div>
+              <div class="r-progress-bg"><div class="r-progress-fill zero" style="width: 0%;"></div></div>
+            </div>
+          </div>
+
+          <div class="reconcile-footer">
+            <span class="r-audit-note">Next reconciliation run: Tomorrow at 06:00 AM IST via NPCI HDFC Direct Gateway Feed</span>
+            <button class="btn-download-inv" onclick="showDishaToast('Downloading 1-Click Bank Reconciliation Report...')">
+              📊 Export Full Reconciliation Audit
+            </button>
+          </div>
+        </div>
+
+      </div>
+    </section>
+
+    <!-- ========================================================
+         ACT 8: LIVE MERCHANT DASHBOARD (WHAT THEY SEE)
+    ======================================================== -->
+    <section class="story-scene scene-dashboard" id="scene-dashboard">
+      <div class="scene-inner-bounds">
+        
+        <div class="scene-lead-header">
+          <div class="enterprise-eyebrow eyebrow-teal">
+            <span>UNIFIED SOVEREIGN MERCHANT CONSOLE</span>
+          </div>
+          <h2 class="scene-master-title">Your Complete Financial Command Center.</h2>
+          <p class="scene-master-sub">
+            Realtime revenue, balanced ledger entries, VPA health telemetry, and savings tracker in one unified, responsive interface.
+          </p>
+        </div>
+
+        <div class="merchant-dashboard-frame">
+          
+          <!-- Top Metric KPI Cards -->
+          <div class="dash-kpi-quad">
+            <div class="kpi-card">
+              <span class="kpi-label">Today's Settlement Volume</span>
+              <div class="kpi-value font-mono">₹47,320.00</div>
+              <span class="kpi-sub text-teal">↑ 18.4% vs yesterday</span>
+            </div>
+            <div class="kpi-card">
+              <span class="kpi-label">Successful Transactions</span>
+              <div class="kpi-value font-mono">38 Txns</div>
+              <span class="kpi-sub text-teal">100% Success Rate</span>
+            </div>
+            <div class="kpi-card highlight-kpi">
+              <span class="kpi-label">Gateway Fees Saved (Today)</span>
+              <div class="kpi-value font-mono text-teal">₹1,193.46</div>
+              <span class="kpi-sub text-gold">₹28,320.00 saved this month</span>
+            </div>
+            <div class="kpi-card">
+              <span class="kpi-label">Active Healthy VPAs</span>
+              <div class="kpi-value font-mono">3 / 4 Pool</div>
+              <span class="kpi-sub text-teal">Average Health 88.5</span>
+            </div>
+          </div>
+
+          <!-- Bottom Duo: Live Ledger Feed & Monthly Savings -->
+          <div class="dash-duo-row">
+            
+            <!-- Live Ledger Feed -->
+            <div class="dash-panel">
+              <div class="dash-panel-header">
+                <h4 class="dash-h4">Live Balanced Ledger Journal</h4>
+                <a href="#scene-ledger" class="dash-link">View Full Ledger ➔</a>
+              </div>
+              <div class="dash-feed-list">
+                <div class="feed-item">
+                  <div class="feed-left">
+                    <span class="feed-dot"></span>
+                    <div>
+                      <div class="feed-title">₹1,249.37 Received via UPI</div>
+                      <div class="feed-meta font-mono">UTR 311400000123 · merchant007@ybl</div>
+                    </div>
+                  </div>
+                  <div class="feed-right font-mono text-teal">+₹1,249.37</div>
+                </div>
+
+                <div class="feed-item">
+                  <div class="feed-left">
+                    <span class="feed-dot"></span>
+                    <div>
+                      <div class="feed-title">₹500.00 Received via UPI</div>
+                      <div class="feed-meta font-mono">UTR 311400000122 · merchant008@oksbi</div>
+                    </div>
+                  </div>
+                  <div class="feed-right font-mono text-teal">+₹500.00</div>
+                </div>
+
+                <div class="feed-item">
+                  <div class="feed-left">
+                    <span class="feed-dot"></span>
+                    <div>
+                      <div class="feed-title">₹2,499.00 Received via UPI</div>
+                      <div class="feed-meta font-mono">UTR 311400000121 · merchant009@ibl</div>
+                    </div>
+                  </div>
+                  <div class="feed-right font-mono text-teal">+₹2,499.00</div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Monthly Savings Summary -->
+            <div class="dash-panel savings-panel">
+              <div class="dash-panel-header">
+                <h4 class="dash-h4">Monthly Fee Exemption Ledger</h4>
+                <span class="tag-zero">0.00% MDR</span>
+              </div>
+              <div class="savings-content">
+                <div class="savings-row">
+                  <span>If Using Razorpay / PineLabs (2.36%)</span>
+                  <span class="font-mono text-loss">₹28,320.00</span>
+                </div>
+                <div class="savings-row">
+                  <span>Using DISHA 8.2 Sovereign Rail</span>
+                  <span class="font-mono text-teal">₹0.00</span>
+                </div>
+                <div class="savings-divider"></div>
+                <div class="savings-row highlight">
+                  <span>Total Capital Retained This Month</span>
+                  <span class="font-mono text-teal font-bold">₹28,320.00</span>
+                </div>
+                <div class="savings-row projection">
+                  <span>Annual Projected Merchant Rent Retained</span>
+                  <span class="font-mono text-gold font-bold">₹3,39,840.00 / yr</span>
+                </div>
+              </div>
+            </div>
+
+          </div>
+
+        </div>
+
+      </div>
+    </section>
+
+    <!-- ========================================================
+         ACT 9: SOVEREIGN P&L ROI CALCULATOR
+    ======================================================== -->
+    <section class="story-scene scene-calc" id="scene-calculator">
+      <div class="scene-inner-bounds">
+        
+        <div class="scene-lead-header">
+          <div class="enterprise-eyebrow eyebrow-teal">
+            <span>INTERACTIVE FINANCIAL RETURN MODEL</span>
+          </div>
+          <h2 class="scene-master-title">Calculate Your Recovered Annual Capital.</h2>
+          <p class="scene-master-sub">
+            Move the slider to calculate the exact capital extracted by legacy aggregators versus preserved by DISHA 8.2.
+          </p>
+        </div>
+
+        <div class="calculator-glass-card">
+          <div class="calc-slider-block">
+            <div class="calc-slider-top">
+              <label for="monthlyTurnover" class="calc-label">Monthly UPI Store Turnover</label>
+              <div class="calc-slider-val" id="turnoverDisplay">₹6,00,000</div>
+            </div>
+            <input type="range" id="monthlyTurnover" min="50000" max="2500000" step="25000" value="600000" class="disha-range-slider">
+            <div class="slider-ticks">
+              <span>₹50K</span>
+              <span>₹5L</span>
+              <span>₹10L</span>
+              <span>₹15L</span>
+              <span>₹25L</span>
+            </div>
+          </div>
+
+          <div class="calc-results-duo">
+            <div class="calc-card legacy-loss">
+              <span class="calc-card-eyebrow text-loss">LEGACY GATEWAY COMMISSION SIPHON</span>
+              <div class="calc-big-num text-loss" id="annualLossDisplay">₹1,69,920</div>
+              <div class="calc-sub-text">Lost each year to 1.8% MDR + 18% GST + soundbox hardware rental</div>
+            </div>
+
+            <div class="calc-card disha-retained">
+              <span class="calc-card-eyebrow text-teal">DISHA 8.2 RETAINED CAPITAL</span>
+              <div class="calc-big-num text-teal" id="annualSavingsDisplay">+₹1,69,920</div>
+              <div class="calc-sub-text">100% of revenue settled instantly into your bank account with zero fees</div>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </section>
+
+    <!-- ========================================================
+         ACT 10: PHYSICAL HARDWARE SOUNDBOX TEST
+    ======================================================== -->
+    <section class="story-scene scene-soundbox" id="scene-soundbox">
+      <div class="scene-inner-bounds">
+        
+        <div class="scene-lead-header">
+          <div class="enterprise-eyebrow eyebrow-cyan">
+            <span>&lt; 15MS SUB-AUDIBLE ACOUSTIC TELEMETRY</span>
+          </div>
+          <h2 class="scene-master-title">Browser-Native Voice Soundbox.</h2>
+          <p class="scene-master-sub">
+            Zero SIM cards. Zero hardware rentals. Zero delayed alerts. DISHA uses browser-native Web Audio and Web SpeechSynthesis to announce payments in English, Hindi, and Marathi instantly.
+          </p>
+        </div>
+
+        <div class="soundbox-hardware-stage">
+          <div class="soundbox-bezel-device tilt-card" data-tilt>
+            
+            <div class="soundbox-speaker-grille">
+              <div class="grille-hole"></div><div class="grille-hole"></div><div class="grille-hole"></div><div class="grille-hole"></div>
+              <div class="grille-hole"></div><div class="grille-hole"></div><div class="grille-hole"></div><div class="grille-hole"></div>
+            </div>
+
+            <div class="soundbox-led-display" id="soundboxLed">
+              <span class="led-dot-live"></span>
+              <span class="led-text" id="soundboxLedText">DISHA 8.2 · READY</span>
+            </div>
+
+            <div class="soundbox-controls-row">
+              <div class="lang-selector">
+                <label>Language:</label>
+                <select id="soundboxLangSelect" class="lang-select">
+                  <option value="en-IN">English (en-IN)</option>
+                  <option value="hi-IN">हिन्दी (hi-IN)</option>
+                  <option value="mr-IN">मराठी (mr-IN)</option>
+                </select>
+              </div>
+
+              <div class="amount-buttons-cluster">
+                <button class="btn-voice-test" data-amt="100">₹100</button>
+                <button class="btn-voice-test" data-amt="500">₹500</button>
+                <button class="btn-voice-test" data-amt="1000">₹1,000</button>
+                <button class="btn-voice-test" data-amt="5000">₹5,000</button>
+              </div>
+            </div>
+
+          </div>
+        </div>
+
+      </div>
+    </section>
+
+  </main>
+
+  <!-- ========================================================
+       GLOBAL PROFESSIONAL FOOTER
+  ======================================================== -->
+  <footer class="disha-global-footer">
+    <div class="footer-container">
+      <div class="footer-brand-col">
+        <div class="f-brand-title">DISHA 8.2 ENTERPRISE</div>
+        <p class="f-brand-desc">Sovereign Direct UPI Settlement Rail, Smart VPA Routing &amp; Cryptographic Double-Entry Ledger System for Modern Merchants.</p>
+        <div class="f-compliance-badges">
+          <span class="badge-compliance">RBI Data Localization (ap-south-1)</span>
+          <span class="badge-compliance">GST Section 194Q Compliant</span>
+          <span class="badge-compliance">NPCI UPI 2.0 Direct</span>
+        </div>
+      </div>
+
+      <div class="footer-links-col">
+        <h5 class="f-link-h5">Production Stack</h5>
+        <a href="#scene-vpa-routing">Smart VPA Routing</a>
+        <a href="#scene-ledger">Double-Entry Ledger</a>
+        <a href="#scene-compliance">Compliance &amp; GST Invoicing</a>
+        <a href="#scene-reconciliation">Bank Statement Reconciliation</a>
+      </div>
+
+      <div class="footer-links-col">
+        <h5 class="f-link-h5">Hardware &amp; Tools</h5>
+        <a href="#scene-soundbox">Voice Soundbox Engine</a>
+        <a href="#scene-calculator">P&amp;L ROI Calculator</a>
+        <a href="#scene-dashboard">Merchant Console</a>
+        <a href="http://localhost:5173" target="_blank" rel="noopener">LŪMEN // ÍNDEX Portal ➔</a>
+      </div>
+    </div>
+
+    <div class="footer-bottom-line">
+      <span>© 2026 DISHA Sovereign Fintech. Apache 2.0 Open Sovereign Architecture.</span>
+      <span>Engineered for Indian Merchants with Zero Exploitative Intermediaries.</span>
+    </div>
+  </footer>
+
+  <script src="app.js"></script>
+</body>
+</html>

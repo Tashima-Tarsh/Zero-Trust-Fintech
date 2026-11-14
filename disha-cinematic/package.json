@@ -1,0 +1,21 @@
+{
+  "name": "disha-cinematic",
+  "version": "8.2.0",
+  "description": "DISHA 8.2 Cinematic Motion Website - Problem -> Villain -> Panic -> Hero -> Transformation",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "keywords": [
+    "fintech",
+    "zero-trust",
+    "cinematic",
+    "upi",
+    "motion-design"
+  ],
+  "author": "NITISH KUMAR",
+  "license": "MIT",
+  "devDependencies": {
+    "puppeteer-core": "^25.17.0"
+  }
+}

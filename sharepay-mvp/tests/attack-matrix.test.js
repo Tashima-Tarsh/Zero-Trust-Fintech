@@ -126,10 +126,11 @@ runTest('Attack 3: Receipt from 5 hours ago today is blocked by Hourly Window ch
     expiresAt: now + 3 * 60 * 1000
   });
 
-  const istNow = getISTDate(now);
-  const yearDigit = istNow.getFullYear() % 10;
-  const julianDay = String(getJulianDay(istNow)).padStart(3, '0');
-  const staleHour = String((istNow.getHours() - 5 + 24) % 24).padStart(2, '0');
+  const fiveHoursAgo = new Date(now - 5 * 3600 * 1000);
+  const istStale = getISTDate(fiveHoursAgo);
+  const yearDigit = istStale.getFullYear() % 10;
+  const julianDay = String(getJulianDay(istStale)).padStart(3, '0');
+  const staleHour = String(istStale.getHours()).padStart(2, '0');
   const staleHourUtr = `${yearDigit}${julianDay}${staleHour}888888`;
 
   const rawReceipt = `Paid ₹99.12 to Test Store. UTR: ${staleHourUtr}.`;
