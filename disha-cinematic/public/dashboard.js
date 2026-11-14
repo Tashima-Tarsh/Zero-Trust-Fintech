@@ -586,38 +586,79 @@ function playMerchantAnnouncement(amount) {
 // VPA Management
 async function loadVpas() {
   try {
-    const res = await fetch('/api/merchant/vpas', {
-      headers: { 'Authorization': 'Bearer ' + authToken }
-    });
-    if (!res.ok) return;
+    const [vpaRes, anaRes] = await Promise.all([
+      fetch('/api/merchant/vpas', { headers: { 'Authorization': 'Bearer ' + authToken } }),
+      fetch('/api/merchant/vpas/analytics', { headers: { 'Authorization': 'Bearer ' + authToken } }).catch(() => null)
+    ]);
 
-    const data = await res.json();
+    if (!vpaRes.ok) return;
+
+    const data = await vpaRes.json();
     currentVpas = data.vpas || [];
     renderVpaTable(currentVpas);
+
+    if (anaRes && anaRes.ok) {
+      const anaData = await anaRes.json();
+      renderVpaAnalytics(anaData.analytics);
+    }
   } catch (err) {
     console.error('Failed to load VPAs:', err);
+  }
+}
+
+function renderVpaAnalytics(analytics) {
+  if (!analytics) return;
+  const healthEl = document.getElementById('vpaFleetHealth');
+  const activeCountEl = document.getElementById('vpaActiveCount');
+  const dailyTxEl = document.getElementById('vpaDailyTxCapacity');
+  const dailyVolEl = document.getElementById('vpaDailyVolCapacity');
+  const monthlyVolEl = document.getElementById('vpaMonthlyVolCapacity');
+  const bankCountEl = document.getElementById('vpaBankDiversityCount');
+  const pillsEl = document.getElementById('vpaDiversityPills');
+
+  if (healthEl) healthEl.textContent = `${analytics.avgHealth}% Low Risk`;
+  if (activeCountEl) activeCountEl.textContent = analytics.active;
+  if (dailyTxEl) dailyTxEl.textContent = `${analytics.capacity?.dailySafeTxCapacity || 0} / day`;
+  if (dailyVolEl) dailyVolEl.textContent = `₹${(analytics.capacity?.dailySafeVolumeCapacity || 0).toLocaleString('en-IN')} / day`;
+  if (monthlyVolEl) monthlyVolEl.textContent = `₹${((analytics.capacity?.monthlySafeVolumeCapacity || 0) / 10000000).toFixed(2)} Cr / mo safe limit`;
+  if (bankCountEl) bankCountEl.textContent = `${analytics.bankDiversity?.length || 0} Banks`;
+
+  if (pillsEl && analytics.bankDiversity) {
+    pillsEl.innerHTML = analytics.bankDiversity.map(b => `
+      <span style="font-size: 11px; padding: 2px 6px; background: rgba(255,255,255,0.06); border-radius: 4px; border: 1px solid rgba(255,255,255,0.1);">
+        ${b.bank}: <strong>${b.pct}%</strong>
+      </span>
+    `).join('');
   }
 }
 
 function renderVpaTable(vpas) {
   const tbody = document.getElementById('vpaTableBody');
   if (!vpas || vpas.length === 0) {
-    tbody.innerHTML = `<tr><td colspan="5" class="empty-table-msg">No UPI IDs found. Click "+ Add New UPI ID" above.</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="5" class="empty-table-msg">No UPI IDs found. Click "+ Add New UPI ID" or "Bulk Import" above.</td></tr>`;
     return;
   }
 
   tbody.innerHTML = vpas.map(v => {
     const isActive = v.status === 'ACTIVE';
+    const isCooldown = v.status === 'COOLDOWN';
+    let statusBadge = '<span class="status-pill-active">Active</span>';
+    if (isCooldown) {
+      statusBadge = '<span class="status-pill-paused" style="background: rgba(245, 158, 11, 0.2); color: #fbbf24;">Quarantined (Cooldown)</span>';
+    } else if (!isActive) {
+      statusBadge = '<span class="status-pill-paused">Paused</span>';
+    }
+
     return `
       <tr>
         <td><strong class="font-mono">${v.vpa_address}</strong></td>
         <td>${v.bank_name}</td>
-        <td><span class="${isActive ? 'status-pill-active' : 'status-pill-paused'}">${isActive ? 'Active' : 'Paused'}</span></td>
+        <td>${statusBadge}</td>
         <td>${v.is_default ? '<span class="tag-default">DEFAULT</span>' : '<button type="button" class="btn-table-action" onclick="setDefaultVpa(\'' + v.id + '\')">Set Default</button>'}</td>
         <td>
-          <button type="button" class="btn-table-action" onclick="toggleVpaStatus('${v.id}', '${isActive ? 'pause' : 'resume'}')">
-            ${isActive ? 'Pause' : 'Resume'}
-          </button>
+          ${isActive ? '<button type="button" class="btn-table-action" onclick="toggleVpaStatus(\'' + v.id + '\', \'pause\')">Pause</button>' : ''}
+          ${v.status === 'PAUSED' || isCooldown ? '<button type="button" class="btn-table-action" onclick="toggleVpaStatus(\'' + v.id + '\', \'resume\')">Resume</button>' : ''}
+          ${isActive && !v.is_default ? '<button type="button" class="btn-table-action" style="color: #f59e0b;" onclick="quarantineVpa(\'' + v.id + '\')">Quarantine</button>' : ''}
           ${!v.is_default ? '<button type="button" class="btn-table-danger" onclick="deleteVpa(\'' + v.id + '\')">Delete</button>' : ''}
         </td>
       </tr>
@@ -634,6 +675,93 @@ window.openAddVpaModal = function() {
 
 window.closeAddVpaModal = function() {
   document.getElementById('addVpaModal').style.display = 'none';
+};
+
+window.openBulkVpaModal = function() {
+  const modal = document.getElementById('bulkVpaModal');
+  if (modal) {
+    modal.style.display = 'flex';
+    document.getElementById('bulkCsvInput').value = '';
+    const fb = document.getElementById('bulkVpaFeedback');
+    if (fb) fb.style.display = 'none';
+  }
+};
+
+window.closeBulkVpaModal = function() {
+  const modal = document.getElementById('bulkVpaModal');
+  if (modal) modal.style.display = 'none';
+};
+
+document.getElementById('bulkVpaForm')?.addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const csv = document.getElementById('bulkCsvInput').value.trim();
+  const fb = document.getElementById('bulkVpaFeedback');
+  const btn = document.getElementById('btnUploadBulkVpa');
+
+  if (!csv) return;
+  btn.disabled = true;
+  btn.textContent = 'Ingesting...';
+
+  try {
+    const res = await fetch('/api/merchant/vpas/bulk-upload', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer ' + authToken
+      },
+      body: JSON.stringify({ csv })
+    });
+    const data = await res.json();
+    btn.disabled = false;
+    btn.textContent = 'Ingest Fleet';
+
+    if (!res.ok) {
+      alert(data.error || 'Failed to ingest VPAs');
+      return;
+    }
+
+    if (fb) {
+      fb.style.display = 'block';
+      let msg = `✓ Added ${data.added} VPAs into rotation (${data.skipped} skipped).`;
+      if (data.bankDiversityWarning) {
+        msg += `<br>⚠️ ${data.bankDiversityWarning}`;
+        fb.className = 'vpa-feedback-box invalid';
+      } else {
+        fb.className = 'vpa-feedback-box valid';
+      }
+      fb.innerHTML = msg;
+    }
+
+    setTimeout(() => {
+      closeBulkVpaModal();
+      loadVpas();
+      loadDashboardOverview();
+    }, 1500);
+  } catch (err) {
+    btn.disabled = false;
+    btn.textContent = 'Ingest Fleet';
+    alert('Server error while importing VPAs');
+  }
+});
+
+window.quarantineVpa = async function(vpaId) {
+  if (!confirm('Put this VPA into emergency 7-day quarantine cooldown? It will be removed from active checkout rotation.')) return;
+  try {
+    const res = await fetch(`/api/merchant/vpas/${vpaId}`, {
+      method: 'PATCH',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer ' + authToken
+      },
+      body: JSON.stringify({ action: 'quarantine' })
+    });
+    if (res.ok) {
+      loadVpas();
+      loadDashboardOverview();
+    }
+  } catch (err) {
+    console.error(err);
+  }
 };
 
 const newVpaInput = document.getElementById('newVpaAddress');

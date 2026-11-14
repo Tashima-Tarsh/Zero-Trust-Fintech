@@ -1,0 +1,96 @@
+{
+  "name": "DISHA 8.2 — Workflow 3: Real-Time Dynamic VPA Anti-Ban Routing",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "checkout/initiate",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "node-webhook-checkout",
+      "name": "Webhook: Order Checkout Initiated",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [220, 320],
+      "webhookId": "disha-checkout-initiate"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://localhost:3000/api/vpa/select",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"merchantId\": \"{{ $json.body.merchantId || 'mer_default' }}\",\n  \"amount\": {{ $json.body.amount || 100 }},\n  \"customerRegion\": \"{{ $json.body.customerRegion || 'MH' }}\",\n  \"customerVpa\": \"{{ $json.body.customerVpa || '' }}\"\n}",
+        "options": {}
+      },
+      "id": "node-http-vpa-select",
+      "name": "Query DISHA 5-Factor VPA Router",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [460, 320]
+    },
+    {
+      "parameters": {
+        "jsCode": "const initial = $('Webhook: Order Checkout Initiated').first().json.body || {};\nconst routerRes = $input.first().json.selectedVpa || {};\n\nconst orderId = initial.orderId || ('Order_' + Math.random().toString(36).substring(2, 10).toUpperCase());\nconst amount = parseFloat(initial.amount || 100).toFixed(2);\nconst payeeVpa = routerRes.vpaAddress || 'disha82@okaxis';\nconst payeeName = routerRes.holderName || 'DISHA Merchant Store';\nconst txnRef = 'TXN_' + Date.now() + '_' + Math.random().toString(36).substring(2, 8).toUpperCase();\n\n// NPCI UPI Specification v3.2 formatting\nconst params = new URLSearchParams({\n  pa: payeeVpa,\n  pn: payeeName,\n  am: amount,\n  tn: orderId,\n  tr: txnRef,\n  cu: 'INR'\n});\n\nconst upiIntentUri = 'upi://pay?' + params.toString();\n\nreturn [{\n  json: {\n    success: true,\n    orderId,\n    amount: parseFloat(amount),\n    vpa: payeeVpa,\n    bank: routerRes.bankName,\n    healthScore: routerRes.healthScore,\n    cooldownMinutes: routerRes.cooldownMinutes,\n    upiIntentUri,\n    qrData: upiIntentUri,\n    expiresInSeconds: 180\n  }\n}];"
+      },
+      "id": "node-build-intent",
+      "name": "Build NPCI Intent Deep Link",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [700, 320]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify($json) }}",
+        "options": {
+          "responseCode": 200
+        }
+      },
+      "id": "node-respond-webhook",
+      "name": "Respond to Checkout Client",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [940, 320]
+    }
+  ],
+  "connections": {
+    "Webhook: Order Checkout Initiated": {
+      "main": [
+        [
+          {
+            "node": "Query DISHA 5-Factor VPA Router",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Query DISHA 5-Factor VPA Router": {
+      "main": [
+        [
+          {
+            "node": "Build NPCI Intent Deep Link",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build NPCI Intent Deep Link": {
+      "main": [
+        [
+          {
+            "node": "Respond to Checkout Client",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  }
+}

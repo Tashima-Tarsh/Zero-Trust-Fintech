@@ -253,7 +253,39 @@ const server = http.createServer(async (req, res) => {
         return sendJson(res, 200, { success: true, vpas });
       }
 
-      // UPI IDs: Add
+      // UPI IDs: Pool Analytics & Anti-Ban Safe Capacity
+      if (pathname === '/api/merchant/vpas/analytics' && method === 'GET') {
+        const analytics = db.getMerchantVPAAnalytics(currentMerchant.id);
+        return sendJson(res, 200, { success: true, analytics });
+      }
+
+      // UPI IDs: Bulk CSV / Array Ingestion
+      if (pathname === '/api/merchant/vpas/bulk-upload' && method === 'POST') {
+        const body = await readBody(req);
+        let rows = body.rows;
+        if (!rows && (body.csv || body.csvContent)) {
+          const lines = (body.csv || body.csvContent).split(/\r?\n/).filter(l => l.trim().length > 0);
+          if (lines.length > 1) {
+            const headers = lines[0].split(',').map(h => h.trim().toLowerCase());
+            rows = [];
+            for (let i = 1; i < lines.length; i++) {
+              const vals = lines[i].split(',').map(v => v.trim());
+              const obj = {};
+              headers.forEach((h, idx) => { obj[h] = vals[idx]; });
+              rows.push(obj);
+            }
+          }
+        }
+
+        if (!rows || !Array.isArray(rows) || rows.length === 0) {
+          return sendError(res, 400, 'Valid CSV content or rows array required');
+        }
+
+        const result = db.bulkImportMerchantVPAs(currentMerchant.id, rows);
+        return sendJson(res, 200, { success: true, ...result });
+      }
+
+      // UPI IDs: Add Single
       if (pathname === '/api/merchant/vpas' && method === 'POST') {
         const body = await readBody(req);
         const { vpaAddress, bankName } = body;
@@ -272,7 +304,7 @@ const server = http.createServer(async (req, res) => {
         return sendJson(res, 201, { success: true, vpa: newVpa });
       }
 
-      // UPI IDs: Action (pause / resume / set_default)
+      // UPI IDs: Action (pause / resume / set_default / quarantine)
       const vpaMatch = pathname.match(/^\/api\/merchant\/vpas\/([^/]+)$/);
       if (vpaMatch && method === 'PATCH') {
         const vpaId = vpaMatch[1];
@@ -288,8 +320,11 @@ const server = http.createServer(async (req, res) => {
         } else if (action === 'resume') {
           const vpa = db.updateVPAStatus(currentMerchant.id, vpaId, 'ACTIVE');
           return sendJson(res, 200, { success: true, vpa });
+        } else if (action === 'quarantine') {
+          const vpa = db.updateVPAStatus(currentMerchant.id, vpaId, 'COOLDOWN');
+          return sendJson(res, 200, { success: true, vpa, message: 'VPA placed into 7-day quarantine cooldown.' });
         } else {
-          return sendError(res, 400, 'Invalid action. Supported: set_default, pause, resume');
+          return sendError(res, 400, 'Invalid action. Supported: set_default, pause, resume, quarantine');
         }
       }
 

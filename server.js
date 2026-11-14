@@ -525,6 +525,80 @@ app.get('/api/ledger/:orderId', (req, res) => {
   });
 });
 
+// ═══════════════════════════════════════════════════════════════════
+// TASK 12: 1000 VPA ROUTING, TELEMETRY & ANTI-BAN REST ENDPOINTS
+// ═══════════════════════════════════════════════════════════════════
+
+// 1. Select optimal VPA (5-Factor anti-ban scoring + chaos jitter)
+app.post('/api/vpa/select', async (req, res) => {
+  try {
+    const { merchantId = 'mer_default', amount = 100, customerRegion = 'MH', timeOfDay = null, customerVpa = null } = req.body;
+    const selected = await db.vpaRouter.selectVPA(merchantId, parseFloat(amount), customerRegion, timeOfDay, customerVpa);
+    res.json({ success: true, selectedVpa: selected });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// 2. Bulk upload VPAs (CSV text or JSON rows)
+app.post('/api/vpa/upload', async (req, res) => {
+  try {
+    const { csv, csvContent, rows, merchantId = 'mer_default' } = req.body;
+    const { parseCSV } = require('./vpa-importer');
+    let vpaRows = rows;
+    if (!vpaRows && (csv || csvContent)) {
+      vpaRows = parseCSV(csv || csvContent);
+    }
+    if (!vpaRows || !Array.isArray(vpaRows) || vpaRows.length === 0) {
+      return res.status(400).json({ success: false, error: 'No valid rows or CSV content provided' });
+    }
+
+    const result = await db.vpaImporter.importVPAs(vpaRows, merchantId);
+    res.json({ success: true, ...result });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// 3. Emergency quarantine (7-day cooldown + health reduction)
+app.post('/api/vpa/quarantine', (req, res) => {
+  try {
+    const { vpaId, reason } = req.body;
+    if (!vpaId) {
+      return res.status(400).json({ success: false, error: 'vpaId is required' });
+    }
+    const result = db.vpaRouter.quarantineVPA(vpaId, reason || 'Bank warning / emergency freeze');
+    res.json({ success: true, ...result });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// 4. Pool analytics & bank diversity breakdown
+app.get('/api/vpa/analytics', (req, res) => {
+  try {
+    const merchantId = req.query.merchantId || 'mer_default';
+    const analytics = db.vpaRouter.getPoolAnalytics(merchantId);
+    res.json({ success: true, analytics });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// 5. Daily health reset & rebalance (6 AM Cron trigger)
+app.post('/api/vpa/health-check', (req, res) => {
+  try {
+    const result = db.vpaRouter.dailyHealthResetAndRebalance();
+    res.json({
+      success: true,
+      message: 'Daily VPA health recalibration and rebalance complete',
+      ...result
+    });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
 // Route fallbacks
 app.get('/success', (req, res) => res.sendFile(path.join(__dirname, 'public', 'success.html')));
 app.get('/failed', (req, res) => res.sendFile(path.join(__dirname, 'public', 'failed.html')));

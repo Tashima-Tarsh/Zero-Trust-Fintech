@@ -21,29 +21,76 @@ VALUES
     ('acc_fee_01', '5010-FEES', 'Aggregator Gateway Fees (Zero in DISHA)', 'EXPENSE', 'mer_default', 1700000000000)
 ON CONFLICT (code) DO NOTHING;
 
--- 2. VPA Pool for Ban Prevention and Smart Rotation
+-- 2. VPA Pool for 1000-VPA Anti-Ban Smart Rotation & Personal Accounts
 CREATE TABLE IF NOT EXISTS vpa_pool (
     id VARCHAR(64) PRIMARY KEY,
     vpa_address VARCHAR(128) UNIQUE NOT NULL,
+    holder_name VARCHAR(128),
     bank_name VARCHAR(64) NOT NULL,
-    status VARCHAR(16) NOT NULL DEFAULT 'ACTIVE' CHECK(status IN ('ACTIVE', 'PAUSED', 'COOLDOWN')),
-    health_score INT NOT NULL DEFAULT 95 CHECK(health_score BETWEEN 0 AND 100),
-    daily_tx_limit INT NOT NULL DEFAULT 30,
-    daily_volume_limit NUMERIC(12, 2) NOT NULL DEFAULT 50000.00,
+    account_type VARCHAR(20) NOT NULL DEFAULT 'PERSONAL',
+    status VARCHAR(20) NOT NULL DEFAULT 'ACTIVE' CHECK(status IN ('ACTIVE', 'COOLDOWN', 'FLAGGED', 'BANNED', 'RETIRED', 'PAUSED')),
+    health_score INT NOT NULL DEFAULT 100 CHECK(health_score BETWEEN 0 AND 100),
+    risk_level VARCHAR(10) NOT NULL DEFAULT 'LOW' CHECK(risk_level IN ('LOW', 'MEDIUM', 'HIGH', 'CRITICAL')),
+    preferred_time_slot VARCHAR(20) NOT NULL DEFAULT 'ANY' CHECK(preferred_time_slot IN ('MORNING', 'AFTERNOON', 'EVENING', 'ANY')),
+    active_hours_start INT NOT NULL DEFAULT 8,
+    active_hours_end INT NOT NULL DEFAULT 22,
+    daily_tx_limit INT NOT NULL DEFAULT 15,
+    daily_volume_limit NUMERIC(12, 2) NOT NULL DEFAULT 25000.00,
+    per_tx_limit NUMERIC(12, 2) NOT NULL DEFAULT 5000.00,
+    unique_senders_daily_limit INT NOT NULL DEFAULT 12,
     daily_tx_count INT NOT NULL DEFAULT 0,
     daily_volume NUMERIC(12, 2) NOT NULL DEFAULT 0.00,
+    unique_senders_today INT NOT NULL DEFAULT 0,
+    min_gap_minutes INT NOT NULL DEFAULT 8,
     last_used_at BIGINT,
     cooldown_until BIGINT NOT NULL DEFAULT 0,
     merchant_id VARCHAR(64) NOT NULL DEFAULT 'mer_default',
+    notes TEXT,
+    excel_row_id VARCHAR(50),
     created_at BIGINT NOT NULL
 );
 
--- Seed Primary Merchant VPAs
-INSERT INTO vpa_pool (id, vpa_address, bank_name, status, health_score, daily_tx_limit, daily_volume_limit, merchant_id, created_at)
+-- VPA Usage Log for pattern analysis and anti-ban telemetry
+CREATE TABLE IF NOT EXISTS vpa_usage_log (
+    id VARCHAR(64) PRIMARY KEY,
+    vpa_id VARCHAR(64) NOT NULL,
+    merchant_id VARCHAR(64) NOT NULL,
+    transaction_id VARCHAR(64),
+    amount NUMERIC(12, 2) NOT NULL,
+    customer_vpa VARCHAR(128),
+    customer_region VARCHAR(64),
+    time_slot VARCHAR(20),
+    used_at BIGINT NOT NULL
+);
+
+-- VPA Health Events for warning signs and degradation
+CREATE TABLE IF NOT EXISTS vpa_health_events (
+    id VARCHAR(64) PRIMARY KEY,
+    vpa_id VARCHAR(64) NOT NULL,
+    event_type VARCHAR(50) NOT NULL,
+    severity VARCHAR(20) NOT NULL,
+    description TEXT,
+    health_impact INT DEFAULT 0,
+    created_at BIGINT NOT NULL
+);
+
+-- VPA Sender Tracking (Prevent same sender hitting same VPA multiple times per day)
+CREATE TABLE IF NOT EXISTS vpa_sender_tracking (
+    id VARCHAR(64) PRIMARY KEY,
+    vpa_id VARCHAR(64) NOT NULL,
+    customer_vpa VARCHAR(128) NOT NULL,
+    tracking_date VARCHAR(10) NOT NULL,
+    tx_count INT DEFAULT 1,
+    last_seen BIGINT NOT NULL,
+    UNIQUE(vpa_id, customer_vpa, tracking_date)
+);
+
+-- Seed Primary Merchant VPAs with human time-slots and conservative limits
+INSERT INTO vpa_pool (id, vpa_address, holder_name, bank_name, status, health_score, preferred_time_slot, daily_tx_limit, daily_volume_limit, merchant_id, created_at)
 VALUES 
-    ('vpa_axis_01', 'disha82@okaxis', 'Axis Bank', 'ACTIVE', 98, 30, 50000.00, 'mer_default', 1700000000000),
-    ('vpa_icici_02', 'disha82@icici', 'ICICI Bank', 'ACTIVE', 96, 30, 50000.00, 'mer_default', 1700000000000),
-    ('vpa_yes_03', 'disha82@ybl', 'YES Bank', 'ACTIVE', 94, 30, 50000.00, 'mer_default', 1700000000000)
+    ('vpa_axis_01', 'disha82@okaxis', 'Ramesh Kirana Core', 'Axis Bank', 'ACTIVE', 98, 'MORNING', 15, 25000.00, 'mer_default', 1700000000000),
+    ('vpa_icici_02', 'disha82@icici', 'Ramesh Secondary', 'ICICI Bank', 'ACTIVE', 96, 'AFTERNOON', 15, 25000.00, 'mer_default', 1700000000000),
+    ('vpa_yes_03', 'disha82@ybl', 'Ramesh Retail Store', 'YES Bank', 'ACTIVE', 94, 'EVENING', 15, 25000.00, 'mer_default', 1700000000000)
 ON CONFLICT (vpa_address) DO NOTHING;
 
 -- 3. Sessions & Orders

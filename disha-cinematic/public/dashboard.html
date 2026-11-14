@@ -390,15 +390,44 @@
 
         <!-- WORKSPACE 4: UPI IDS -->
         <section id="ws-upi-ids" class="workspace-section">
+          <!-- 1000-VPA Anti-Ban Fleet Capacity & Health Header -->
+          <div class="metrics-grid" style="grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); margin-bottom: 24px;">
+            <div class="metric-card">
+              <span class="m-card-title">1000-VPA Fleet Health</span>
+              <div class="m-card-val text-success" id="vpaFleetHealth">98% Low Risk</div>
+              <div class="m-card-sub"><span id="vpaActiveCount">0</span> active handles in rotation</div>
+            </div>
+            <div class="metric-card">
+              <span class="m-card-title">Safe Daily Tx Capacity</span>
+              <div class="m-card-val" id="vpaDailyTxCapacity">0 / day</div>
+              <div class="m-card-sub text-muted">15 safe txns / personal VPA limit</div>
+            </div>
+            <div class="metric-card">
+              <span class="m-card-title">Safe Daily Volume Run-Rate</span>
+              <div class="m-card-val text-success" id="vpaDailyVolCapacity">₹0.00 / day</div>
+              <div class="m-card-sub" id="vpaMonthlyVolCapacity">₹0.00 / month safe capacity</div>
+            </div>
+            <div class="metric-card">
+              <span class="m-card-title">Bank Diversity (&lt;30% Rule)</span>
+              <div class="m-card-val" id="vpaBankDiversityCount">0 Banks</div>
+              <div class="m-card-sub" id="vpaDiversityPills" style="display:flex; flex-wrap:wrap; gap:4px; margin-top:4px;"></div>
+            </div>
+          </div>
+
           <div class="dash-panel">
             <div class="panel-header">
               <div>
                 <h3>Configured UPI Settlement Handles</h3>
-                <p class="panel-subtitle">Manage the bank accounts where your customer collections land directly.</p>
+                <p class="panel-subtitle">Manage personal VPAs rotated with 5-factor anti-ban scoring, chaos jitter, and dynamic cooldowns.</p>
               </div>
-              <button type="button" class="btn-dash-primary" onclick="openAddVpaModal()">
-                <span>+ Add New UPI ID</span>
-              </button>
+              <div style="display: flex; gap: 8px;">
+                <button type="button" class="btn-dash-secondary" onclick="openBulkVpaModal()">
+                  <span>📁 Bulk Import (CSV)</span>
+                </button>
+                <button type="button" class="btn-dash-primary" onclick="openAddVpaModal()">
+                  <span>+ Add Single UPI ID</span>
+                </button>
+              </div>
             </div>
 
             <div class="table-responsive">
@@ -638,6 +667,28 @@
         <div class="modal-actions">
           <button type="button" class="btn-dash-secondary" onclick="closeAddVpaModal()">Cancel</button>
           <button type="submit" id="btnSaveNewVpa" class="btn-dash-primary" disabled>Save UPI ID</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- BULK VPA MODAL -->
+  <div id="bulkVpaModal" class="modal-backdrop" style="display: none;">
+    <div class="modal-dialog" style="max-width: 560px;">
+      <div class="modal-header">
+        <h3>Bulk Import 1000 Personal VPAs</h3>
+        <button type="button" class="btn-close-modal" onclick="closeBulkVpaModal()">✕</button>
+      </div>
+      <form id="bulkVpaForm" class="modal-body">
+        <div class="form-group">
+          <label class="form-label">Paste CSV Content or VPA List</label>
+          <p class="panel-subtitle" style="margin-bottom: 8px;">Format: <code>vpa_address,holder_name,bank_name</code> (one per line). Time slots (Morning, Afternoon, Evening) are auto-distributed.</p>
+          <textarea id="bulkCsvInput" class="form-input font-mono" rows="8" placeholder="rahul.patel@oksbi,Rahul Patel,SBI&#10;priya.sharma@okhdfcbank,Priya Sharma,HDFC Bank&#10;amit.kumar@okicici,Amit Kumar,ICICI Bank" required></textarea>
+          <div id="bulkVpaFeedback" class="vpa-feedback-box empty" style="margin-top: 8px; display: none;"></div>
+        </div>
+        <div class="modal-actions">
+          <button type="button" class="btn-dash-secondary" onclick="closeBulkVpaModal()">Cancel</button>
+          <button type="submit" id="btnUploadBulkVpa" class="btn-dash-primary">Ingest Fleet</button>
         </div>
       </form>
     </div>

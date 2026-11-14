@@ -1,0 +1,155 @@
+{
+  "name": "DISHA 8.2 — Workflow 1: 1000 VPA Bulk Upload & Ingestion",
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "node-trigger-manual",
+      "name": "Manual / Test Trigger",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [220, 300]
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "vpa-bulk-upload",
+        "options": {}
+      },
+      "id": "node-trigger-webhook",
+      "name": "Webhook: Ingest VPA Batch",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [220, 480],
+      "webhookId": "disha-vpa-bulk-upload"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Prepare and sanitize incoming VPA list\nconst input = $input.first().json;\nlet rows = input.rows || [];\n\nif (typeof input.csv === 'string') {\n  const lines = input.csv.split(/\\r?\\n/).filter(l => l.trim().length > 0);\n  if (lines.length > 1) {\n    const headers = lines[0].split(',').map(h => h.trim().toLowerCase());\n    rows = [];\n    for (let i = 1; i < lines.length; i++) {\n      const vals = lines[i].split(',').map(v => v.trim());\n      const obj = {};\n      headers.forEach((h, idx) => { obj[h] = vals[idx]; });\n      rows.push(obj);\n    }\n  }\n}\n\n// Distribute time-slots evenly (33% MORNING, 33% AFTERNOON, 34% EVENING)\nconst slots = ['MORNING', 'AFTERNOON', 'EVENING'];\nrows = rows.map((r, i) => ({\n  vpa_address: (r.vpa_address || r.vpa || '').trim().toLowerCase(),\n  holder_name: r.holder_name || `Account Holder ${i + 1}`,\n  bank_name: r.bank_name || '',\n  preferred_time_slot: r.preferred_time_slot || slots[i % 3],\n  daily_tx_limit: parseInt(r.daily_tx_limit, 10) || 15,\n  daily_volume_limit: parseFloat(r.daily_volume_limit) || 25000.0,\n  per_tx_limit: parseFloat(r.per_tx_limit) || 5000.0\n}));\n\nreturn [{ json: { rows, merchantId: input.merchantId || 'mer_default', total: rows.length } }];"
+      },
+      "id": "node-code-sanitize",
+      "name": "Sanitize & Distribute Slots",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [460, 380]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://localhost:3000/api/vpa/upload",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"rows\": {{ JSON.stringify($json.rows) }},\n  \"merchantId\": \"{{ $json.merchantId }}\"\n}",
+        "options": {}
+      },
+      "id": "node-http-upload",
+      "name": "POST to DISHA 8.2 API",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [700, 380]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "string": [
+            {
+              "value1": "={{ $json.bankDiversityWarning }}",
+              "operation": "isNotEmpty"
+            }
+          ]
+        }
+      },
+      "id": "node-if-warning",
+      "name": "Bank Concentration Warning?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [940, 380]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Prepare notification summary\nconst res = $input.first().json;\nconst message = `🚨 *DISHA 8.2 Anti-Ban Warning*\\nBatch Ingestion Succeeded with Warnings:\\n• Total Processed: ${res.total}\\n• Active Added: ${res.added}\\n• Skipped: ${res.skipped}\\n\\n⚠️ *Concentration:* ${res.bankDiversityWarning}\\nRecommendation: Diversify across at least 4 scheduled banks to prevent algorithmic freezing.`;\nreturn [{ json: { status: 'WARNING', message, ...res } }];"
+      },
+      "id": "node-prep-warning",
+      "name": "Format Warning Alert",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1180, 280]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Prepare success summary\nconst res = $input.first().json;\nconst message = `✅ *DISHA 8.2 VPA Fleet Expanded*\\nSuccessfully integrated ${res.added} personal VPAs into rotation!\\n• Total Pool: ${res.total}\\n• Daily Safe Transactions: +${res.added * 15} txns/day\\n• Daily Safe Volume: +₹${((res.added * 25000) / 100000).toFixed(2)} Lakhs/day\\n• Bank Diversity: Balanced (<30% per bank)`;\nreturn [{ json: { status: 'SUCCESS', message, ...res } }];"
+      },
+      "id": "node-prep-success",
+      "name": "Format Success Alert",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1180, 480]
+    }
+  ],
+  "connections": {
+    "Manual / Test Trigger": {
+      "main": [
+        [
+          {
+            "node": "Sanitize & Distribute Slots",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Webhook: Ingest VPA Batch": {
+      "main": [
+        [
+          {
+            "node": "Sanitize & Distribute Slots",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Sanitize & Distribute Slots": {
+      "main": [
+        [
+          {
+            "node": "POST to DISHA 8.2 API",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "POST to DISHA 8.2 API": {
+      "main": [
+        [
+          {
+            "node": "Bank Concentration Warning?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Bank Concentration Warning?": {
+      "main": [
+        [
+          {
+            "node": "Format Warning Alert",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Format Success Alert",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  }
+}

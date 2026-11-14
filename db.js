@@ -1,14 +1,28 @@
 /**
  * DISHA 8.2 — Enterprise Data Layer
  * Supports PostgreSQL with seamless built-in fallback to native SQLite (node:sqlite)
+ * Integrated with 1000-VPA Anti-Ban Routing Engine & Bulk Importer
  */
 
 const { join } = require('path');
 const crypto = require('crypto');
+const VPARouter = require('./vpa-router');
+const { VPAImporter, parseCSV } = require('./vpa-importer');
 
 let pgPool = null;
 let sqliteDb = null;
 let isPostgres = false;
+let vpaRouter = null;
+let vpaImporter = null;
+
+// Proxy object for router and importer
+const dbAccessor = {
+  get sqliteDb() { return sqliteDb; },
+  get pgPool() { return pgPool; }
+};
+
+vpaRouter = new VPARouter(dbAccessor);
+vpaImporter = new VPAImporter(dbAccessor);
 
 // Attempt PostgreSQL initialization if DATABASE_URL is set and reachable
 async function initDb() {
@@ -46,6 +60,38 @@ async function initDb() {
   }
 }
 
+function migrateVpaPoolColumns(dbInstance) {
+  if (!dbInstance) return;
+  try {
+    const cols = dbInstance.prepare(`PRAGMA table_info(vpa_pool)`).all().map(c => c.name);
+
+    const requiredColumns = [
+      { name: 'holder_name', type: 'TEXT' },
+      { name: 'account_type', type: "TEXT NOT NULL DEFAULT 'PERSONAL'" },
+      { name: 'risk_level', type: "TEXT NOT NULL DEFAULT 'LOW'" },
+      { name: 'preferred_time_slot', type: "TEXT NOT NULL DEFAULT 'ANY'" },
+      { name: 'active_hours_start', type: 'INTEGER NOT NULL DEFAULT 8' },
+      { name: 'active_hours_end', type: 'INTEGER NOT NULL DEFAULT 22' },
+      { name: 'per_tx_limit', type: 'REAL NOT NULL DEFAULT 5000.0' },
+      { name: 'unique_senders_daily_limit', type: 'INTEGER NOT NULL DEFAULT 12' },
+      { name: 'unique_senders_today', type: 'INTEGER NOT NULL DEFAULT 0' },
+      { name: 'min_gap_minutes', type: 'INTEGER NOT NULL DEFAULT 8' },
+      { name: 'notes', type: 'TEXT' },
+      { name: 'excel_row_id', type: 'TEXT' }
+    ];
+
+    for (const col of requiredColumns) {
+      if (!cols.includes(col.name)) {
+        try {
+          dbInstance.exec(`ALTER TABLE vpa_pool ADD COLUMN ${col.name} ${col.type}`);
+        } catch (_) {}
+      }
+    }
+  } catch (e) {
+    console.warn('[Database Migration Notice]', e.message);
+  }
+}
+
 function setupSqliteTables() {
   if (!sqliteDb) return;
   sqliteDb.exec(`
@@ -61,17 +107,61 @@ function setupSqliteTables() {
     CREATE TABLE IF NOT EXISTS vpa_pool (
       id TEXT PRIMARY KEY,
       vpa_address TEXT UNIQUE NOT NULL,
+      holder_name TEXT,
       bank_name TEXT NOT NULL,
+      account_type TEXT NOT NULL DEFAULT 'PERSONAL',
       status TEXT NOT NULL DEFAULT 'ACTIVE',
-      health_score INTEGER NOT NULL DEFAULT 95,
-      daily_tx_limit INTEGER NOT NULL DEFAULT 30,
-      daily_volume_limit REAL NOT NULL DEFAULT 50000.0,
+      health_score INTEGER NOT NULL DEFAULT 98,
+      risk_level TEXT NOT NULL DEFAULT 'LOW',
+      preferred_time_slot TEXT NOT NULL DEFAULT 'ANY',
+      active_hours_start INTEGER NOT NULL DEFAULT 8,
+      active_hours_end INTEGER NOT NULL DEFAULT 22,
+      daily_tx_limit INTEGER NOT NULL DEFAULT 15,
+      daily_volume_limit REAL NOT NULL DEFAULT 25000.0,
+      per_tx_limit REAL NOT NULL DEFAULT 5000.0,
+      unique_senders_daily_limit INTEGER NOT NULL DEFAULT 12,
       daily_tx_count INTEGER NOT NULL DEFAULT 0,
       daily_volume REAL NOT NULL DEFAULT 0.0,
+      unique_senders_today INTEGER NOT NULL DEFAULT 0,
+      min_gap_minutes INTEGER NOT NULL DEFAULT 8,
       last_used_at INTEGER,
       cooldown_until INTEGER NOT NULL DEFAULT 0,
       merchant_id TEXT NOT NULL DEFAULT 'mer_default',
+      notes TEXT,
+      excel_row_id TEXT,
       created_at INTEGER NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS vpa_usage_log (
+      id TEXT PRIMARY KEY,
+      vpa_id TEXT NOT NULL,
+      merchant_id TEXT NOT NULL,
+      transaction_id TEXT,
+      amount REAL NOT NULL,
+      customer_vpa TEXT,
+      customer_region TEXT,
+      time_slot TEXT,
+      used_at INTEGER NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS vpa_health_events (
+      id TEXT PRIMARY KEY,
+      vpa_id TEXT NOT NULL,
+      event_type TEXT NOT NULL,
+      severity TEXT NOT NULL,
+      description TEXT,
+      health_impact INTEGER DEFAULT 0,
+      created_at INTEGER NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS vpa_sender_tracking (
+      id TEXT PRIMARY KEY,
+      vpa_id TEXT NOT NULL,
+      customer_vpa TEXT NOT NULL,
+      tracking_date TEXT NOT NULL,
+      tx_count INTEGER DEFAULT 1,
+      last_seen INTEGER NOT NULL,
+      UNIQUE(vpa_id, customer_vpa, tracking_date)
     );
 
     CREATE TABLE IF NOT EXISTS sessions (
@@ -117,6 +207,9 @@ function setupSqliteTables() {
     );
   `);
 
+  // Run dynamic schema migration for existing databases
+  migrateVpaPoolColumns(sqliteDb);
+
   // Seed default Chart of Accounts
   const seedAccounts = [
     { id: 'acc_bank_01', code: '1010-BANK', name: 'Direct Bank Settlement Account', type: 'ASSET' },
@@ -129,18 +222,20 @@ function setupSqliteTables() {
     accStmt.run(a.id, a.code, a.name, a.type, now);
   }
 
-  // Seed VPA Pool
+  // Seed VPA Pool with human time-slots and conservative limits
   const seedVpas = [
-    { id: 'vpa_axis_01', vpa: 'disha82@okaxis', bank: 'Axis Bank', score: 98 },
-    { id: 'vpa_icici_02', vpa: 'disha82@icici', bank: 'ICICI Bank', score: 96 },
-    { id: 'vpa_yes_03', vpa: 'disha82@ybl', bank: 'YES Bank', score: 94 }
+    { id: 'vpa_axis_01', vpa: 'disha82@okaxis', holder: 'Ramesh Kirana Core', bank: 'Axis Bank', score: 98, slot: 'MORNING' },
+    { id: 'vpa_icici_02', vpa: 'disha82@icici', holder: 'Ramesh Secondary', bank: 'ICICI Bank', score: 96, slot: 'AFTERNOON' },
+    { id: 'vpa_yes_03', vpa: 'disha82@ybl', holder: 'Ramesh Retail Store', bank: 'YES Bank', score: 94, slot: 'EVENING' }
   ];
   const vpaStmt = sqliteDb.prepare(`
-    INSERT OR IGNORE INTO vpa_pool (id, vpa_address, bank_name, status, health_score, daily_tx_limit, daily_volume_limit, merchant_id, created_at)
-    VALUES (?, ?, ?, 'ACTIVE', ?, 30, 50000.0, 'mer_default', ?)
+    INSERT OR IGNORE INTO vpa_pool (
+      id, vpa_address, holder_name, bank_name, status, health_score,
+      preferred_time_slot, daily_tx_limit, daily_volume_limit, merchant_id, created_at
+    ) VALUES (?, ?, ?, ?, 'ACTIVE', ?, ?, 15, 25000.0, 'mer_default', ?)
   `);
   for (const v of seedVpas) {
-    vpaStmt.run(v.id, v.vpa, v.bank, v.score, now);
+    vpaStmt.run(v.id, v.vpa, v.holder, v.bank, v.score, v.slot, now);
   }
 }
 
@@ -151,78 +246,44 @@ async function setupPostgresTables() {
   await pgPool.query(sql);
 }
 
-// Memory tracking for VPA pattern masking
+// Memory tracking for VPA pattern masking fallback
 const recentUsedVpas = [];
 
-// TASK 9: Smart VPA Selection Engine
+// TASK 9: 1000 VPA Smart Anti-Ban Routing Engine
 function selectVPA(merchantId = 'mer_default', amount = 100) {
-  const now = Date.now();
-  const amt = Number(amount);
+  try {
+    if (vpaRouter && sqliteDb) {
+      const route = vpaRouter.selectVPASync(merchantId, amount);
+      if (route && route.vpaAddress) {
+        return route.vpaAddress;
+      }
+    }
+  } catch (err) {
+    console.warn('[VPA Router Notice]', err.message);
+  }
 
+  // Pure fallback if router threw or wasn't ready
   if (sqliteDb) {
-    const rows = sqliteDb.prepare(`
-      SELECT * FROM vpa_pool 
-      WHERE merchant_id = ? 
-        AND status = 'ACTIVE' 
-        AND daily_tx_count < daily_tx_limit 
-        AND (daily_volume + ?) <= daily_volume_limit 
-        AND cooldown_until <= ?
-        AND health_score > 70
-    `).all(merchantId, amt, now);
-
-    let candidates = rows;
-    if (candidates.length === 0) {
-      // Cooldown fallback
-      candidates = sqliteDb.prepare(`
-        SELECT * FROM vpa_pool 
-        WHERE merchant_id = ? AND status = 'ACTIVE'
-        ORDER BY daily_tx_count ASC LIMIT 3
-      `).all(merchantId);
-    }
-
-    if (candidates.length === 0) {
-      return process.env.MERCHANT_UPI_ID || 'disha82@ybl';
-    }
-
-    let topCandidate = null;
-    let topScore = -1;
-
-    for (const vpa of candidates) {
-      const lastUsed = vpa.last_used_at || 0;
-      const cooldownFactor = Math.min(1.0, (now - lastUsed) / 60000);
-      const randomFactor = Math.random();
-      let score = (vpa.health_score * 0.4) + (cooldownFactor * 30.0) + (randomFactor * 30.0);
-
-      // Pattern masking: penalize if recently used
-      if (recentUsedVpas.includes(vpa.vpa_address)) {
-        score *= 0.5;
-      }
-
-      if (score > topScore) {
-        topScore = score;
-        topCandidate = vpa;
-      }
-    }
-
-    const selected = topCandidate || candidates[0];
-
-    // Update VPA counters
-    sqliteDb.prepare(`
-      UPDATE vpa_pool 
-      SET daily_tx_count = daily_tx_count + 1,
-          daily_volume = daily_volume + ?,
-          last_used_at = ?,
-          cooldown_until = ?
-      WHERE id = ?
-    `).run(amt, now, now + 45000, selected.id);
-
-    recentUsedVpas.push(selected.vpa_address);
-    if (recentUsedVpas.length > 5) recentUsedVpas.shift();
-
-    return selected.vpa_address;
+    const row = sqliteDb.prepare(`
+      SELECT vpa_address FROM vpa_pool
+      WHERE (merchant_id = ? OR merchant_id = 'mer_default') AND status = 'ACTIVE'
+      ORDER BY last_used_at ASC, daily_tx_count ASC LIMIT 1
+    `).get(merchantId);
+    if (row && row.vpa_address) return row.vpa_address;
   }
 
   return process.env.MERCHANT_UPI_ID || 'disha82@ybl';
+}
+
+function selectVPARoute(merchantId = 'mer_default', amount = 100, customerRegion = 'MH', timeOfDay = null, customerVpa = null) {
+  if (vpaRouter) {
+    return vpaRouter.selectVPASync(merchantId, amount, customerRegion, timeOfDay, customerVpa);
+  }
+  return {
+    vpaAddress: selectVPA(merchantId, amount),
+    healthScore: 95,
+    cooldownMinutes: 10
+  };
 }
 
 // Session Management (TASK 3)
@@ -330,15 +391,11 @@ function recordTransactionAndLedger(orderId, utr, amount, vpaUsed) {
   const entryCreditId = 'LE_' + crypto.randomBytes(6).toString('hex').toUpperCase();
 
   if (sqliteDb) {
-    // 1. Record Transaction
     sqliteDb.prepare(`
       INSERT INTO transactions (id, order_id, utr, amount, status, vpa_used, created_at)
       VALUES (?, ?, ?, ?, 'COMPLETED', ?, ?)
     `).run(txId, orderId, utr, amount, vpaUsed, now);
 
-    // 2. Double-Entry Posting:
-    // Debit: Bank Account (Asset increases)
-    // Credit: Revenue Account (Revenue increases)
     sqliteDb.prepare(`
       INSERT INTO ledger_entries (id, transaction_id, account_id, entry_type, amount, created_at)
       VALUES (?, ?, 'acc_bank_01', 'DEBIT', ?, ?)
@@ -349,7 +406,6 @@ function recordTransactionAndLedger(orderId, utr, amount, vpaUsed) {
       VALUES (?, ?, 'acc_rev_01', 'CREDIT', ?, ?)
     `).run(entryCreditId, txId, amount, now);
 
-    // 3. Ledger Assertion Check: SUM(Debits) === SUM(Credits)
     const verification = getLedgerVerification(txId);
     if (!verification.balanced) {
       throw new Error(`Double-entry balance violation: Debits ₹${verification.totalDebits} != Credits ₹${verification.totalCredits}`);
@@ -382,15 +438,23 @@ function getLedgerVerification(txId) {
 }
 
 function resetDailyVPAs() {
-  if (sqliteDb) {
+  if (vpaRouter) {
+    vpaRouter.dailyHealthResetAndRebalance();
+  } else if (sqliteDb) {
     sqliteDb.prepare(`UPDATE vpa_pool SET daily_tx_count = 0, daily_volume = 0.0, cooldown_until = 0`).run();
-    console.log('🔄 [VPA Engine] Daily limits reset successfully.');
   }
+  console.log('🔄 [VPA Engine] Daily limits reset and health rebalanced successfully.');
 }
 
 module.exports = {
   initDb,
+  get sqliteDb() { return sqliteDb; },
+  get pgPool() { return pgPool; },
+  get isPostgres() { return isPostgres; },
+  get vpaRouter() { return vpaRouter; },
+  get vpaImporter() { return vpaImporter; },
   selectVPA,
+  selectVPARoute,
   saveSession,
   findSessionByOrderId,
   findSessionByTxnRef,

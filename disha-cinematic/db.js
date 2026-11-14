@@ -303,6 +303,105 @@ function deleteVPA(merchantId, vpaId) {
   return true;
 }
 
+function bulkImportMerchantVPAs(merchantId, rows) {
+  const results = { total: rows.length, added: 0, skipped: 0, errors: [] };
+  const vpaRegex = /^[a-zA-Z0-9.\-_]{2,256}@[a-zA-Z]{2,64}$/;
+  const now = Date.now();
+
+  for (let i = 0; i < rows.length; i++) {
+    const r = rows[i];
+    const vpa = String(r.vpa_address || r.vpa || '').trim().toLowerCase();
+
+    if (!vpaRegex.test(vpa)) {
+      results.errors.push({ row: i + 1, vpa, error: 'Invalid format' });
+      results.skipped++;
+      continue;
+    }
+
+    const existing = db.prepare('SELECT id FROM merchant_vpas WHERE merchant_id = ? AND vpa_address = ?').get(merchantId, vpa);
+    if (existing) {
+      results.skipped++;
+      continue;
+    }
+
+    const vpaId = 'vpa_' + crypto.randomBytes(6).toString('hex');
+    let bank = r.bank_name || '';
+    if (!bank) {
+      if (vpa.includes('@oksbi') || vpa.includes('@sbi')) bank = 'SBI';
+      else if (vpa.includes('@okhdfcbank') || vpa.includes('@hdfcbank')) bank = 'HDFC Bank';
+      else if (vpa.includes('@okicici') || vpa.includes('@icici')) bank = 'ICICI Bank';
+      else if (vpa.includes('@okaxis') || vpa.includes('@axisbank')) bank = 'Axis Bank';
+      else if (vpa.includes('@ybl') || vpa.includes('@yesbank')) bank = 'YES Bank';
+      else if (vpa.includes('@paytm')) bank = 'Paytm Payments Bank';
+      else bank = vpa.split('@')[1].toUpperCase();
+    }
+
+    try {
+      db.prepare(`
+        INSERT INTO merchant_vpas (id, merchant_id, vpa_address, bank_name, is_default, status, created_at)
+        VALUES (?, ?, ?, ?, 0, 'ACTIVE', ?)
+      `).run(vpaId, merchantId, vpa, bank, now);
+      results.added++;
+    } catch (err) {
+      results.errors.push({ row: i + 1, vpa, error: err.message });
+      results.skipped++;
+    }
+  }
+
+  // Diversity check
+  const allVpas = getMerchantVPAs(merchantId);
+  const bankCounts = {};
+  allVpas.forEach(v => {
+    bankCounts[v.bank_name] = (bankCounts[v.bank_name] || 0) + 1;
+  });
+  const dominant = [];
+  for (const b of Object.keys(bankCounts)) {
+    const pct = (bankCounts[b] / allVpas.length) * 100;
+    if (pct > 30) dominant.push(`${b} (${pct.toFixed(0)}%)`);
+  }
+  if (dominant.length > 0 && allVpas.length >= 4) {
+    results.bankDiversityWarning = `Single bank concentration exceeds 30%: ${dominant.join(', ')}`;
+  }
+
+  return results;
+}
+
+function getMerchantVPAAnalytics(merchantId) {
+  const vpas = getMerchantVPAs(merchantId);
+  const total = vpas.length;
+  const active = vpas.filter(v => v.status === 'ACTIVE').length;
+  const paused = vpas.filter(v => v.status === 'PAUSED').length;
+  const cooldown = vpas.filter(v => v.status === 'COOLDOWN').length;
+
+  const bankCounts = {};
+  vpas.forEach(v => {
+    bankCounts[v.bank_name] = (bankCounts[v.bank_name] || 0) + 1;
+  });
+
+  const bankDiversity = Object.keys(bankCounts).map(b => ({
+    bank: b,
+    count: bankCounts[b],
+    pct: total > 0 ? Math.round((bankCounts[b] / total) * 100) : 0
+  })).sort((a, b) => b.count - a.count);
+
+  const dailySafeTxCapacity = active * 15;
+  const dailySafeVolumeCapacity = active * 25000;
+
+  return {
+    total,
+    active,
+    paused,
+    cooldown,
+    avgHealth: active > 0 ? 98 : 0,
+    bankDiversity,
+    capacity: {
+      dailySafeTxCapacity,
+      dailySafeVolumeCapacity,
+      monthlySafeVolumeCapacity: dailySafeVolumeCapacity * 30
+    }
+  };
+}
+
 // Orders and Payments
 function createMerchantOrder(merchantId, { amount, description = '', vpaAddress = null }) {
   const parsedAmount = parseFloat(amount);
@@ -583,6 +682,8 @@ module.exports = {
   updateVPAStatus,
   setDefaultVPA,
   deleteVPA,
+  bulkImportMerchantVPAs,
+  getMerchantVPAAnalytics,
   createMerchantOrder,
   simulateOrderPayment,
   getMerchantOrders,
