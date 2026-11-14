@@ -260,10 +260,17 @@ function completeSetup(merchantId, { businessName, contactPhone, city, primaryVp
   return findMerchantById(merchantId);
 }
 
-function updateMerchantProfile(merchantId, { businessName, contactPhone, city, soundboxEnabled, soundboxLang, soundboxVolume }) {
+function updateMerchantProfile(merchantId, params = {}) {
   const now = Date.now();
   const current = findMerchantById(merchantId);
   if (!current) return null;
+
+  const businessName = params.businessName !== undefined ? params.businessName : params.business_name;
+  const contactPhone = params.contactPhone !== undefined ? params.contactPhone : params.contact_phone;
+  const city = params.city !== undefined ? params.city : params.city;
+  const soundboxEnabled = params.soundboxEnabled !== undefined ? params.soundboxEnabled : params.soundbox_enabled;
+  const soundboxLang = params.soundboxLang !== undefined ? params.soundboxLang : params.soundbox_lang;
+  const soundboxVolume = params.soundboxVolume !== undefined ? params.soundboxVolume : params.soundbox_volume;
 
   const stmt = db.prepare(`
     UPDATE merchants

@@ -310,8 +310,15 @@ const server = http.createServer(async (req, res) => {
           return sendError(res, 400, 'Invalid UPI ID format. Expected format: username@bank');
         }
 
-        const newVpa = db.addMerchantVPA(currentMerchant.id, vpaClean, bankName);
-        return sendJson(res, 201, { success: true, vpa: newVpa });
+        try {
+          const newVpa = db.addMerchantVPA(currentMerchant.id, vpaClean, bankName);
+          return sendJson(res, 201, { success: true, vpa: newVpa });
+        } catch (err) {
+          if (err.message && err.message.includes('already added')) {
+            return sendError(res, 400, err.message);
+          }
+          return sendError(res, 500, err.message);
+        }
       }
 
       // UPI IDs: Action (pause / resume / set_default / quarantine)
