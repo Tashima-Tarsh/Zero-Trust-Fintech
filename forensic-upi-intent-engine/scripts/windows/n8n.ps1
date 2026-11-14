@@ -1,6 +1,6 @@
 [CmdletBinding()]
 param(
-    [ValidateSet('Setup','Start','Import','Status')]
+    [ValidateSet('Setup','Start','Import','Status','Diagnose')]
     [string]$Action = 'Status',
     [string]$RuntimeRoot = '',
     [switch]$NoBrowser
@@ -36,7 +36,7 @@ function Set-N8nEnvironment {
     $env:TZ = 'Asia/Kolkata'
 }
 function Invoke-N8n([string[]]$CliArguments) {
-    & node $cli @CliArguments
+    & $node $cli @CliArguments
     if ($LASTEXITCODE -ne 0) { throw "n8n command failed (exit $LASTEXITCODE)." }
 }
 
@@ -54,16 +54,36 @@ if ($Action -eq 'Status') {
     exit 0
 }
 
-if (-not (Get-Command node -ErrorAction SilentlyContinue)) { throw 'Install Node.js 22 or 24 first.' }
-$nodeMajor = [int]((& node -p 'process.versions.node.split(".")[0]') | Select-Object -Last 1)
-if ($nodeMajor -notin 22,24) { throw 'This setup requires Node.js 22 or 24.' }
+$nodeCommand = Get-Command node.exe -CommandType Application -ErrorAction SilentlyContinue
+$node = if ($nodeCommand) { $nodeCommand.Source } else { $null }
+if (-not $node) {
+    foreach ($candidate in @(
+        (Join-Path $env:ProgramFiles 'nodejs/node.exe'),
+        (Join-Path $env:LOCALAPPDATA 'Programs/nodejs/node.exe')
+    )) {
+        if (Test-Path -LiteralPath $candidate) { $node = $candidate; break }
+    }
+}
+if (-not $node) { throw 'Node.js was not found in PATH or its standard install folders. Install Node.js 22 or 24.' }
+$nodeVersion = (& $node --version | Select-Object -Last 1).Trim()
+if ($LASTEXITCODE -ne 0 -or $nodeVersion -notmatch '^v(22|24)\.') {
+    throw "This setup requires Node.js 22 or 24. Detected: $nodeVersion ($node)"
+}
+# VS Code can retain an older PATH after Node installation. Update only this process.
+$env:PATH = (Split-Path $node -Parent) + [IO.Path]::PathSeparator + $env:PATH
+$npm = Join-Path (Split-Path $node -Parent) 'npm.cmd'
+if (-not (Test-Path -LiteralPath $npm)) { throw "npm.cmd is missing beside $node" }
+Write-Host "Node.js detected: $nodeVersion ($node)"
+if ($Action -eq 'Diagnose') {
+    Write-Host "npm detected: $npm"
+    exit 0
+}
 New-Item -ItemType Directory -Path $packages,$state -Force | Out-Null
 Set-N8nEnvironment
 
 if ($Action -eq 'Setup' -and -not (Test-Path -LiteralPath $cli)) {
-    if (-not (Get-Command npm.cmd -ErrorAction SilentlyContinue)) { throw 'npm.cmd is unavailable.' }
     # Keep the existing native-host workflows on n8n 2, rather than a future major upgrade.
-    & npm.cmd install --prefix $packages --cache (Join-Path $runtime 'npm-cache') --save-exact --no-audit --no-fund n8n@2
+    & $npm install --prefix $packages --cache (Join-Path $runtime 'npm-cache') --save-exact --no-audit --no-fund n8n@2
     if ($LASTEXITCODE -ne 0) { throw 'n8n installation failed. Check network access and the npm output above.' }
 }
 if (-not (Test-Path -LiteralPath $cli)) { throw 'n8n is not installed. Run this script with -Action Setup.' }
@@ -97,7 +117,6 @@ if ($Action -in 'Setup','Import') {
 if (-not (Test-N8nReady)) {
     $listener = Get-NetTCPConnection -LocalPort 5678 -State Listen -ErrorAction SilentlyContinue
     if ($listener) { throw 'Port 5678 is occupied by a service that failed the n8n readiness check.' }
-    $node = (Get-Command node).Source
     $log = Join-Path $runtime 'n8n.log'
     $errLog = Join-Path $runtime 'n8n-error.log'
     $process = Start-Process -FilePath $node -ArgumentList @(('"' + $cli + '"'),'start') -WindowStyle Hidden -PassThru -RedirectStandardOutput $log -RedirectStandardError $errLog
