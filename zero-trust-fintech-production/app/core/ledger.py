@@ -107,14 +107,19 @@ class MerkleTreeLedger:
             return {"status": "empty", "message": "No blocks in ledger"}
         
         tampered_blocks = []
-        
-        for i in range(1, len(blocks)):
-            current_block = blocks[i]
-            prev_block = blocks[i-1]
-            
-            if current_block.prev_hash != prev_block.block_hash:
-                tampered_blocks.append(current_block.id)
-                logger.error(f"🚨 TAMPERING DETECTED at block {current_block.id}")
+        expected_prev_hash = "0" * 64
+
+        # Validate both links and each stored payload's cryptographic digest.
+        # Checking links alone misses modifications to tx_data after a commit.
+        for block in blocks:
+            expected_block_hash = self._hash_data(
+                self._hash_data(block.tx_data) + block.prev_hash
+            )
+            if (block.prev_hash != expected_prev_hash
+                    or block.block_hash != expected_block_hash):
+                tampered_blocks.append(block.id)
+                logger.error("Ledger integrity check failed at block %s", block.id)
+            expected_prev_hash = block.block_hash
         
         if tampered_blocks:
             return {
