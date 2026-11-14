@@ -93,31 +93,7 @@
         </div>
       </form>
 
-      <!-- Provisioned Credentials Helper -->
-      <div class="provision-helper-card">
-        <div class="provision-header">
-          <span class="helper-badge">ADMIN PROVISIONED ACCESS</span>
-          <p class="helper-text">Merchant logins are provisioned by your system administrator. Use one of the test merchant credentials below:</p>
-        </div>
-
-        <div class="preset-merchants-list">
-          <div class="preset-merchant-item" onclick="fillCredentials('ramesh@kirana.in', 'Ramesh@123')">
-            <div class="preset-details">
-              <strong>Ramesh Provision Stores (Active Merchant)</strong>
-              <span>ramesh@kirana.in · Pre-configured with historic collections & UPI IDs</span>
-            </div>
-            <button type="button" class="btn-preset-use">Use Credentials</button>
-          </div>
-
-          <div class="preset-merchant-item" onclick="fillCredentials('new@merchant.in', 'Merchant@123')">
-            <div class="preset-details">
-              <strong>New Merchant (First-Time Setup Demo)</strong>
-              <span>new@merchant.in · Shows guided onboarding & fresh empty workspace</span>
-            </div>
-            <button type="button" class="btn-preset-use">Use Credentials</button>
-          </div>
-        </div>
-      </div>
+      <p class="helper-text">Access to this merchant workspace is provided by your administrator.</p>
 
       <div class="auth-card-footer">
         <p>🔒 256-bit encrypted session · Direct bank-to-bank settlement</p>
@@ -137,14 +113,6 @@
     const btnSpinner = document.getElementById('btnSpinner');
     const errorAlert = document.getElementById('errorAlert');
     const errorMessage = document.getElementById('errorMessage');
-
-    // Quick fill helper
-    window.fillCredentials = function(email, pass) {
-      emailInput.value = email;
-      passwordInput.value = pass;
-      errorAlert.style.display = 'none';
-      submitBtn.focus();
-    };
 
     // Password visibility toggle
     togglePasswordBtn.addEventListener('click', () => {
