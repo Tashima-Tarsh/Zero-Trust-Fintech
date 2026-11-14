@@ -27,7 +27,7 @@
     },
     {
       "parameters": {
-        "url": "https://api.yourbank.com/v1/settlement",
+        "url": "={{ $env.BANK_SETTLEMENT_API_URL || 'https://api.yourbank.com/v1/settlement' }}",
         "method": "POST",
         "sendHeaders": true,
         "headerParameters": {

@@ -7,6 +7,9 @@ console.log('====================================================');
 console.log('🛡️  STARTING SHAREPAY ZERO-TRUST FRAUD ATTACK MATRIX');
 console.log('====================================================\n');
 
+// Clean test records before test run to guarantee idempotency
+database.resetForTesting();
+
 let passedTests = 0;
 let totalTests = 0;
 

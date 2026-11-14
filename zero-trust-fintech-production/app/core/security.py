@@ -1,9 +1,12 @@
 import time
 import logging
+import base64
+import binascii
 from typing import Optional
 from datetime import datetime
 from cryptography.hazmat.primitives import hashes, serialization
 from cryptography.hazmat.primitives.asymmetric import ec, ed25519
+from cryptography.hazmat.primitives.asymmetric.utils import encode_dss_signature
 from cryptography.exceptions import InvalidSignature
 import redis.asyncio as redis
 import json
@@ -17,6 +20,52 @@ class SignatureVerificationError(Exception):
 
 class ReplayAttackError(Exception):
     pass
+
+HEX_CHARS = set("0123456789abcdefABCDEF")
+B64_CHARS = set("ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/=-_")
+
+def decode_signature(signature: str) -> bytes:
+    """
+    Decodes signature string strictly from Hexadecimal or Base64/Base64URL.
+    Rejects malformed, empty, unencoded strings, or invalid character sets.
+    Never treats raw string characters directly as signature bytes.
+    """
+    if not signature or not isinstance(signature, str):
+        raise SignatureVerificationError("Signature must be a non-empty string")
+    
+    clean_sig = signature.strip()
+    if not clean_sig:
+        raise SignatureVerificationError("Signature cannot be empty or whitespace")
+    
+    # Strictly reject any character not belonging to Hex or Base64/Base64URL
+    if not all(c in B64_CHARS for c in clean_sig):
+        raise SignatureVerificationError("Signature contains invalid characters (not valid Hex or Base64)")
+    
+    # 1. Try Hexadecimal decoding if string consists of valid hex digits and even length
+    if len(clean_sig) % 2 == 0 and all(c in HEX_CHARS for c in clean_sig):
+        if len(clean_sig) == 128 or len(clean_sig) >= 64:
+            try:
+                return bytes.fromhex(clean_sig)
+            except ValueError:
+                pass
+            
+    # 2. Try Base64 / Base64URL decoding with strict validation
+    try:
+        pad_len = len(clean_sig) % 4
+        padded = clean_sig + ('=' * (4 - pad_len) if pad_len else '')
+        
+        standard_b64 = padded.replace('-', '+').replace('_', '/')
+        decoded = base64.b64decode(standard_b64, validate=True)
+        if not decoded:
+            raise SignatureVerificationError("Decoded signature cannot be empty")
+        return decoded
+    except Exception as b64_err:
+        if len(clean_sig) % 2 == 0 and all(c in HEX_CHARS for c in clean_sig):
+            try:
+                return bytes.fromhex(clean_sig)
+            except ValueError:
+                pass
+        raise SignatureVerificationError(f"Malformed signature encoding (neither valid Base64 nor Hex): {b64_err}")
 
 class DeviceAttestationVerifier:
     def __init__(self):
@@ -40,11 +89,19 @@ class DeviceAttestationVerifier:
                 device = db.query(DeviceKey).filter_by(device_id=device_id, is_active=True).first()
                 if device and device.public_key:
                     pub_str = device.public_key.strip()
-                    # If raw hex string, convert or return bytes
-                    if len(pub_str) == 64:
+                    # Check if hex string (32 bytes = 64 hex chars for ed25519)
+                    if len(pub_str) == 64 and all(c in "0123456789abcdefABCDEF" for c in pub_str):
                         key_bytes = bytes.fromhex(pub_str)
-                    else:
+                    elif pub_str.startswith("-----BEGIN"):
                         key_bytes = pub_str.encode('utf-8')
+                    else:
+                        # Base64 encoded or raw bytes
+                        try:
+                            pad_len = len(pub_str) % 4
+                            padded = pub_str + ('=' * (4 - pad_len) if pad_len else '')
+                            key_bytes = base64.b64decode(padded)
+                        except Exception:
+                            key_bytes = pub_str.encode('utf-8')
                     try:
                         await self.redis.setex(cache_key, 3600, key_bytes)
                     except Exception:
@@ -65,7 +122,8 @@ class DeviceAttestationVerifier:
         algorithm: str = "ed25519"
     ) -> bool:
         """
-        Verify cryptographic signature and check for replay attacks
+        Verify cryptographic signature strictly and check for replay attacks.
+        Enforces 64-byte length on Ed25519 and rejects raw string encodings.
         """
         # 1. Check timestamp freshness
         timestamp = payload.get('timestamp')
@@ -82,38 +140,78 @@ class DeviceAttestationVerifier:
         if age < -10:
             raise SignatureVerificationError("Future timestamp detected")
         
-        # 2. Reconstruct signed message
+        # 2. Reconstruct deterministic signed message
         message = self._construct_message(payload)
         
         # 3. Get public key
         public_key_bytes = await self.get_public_key(device_id)
         
-        # 4. Verify signature
-        try:
-            sig_bytes = bytes.fromhex(signature) if all(c in "0123456789abcdefABCDEF" for c in signature) else signature.encode('utf-8')
-            
-            if algorithm.lower() == "ed25519":
-                public_key = ed25519.Ed25519PublicKey.from_public_bytes(public_key_bytes)
-                public_key.verify(
-                    sig_bytes,
-                    message.encode('utf-8')
+        # 4. Strict decoding of signature bytes (never treat raw string as bytes)
+        sig_bytes = decode_signature(signature)
+        
+        # 5. Algorithm-specific validation and cryptographic verification
+        algo_lower = algorithm.lower().strip()
+        
+        if algo_lower == "ed25519":
+            if len(sig_bytes) != 64:
+                raise SignatureVerificationError(
+                    f"Invalid Ed25519 signature length: expected 64 bytes, got {len(sig_bytes)}"
                 )
-            elif algorithm.lower() == "ecdsa":
-                public_key = serialization.load_pem_public_key(public_key_bytes)
+            
+            try:
+                if len(public_key_bytes) == 32:
+                    public_key = ed25519.Ed25519PublicKey.from_public_bytes(public_key_bytes)
+                else:
+                    public_key = serialization.load_pem_public_key(public_key_bytes)
+                    if not isinstance(public_key, ed25519.Ed25519PublicKey):
+                        raise SignatureVerificationError("Key is not an Ed25519 public key")
+            except Exception as e:
+                raise SignatureVerificationError(f"Invalid Ed25519 public key: {e}")
+            
+            try:
+                public_key.verify(sig_bytes, message.encode('utf-8'))
+            except InvalidSignature:
+                logger.error(f"❌ Invalid Ed25519 signature for device {device_id}")
+                raise SignatureVerificationError("Signature verification failed")
+                
+        elif algo_lower in ("ecdsa", "ecdsa-sha256", "p256", "secp256r1"):
+            try:
+                if public_key_bytes.startswith(b"-----BEGIN"):
+                    public_key = serialization.load_pem_public_key(public_key_bytes)
+                else:
+                    public_key = serialization.load_der_public_key(public_key_bytes)
+            except Exception as e:
+                raise SignatureVerificationError(f"Invalid ECDSA public key: {e}")
+            
+            try:
                 public_key.verify(
                     sig_bytes,
                     message.encode('utf-8'),
                     ec.ECDSA(hashes.SHA256())
                 )
-            else:
-                raise SignatureVerificationError(f"Unsupported algorithm: {algorithm}")
+            except InvalidSignature:
+                # Support raw IEEE P1363 (64 bytes: r[32] || s[32]) from Android KeyStore
+                if len(sig_bytes) == 64:
+                    try:
+                        r = int.from_bytes(sig_bytes[:32], byteorder='big')
+                        s = int.from_bytes(sig_bytes[32:], byteorder='big')
+                        der_sig = encode_dss_signature(r, s)
+                        public_key.verify(
+                            der_sig,
+                            message.encode('utf-8'),
+                            ec.ECDSA(hashes.SHA256())
+                        )
+                    except Exception:
+                        logger.error(f"❌ Invalid ECDSA signature for device {device_id}")
+                        raise SignatureVerificationError("Signature verification failed")
+                else:
+                    logger.error(f"❌ Invalid ECDSA signature for device {device_id}")
+                    raise SignatureVerificationError("Signature verification failed")
+        else:
+            raise SignatureVerificationError(f"Unsupported algorithm: {algorithm}")
             
-            logger.info(f"✅ Signature verified for device {device_id}")
-            return True
-            
-        except InvalidSignature:
-            logger.error(f"❌ Invalid signature for device {device_id}")
-            raise SignatureVerificationError("Signature verification failed")
+        logger.info(f"✅ Signature verified for device {device_id}")
+        return True
     
     def _construct_message(self, payload: dict) -> str:
         """Construct deterministic message string for signing"""

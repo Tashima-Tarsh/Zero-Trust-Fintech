@@ -7,8 +7,30 @@ self.addEventListener('fetch', (event) => {
   if (url.pathname === '/handle-share' && event.request.method === 'POST') {
     event.respondWith((async () => {
       try {
-        const formData = await event.request.formData();
-        const sharedText = formData.get('text') || formData.get('title') || '';
+        let sharedText = '';
+        if (typeof event.request.formData === 'function') {
+          try {
+            const formData = await event.request.formData();
+            sharedText = formData.get('text') || formData.get('title') || formData.get('description') || '';
+          } catch (e) {
+            console.warn('[SharePay SW] formData extraction failed, trying text fallback:', e);
+          }
+        }
+        
+        if (!sharedText && typeof event.request.text === 'function') {
+          try {
+            const rawBody = await event.request.text();
+            // Handle urlencoded body if present
+            if (rawBody && rawBody.includes('=')) {
+              const params = new URLSearchParams(rawBody);
+              sharedText = params.get('text') || params.get('title') || rawBody;
+            } else {
+              sharedText = rawBody;
+            }
+          } catch (e) {
+            console.warn('[SharePay SW] text extraction failed:', e);
+          }
+        }
         
         console.log('[SharePay SW] Captured receipt text:', sharedText);
         

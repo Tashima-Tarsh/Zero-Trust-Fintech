@@ -9,9 +9,24 @@ from .config import get_settings
 logger = logging.getLogger(__name__)
 settings = get_settings()
 
+# Lua script for atomic challenge consumption (eliminates race conditions and replay)
+LUA_ATOMIC_CONSUME_CHALLENGE = """
+local key = KEYS[1]
+local meta_key = KEYS[2]
+local val = redis.call('GET', key)
+if val then
+    redis.call('DEL', key)
+    redis.call('DEL', meta_key)
+    return val
+else
+    return nil
+end
+"""
+
 class FraudDetectionEngine:
     """
     5-Layer Fraud-Proof Engine for UPI Receipt Verification
+    with Atomic Challenge Consumption and Fail-Closed Security.
     """
     
     def __init__(self):
@@ -34,12 +49,12 @@ class FraudDetectionEngine:
         report["layers"]["freshness"] = layer1_result
         report["overall_score"] += layer1_result["score"]
         
-        # Layer 2: Dynamic Challenge Matching
+        # Layer 2: Dynamic Challenge Matching (Atomic & Fail-Closed)
         layer2_result = await self._layer2_challenge_verification(receipt_data)
         report["layers"]["challenge"] = layer2_result
         report["overall_score"] += layer2_result["score"]
         
-        # Layer 3: Replay Attack Detection
+        # Layer 3: Replay Attack Detection (Atomic SET NX)
         layer3_result = await self._layer3_replay_detection(receipt_data)
         report["layers"]["replay"] = layer3_result
         report["overall_score"] += layer3_result["score"]
@@ -92,7 +107,6 @@ class FraudDetectionEngine:
             details["reason"] = "Timestamp in future"
         
         # Additional freshness pattern analysis
-        # Check if timestamp aligns with typical UPI processing times
         try:
             hour = datetime.fromtimestamp(receipt_timestamp, tz=timezone.utc).hour
             if 6 <= hour <= 23:  # Normal banking hours
@@ -110,9 +124,9 @@ class FraudDetectionEngine:
     
     async def _layer2_challenge_verification(self, receipt_data: Dict) -> Dict:
         """
-        Layer 2: Dynamic Challenge Matching
-        Verifies that the receipt contains the correct challenge response
-        that was issued at transaction initiation
+        Layer 2: Dynamic Challenge Matching (Atomic One-Time Consumption)
+        Atomically checks and consumes the challenge secret from Redis using Lua script.
+        Strict fail-closed policy: never falls back to verified_offline on error.
         """
         challenge_id = receipt_data.get("challenge_id")
         challenge_response = receipt_data.get("challenge_response")
@@ -128,13 +142,27 @@ class FraudDetectionEngine:
             }
         
         try:
-            # Fetch expected challenge from Redis
-            expected_challenge = await self.redis.get(f"challenge:{challenge_id}")
+            # Atomically fetch and consume challenge to prevent race conditions and replay
+            try:
+                expected_challenge = await self.redis.eval(
+                    LUA_ATOMIC_CONSUME_CHALLENGE,
+                    2,
+                    f"challenge:{challenge_id}",
+                    f"challenge_meta:{challenge_id}"
+                )
+            except Exception:
+                # Fallback to GETDEL or get + del if eval is unavailable
+                try:
+                    expected_challenge = await self.redis.getdel(f"challenge:{challenge_id}")
+                except Exception:
+                    expected_challenge = await self.redis.get(f"challenge:{challenge_id}")
+                    if expected_challenge:
+                        await self.redis.delete(f"challenge:{challenge_id}")
             
             if not expected_challenge:
                 return {
                     "score": 0,
-                    "details": {"status": "challenge_expired", "reason": "Challenge not found or expired"}
+                    "details": {"status": "challenge_expired_or_used", "reason": "Challenge not found, expired, or already consumed"}
                 }
             
             # Verify challenge response
@@ -146,17 +174,16 @@ class FraudDetectionEngine:
             if challenge_response == expected_hash:
                 score = 25  # Max score for this layer
                 details["status"] = "verified"
-                
-                # Invalidate challenge (one-time use)
-                await self.redis.delete(f"challenge:{challenge_id}")
             else:
                 score = 0
                 details["status"] = "mismatch"
                 details["reason"] = "Challenge response incorrect"
+                
         except Exception as e:
-            logger.warning(f"Challenge verification fallback: {e}")
-            score = 25
-            details["status"] = "verified_offline"
+            logger.error(f"❌ Challenge verification error (failing closed): {e}")
+            score = 0
+            details["status"] = "error"
+            details["reason"] = f"Challenge verification failed: {str(e)}"
         
         return {
             "score": score,
@@ -165,8 +192,8 @@ class FraudDetectionEngine:
     
     async def _layer3_replay_detection(self, receipt_data: Dict) -> Dict:
         """
-        Layer 3: Replay Attack Detection
-        Prevents reuse of old receipts or duplicate submissions
+        Layer 3: Replay Attack Detection (Atomic SET NX)
+        Atomically sets receipt fingerprint key only if it does not already exist.
         """
         utr = receipt_data.get("utr")
         amount = receipt_data.get("amount")
@@ -181,30 +208,31 @@ class FraudDetectionEngine:
         ).hexdigest()
         
         try:
-            # Check if this receipt was already submitted
-            existing = await self.redis.get(f"receipt:{receipt_fingerprint}")
+            # Atomically claim fingerprint with NX (Set if Not Exists)
+            acquired = await self.redis.set(
+                f"receipt:{receipt_fingerprint}",
+                datetime.now(timezone.utc).isoformat(),
+                nx=True,
+                ex=86400
+            )
             
-            if existing:
+            if not acquired:
                 return {
                     "score": 0,
                     "details": {
                         "status": "duplicate",
-                        "reason": "Receipt already processed",
-                        "first_seen": existing.decode() if isinstance(existing, bytes) else str(existing)
+                        "reason": "Receipt already processed (replay detected)"
                     }
                 }
             
-            # Mark receipt as processed (TTL: 24 hours)
-            await self.redis.setex(
-                f"receipt:{receipt_fingerprint}",
-                86400,
-                datetime.now(timezone.utc).isoformat()
-            )
+            score = 20  # Max score for this layer
+            details["status"] = "unique"
+            
         except Exception as e:
-            logger.warning(f"Redis replay check error: {e}")
-        
-        score = 20  # Max score for this layer
-        details["status"] = "unique"
+            logger.error(f"❌ Redis replay check error (failing closed): {e}")
+            score = 0
+            details["status"] = "error"
+            details["reason"] = f"Replay check failed: {str(e)}"
         
         return {
             "score": score,
@@ -275,8 +303,9 @@ class FraudDetectionEngine:
             else:
                 score += 5
                 details["ip_flagged"] = False
-        except Exception:
-            score += 10
+        except Exception as e:
+            logger.warning(f"Behavioral check degraded: {e}")
+            score += 0
             details["device_flagged"] = False
             details["ip_flagged"] = False
         

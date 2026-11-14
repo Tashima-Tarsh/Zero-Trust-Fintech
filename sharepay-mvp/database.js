@@ -10,8 +10,15 @@ const __dirname = dirname(__filename);
 const dbPath = join(__dirname, 'sharepay.db');
 const db = new DatabaseSync(dbPath);
 
-// Enable WAL mode for high concurrency
-db.exec('PRAGMA journal_mode = WAL;');
+// Enable WAL mode and resilience pragmas for high concurrency and crash safety
+try {
+  db.exec('PRAGMA journal_mode = WAL;');
+  db.exec('PRAGMA busy_timeout = 5000;');
+  db.exec('PRAGMA synchronous = NORMAL;');
+  db.exec('PRAGMA foreign_keys = ON;');
+} catch (pragmaErr) {
+  console.warn('[Database] Warning applying SQLite pragmas:', pragmaErr.message);
+}
 
 // Initialize Checkpoint Tables
 db.exec(`
@@ -102,8 +109,8 @@ export const database = {
   recordSuccess(orderId, utr, amount, receiptText, verifiedAt = Date.now()) {
     const receiptHash = crypto.createHash('sha256').update(receiptText || '').digest('hex');
 
-    db.exec('BEGIN TRANSACTION;');
     try {
+      db.exec('BEGIN TRANSACTION;');
       // 1. Insert into checkpoint table
       const utrStmt = db.prepare(`
         INSERT INTO processed_utrs (utr, order_id, amount, receipt_hash, verified_at)
@@ -122,8 +129,34 @@ export const database = {
       db.exec('COMMIT;');
       return true;
     } catch (err) {
-      db.exec('ROLLBACK;');
+      try {
+        db.exec('ROLLBACK;');
+      } catch (rollbackErr) {
+        // Suppress if transaction already unrolled
+      }
       throw err;
+    }
+  },
+
+  ping() {
+    try {
+      const stmt = db.prepare('SELECT 1 as alive');
+      const res = stmt.get();
+      return res && res.alive === 1;
+    } catch (e) {
+      return false;
+    }
+  },
+
+  resetForTesting() {
+    try {
+      db.exec(`
+        DELETE FROM processed_utrs WHERE order_id LIKE 'Order_TEST_%';
+        DELETE FROM rejected_shares WHERE order_id LIKE 'Order_TEST_%';
+        DELETE FROM orders WHERE id LIKE 'Order_TEST_%';
+      `);
+    } catch (e) {
+      console.warn('Test reset error:', e.message);
     }
   },
 

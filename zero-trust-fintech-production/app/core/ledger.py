@@ -1,16 +1,24 @@
 import hashlib
 import json
 import logging
+import threading
 from typing import Optional, List
 from sqlalchemy.orm import Session
+from sqlalchemy import text
 from datetime import datetime, timezone
 from ..models.database import TransactionBlock
 
 logger = logging.getLogger(__name__)
 
+# Mutex for thread-level synchronization (especially during tests/in-memory SQLite)
+_LEDGER_COMMIT_LOCK = threading.Lock()
+# Dedicated 64-bit integer advisory lock ID for PostgreSQL
+PG_LEDGER_ADVISORY_LOCK_ID = 882194129381273
+
 class MerkleTreeLedger:
     """
     Tamper-evident blockchain-style ledger using hash chaining
+    with strict concurrency control against race conditions.
     """
     
     def __init__(self, db: Session):
@@ -29,40 +37,63 @@ class MerkleTreeLedger:
     
     def commit_transaction(self, tx_data: dict) -> TransactionBlock:
         """
-        Add new transaction to the immutable ledger
+        Add new transaction to the immutable ledger atomically.
+        Uses PostgreSQL advisory transaction locking (pg_advisory_xact_lock) and
+        process-level locking to guarantee sequential block chaining without forks.
         """
-        try:
-            # 1. Get previous block hash
-            last_block = self.get_last_block()
-            prev_hash = last_block.block_hash if last_block else "0" * 64
-            
-            # 2. Create deterministic transaction hash
-            tx_json = json.dumps(tx_data, sort_keys=True, default=str)
-            current_tx_hash = self._hash_data(tx_json)
-            
-            # 3. Create block hash (chain previous + current)
-            block_hash_input = f"{current_tx_hash}{prev_hash}"
-            block_hash = self._hash_data(block_hash_input)
-            
-            # 4. Create and save new block
-            new_block = TransactionBlock(
-                tx_data=tx_json,
-                prev_hash=prev_hash,
-                block_hash=block_hash,
-                created_at=datetime.now(timezone.utc)
-            )
-            
-            self.db.add(new_block)
-            self.db.commit()
-            self.db.refresh(new_block)
-            
-            logger.info(f"✅ Ledger block committed: {block_hash[:16]}...")
-            return new_block
-            
-        except Exception as e:
-            self.db.rollback()
-            logger.error(f"❌ Failed to commit ledger block: {e}")
-            raise
+        with _LEDGER_COMMIT_LOCK:
+            try:
+                dialect_name = ""
+                try:
+                    if self.db.bind:
+                        dialect_name = self.db.bind.dialect.name
+                except Exception:
+                    pass
+
+                # 1. Acquire PostgreSQL advisory transaction lock
+                if "postgres" in dialect_name:
+                    self.db.execute(
+                        text("SELECT pg_advisory_xact_lock(:lock_id)"),
+                        {"lock_id": PG_LEDGER_ADVISORY_LOCK_ID}
+                    )
+
+                # 2. Get previous block hash (using with_for_update when supported)
+                if "postgres" in dialect_name:
+                    last_block = self.db.query(TransactionBlock).order_by(
+                        TransactionBlock.id.desc()
+                    ).with_for_update().first()
+                else:
+                    last_block = self.get_last_block()
+
+                prev_hash = last_block.block_hash if last_block else "0" * 64
+                
+                # 3. Create deterministic transaction hash
+                tx_json = json.dumps(tx_data, sort_keys=True, default=str)
+                current_tx_hash = self._hash_data(tx_json)
+                
+                # 4. Create block hash (chain previous + current)
+                block_hash_input = f"{current_tx_hash}{prev_hash}"
+                block_hash = self._hash_data(block_hash_input)
+                
+                # 5. Create and save new block
+                new_block = TransactionBlock(
+                    tx_data=tx_json,
+                    prev_hash=prev_hash,
+                    block_hash=block_hash,
+                    created_at=datetime.now(timezone.utc)
+                )
+                
+                self.db.add(new_block)
+                self.db.commit()
+                self.db.refresh(new_block)
+                
+                logger.info(f"✅ Ledger block committed: {block_hash[:16]}... (prev: {prev_hash[:16]}...)")
+                return new_block
+                
+            except Exception as e:
+                self.db.rollback()
+                logger.error(f"❌ Failed to commit ledger block: {e}")
+                raise
     
     def verify_integrity(self) -> dict:
         """

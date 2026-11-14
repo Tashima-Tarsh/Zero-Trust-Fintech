@@ -1,5 +1,13 @@
+-- ============================================================================
+-- Zero-Trust Fintech Production Database Schema Isolation
+-- Isolated schema 'production' prevents collisions with forensic-upi-intent-engine
+-- ============================================================================
+
+CREATE SCHEMA IF NOT EXISTS production;
+SET search_path TO production, public;
+
 -- Immutable ledger table with hash chaining
-CREATE TABLE IF NOT EXISTS merkle_ledger (
+CREATE TABLE IF NOT EXISTS production.merkle_ledger (
     id SERIAL PRIMARY KEY,
     tx_data JSONB NOT NULL,
     prev_hash VARCHAR(64) NOT NULL,
@@ -8,11 +16,11 @@ CREATE TABLE IF NOT EXISTS merkle_ledger (
 );
 
 -- Index for fast chain verification
-CREATE INDEX IF NOT EXISTS idx_block_chain ON merkle_ledger(prev_hash, block_hash);
-CREATE INDEX IF NOT EXISTS idx_block_created ON merkle_ledger(created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_block_chain ON production.merkle_ledger(prev_hash, block_hash);
+CREATE INDEX IF NOT EXISTS idx_block_created ON production.merkle_ledger(created_at DESC);
 
 -- Device keys table
-CREATE TABLE IF NOT EXISTS device_keys (
+CREATE TABLE IF NOT EXISTS production.device_keys (
     id SERIAL PRIMARY KEY,
     device_id VARCHAR(255) UNIQUE NOT NULL,
     public_key TEXT NOT NULL,
@@ -22,10 +30,10 @@ CREATE TABLE IF NOT EXISTS device_keys (
     is_active BOOLEAN DEFAULT TRUE
 );
 
-CREATE INDEX IF NOT EXISTS idx_device_id ON device_keys(device_id);
+CREATE INDEX IF NOT EXISTS idx_device_id ON production.device_keys(device_id);
 
 -- Audit logs table
-CREATE TABLE IF NOT EXISTS audit_logs (
+CREATE TABLE IF NOT EXISTS production.audit_logs (
     id SERIAL PRIMARY KEY,
     event_type VARCHAR(100) NOT NULL,
     device_id VARCHAR(255),
@@ -36,11 +44,11 @@ CREATE TABLE IF NOT EXISTS audit_logs (
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
-CREATE INDEX IF NOT EXISTS idx_audit_event ON audit_logs(event_type);
-CREATE INDEX IF NOT EXISTS idx_audit_created ON audit_logs(created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_audit_event ON production.audit_logs(event_type);
+CREATE INDEX IF NOT EXISTS idx_audit_created ON production.audit_logs(created_at DESC);
 
 -- Function to verify ledger integrity (PLpgSQL)
-CREATE OR REPLACE FUNCTION verify_ledger_integrity()
+CREATE OR REPLACE FUNCTION production.verify_ledger_integrity()
 RETURNS TABLE(
     status VARCHAR,
     total_blocks INTEGER,
@@ -53,11 +61,11 @@ DECLARE
     tampered INTEGER[] := ARRAY[]::INTEGER[];
     block_count INTEGER := 0;
 BEGIN
-    FOR block IN SELECT * FROM merkle_ledger ORDER BY id LOOP
+    FOR block IN SELECT * FROM production.merkle_ledger ORDER BY id LOOP
         block_count := block_count + 1;
         
         IF block.id > 1 THEN
-            SELECT * INTO prev_block FROM merkle_ledger WHERE id = block.id - 1;
+            SELECT * INTO prev_block FROM production.merkle_ledger WHERE id = block.id - 1;
             
             IF block.prev_hash != prev_block.block_hash THEN
                 tampered := array_append(tampered, block.id);
@@ -72,3 +80,8 @@ BEGIN
     END IF;
 END;
 $$ LANGUAGE plpgsql;
+
+-- Public compatibility views if queries omit the 'production.' schema prefix
+CREATE OR REPLACE VIEW public.merkle_ledger AS SELECT * FROM production.merkle_ledger;
+CREATE OR REPLACE VIEW public.device_keys AS SELECT * FROM production.device_keys;
+CREATE OR REPLACE VIEW public.audit_logs AS SELECT * FROM production.audit_logs;
