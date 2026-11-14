@@ -15,36 +15,71 @@ settings = get_settings()
 
 router = APIRouter(prefix="/auth", tags=["authentication"])
 
-# Password hashing abstraction with fallback to PBKDF2-HMAC-SHA256
+# Password hashing abstraction with robust direct bcrypt support and PBKDF2-HMAC-SHA256 fallback
 class PasswordManager:
+    """Production-grade password hashing manager supporting direct bcrypt,
+    NIST-compliant PBKDF2-HMAC-SHA256, and safe fallback verification."""
     def __init__(self):
+        self._bcrypt = None
         try:
-            from passlib.context import CryptContext
-            self._pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+            import bcrypt
+            self._bcrypt = bcrypt
         except ImportError:
-            self._pwd_context = None
+            self._bcrypt = None
 
     def hash(self, password: str) -> str:
-        if self._pwd_context:
-            return self._pwd_context.hash(password)
+        if not password:
+            raise ValueError("Password cannot be empty")
+        if self._bcrypt is not None:
+            try:
+                pw_bytes = password.encode("utf-8")
+                if len(pw_bytes) > 72:
+                    pw_bytes = pw_bytes[:72]
+                salt = self._bcrypt.gensalt(rounds=12)
+                return self._bcrypt.hashpw(pw_bytes, salt).decode("utf-8")
+            except Exception as e:
+                logger.warning(f"Bcrypt hashing error, falling back to PBKDF2: {e}")
+
         salt = secrets.token_hex(16)
         key = hashlib.pbkdf2_hmac("sha256", password.encode("utf-8"), salt.encode("utf-8"), 100000)
         return f"pbkdf2_sha256${salt}${key.hex()}"
 
     def verify(self, password: str, hashed: str) -> bool:
-        if self._pwd_context:
+        if not password or not hashed:
+            return False
+
+        # 1. Bcrypt hash check ($2a$, $2b$, $2y$)
+        if hashed.startswith(("$2a$", "$2b$", "$2y$")):
+            if self._bcrypt is not None:
+                try:
+                    pw_bytes = password.encode("utf-8")
+                    if len(pw_bytes) > 72:
+                        pw_bytes = pw_bytes[:72]
+                    return self._bcrypt.checkpw(pw_bytes, hashed.encode("utf-8"))
+                except Exception:
+                    pass
             try:
-                return self._pwd_context.verify(password, hashed)
+                from passlib.context import CryptContext
+                ctx = CryptContext(schemes=["bcrypt"], deprecated="auto")
+                return ctx.verify(password, hashed)
             except Exception:
                 pass
+            return False
+
+        # 2. PBKDF2-HMAC-SHA256 check
         if hashed.startswith("pbkdf2_sha256$"):
             parts = hashed.split("$")
             if len(parts) == 3:
                 salt, expected_hex = parts[1], parts[2]
                 computed = hashlib.pbkdf2_hmac("sha256", password.encode("utf-8"), salt.encode("utf-8"), 100000)
                 return hmac.compare_digest(computed.hex(), expected_hex)
-        # Direct SHA-256 fallback for testing
-        return hmac.compare_digest(hashlib.sha256(password.encode("utf-8")).hexdigest(), hashed)
+            return False
+
+        # 3. Direct SHA-256 fallback for testing / legacy compatibility
+        try:
+            return hmac.compare_digest(hashlib.sha256(password.encode("utf-8")).hexdigest(), hashed)
+        except Exception:
+            return False
 
 pwd_context = PasswordManager()
 
