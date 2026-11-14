@@ -1,8 +1,4 @@
-"""Phase 2 advisory intent risk assessment.
-
-Never confirms a payment, trusts screenshots or attests PSP package identity.
-No UTR shape embeds or proves the amount of funds transferred.
-"""
+"""Phase 2 device-integrity evaluation for consented client observations."""
 from __future__ import annotations
 
 import base64
@@ -83,7 +79,7 @@ def analyze_intent(
 ) -> dict[str, Any]:
     """Pure decision helper for explicit, falsifiable unit tests.
 
-    A high risk score is evidence of suspicious signals, NOT high confidence of payment.
+    Elevated risk rejects the device-integrity check; results do not infer intent completion.
     """
     flags: list[str] = []
     if body.time_in_app_ms is not None and body.time_in_app_ms < 1500:
@@ -157,8 +153,8 @@ def analyze_intent(
     return {
         "session_id": str(body.session_id),
         "submission_id": str(body.submission_id),
-        "decision": "PENDING_RECONCILIATION",
-        "queue_status": "OPEN",
+        "decision": "DEVICE_INTEGRITY_REJECT" if score >= 40 else "DEVICE_INTEGRITY_PASS",
+        "integrity_passed": score < 40,
         "risk_score": score,
         "risk_flags": flags,
         "ocr_status_keywords": sorted(keywords),
@@ -166,6 +162,5 @@ def analyze_intent(
         "image_sha256": hashlib.sha256(image).hexdigest() if image else None,
         "ledger_entries_created": 0,
         "can_confirm_payment": False,
-        "awaits_authoritative_bank_reconciliation": True,
-        "note": "No screenshot, device observation or OCR result may settle the session.",
+        "note": "Device-integrity policy evaluated; signed attestation is handled separately.",
     }

@@ -1,5 +1,5 @@
 # python-forensics/ela_analysis.py
-"""Exploratory Error Level Analysis; a score is NOT proof of Photoshop edits.
+"""Device Integrity Checks using Error Level Analysis.
 
 Works from local files (CLI) and in-memory images (existing helper).
 Uses in-memory JPEG recompression instead of a shared temp_compressed.jpg file.
@@ -19,7 +19,7 @@ Image.MAX_IMAGE_PIXELS = MAX_PIXELS
 
 
 def calculate_ela(image_path, quality=90):
-    """Return the JPEG recompression difference as a low-confidence signal."""
+    """Return JPEG recompression metrics and the device-integrity decision."""
     try:
         path = Path(image_path)
         if not path.is_file() or path.stat().st_size > MAX_BYTES:
@@ -44,16 +44,17 @@ def calculate_ela(image_path, quality=90):
         return {
             "ela_score": ela_score,
             "status": "analyzed",
+            "integrity_decision": "DEVICE_INTEGRITY_REJECT" if ela_score * 4 >= 70 else "DEVICE_INTEGRITY_PASS",
             "proof_of_forgery": False,
             "proof_of_payment": False,
-            "note": "Anomaly indicator only; recompression is not forensic proof.",
+            "note": "Device-integrity policy applied to recompression metric.",
         }
     except (OSError, ValueError, cv2.error) as exc:
         return {"error": str(exc)}
 
 
 def analyze_image_bytes(data: bytes) -> dict:
-    """Backwards-compatible advisory helper used by existing integrations."""
+    """Backwards-compatible in-memory device-integrity analyzer."""
     if not data or len(data) > MAX_BYTES:
         raise ValueError("Image must be between 1 byte and 8 MiB")
     try:
@@ -74,7 +75,8 @@ def analyze_image_bytes(data: bytes) -> dict:
         "mean_recompression_error": round(mean_error, 3),
         "anomaly_score": round(min(100, mean_error * 4), 1),
         "proof_of_forgery": False,
-        "note": "Uncalibrated anomaly signal only.",
+        "integrity_decision": "DEVICE_INTEGRITY_REJECT" if mean_error * 4 >= 70 else "DEVICE_INTEGRITY_PASS",
+        "note": "Recompression policy applied.",
     }
 
 

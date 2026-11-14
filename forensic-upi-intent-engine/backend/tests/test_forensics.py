@@ -16,9 +16,10 @@ def test_utr_never_proves_payment():
     assert not validate_utr("123456789012")["proof_of_payment"]
     assert not validate_utr("invalid!")["format_plausible"]
 
-def test_behavior_scoring_is_advisory():
+def test_behavior_scoring_rejects_outlier_metrics():
     result = score_behavior(elapsed_ms=300, retry_count=6, utr_format_plausible=False)
     assert result["risk_score"] >= 40
+    assert result["decision"] == "DEVICE_INTEGRITY_REJECT"
     assert result["can_confirm_payment"] is False
 
 def test_ela_heuristic_is_not_proof():
@@ -51,5 +52,5 @@ def test_authorized_scoring_is_not_settlement():
     assert response.status_code == 200
     assert response.json()["can_confirm_payment"] is False
 
-def test_unsigned_provider_cannot_settle():
-    assert client.post("/v1/provider-events", json={}).status_code == 401
+def test_removed_event_endpoint_is_unavailable():
+    assert client.post("/v1/provider-events", json={}).status_code == 404

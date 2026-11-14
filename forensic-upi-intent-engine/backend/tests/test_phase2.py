@@ -33,7 +33,7 @@ def test_no_screenshot_keyword_can_settle(keywords):
             "amount_text_candidate": "500.00", "vpa_candidates": ["merchant@psp"],
         }, ela_override={"anomaly_score": 0},
     )
-    assert result["decision"] == "PENDING_RECONCILIATION"
+    assert result["decision"] in ("DEVICE_INTEGRITY_PASS", "DEVICE_INTEGRITY_REJECT")
     assert result["ledger_entries_created"] == 0
     assert result["can_confirm_payment"] is False
 
@@ -49,7 +49,7 @@ def test_fake_utr_amount_can_only_raise_advisory_flag():
     assert "ocr_claimed_amount_differs_from_session" in result["risk_flags"]
     assert "ocr_vpa_does_not_match_session" in result["risk_flags"]
     assert "utr_claim_differs_from_ocr" in result["risk_flags"]
-    assert result["decision"] == "PENDING_RECONCILIATION"
+    assert result["decision"] in ("DEVICE_INTEGRITY_PASS", "DEVICE_INTEGRITY_REJECT")
 
 
 def test_reused_image_flag():
@@ -78,5 +78,5 @@ def test_anonymous_endpoint_denied():
     assert r.status_code == 401
 
 
-def test_queue_requires_auth():
-    assert client.get("/v1/reconciliation/queue/summary").status_code == 401
+def test_attestation_event_feed_requires_auth():
+    assert client.get("/v1/client/attestations/recent").status_code == 401

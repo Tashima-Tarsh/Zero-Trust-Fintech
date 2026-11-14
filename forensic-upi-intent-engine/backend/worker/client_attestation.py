@@ -116,13 +116,6 @@ def attest_payment(body: ClientAttestation):
             raise HTTPException(403, "Device not bound to session")
         if session["amount_paise"] != amount_paise:
             raise HTTPException(409, "Amount does not match session")
-        if session["is_client_finalized"]:
-            if session["attestation_hash"] == digest:
-                return {"status": "CLIENT_ATTESTED", "client_finalized": True,
-                        "attestation_hash": digest, "duplicate": True}
-            raise HTTPException(409, "Session already attested with different payload")
-        if session["status"] not in ("PENDING", "REVIEW") or session["expires_at"] <= now:
-            raise HTTPException(409, "Session closed or expired")
         cur.execute(
             """SELECT public_key_b64, hardware_attested FROM client_device_keys
                WHERE user_id=%s AND device_id=%s AND is_active=TRUE FOR SHARE""",
@@ -132,6 +125,13 @@ def attest_payment(body: ClientAttestation):
         if not key or not key["hardware_attested"]:
             raise HTTPException(403, "Active attested device enrollment required")
         verify_client_signature(body, key["public_key_b64"])
+        if session["is_client_finalized"]:
+            if session["attestation_hash"] == digest:
+                return {"status": "CLIENT_ATTESTED", "client_finalized": True,
+                        "attestation_hash": digest, "duplicate": True}
+            raise HTTPException(409, "Session already attested with different payload")
+        if session["status"] not in ("PENDING", "REVIEW") or session["expires_at"] <= now:
+            raise HTTPException(409, "Session closed or expired")
         cur.execute(
             """UPDATE payment_sessions SET status='CLIENT_ATTESTED',
                is_client_finalized=TRUE, client_verified_at=now(),

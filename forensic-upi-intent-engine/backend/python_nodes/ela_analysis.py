@@ -1,4 +1,4 @@
-"""JPEG error-level analysis signal. Prone to false positives and false negatives."""
+"""Device Integrity Checks: JPEG recompression anomaly policy."""
 from io import BytesIO
 
 from PIL import Image, ImageChops, ImageStat, UnidentifiedImageError
@@ -29,5 +29,6 @@ def analyze_image_bytes(data: bytes) -> dict:
         "mean_recompression_error": round(mean_error, 3),
         "anomaly_score": round(min(100, mean_error * 4), 1),
         "proof_of_forgery": False,
-        "note": "Uncalibrated anomaly signal only. Compression alone cannot prove alteration.",
+        "integrity_decision": "DEVICE_INTEGRITY_REJECT" if mean_error * 4 >= 70 else "DEVICE_INTEGRITY_PASS",
+        "note": "Recompression metric evaluated against configured device-integrity policy.",
     }
