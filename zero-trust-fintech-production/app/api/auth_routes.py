@@ -177,10 +177,12 @@ async def refresh_token(
             expires_in=getattr(settings, "JWT_ACCESS_TOKEN_EXPIRE_MINUTES", 60) * 60
         )
         
-    except (AuthError, Exception) as e:
+    except HTTPException:
+        raise
+    except AuthError:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail=f"Invalid refresh token: {str(e)}"
+            detail="Invalid refresh token"
         )
 
 @router.post("/websocket-token")
