@@ -1,5 +1,5 @@
 {
-  "name": "02 Intent Verifier — Pending Reconciliation (Phase 2)",
+  "name": "02 Device Integrity Checks",
   "nodes": [
     {
       "parameters": {
@@ -10,7 +10,7 @@
         "options": {}
       },
       "id": "72951e2b-847c-456b-bf2e-020000000001",
-      "name": "Authenticated Evidence Webhook",
+      "name": "Authenticated Device Integrity Request",
       "type": "n8n-nodes-base.webhook",
       "typeVersion": 2,
       "position": [
@@ -31,7 +31,7 @@
         "options": {}
       },
       "id": "72951e2b-847c-456b-bf2e-020000000002",
-      "name": "Analyze and Hold in Queue",
+      "name": "Evaluate Device Integrity",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [
@@ -46,7 +46,7 @@
         "options": {}
       },
       "id": "72951e2b-847c-456b-bf2e-020000000003",
-      "name": "Return Pending Reconciliation",
+      "name": "Return Device Integrity Decision",
       "type": "n8n-nodes-base.respondToWebhook",
       "typeVersion": 1.1,
       "position": [
@@ -56,22 +56,22 @@
     }
   ],
   "connections": {
-    "Authenticated Evidence Webhook": {
+    "Authenticated Device Integrity Request": {
       "main": [
         [
           {
-            "node": "Analyze and Hold in Queue",
+            "node": "Evaluate Device Integrity",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Analyze and Hold in Queue": {
+    "Evaluate Device Integrity": {
       "main": [
         [
           {
-            "node": "Return Pending Reconciliation",
+            "node": "Return Device Integrity Decision",
             "type": "main",
             "index": 0
           }

@@ -1,5 +1,5 @@
 {
-  "name": "B - Forensic triage (never confirms payment)",
+  "name": "02 Device Integrity Checks",
   "nodes": [
     {
       "parameters": {
