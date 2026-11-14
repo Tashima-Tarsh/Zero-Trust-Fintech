@@ -1,0 +1,27 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "n8n: Set up and start",
+      "type": "process",
+      "command": "powershell.exe",
+      "args": ["-NoProfile", "-File", "${workspaceFolder}/forensic-upi-intent-engine/scripts/windows/n8n.ps1", "-Action", "Setup"],
+      "problemMatcher": []
+    },
+    {
+      "label": "n8n: Start server",
+      "type": "process",
+      "command": "powershell.exe",
+      "args": ["-NoProfile", "-File", "${workspaceFolder}/forensic-upi-intent-engine/scripts/windows/n8n.ps1", "-Action", "Start"],
+      "problemMatcher": []
+    },
+    {
+      "label": "n8n: Check connections",
+      "type": "process",
+      "command": "powershell.exe",
+      "args": ["-NoProfile", "-File", "${workspaceFolder}/forensic-upi-intent-engine/scripts/windows/n8n.ps1", "-Action", "Status"],
+      "problemMatcher": []
+    }
+  ]
+}
+
