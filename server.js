@@ -38,6 +38,16 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(express.static(path.join(__dirname, 'public')));
 
+// Health Check Endpoint (Render & Uptime Monitoring)
+app.get(['/health', '/api/health'], (req, res) => {
+  res.json({
+    status: 'healthy',
+    service: 'disha-checkout-gateway',
+    uptime: process.uptime(),
+    timestamp: new Date().toISOString()
+  });
+});
+
 // Inject db and ipWhitelist into request
 app.use((req, res, next) => {
   req.db = db;

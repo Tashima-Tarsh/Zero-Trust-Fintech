@@ -102,6 +102,16 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
+  // Public Health Checks
+  if ((pathname === '/health' || pathname === '/api/health') && method === 'GET') {
+    return sendJson(res, 200, {
+      status: 'healthy',
+      service: 'disha-merchant-saas',
+      uptime: process.uptime(),
+      timestamp: new Date().toISOString()
+    });
+  }
+
   // =========================================================================
   // API ROUTES
   // =========================================================================

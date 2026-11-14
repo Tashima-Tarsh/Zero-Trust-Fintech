@@ -1,0 +1,113 @@
+# ══════════════════════════════════════════════════════════════════════════════
+# DISHA 8.2 — ZERO-TRUST FINTECH RENDER BLUEPRINT (INFRASTRUCTURE-AS-CODE)
+# ══════════════════════════════════════════════════════════════════════════════
+# Fully automated production deployment on Render.com:
+# - Managed PostgreSQL 15 Ledger Database
+# - Managed Redis 7 In-Memory Challenge Store
+# - FastAPI Zero-Trust Backend (Docker runtime)
+# - DISHA Sovereign Customer Checkout Gateway (Node 22)
+# - DISHA Merchant SaaS Platform & Audio Soundbox (Node 22 + Persistent Disk)
+# ══════════════════════════════════════════════════════════════════════════════
+
+databases:
+  - name: disha-postgres
+    databaseName: zerotrust_ledger
+    user: zerotrust
+    plan: starter
+    region: frankfurt
+    ipAllowList: []
+
+services:
+  # ─────────────────────────────────────────────────────────────────────────────
+  # 1. Managed Redis Cache (Challenge Token Nonces & Rate Limiting)
+  # ─────────────────────────────────────────────────────────────────────────────
+  - type: redis
+    name: disha-redis
+    plan: starter
+    region: frankfurt
+    ipAllowList: []
+    maxmemoryPolicy: noeviction
+
+  # ─────────────────────────────────────────────────────────────────────────────
+  # 2. FastAPI Zero-Trust Backend (Ledger, Fraud Engine, Device Attestation)
+  # ─────────────────────────────────────────────────────────────────────────────
+  - type: web
+    name: disha-api-backend
+    runtime: docker
+    dockerContext: ./zero-trust-fintech-production
+    dockerfilePath: ./zero-trust-fintech-production/Dockerfile
+    plan: starter
+    region: frankfurt
+    healthCheckPath: /health
+    autoDeploy: true
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: disha-postgres
+          property: connectionString
+      - key: REDIS_URL
+        fromService:
+          name: disha-redis
+          type: redis
+          property: connectionString
+      - key: JWT_SECRET_KEY
+        generateValue: true
+      - key: APP_ENV
+        value: production
+      - key: LOG_LEVEL
+        value: INFO
+      - key: CORS_ALLOWED_ORIGINS
+        value: "https://disha-checkout.onrender.com,https://disha-merchant-saas.onrender.com"
+
+  # ─────────────────────────────────────────────────────────────────────────────
+  # 3. DISHA Sovereign Customer Checkout Gateway (Port 3000 Web App)
+  # ─────────────────────────────────────────────────────────────────────────────
+  - type: web
+    name: disha-checkout
+    runtime: node
+    plan: starter
+    region: frankfurt
+    rootDir: .
+    buildCommand: npm install
+    startCommand: node server.js
+    healthCheckPath: /health
+    autoDeploy: true
+    envVars:
+      - key: NODE_VERSION
+        value: 22.14.0
+      - key: NODE_ENV
+        value: production
+      - key: DISHA_API_BASE_URL
+        fromService:
+          name: disha-api-backend
+          type: web
+          property: host
+      - key: ENABLE_PAYMENT_SIMULATION
+        value: "false"
+
+  # ─────────────────────────────────────────────────────────────────────────────
+  # 4. DISHA Merchant SaaS Platform & Soundbox (Port 5000 Web App)
+  # ─────────────────────────────────────────────────────────────────────────────
+  - type: web
+    name: disha-merchant-saas
+    runtime: node
+    plan: starter
+    region: frankfurt
+    rootDir: disha-cinematic
+    buildCommand: npm install
+    startCommand: node server.js
+    healthCheckPath: /health
+    autoDeploy: true
+    disk:
+      name: disha-saas-data
+      mountPath: /data
+      sizeGB: 1
+    envVars:
+      - key: NODE_VERSION
+        value: 22.14.0
+      - key: NODE_ENV
+        value: production
+      - key: DATA_DIR
+        value: /data
+      - key: ENABLE_PAYMENT_SIMULATION
+        value: "false"
