@@ -1,0 +1,54 @@
+name: Cross-project Code Audit
+
+on:
+  push:
+    branches: [main, 'audit/**']
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  source-integrity:
+    name: Source syntax, workflow graphs and checkout tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - name: Parse all Python and JSON source; validate n8n graph integrity
+        run: python scripts/validate_repository.py
+      - name: JavaScript syntax (Node and browser modules)
+        shell: bash
+        run: |
+          set -euo pipefail
+          for directory in . disha-cinematic sharepay-mvp merchant-pwa; do
+            if [ "$directory" = "." ]; then
+              find . -maxdepth 1 -name '*.js' -print0
+            else
+              find "$directory" -name '*.js' -not -path '*/vendor/*' -not -path '*/node_modules/*' -print0
+            fi
+          done | while IFS= read -r -d '' file; do node --check "$file"; done
+      - name: Checkout dependency install
+        run: npm ci
+      - name: Checkout unit and security tests
+        run: npm test
+
+  landing:
+    name: TypeScript production build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install frontend dependencies
+        run: npm ci --prefix halo-landing
+      - name: Build frontend and verify TypeScript
+        run: npm run build --prefix halo-landing
