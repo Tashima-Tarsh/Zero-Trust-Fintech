@@ -61,6 +61,10 @@
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 21h18M3 10h18M5 6l7-3 7 3M4 10v11M20 10v11M8 14v4M12 14v4M16 14v4"></path></svg>
           <span>UPI IDs</span>
         </a>
+        <a href="#ip-whitelist" class="side-nav-item" data-workspace="ip-whitelist" onclick="switchWorkspace('ip-whitelist')">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>
+          <span>Server IP Whitelist</span>
+        </a>
         <a href="#reports" class="side-nav-item" data-workspace="reports" onclick="switchWorkspace('reports')">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
           <span>Reports & Taxes</span>
@@ -546,6 +550,88 @@
           </div>
         </section>
 
+        <!-- WORKSPACE: SERVER IP WHITELIST -->
+        <section id="ws-ip-whitelist" class="workspace-section">
+          <!-- Credentials & Security Card -->
+          <div class="metrics-grid" style="grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); margin-bottom: 24px;">
+            <div class="metric-card">
+              <span class="m-card-title">Enterprise API Key (X-API-Key)</span>
+              <div style="display: flex; gap: 8px; align-items: center; margin-top: 8px;">
+                <input type="text" id="dispApiKey" class="form-input font-mono" style="font-size: 13px;" readonly value="Loading...">
+                <button type="button" class="btn-dash-secondary" onclick="copyApiKey()">Copy</button>
+              </div>
+              <div class="m-card-sub text-muted" style="margin-top: 6px;">Required in <code>X-API-Key</code> request header</div>
+            </div>
+            <div class="metric-card">
+              <span class="m-card-title">Security Firewall Status</span>
+              <div class="m-card-val text-success" id="ipSecStatus">🟢 IP Whitelist Enforced</div>
+              <div class="m-card-sub">Direct unauthorized calls blocked with 403 Forbidden</div>
+            </div>
+            <div class="metric-card">
+              <span class="m-card-title">Whitelisted Nodes</span>
+              <div class="m-card-val" id="ipNodeCount">0 Server IPs</div>
+              <div class="m-card-sub text-muted">Exact IPv4 / IPv6 and CIDR Subnet Ranges</div>
+            </div>
+          </div>
+
+          <!-- Whitelist Table -->
+          <div class="dash-panel" style="margin-bottom: 24px;">
+            <div class="panel-header">
+              <div>
+                <h3>Whitelisted Game Server IPs &amp; Subnets</h3>
+                <p class="panel-subtitle">Only requests originating from these IP addresses can execute payment verifications.</p>
+              </div>
+              <button type="button" class="btn-dash-primary" onclick="openAddServerIpModal()">
+                <span>+ Whitelist New IP / CIDR</span>
+              </button>
+            </div>
+
+            <div class="table-responsive">
+              <table class="dash-table">
+                <thead>
+                  <tr>
+                    <th>Authorized IP / Subnet</th>
+                    <th>Node Description</th>
+                    <th>Status</th>
+                    <th>Actions</th>
+                  </tr>
+                </thead>
+                <tbody id="whitelistTableBody">
+                  <!-- Populated by JS -->
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <!-- Blocked Hacker Attempts (Security Alerts) -->
+          <div class="dash-panel">
+            <div class="panel-header">
+              <div>
+                <h3 style="color: #ef4444;">🚨 Security Monitoring: Blocked Unauthorized Attempts</h3>
+                <p class="panel-subtitle">Real-time log of unauthorized IP addresses intercepted by the firewall.</p>
+              </div>
+              <span class="panel-badge" style="background: rgba(239, 68, 68, 0.15); color: #f87171;">Auto-Drop Protection Active</span>
+            </div>
+
+            <div class="table-responsive">
+              <table class="dash-table">
+                <thead>
+                  <tr>
+                    <th>Blocked IP Address</th>
+                    <th>Attempt Count</th>
+                    <th>Intercepted Endpoint</th>
+                    <th>Violation Reason</th>
+                    <th>Last Attempt Time</th>
+                  </tr>
+                </thead>
+                <tbody id="blockedTableBody">
+                  <!-- Populated by JS -->
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </section>
+
         <!-- WORKSPACE 7: NOTIFICATIONS -->
         <section id="ws-notifications" class="workspace-section">
           <div class="dash-panel">
@@ -689,6 +775,36 @@
         <div class="modal-actions">
           <button type="button" class="btn-dash-secondary" onclick="closeBulkVpaModal()">Cancel</button>
           <button type="submit" id="btnUploadBulkVpa" class="btn-dash-primary">Ingest Fleet</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- ADD SERVER IP MODAL -->
+  <div id="addServerIpModal" class="modal-backdrop" style="display: none;">
+    <div class="modal-dialog">
+      <div class="modal-header">
+        <h3>Whitelist Game Server IP or Subnet</h3>
+        <button type="button" class="btn-close-modal" onclick="closeAddServerIpModal()">✕</button>
+      </div>
+      <form id="addServerIpForm" class="modal-body">
+        <div class="form-group">
+          <label for="newServerIp" class="form-label">Server IP or CIDR Subnet <span class="required">*</span></label>
+          <input type="text" id="newServerIp" class="form-input font-mono" placeholder="e.g. 52.84.123.45 or 103.21.58.0/24" required>
+          <div id="serverIpValidation" class="vpa-feedback-box empty">
+            <span id="serverIpIcon">ℹ️</span>
+            <span id="serverIpText">Enter IPv4 address (e.g. 52.84.123.45) or CIDR (e.g. 52.84.0.0/16)</span>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label for="newServerDesc" class="form-label">Node Description <span class="required">*</span></label>
+          <input type="text" id="newServerDesc" class="form-input" placeholder="e.g. AWS Mumbai Game Server 1" required>
+        </div>
+
+        <div class="modal-actions">
+          <button type="button" class="btn-dash-secondary" onclick="closeAddServerIpModal()">Cancel</button>
+          <button type="submit" id="btnSaveServerIp" class="btn-dash-primary" disabled>Whitelist IP</button>
         </div>
       </form>
     </div>

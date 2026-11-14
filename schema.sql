@@ -143,3 +143,65 @@ CREATE INDEX IF NOT EXISTS idx_sessions_order_id ON sessions(order_id);
 CREATE INDEX IF NOT EXISTS idx_sessions_txn_ref ON sessions(txn_ref);
 CREATE INDEX IF NOT EXISTS idx_ledger_tx_id ON ledger_entries(transaction_id);
 CREATE INDEX IF NOT EXISTS idx_vpa_pool_status ON vpa_pool(status, daily_tx_count);
+
+-- ═══════════════════════════════════════════════════════════════════
+-- 7. Gaming Enterprise & IP Whitelisting Security
+-- ═══════════════════════════════════════════════════════════════════
+
+-- Gaming Companies (Tenants)
+CREATE TABLE IF NOT EXISTS gaming_companies (
+    id VARCHAR(64) PRIMARY KEY,
+    company_name VARCHAR(200) NOT NULL,
+    contact_email VARCHAR(200) NOT NULL,
+    api_key VARCHAR(64) UNIQUE NOT NULL,
+    api_secret VARCHAR(128) NOT NULL,
+    status VARCHAR(20) DEFAULT 'ACTIVE' CHECK(status IN ('ACTIVE', 'SUSPENDED', 'PENDING')),
+    created_at BIGINT NOT NULL,
+    last_active_at BIGINT
+);
+
+-- IP Whitelist per Gaming Company
+CREATE TABLE IF NOT EXISTS ip_whitelist (
+    id VARCHAR(64) PRIMARY KEY,
+    company_id VARCHAR(64) NOT NULL REFERENCES gaming_companies(id) ON DELETE CASCADE,
+    ip_address VARCHAR(45),
+    ip_range VARCHAR(50),
+    description VARCHAR(200),
+    is_active BOOLEAN DEFAULT true,
+    added_by VARCHAR(64),
+    added_at BIGINT NOT NULL,
+    last_used_at BIGINT,
+    UNIQUE(company_id, ip_address)
+);
+
+-- API Access Logs (Audit Trail)
+CREATE TABLE IF NOT EXISTS api_access_log (
+    id VARCHAR(64) PRIMARY KEY,
+    company_id VARCHAR(64) REFERENCES gaming_companies(id),
+    ip_address VARCHAR(45) NOT NULL,
+    endpoint VARCHAR(200) NOT NULL,
+    method VARCHAR(10) NOT NULL,
+    status_code INTEGER NOT NULL,
+    request_body TEXT,
+    response_body TEXT,
+    user_agent TEXT,
+    accessed_at BIGINT NOT NULL
+);
+
+-- Blocked IP Attempts (Security Monitoring)
+CREATE TABLE IF NOT EXISTS blocked_ip_attempts (
+    id VARCHAR(64) PRIMARY KEY,
+    ip_address VARCHAR(45) NOT NULL,
+    company_id VARCHAR(64) REFERENCES gaming_companies(id),
+    endpoint VARCHAR(200) NOT NULL,
+    reason VARCHAR(100) NOT NULL,
+    attempt_count INTEGER DEFAULT 1,
+    first_attempt BIGINT NOT NULL,
+    last_attempt BIGINT NOT NULL,
+    UNIQUE(ip_address, endpoint)
+);
+
+CREATE INDEX IF NOT EXISTS idx_whitelist_company ON ip_whitelist(company_id, is_active);
+CREATE INDEX IF NOT EXISTS idx_whitelist_ip ON ip_whitelist(ip_address);
+CREATE INDEX IF NOT EXISTS idx_access_log_company ON api_access_log(company_id, accessed_at);
+CREATE INDEX IF NOT EXISTS idx_blocked_ip ON blocked_ip_attempts(ip_address, last_attempt);

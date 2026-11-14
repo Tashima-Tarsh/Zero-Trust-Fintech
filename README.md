@@ -125,6 +125,7 @@ npm test
 | **VPA Routing Engine** | Rotating through active bank VPAs | Health > 70, Cooldown > 45s, Pattern masked | ✅ PASS |
 | **1000-VPA 5-Factor Scoring** | Health (30%), Cooldown (25%), Load (20%), Slot (15%), Geo (10%) | Dynamic top-10 weighted selection + chaos jitter | ✅ PASS |
 | **Emergency Quarantine** | Anomaly freeze trigger | 7-day cooldown, 30 health, instant failover | ✅ PASS |
+| **Enterprise IP Whitelist** | Exact IP & CIDR match, API key auth, blocked logging (`node test-ip-whitelist.js`) | Subnet resolution, 403 on intrusion, sub-ms TTL cache | ✅ PASS |
 | **WebSocket Delivery** | Real-time push on `/ws?orderId=...` | Instant UI transition & audio chime | ✅ PASS |
 
 ---
@@ -173,6 +174,102 @@ DISHA 8.2 provides 4 production-ready n8n workflows:
 - **`workflows/n8n/workflow-2-vpa-daily-health-check.json`**: Runs daily at 6:00 AM IST via Cron, resets daily counters, awards +2 health recovery to clean accounts, and dispatches an executive capacity briefing to Telegram/Slack.
 - **`workflows/n8n/workflow-3-vpa-realtime-routing.json`**: Real-time webhook checkout routing that evaluates 5-factor scoring, selects the optimal VPA, and generates NPCI v3.2 compliant deep links.
 - **`workflows/n8n/workflow-4-vpa-emergency-quarantine.json`**: Instant failover upon bank anomaly alert, quarantines the affected handle for 7 days (`status: 'COOLDOWN'`, health dropped to 30), and immediately provisions a replacement VPA.
+
+---
+
+## 🛡️ Enterprise Gaming Security & Server IP Whitelisting
+
+High-volume gaming companies and MMO studios require strict **IP Whitelisting** to ensure only authorized game matchmaking servers and backend clusters can call payment verification endpoints. This renders direct script attacks and spoofed UTR injections completely ineffective.
+
+```
+┌────────────────────────────────────────────────────────────────────────┐
+│               ENTERPRISE GAMING IP WHITELIST ARCHITECTURE              │
+├────────────────────────────────────────────────────────────────────────┤
+│                                                                        │
+│   [Authorized Game Cluster]             [Unauthorized Intruder / Bot] │
+│   AWS Mumbai (52.84.123.45)             Tor Exit Node (185.220.101.5)  │
+│              │                                        │                │
+│              │  POST /api/gaming/verify-payment       │                │
+│              ▼                                        ▼                │
+│  ┌──────────────────────────────────────────────────────────────────┐  │
+│  │                     DISHA 8.2 REVERSE PROXY                      │  │
+│  │  1. Unwraps Client IP (CF-Connecting-IP, X-Forwarded-For first)  │  │
+│  │  2. Strips IPv4-mapped IPv6 (::ffff:)                            │  │
+│  └──────────────────────────────────┬───────────────────────────────┘  │
+│                                     │                                  │
+│                                     ▼                                  │
+│  ┌──────────────────────────────────────────────────────────────────┐  │
+│  │                     IP WHITELIST MIDDLEWARE                      │  │
+│  │  • Authenticate Tenant (X-API-Key with 300s TTL cache)           │  │
+│  │  • Exact IP Match Check                                          │  │
+│  │  • Bitwise 32-bit CIDR Subnet Match (e.g. 103.21.58.0/24)        │  │
+│  │  • Microsecond latency via in-memory Cache                       │  │
+│  └──────────────┬───────────────────────────────────┬───────────────┘  │
+│                 │                                   │                  │
+│       [Match = True] ✅                     [Match = False] ❌         │
+│                 │                                   │                  │
+│                 ▼                                   ▼                  │
+│  ┌──────────────────────────────┐   ┌───────────────────────────────┐  │
+│  │  7-LAYER FRAUD VERIFICATION  │   │  403 IP_NOT_WHITELISTED       │  │
+│  │  • Check Challenge Amount    │   │  • Increment Blocked Counter  │  │
+│  │  • Double-Entry Settlement   │   │  • Audit Blocked Log          │  │
+│  │  • 200 OK + Cryptographic Tx │   │  • Alert if >50 attempts/hour │  │
+│  └──────────────────────────────┘   └───────────────────────────────┘  │
+└────────────────────────────────────────────────────────────────────────┘
+```
+
+### Key Security Guardrails
+1. **Bitwise CIDR Subnet Arithmetic**: Fast microsecond matching for dynamic autoscaling cloud clusters (`13.235.0.0/16`, `103.21.58.0/24`) without external dependencies.
+2. **Reverse Proxy Unwrapping**: Correctly parses `cf-connecting-ip`, `x-real-ip`, and the true client origin in `x-forwarded-for` (`client, proxy1, proxy2`).
+3. **In-Memory TTL Caching**: API keys cached for 300s, whitelists for 600s; cache invalidated immediately upon IP addition or revocation.
+4. **Brute-Force & Bot Detection**: Logs repeated unauthorized hits into `blocked_ip_attempts`; triggers critical alert upon exceeding 50 attempts/hour.
+5. **Multi-Tenant Dashboard Integration**: Gaming merchants manage API keys, whitelist nodes, and review live blocked intrusions in the DISHA Cinematic Dashboard (`http://localhost:5000/dashboard#ip-whitelist`).
+
+### Gaming API Reference
+
+| Endpoint | Method | Headers | Description |
+| :--- | :--- | :--- | :--- |
+| `/api/gaming/verify-payment` | `POST` | `X-API-Key: <key>` | Authenticated game server payment verification |
+| `/api/admin/companies` | `POST` | None | Provision new gaming company tenant and API key |
+| `/api/admin/companies` | `GET` | None | List all registered gaming studios & active IP counts |
+| `/api/admin/companies/:id/ips` | `POST` | None | Whitelist specific IPv4 or CIDR subnet |
+| `/api/admin/companies/:id/ips` | `GET` | None | List whitelisted nodes for tenant |
+| `/api/admin/companies/:id/ips/:ipId` | `DELETE` | None | Instant revocation of IP access |
+| `/api/admin/blocked-attempts` | `GET` | None | Real-time firewall security attempt log |
+| `/api/admin/access-logs` | `GET` | None | Audited access logs with IP, path, status, and latency |
+
+### Game Studio Integration Snippet (Node.js)
+
+```javascript
+import axios from 'axios';
+
+async function verifyGamePurchase(utr, amount, orderId) {
+  try {
+    const res = await axios.post('https://disha-engine.yourdomain.com/api/gaming/verify-payment', {
+      utr,
+      amount,
+      orderId
+    }, {
+      headers: {
+        'X-API-Key': process.env.DISHA_GAME_API_KEY,
+        'Content-Type': 'application/json'
+      }
+    });
+
+    if (res.data.status === 'VERIFIED') {
+      console.log(`✅ Diamonds credited for ${orderId}. Ledger Tx: ${res.data.ledgerTxId}`);
+      return true;
+    }
+  } catch (err) {
+    if (err.response?.status === 403) {
+      console.error('🚨 Game server IP is not whitelisted in DISHA gateway!');
+    } else {
+      console.error('Payment verification failed:', err.response?.data?.message);
+    }
+    return false;
+  }
+}
+```
 
 ---
 

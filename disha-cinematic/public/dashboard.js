@@ -78,7 +78,7 @@ window.toggleMobileSidebar = function(open) {
 
 // Workspace Switcher
 window.switchWorkspace = function(wsId) {
-  const valid = ['overview', 'payments', 'create-payment', 'upi-ids', 'reports', 'soundbox', 'notifications', 'settings'];
+  const valid = ['overview', 'payments', 'create-payment', 'upi-ids', 'reports', 'soundbox', 'ip-whitelist', 'notifications', 'settings'];
   const target = valid.includes(wsId) ? wsId : 'overview';
 
   // Update nav links
@@ -106,6 +106,7 @@ window.switchWorkspace = function(wsId) {
     'upi-ids': 'UPI IDs',
     'reports': 'Reports & Taxes',
     'soundbox': 'Voice Soundbox',
+    'ip-whitelist': 'Server IP Whitelist',
     'notifications': 'Notifications',
     'settings': 'Settings'
   };
@@ -117,6 +118,7 @@ window.switchWorkspace = function(wsId) {
   // Trigger workspace specific refresh
   if (target === 'payments') loadPaymentsList();
   if (target === 'upi-ids') loadVpas();
+  if (target === 'ip-whitelist') loadIpWhitelist();
   if (target === 'reports') loadReportsData();
   if (target === 'notifications') loadFullNotifications();
   if (target === 'settings') populateSettingsForm();
@@ -1117,4 +1119,189 @@ window.handleLogout = async function() {
   } catch (_) {}
   sessionStorage.clear();
   window.location.href = '/login';
+};
+
+// ═══════════════════════════════════════════════════════════════════
+// GAMING ENTERPRISE IP WHITELIST WORKSPACE
+// ═══════════════════════════════════════════════════════════════════
+let currentWhitelistedIps = [];
+
+async function loadIpWhitelist() {
+  try {
+    const res = await fetch('/api/merchant/ip-whitelist', {
+      headers: { 'Authorization': 'Bearer ' + authToken }
+    });
+    if (!res.ok) return;
+
+    const data = await res.json();
+    const apiKeyEl = document.getElementById('dispApiKey');
+    if (apiKeyEl) apiKeyEl.value = data.apiKey || 'disha_live_default_key';
+
+    const countEl = document.getElementById('ipNodeCount');
+    if (countEl) countEl.textContent = `${data.ips ? data.ips.length : 0} Server IPs`;
+
+    currentWhitelistedIps = data.ips || [];
+    renderWhitelistTable(currentWhitelistedIps);
+    renderBlockedAttemptsTable(data.blocked || []);
+  } catch (err) {
+    console.error('Failed to load IP whitelist:', err);
+  }
+}
+
+function renderWhitelistTable(ips) {
+  const tbody = document.getElementById('whitelistTableBody');
+  if (!tbody) return;
+
+  if (!ips || ips.length === 0) {
+    tbody.innerHTML = `<tr><td colspan="4" class="empty-table-msg">No server IPs whitelisted yet. Click "+ Whitelist New IP / CIDR" above.</td></tr>`;
+    return;
+  }
+
+  tbody.innerHTML = ips.map(i => {
+    const addr = i.ip_address || i.ip_range;
+    const isCidr = Boolean(i.ip_range);
+    const lastUsed = i.last_used_at ? new Date(i.last_used_at).toLocaleTimeString() : 'Never';
+
+    return `
+      <tr>
+        <td>
+          <strong class="font-mono" style="color: #38bdf8;">${addr}</strong>
+          ${isCidr ? '<span style="font-size: 10px; background: rgba(56, 189, 248, 0.15); color: #38bdf8; padding: 2px 5px; border-radius: 4px; margin-left: 6px;">SUBNET CIDR</span>' : ''}
+        </td>
+        <td>${i.description || 'Game Server Node'}</td>
+        <td><span class="status-pill-active">Whitelisted</span></td>
+        <td>
+          <button type="button" class="btn-table-danger" onclick="deleteServerIp('${i.id}')">Revoke</button>
+        </td>
+      </tr>
+    `;
+  }).join('');
+}
+
+function renderBlockedAttemptsTable(blocked) {
+  const tbody = document.getElementById('blockedTableBody');
+  if (!tbody) return;
+
+  if (!blocked || blocked.length === 0) {
+    tbody.innerHTML = `<tr><td colspan="5" class="empty-table-msg" style="color: #10b981;">✓ Zero unauthorized intrusions detected in the last 24 hours.</td></tr>`;
+    return;
+  }
+
+  tbody.innerHTML = blocked.map(b => {
+    const dateStr = b.last_attempt ? new Date(b.last_attempt).toLocaleTimeString() : 'Just now';
+    return `
+      <tr>
+        <td><strong class="font-mono" style="color: #ef4444;">${b.ip_address}</strong></td>
+        <td><span class="panel-badge" style="background: rgba(239, 68, 68, 0.2); color: #f87171;">${b.attempt_count} blocked</span></td>
+        <td><code style="font-size: 12px;">${b.endpoint}</code></td>
+        <td><span style="color: #f59e0b;">${b.reason}</span></td>
+        <td class="text-muted" style="font-size: 12px;">${dateStr}</td>
+      </tr>
+    `;
+  }).join('');
+}
+
+window.copyApiKey = function() {
+  const apiKeyEl = document.getElementById('dispApiKey');
+  if (!apiKeyEl) return;
+  navigator.clipboard.writeText(apiKeyEl.value);
+  const btn = event.target;
+  const originalText = btn.textContent;
+  btn.textContent = 'Copied!';
+  setTimeout(() => { btn.textContent = originalText; }, 1800);
+};
+
+window.openAddServerIpModal = function() {
+  const modal = document.getElementById('addServerIpModal');
+  if (modal) {
+    modal.style.display = 'flex';
+    document.getElementById('newServerIp').value = '';
+    document.getElementById('newServerDesc').value = '';
+    document.getElementById('newServerIp').focus();
+    const box = document.getElementById('serverIpValidation');
+    if (box) box.className = 'vpa-feedback-box empty';
+  }
+};
+
+window.closeAddServerIpModal = function() {
+  const modal = document.getElementById('addServerIpModal');
+  if (modal) modal.style.display = 'none';
+};
+
+const serverIpInput = document.getElementById('newServerIp');
+serverIpInput?.addEventListener('input', () => {
+  const val = serverIpInput.value.trim();
+  const box = document.getElementById('serverIpValidation');
+  const icon = document.getElementById('serverIpIcon');
+  const text = document.getElementById('serverIpText');
+  const btn = document.getElementById('btnSaveServerIp');
+
+  if (!val) {
+    box.className = 'vpa-feedback-box empty';
+    icon.textContent = 'ℹ️';
+    text.textContent = 'Enter IPv4 address (e.g. 52.84.123.45) or CIDR (e.g. 52.84.0.0/16)';
+    btn.disabled = true;
+    return;
+  }
+
+  const isIpv4 = /^(\d{1,3}\.){3}\d{1,3}$/.test(val);
+  const isCidr = /^(\d{1,3}\.){3}\d{1,3}\/\d{1,2}$/.test(val);
+
+  if (isIpv4 || isCidr) {
+    box.className = 'vpa-feedback-box valid';
+    icon.textContent = '✓';
+    text.textContent = isCidr ? 'Valid CIDR subnet range syntax.' : 'Valid IPv4 server address syntax.';
+    btn.disabled = false;
+  } else {
+    box.className = 'vpa-feedback-box invalid';
+    icon.textContent = '⚠️';
+    text.textContent = 'Invalid format. Provide a valid IPv4 address or CIDR notation.';
+    btn.disabled = true;
+  }
+});
+
+document.getElementById('addServerIpForm')?.addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const rawIp = document.getElementById('newServerIp').value.trim();
+  const description = document.getElementById('newServerDesc').value.trim();
+  const isCidr = rawIp.includes('/');
+
+  try {
+    const res = await fetch('/api/merchant/ip-whitelist', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer ' + authToken
+      },
+      body: JSON.stringify({
+        ip_address: isCidr ? null : rawIp,
+        ip_range: isCidr ? rawIp : null,
+        description
+      })
+    });
+    const data = await res.json();
+    if (!res.ok) {
+      alert(data.error || 'Failed to whitelist IP');
+      return;
+    }
+    closeAddServerIpModal();
+    loadIpWhitelist();
+  } catch (err) {
+    alert('Server error while whitelisting IP');
+  }
+});
+
+window.deleteServerIp = async function(ipId) {
+  if (!confirm('Revoke access for this server IP? Requests from this IP will be blocked immediately.')) return;
+  try {
+    const res = await fetch(`/api/merchant/ip-whitelist/${ipId}`, {
+      method: 'DELETE',
+      headers: { 'Authorization': 'Bearer ' + authToken }
+    });
+    if (res.ok) {
+      loadIpWhitelist();
+    }
+  } catch (err) {
+    console.error(err);
+  }
 };

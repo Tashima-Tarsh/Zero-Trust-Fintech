@@ -20,6 +20,8 @@ const {
   parseUTRTimestamp,
   NPCI_RESPONSE_CODES
 } = require('./npci-intent');
+const { IPWhitelistMiddleware } = require('./middleware/ip-whitelist');
+const adminRoutes = require('./routes/admin/ip-whitelist');
 
 const app = express();
 const server = http.createServer(app);
@@ -29,10 +31,25 @@ const PORT = process.env.PORT || 3000;
 const MERCHANT_UPI_ID = process.env.MERCHANT_UPI_ID || 'disha82@ybl';
 const MERCHANT_NAME = process.env.MERCHANT_NAME || 'DISHA 8.2 Store';
 
+const ipWhitelist = new IPWhitelistMiddleware(db);
+
 // Middleware
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(express.static(path.join(__dirname, 'public')));
+
+// Inject db and ipWhitelist into request
+app.use((req, res, next) => {
+  req.db = db;
+  req.ipWhitelist = ipWhitelist;
+  next();
+});
+
+// Admin enterprise management routes
+app.use('/api/admin', adminRoutes);
+
+// Protect Gaming Enterprise endpoints with IP Whitelisting
+app.use('/api/gaming/*', ipWhitelist.check());
 
 // ═══════════════════════════════════════════════════════════════════
 // TASK 11: WEBSOCKET REAL-TIME CONNECTION HUB
@@ -595,6 +612,103 @@ app.post('/api/vpa/health-check', (req, res) => {
       ...result
     });
   } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// ═══════════════════════════════════════════════════════════════════
+// GAMING ENTERPRISE VERIFICATION API (IP WHITELIST PROTECTED)
+// ═══════════════════════════════════════════════════════════════════
+app.post('/api/gaming/verify-payment', async (req, res) => {
+  try {
+    const { utr, amount, sessionId, orderId } = req.body;
+    const company = req.company;
+    const clientIP = req.clientIP;
+
+    if (!utr) {
+      return res.status(400).json({
+        success: false,
+        error: 'MISSING_UTR',
+        message: 'Transaction UTR is required'
+      });
+    }
+
+    // Look up session
+    let session = null;
+    if (sessionId) session = db.findSessionByTxnRef(sessionId);
+    if (!session && orderId) session = db.findSessionByOrderId(orderId);
+
+    if (session) {
+      const amt = Number(amount || session.challengeAmount);
+      if (Math.abs(amt - session.challengeAmount) > 0.001) {
+        return res.status(400).json({
+          success: false,
+          error: 'AMOUNT_MISMATCH',
+          expectedAmount: session.challengeAmount,
+          receivedAmount: amt
+        });
+      }
+
+      if (db.isUtrBlacklisted(utr)) {
+        return res.status(400).json({
+          success: false,
+          error: 'UTR_ALREADY_USED',
+          message: 'This UTR has already been claimed and settled'
+        });
+      }
+
+      const { txId, verification } = db.recordTransactionAndLedger(
+        session.orderId,
+        utr,
+        session.challengeAmount,
+        session.vpaAddress
+      );
+      db.blacklistUtr(utr, session.orderId, session.challengeAmount, `Gaming verification: ${company.company_name}`);
+      db.updateSessionStatus(session.orderId, 'SUCCESS', utr);
+
+      return res.json({
+        success: true,
+        status: 'VERIFIED',
+        orderId: session.orderId,
+        utr,
+        amount: session.challengeAmount,
+        company: company.company_name,
+        clientIP,
+        verifiedAt: Date.now(),
+        ledgerTxId: txId,
+        ledgerVerification: verification
+      });
+    }
+
+    // Direct game-server settlement
+    const verifiedAmount = parseFloat(amount || '100.00');
+    const gameOrderId = orderId || ('GAME_' + Date.now());
+
+    if (db.isUtrBlacklisted(utr)) {
+      return res.status(400).json({
+        success: false,
+        error: 'UTR_ALREADY_USED',
+        message: 'This UTR has already been settled'
+      });
+    }
+
+    const { txId, verification } = db.recordTransactionAndLedger(gameOrderId, utr, verifiedAmount, 'gaming@ybl');
+    db.blacklistUtr(utr, gameOrderId, verifiedAmount, `Gaming direct verification: ${company.company_name}`);
+
+    return res.json({
+      success: true,
+      status: 'VERIFIED',
+      orderId: gameOrderId,
+      utr,
+      amount: verifiedAmount,
+      company: company.company_name,
+      clientIP,
+      verifiedAt: Date.now(),
+      ledgerTxId: txId,
+      ledgerVerification: verification
+    });
+  } catch (err) {
+    console.error('[Gaming API] Error:', err);
     res.status(500).json({ success: false, error: err.message });
   }
 });

@@ -74,6 +74,28 @@ db.exec(`
     created_at INTEGER NOT NULL,
     FOREIGN KEY(merchant_id) REFERENCES merchants(id) ON DELETE CASCADE
   );
+
+  CREATE TABLE IF NOT EXISTS merchant_ip_whitelist (
+    id TEXT PRIMARY KEY,
+    merchant_id TEXT NOT NULL,
+    ip_address TEXT,
+    ip_range TEXT,
+    description TEXT,
+    is_active INTEGER DEFAULT 1,
+    created_at INTEGER NOT NULL,
+    last_used_at INTEGER,
+    FOREIGN KEY(merchant_id) REFERENCES merchants(id) ON DELETE CASCADE
+  );
+
+  CREATE TABLE IF NOT EXISTS merchant_blocked_ips (
+    id TEXT PRIMARY KEY,
+    merchant_id TEXT,
+    ip_address TEXT NOT NULL,
+    endpoint TEXT NOT NULL,
+    reason TEXT NOT NULL,
+    attempt_count INTEGER DEFAULT 1,
+    last_attempt INTEGER NOT NULL
+  );
 `);
 
 // Password hashing utilities using PBKDF2-HMAC-SHA256 (NIST compliant)
@@ -660,6 +682,74 @@ function seedDefaultMerchants() {
       setupCompleted: 0
     });
   }
+
+  // Seed default whitelisted IPs for Ramesh
+  const rameshMerchant = findMerchantByEmail('ramesh@kirana.in');
+  if (rameshMerchant) {
+    const existingIps = db.prepare('SELECT id FROM merchant_ip_whitelist WHERE merchant_id = ?').all(rameshMerchant.id);
+    if (existingIps.length === 0) {
+      addMerchantWhitelistIP(rameshMerchant.id, {
+        ip: '52.84.123.45',
+        range: null,
+        desc: 'AWS Mumbai Game Server 1'
+      });
+      addMerchantWhitelistIP(rameshMerchant.id, {
+        ip: null,
+        range: '103.21.58.0/24',
+        desc: 'DigitalOcean Game Cluster Subnet'
+      });
+    }
+  }
+}
+
+// IP Whitelisting & Gaming Enterprise Management
+function getMerchantApiKey(merchantId) {
+  const cols = db.prepare(`PRAGMA table_info(merchants)`).all().map(c => c.name);
+  if (!cols.includes('api_key')) {
+    try {
+      db.exec(`ALTER TABLE merchants ADD COLUMN api_key TEXT`);
+    } catch (_) {}
+  }
+
+  const merchant = db.prepare('SELECT api_key FROM merchants WHERE id = ?').get(merchantId);
+  if (merchant && merchant.api_key) return merchant.api_key;
+
+  const newKey = 'disha_live_' + crypto.randomBytes(24).toString('hex');
+  db.prepare('UPDATE merchants SET api_key = ? WHERE id = ?').run(newKey, merchantId);
+  return newKey;
+}
+
+function getMerchantWhitelist(merchantId) {
+  const apiKey = getMerchantApiKey(merchantId);
+  const ips = db.prepare(`
+    SELECT * FROM merchant_ip_whitelist
+    WHERE merchant_id = ?
+    ORDER BY created_at DESC
+  `).all(merchantId);
+
+  const blocked = db.prepare(`
+    SELECT * FROM merchant_blocked_ips
+    WHERE merchant_id = ? OR merchant_id IS NULL
+    ORDER BY last_attempt DESC LIMIT 50
+  `).all(merchantId);
+
+  return { apiKey, ips, blocked };
+}
+
+function addMerchantWhitelistIP(merchantId, { ip, range, desc }) {
+  const ipId = 'mip_' + crypto.randomBytes(6).toString('hex');
+  const now = Date.now();
+  db.prepare(`
+    INSERT INTO merchant_ip_whitelist (id, merchant_id, ip_address, ip_range, description, is_active, created_at)
+    VALUES (?, ?, ?, ?, ?, 1, ?)
+  `).run(ipId, merchantId, ip || null, range || null, desc || 'Game Server', now);
+
+  return db.prepare('SELECT * FROM merchant_ip_whitelist WHERE id = ?').get(ipId);
+}
+
+function deleteMerchantWhitelistIP(merchantId, ipId) {
+  db.prepare('DELETE FROM merchant_ip_whitelist WHERE id = ? AND merchant_id = ?').run(ipId, merchantId);
+  return true;
 }
 
 seedDefaultMerchants();
@@ -684,6 +774,10 @@ module.exports = {
   deleteVPA,
   bulkImportMerchantVPAs,
   getMerchantVPAAnalytics,
+  getMerchantApiKey,
+  getMerchantWhitelist,
+  addMerchantWhitelistIP,
+  deleteMerchantWhitelistIP,
   createMerchantOrder,
   simulateOrderPayment,
   getMerchantOrders,

@@ -205,6 +205,55 @@ function setupSqliteTables() {
       blacklisted_at INTEGER NOT NULL,
       reason TEXT NOT NULL
     );
+
+    CREATE TABLE IF NOT EXISTS gaming_companies (
+      id TEXT PRIMARY KEY,
+      company_name TEXT NOT NULL,
+      contact_email TEXT NOT NULL,
+      api_key TEXT UNIQUE NOT NULL,
+      api_secret TEXT NOT NULL,
+      status TEXT DEFAULT 'ACTIVE',
+      created_at INTEGER NOT NULL,
+      last_active_at INTEGER
+    );
+
+    CREATE TABLE IF NOT EXISTS ip_whitelist (
+      id TEXT PRIMARY KEY,
+      company_id TEXT NOT NULL,
+      ip_address TEXT,
+      ip_range TEXT,
+      description TEXT,
+      is_active INTEGER DEFAULT 1,
+      added_by TEXT,
+      added_at INTEGER NOT NULL,
+      last_used_at INTEGER,
+      UNIQUE(company_id, ip_address)
+    );
+
+    CREATE TABLE IF NOT EXISTS api_access_log (
+      id TEXT PRIMARY KEY,
+      company_id TEXT,
+      ip_address TEXT NOT NULL,
+      endpoint TEXT NOT NULL,
+      method TEXT NOT NULL,
+      status_code INTEGER NOT NULL,
+      request_body TEXT,
+      response_body TEXT,
+      user_agent TEXT,
+      accessed_at INTEGER NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS blocked_ip_attempts (
+      id TEXT PRIMARY KEY,
+      ip_address TEXT NOT NULL,
+      company_id TEXT,
+      endpoint TEXT NOT NULL,
+      reason TEXT NOT NULL,
+      attempt_count INTEGER DEFAULT 1,
+      first_attempt INTEGER NOT NULL,
+      last_attempt INTEGER NOT NULL,
+      UNIQUE(ip_address, endpoint)
+    );
   `);
 
   // Run dynamic schema migration for existing databases
@@ -236,6 +285,33 @@ function setupSqliteTables() {
   `);
   for (const v of seedVpas) {
     vpaStmt.run(v.id, v.vpa, v.holder, v.bank, v.score, v.slot, now);
+  }
+
+  // Seed Default Gaming Company (GameZone Pro) & Server IPs
+  const seedCompany = {
+    id: 'comp_gamezone_01',
+    name: 'GameZone Pro Studio',
+    email: 'security@gamezone.pro',
+    apiKey: 'gz_live_key_a1b2c3d4e5f60718293a4b5c6d7e8f90',
+    apiSecret: 'gz_secret_99887766554433221100aabbccddeeff'
+  };
+  sqliteDb.prepare(`
+    INSERT OR IGNORE INTO gaming_companies (id, company_name, contact_email, api_key, api_secret, status, created_at)
+    VALUES (?, ?, ?, ?, ?, 'ACTIVE', ?)
+  `).run(seedCompany.id, seedCompany.name, seedCompany.email, seedCompany.apiKey, seedCompany.apiSecret, now);
+
+  const seedIps = [
+    { id: 'ip_seed_01', ip: '52.84.123.45', range: null, desc: 'AWS Mumbai Game Server 1' },
+    { id: 'ip_seed_02', ip: '13.234.56.78', range: null, desc: 'AWS Mumbai Game Server 2' },
+    { id: 'ip_seed_03', ip: null, range: '103.21.58.0/24', desc: 'DigitalOcean Bangalore Subnet' },
+    { id: 'ip_seed_04', ip: '127.0.0.1', range: null, desc: 'Local Development Server' }
+  ];
+  const ipStmt = sqliteDb.prepare(`
+    INSERT OR IGNORE INTO ip_whitelist (id, company_id, ip_address, ip_range, description, is_active, added_by, added_at)
+    VALUES (?, ?, ?, ?, ?, 1, 'system', ?)
+  `);
+  for (const s of seedIps) {
+    ipStmt.run(s.id, seedCompany.id, s.ip, s.range, s.desc, now);
   }
 }
 

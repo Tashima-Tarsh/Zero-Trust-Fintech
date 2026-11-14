@@ -209,8 +209,19 @@ const ARTIFACT_DIR = 'C:/Users/lenovo/.gemini/antigravity/brain/3c4821bd-2d19-49
   await page.screenshot({ path: path.join(ARTIFACT_DIR, 'saas-8-upi-ids.png') });
   console.log('📸 Captured saas-8-upi-ids.png');
 
-  // TEST 12: Reports & Tax Summary
-  console.log('\n--- 12. Testing Reports & Tax Breakdown ---');
+  // TEST 12: Enterprise Server IP Whitelist
+  console.log('\n--- 12. Testing Enterprise Server IP Whitelist & Firewall ---');
+  await page.evaluate(() => switchWorkspace('ip-whitelist'));
+  await page.waitForSelector('#whitelistTableBody tr td strong', { visible: true, timeout: 10000 });
+  const ipKeyVal = await page.$eval('#dispApiKey', el => el.value);
+  const ipRowCount = await page.$$eval('#whitelistTableBody tr', rows => rows.length);
+  console.log(`Enterprise API Key loaded: ${ipKeyVal.substring(0, 16)}... | Whitelisted Nodes: ${ipRowCount}`);
+
+  await page.screenshot({ path: path.join(ARTIFACT_DIR, 'saas-12-ip-whitelist.png') });
+  console.log('📸 Captured saas-12-ip-whitelist.png');
+
+  // TEST 13: Reports & Tax Summary
+  console.log('\n--- 13. Testing Reports & Tax Breakdown ---');
   await page.evaluate(() => switchWorkspace('reports'));
   await page.waitForSelector('#repTaxableTurnover', { visible: true });
   const repTurnover = await page.$eval('#repTaxableTurnover', el => el.textContent);
@@ -220,8 +231,8 @@ const ARTIFACT_DIR = 'C:/Users/lenovo/.gemini/antigravity/brain/3c4821bd-2d19-49
   await page.screenshot({ path: path.join(ARTIFACT_DIR, 'saas-9-reports.png') });
   console.log('📸 Captured saas-9-reports.png');
 
-  // TEST 13: Voice Soundbox Settings
-  console.log('\n--- 13. Testing Voice Soundbox Settings ---');
+  // TEST 14: Voice Soundbox Settings
+  console.log('\n--- 14. Testing Voice Soundbox Settings ---');
   await page.evaluate(() => switchWorkspace('soundbox'));
   await page.waitForSelector('#sbLangSelect', { visible: true });
   const currentLang = await page.$eval('#sbLangSelect', el => el.value);
@@ -230,13 +241,13 @@ const ARTIFACT_DIR = 'C:/Users/lenovo/.gemini/antigravity/brain/3c4821bd-2d19-49
   await page.screenshot({ path: path.join(ARTIFACT_DIR, 'saas-10-soundbox.png') });
   console.log('📸 Captured saas-10-soundbox.png');
 
-  // TEST 14: Mobile Viewport Responsiveness
-  console.log('\n--- 14. Testing Mobile Viewport (390x844) ---');
+  // TEST 15: Mobile Viewport Responsiveness
+  console.log('\n--- 15. Testing Mobile Viewport (390x844) ---');
   await page.setViewport({ width: 390, height: 844 });
   await page.evaluate(() => switchWorkspace('overview'));
   await page.screenshot({ path: path.join(ARTIFACT_DIR, 'saas-11-mobile-dashboard.png') });
   console.log('📸 Captured saas-11-mobile-dashboard.png');
 
-  console.log('\n🎉 ALL 14 SAAS JOURNEY CHECKS PASSED WITH 100% SUCCESS!');
+  console.log('\n🎉 ALL 15 SAAS JOURNEY CHECKS PASSED WITH 100% SUCCESS!');
   await browser.close();
 })();

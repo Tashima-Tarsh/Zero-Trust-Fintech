@@ -367,6 +367,35 @@ const server = http.createServer(async (req, res) => {
         });
       }
 
+      // IP Whitelist: Get Merchant Whitelist & Blocked Attempts
+      if (pathname === '/api/merchant/ip-whitelist' && method === 'GET') {
+        const data = db.getMerchantWhitelist(currentMerchant.id);
+        return sendJson(res, 200, { success: true, ...data });
+      }
+
+      // IP Whitelist: Add Server IP / CIDR
+      if (pathname === '/api/merchant/ip-whitelist' && method === 'POST') {
+        const body = await readBody(req);
+        const { ip_address, ip_range, description } = body;
+        if (!ip_address && !ip_range) {
+          return sendError(res, 400, 'Either IP address or CIDR range is required');
+        }
+        const entry = db.addMerchantWhitelistIP(currentMerchant.id, {
+          ip: ip_address,
+          range: ip_range,
+          desc: description
+        });
+        return sendJson(res, 201, { success: true, entry });
+      }
+
+      // IP Whitelist: Delete IP
+      const ipMatch = pathname.match(/^\/api\/merchant\/ip-whitelist\/([^/]+)$/);
+      if (ipMatch && method === 'DELETE') {
+        const ipId = ipMatch[1];
+        db.deleteMerchantWhitelistIP(currentMerchant.id, ipId);
+        return sendJson(res, 200, { success: true, message: 'Server IP removed from whitelist' });
+      }
+
       // Notifications
       if (pathname === '/api/merchant/notifications' && method === 'GET') {
         const notifs = db.getMerchantNotifications(currentMerchant.id);
