@@ -4,12 +4,13 @@ from pydantic import BaseModel, Field
 from typing import Optional, Dict, Any, List
 import logging
 import time
+import json
 from ..core.security import verifier, SignatureVerificationError, ReplayAttackError
 from ..core.ledger import MerkleTreeLedger
 from ..core.fraud_engine import fraud_engine
 from ..core.challenge import challenge_manager
 from ..core.auth import get_current_merchant, get_current_merchant_user, create_access_token
-from ..models.database import get_db, Merchant, MerchantUser
+from ..models.database import get_db, Merchant, MerchantUser, DeviceKey
 from ..services.n8n_webhook import n8n_orchestrator
 from ..services.notification_service import notification_service
 from ..services.forensics_service import forensics_service
@@ -57,26 +58,38 @@ class LedgerResponse(BaseModel):
     message: str
 
 @router.post("/auth/merchant-token")
-async def get_merchant_token(req: TokenRequest):
-    """Generate signed JWT token for authenticated WebSocket connection (backward-compatible)"""
+async def get_merchant_token(
+    req: TokenRequest,
+    current_user: MerchantUser = Depends(get_current_merchant_user),
+):
+    """Only an authenticated merchant user may mint a merchant-scoped WebSocket token."""
+    if req.merchant_id != current_user.merchant_id or (
+        req.user_id is not None and req.user_id != current_user.id
+    ):
+        raise HTTPException(status_code=403, detail="Merchant or user scope mismatch")
     token = create_access_token(
-        data={"sub": req.user_id or req.merchant_id, "merchant_id": req.merchant_id, "type": "websocket"}
+        data={"sub": current_user.id, "merchant_id": current_user.merchant_id, "type": "websocket"}
     )
     return {
         "status": "success",
         "token": token,
         "token_type": "Bearer",
-        "expires_in": 86400,
-        "merchant_id": req.merchant_id
+        "expires_in": 3600,
+        "merchant_id": current_user.merchant_id
     }
 
 @router.post("/device/register")
-async def register_device(payload: DeviceRegisterRequest, db: Session = Depends(get_db)):
-    """Register client device hardware attestation public key"""
-    from ..models.database import DeviceKey
+async def register_device(
+    payload: DeviceRegisterRequest,
+    current_merchant: Merchant = Depends(get_current_merchant),
+    db: Session = Depends(get_db),
+):
+    """Enroll a public key only within the authenticated merchant's device registry."""
     try:
         existing = db.query(DeviceKey).filter_by(device_id=payload.device_id).first()
         if existing:
+            if existing.merchant_id != current_merchant.id:
+                raise HTTPException(status_code=403, detail="Device belongs to another merchant or is unassigned")
             existing.public_key = payload.public_key
             existing.algorithm = payload.algorithm
             existing.is_active = True
@@ -85,6 +98,7 @@ async def register_device(payload: DeviceRegisterRequest, db: Session = Depends(
         
         new_device = DeviceKey(
             device_id=payload.device_id,
+            merchant_id=current_merchant.id,
             public_key=payload.public_key,
             algorithm=payload.algorithm,
             is_active=True
@@ -92,6 +106,9 @@ async def register_device(payload: DeviceRegisterRequest, db: Session = Depends(
         db.add(new_device)
         db.commit()
         return {"status": "success", "message": "Device key registered", "device_id": payload.device_id}
+    except HTTPException:
+        db.rollback()
+        raise
     except Exception as e:
         db.rollback()
         logger.exception(f"Error registering device: {e}")
@@ -157,7 +174,15 @@ async def verify_payment(
             device_id=payload.device_id,
             algorithm=payload.algorithm
         )
-        
+
+        # Prevent valid device keys enrolled by one merchant from attesting
+        # transactions for another merchant. Legacy unassigned keys must be re-enrolled.
+        device = db.query(DeviceKey).filter_by(
+            device_id=payload.device_id, merchant_id=payload.merchant_id, is_active=True
+        ).first()
+        if device is None:
+            raise HTTPException(status_code=403, detail="Device not enrolled for this merchant")
+
         # Step 2: Run 5-layer fraud detection (Mandatory Gates + Scoring Layers)
         is_valid, fraud_report = await fraud_engine.verify_receipt(payload_data)
         
@@ -247,9 +272,12 @@ async def verify_payment(
 @router.get("/vpa/health/{merchant_id}")
 async def check_merchant_vpa(
     merchant_id: str,
+    current_merchant: Merchant = Depends(get_current_merchant),
     db: Session = Depends(get_db)
 ):
-    """Check VPA health and 90-day rotation status (P2-1)"""
+    """Read VPA health only for the authenticated merchant."""
+    if current_merchant.id != merchant_id:
+        raise HTTPException(status_code=403, detail="Merchant ID mismatch")
     return await vpa_health_monitor.check_vpa_health(merchant_id, db)
 
 @router.post("/vpa/rotate/{merchant_id}")
@@ -268,18 +296,31 @@ async def rotate_merchant_vpa(
     return {"status": "success", "message": f"VPA rotated to {new_vpa}"}
 
 @router.get("/ledger/verify")
-async def verify_ledger_integrity(db: Session = Depends(get_db)):
+async def verify_ledger_integrity(
+    current_user: MerchantUser = Depends(get_current_merchant_user),
+    db: Session = Depends(get_db),
+):
     """Verify the entire ledger chain integrity"""
     ledger = MerkleTreeLedger(db)
     result = ledger.verify_integrity()
     return result
 
 @router.get("/ledger/block/{block_hash}")
-async def get_block_by_hash(block_hash: str, db: Session = Depends(get_db)):
+async def get_block_by_hash(
+    block_hash: str,
+    current_merchant: Merchant = Depends(get_current_merchant),
+    db: Session = Depends(get_db),
+):
     """Retrieve a specific block by its hash"""
     ledger = MerkleTreeLedger(db)
     block = ledger.get_block_by_hash(block_hash)
     if not block:
+        raise HTTPException(status_code=404, detail="Block not found")
+    try:
+        transaction = json.loads(block.tx_data)
+    except (TypeError, ValueError):
+        raise HTTPException(status_code=404, detail="Block not found")
+    if transaction.get("merchant_id") != current_merchant.id:
         raise HTTPException(status_code=404, detail="Block not found")
     return {
         "id": block.id,
