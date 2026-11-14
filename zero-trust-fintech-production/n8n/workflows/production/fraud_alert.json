@@ -1,0 +1,55 @@
+{
+  "name": "Fraud Alert - Production",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "fraud-alert",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [250, 300]
+    },
+    {
+      "parameters": {
+        "url": "={{$env.SLACK_WEBHOOK_URL}}",
+        "method": "POST",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "text",
+              "value": "=🚨 *FRAUD ALERT*\nDevice: {{ $json.data.payload.device_id }}\nAmount: ₹{{ $json.data.payload.amount }}\nScore: {{ $json.data.fraud_report.overall_score }}/100\nReason: {{ $json.data.fraud_report.block_reason }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "name": "Slack Alert",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 3,
+      "position": [450, 300]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={\"status\": \"alerted\"}"
+      },
+      "name": "Response",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [650, 300]
+    }
+  ],
+  "connections": {
+    "Webhook": {
+      "main": [[{"node": "Slack Alert", "type": "main", "index": 0}]]
+    },
+    "Slack Alert": {
+      "main": [[{"node": "Response", "type": "main", "index": 0}]]
+    }
+  }
+}

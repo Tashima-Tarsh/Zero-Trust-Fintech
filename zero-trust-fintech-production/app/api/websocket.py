@@ -1,7 +1,7 @@
-from fastapi import WebSocket, WebSocketDisconnect, status
+from fastapi import WebSocket, WebSocketDisconnect, status, Query
 import logging
 from typing import Dict, Set, Optional
-from ..core.security import verify_jwt_token, JWTError
+from ..core.auth import verify_websocket_token, AuthError
 from ..core.config import get_settings
 
 logger = logging.getLogger(__name__)
@@ -64,29 +64,19 @@ manager = ConnectionManager()
 async def websocket_endpoint(
     websocket: WebSocket,
     merchant_id: str,
-    token: Optional[str] = None
+    token: Optional[str] = Query(None, description="JWT token for authentication")
 ):
     """
-    WebSocket endpoint with JWT-based merchant authentication
+    WebSocket endpoint with JWT-based merchant authentication and scope checking
     """
     merchant_user_id = merchant_id
     
     # 1. Verify token if provided
     if token:
         try:
-            payload = verify_jwt_token(token)
-            token_merchant = payload.get("merchant_id")
-            token_user = payload.get("sub")
-            
-            # Ensure token belongs to the requested merchant or admin
-            if token_merchant and token_merchant != merchant_id and token_user != "admin":
-                logger.warning(f"❌ WebSocket auth violation: token for '{token_merchant}' attempted to access '{merchant_id}'")
-                await websocket.close(code=status.WS_1008_POLICY_VIOLATION)
-                return
-            
-            merchant_user_id = token_user or merchant_id
-            
-        except JWTError as e:
+            payload = verify_websocket_token(token, merchant_id)
+            merchant_user_id = payload.get("sub") or merchant_id
+        except Exception as e:
             logger.warning(f"❌ WebSocket JWT authentication failed: {e}")
             await websocket.close(code=status.WS_1008_POLICY_VIOLATION)
             return

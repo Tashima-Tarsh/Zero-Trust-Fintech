@@ -1,0 +1,42 @@
+name: SharePay PWA CI
+
+on:
+  push:
+    branches: [main, develop]
+    paths:
+      - 'sharepay-mvp/**'
+      - 'merchant-pwa/**'
+      - '.github/workflows/sharepay-ci.yml'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'sharepay-mvp/**'
+      - 'merchant-pwa/**'
+
+jobs:
+  test:
+    name: Test SharePay MVP & Merchant PWA
+    runs-on: ubuntu-latest
+    
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: sharepay-mvp/package.json
+      
+      - name: Install SharePay MVP Dependencies
+        run: |
+          cd sharepay-mvp
+          npm install
+      
+      - name: Run SharePay Attack Matrix Tests
+        run: |
+          npm test --prefix sharepay-mvp
+      
+      - name: Run Merchant PWA Test Suite
+        run: |
+          node merchant-pwa/test.js

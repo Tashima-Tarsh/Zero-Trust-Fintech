@@ -2,8 +2,8 @@
 
 > **Autonomous, zero-fee direct UPI payment orchestration with sub-second WebSocket settlement and a mathematically verifiable 5-layer fraud prevention engine.**
 
-[![Test Suite](https://img.shields.io/badge/Automated%20Tests-37%2F37%20Passing-10b981?style=for-the-badge&logo=githubactions)](tests/)
-[![Security Audit](https://img.shields.io/badge/Security%20Audit-Issues%20A--E%20Fixed-2563eb?style=for-the-badge&logo=shield)](zero-trust-fintech-production/)
+[![Test Suite](https://img.shields.io/badge/Automated%20Tests-46%2F46%20Passing-10b981?style=for-the-badge&logo=githubactions)](tests/)
+[![Security Audit](https://img.shields.io/badge/Security%20Audit-P0%2FP1%2FP2%20Production%20Hardened-2563eb?style=for-the-badge&logo=shield)](zero-trust-fintech-production/)
 [![Payment Rails](https://img.shields.io/badge/Payment%20Rails-NPCI%20UPI%20Direct-f59e0b?style=for-the-badge)](sharepay-mvp/)
 [![Architecture](https://img.shields.io/badge/Architecture-Zero--Trust%20Merkle%20Ledger-6366f1?style=for-the-badge)](zero-trust-fintech-production/)
 [![License](https://img.shields.io/badge/License-MIT-gray?style=for-the-badge)](LICENSE)
@@ -252,9 +252,54 @@ The repository is covered by automated unit, integration, concurrency, and secur
 |---|---|---|---|---|
 | **Backend Audit Fixes** | `zero-trust-fintech-production/tests/test_audit_fixes.py` | **14** | ✅ Passed | Ed25519/ECDSA signatures, 10-thread ledger concurrency, fail-closed challenge verification |
 | **Mandatory Fraud Gates** | `zero-trust-fintech-production/tests/test_fraud_engine.py` | **8** | ✅ Passed | Hard timestamp gate, atomic Lua challenge consumption, SET NX replay defense |
+| **P0/P1/P2 Security & Architecture** | `zero-trust-fintech-production/tests/test_p0_p1_p2.py` | **9** | ✅ Passed | Merchant JWT auth, WebSocket scoping, atomic Lua consumption, VPA rotation, forensics & notifications |
 | **Fraud Attack Matrix** | `sharepay-mvp/tests/attack-matrix.test.js` | **8** | ✅ Passed | UTR replay, Julian day manipulation, hourly window expiry, note mismatch, malformed text |
 | **Merchant PWA Dashboard** | `merchant-pwa/test.js` | **7** | ✅ Passed | Server routing, manifest.json, sw.js service worker, icons, static assets |
-| **Total** | — | **37** | ✅ **100% Passing** | Full End-to-End System Verification |
+| **Total** | — | **46** | ✅ **100% Passing** | Full End-to-End System Verification |
+
+---
+
+## 🛡️ Production Hardening: P0, P1 & P2 Complete Implementation
+
+The platform has been hardened with complete, production-grade solutions addressing all architectural, security, and cloud scalability requirements:
+
+```mermaid
+flowchart LR
+    subgraph P0["🚨 P0: Critical Security & Integrity"]
+        P0_1["Merchant Auth<br/>JWT Bearer + WS Scope"]
+        P0_2["Atomic Challenge<br/>Redis Hash + Lua Script"]
+    end
+
+    subgraph P1["⚡ P1: Enterprise Operations & Cloud"]
+        P1_1["Alembic Migrations<br/>Single Unified Schema"]
+        P1_2["Canonical n8n<br/>Automated Settlement Flow"]
+        P1_3["Cloud Connectivity<br/>Health Probes & Pooling"]
+        P1_4["Notification Retry<br/>Exponential Backoff Queue"]
+        P1_5["Secrets Hardening<br/>Pydantic Validators"]
+        P1_6["Dual CI/CD Matrix<br/>Backend & PWA Actions"]
+    end
+
+    subgraph P2["🔬 P2: Auxiliary Defense & Hygiene"]
+        P2_1["VPA Health & Rotation<br/>90-Day Poisoning Defense"]
+        P2_2["Auxiliary Forensics<br/>Background ELA & OCR Queue"]
+    end
+
+    P0 --> P1 --> P2
+```
+
+### Architectural Breakdown
+| Priority | Component | Key Implementation | File Reference |
+|---|---|---|---|
+| **P0-1** | **Merchant Authentication** | Centralized JWT auth, protected `/ledger/commit` endpoint, merchant-scoped `/ws/{merchant_id}` WebSocket access control | [auth.py](file:///d:/Downloads/Zero-Trust-Fintech/zero-trust-fintech-production/app/core/auth.py), [auth_routes.py](file:///d:/Downloads/Zero-Trust-Fintech/zero-trust-fintech-production/app/api/auth_routes.py) |
+| **P0-2** | **Atomic Challenge Validation** | Redis hash storage (`HSET`/`HGETALL`) with atomic Lua script (`ATOMIC_VERIFY_SCRIPT`) preventing race conditions and double-spending | [challenge.py](file:///d:/Downloads/Zero-Trust-Fintech/zero-trust-fintech-production/app/core/challenge.py), [fraud_engine.py](file:///d:/Downloads/Zero-Trust-Fintech/zero-trust-fintech-production/app/core/fraud_engine.py) |
+| **P1-1** | **Database Migration Strategy** | Unified Alembic migration suite managing `merchants`, `merchant_users`, `merkle_ledger`, `device_keys`, and `audit_logs` | [alembic.ini](file:///d:/Downloads/Zero-Trust-Fintech/zero-trust-fintech-production/alembic.ini), [migrations/](file:///d:/Downloads/Zero-Trust-Fintech/zero-trust-fintech-production/migrations/) |
+| **P1-2** | **Canonical n8n Workflows** | Standardized production workflow schemas for instant settlement and real-time Slack/webhook fraud alerts | [n8n/workflows/production/](file:///d:/Downloads/Zero-Trust-Fintech/zero-trust-fintech-production/n8n/workflows/production/) |
+| **P1-3** | **Cloud-Compatible Backend** | Cloud connection pooling, recycling, SSL toggle, and Kubernetes `/health`, `/health/detailed`, `/health/ready`, `/health/live` probes | [cloud_config.py](file:///d:/Downloads/Zero-Trust-Fintech/zero-trust-fintech-production/app/core/cloud_config.py), [health.py](file:///d:/Downloads/Zero-Trust-Fintech/zero-trust-fintech-production/app/core/health.py) |
+| **P1-4** | **Reliable Notification Delivery** | Multi-channel delivery (WebSocket, FCM Push, Email, SMS) with exponential backoff and background Redis retry queue | [notification_service.py](file:///d:/Downloads/Zero-Trust-Fintech/zero-trust-fintech-production/app/services/notification_service.py) |
+| **P1-5** | **Production Secrets Hardening** | Pydantic strict field validation rejecting default placeholders, hardened `.env.example`, and `generate_secrets.sh` utility | [config.py](file:///d:/Downloads/Zero-Trust-Fintech/zero-trust-fintech-production/app/core/config.py), [generate_secrets.sh](file:///d:/Downloads/Zero-Trust-Fintech/zero-trust-fintech-production/scripts/generate_secrets.sh) |
+| **P1-6** | **Dual CI/CD Automation** | GitHub Actions workflows with Postgres 15/Redis 7 services, alembic migrations, security scans (Bandit), and PWA Lighthouse/test checks | [.github/workflows/](file:///d:/Downloads/Zero-Trust-Fintech/.github/workflows/) |
+| **P2-1** | **VPA Health & Rotation** | Virtual Payment Address monitoring with automated 90-day rotation intervals to prevent scraping and address poisoning | [vpa_health.py](file:///d:/Downloads/Zero-Trust-Fintech/zero-trust-fintech-production/app/services/vpa_health.py) |
+| **P2-2** | **Auxiliary Forensics Processing** | Asynchronous background Redis queue for Error Level Analysis (ELA), OCR bitmap extraction, and metadata heuristics | [forensics_service.py](file:///d:/Downloads/Zero-Trust-Fintech/zero-trust-fintech-production/app/services/forensics_service.py) |
 
 ---
 
@@ -298,15 +343,21 @@ npm start
 # Runs on http://localhost:3001
 ```
 
-### 4. Run the Full Automated Test Suite
+### 4. Run the Full Automated Test Suite (46 Tests)
 ```bash
 # 1. Backend & Audit Fixes (14 tests)
 python zero-trust-fintech-production/tests/test_audit_fixes.py
 
-# 2. Fraud Attack Matrix (8 tests)
+# 2. Mandatory Fraud Gates (8 tests)
+python zero-trust-fintech-production/tests/test_fraud_engine.py
+
+# 3. P0/P1/P2 Security & Cloud Architecture (9 tests)
+python zero-trust-fintech-production/tests/test_p0_p1_p2.py
+
+# 4. SharePay Fraud Attack Matrix (8 tests)
 npm test --prefix sharepay-mvp
 
-# 3. Merchant PWA Suite (7 tests)
+# 5. Merchant PWA Suite (7 tests)
 node merchant-pwa/test.js
 ```
 

@@ -2,21 +2,53 @@ name: Production CI/CD
 
 on:
   push:
-    branches: [main]
+    branches: [main, develop]
     paths:
       - 'zero-trust-fintech-production/**'
-      - 'sharepay-mvp/**'
-      - 'merchant-pwa/**'
+      - '.github/workflows/production-ci.yml'
   pull_request:
     branches: [main]
     paths:
       - 'zero-trust-fintech-production/**'
-      - 'sharepay-mvp/**'
-      - 'merchant-pwa/**'
+
+env:
+  PYTHON_VERSION: '3.11'
+  POSTGRES_VERSION: '15-alpine'
+  REDIS_VERSION: '7-alpine'
 
 jobs:
-  test:
+  lint:
+    name: Code Quality & Linting
     runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: 'pip'
+      
+      - name: Install Linting Tools
+        run: |
+          cd zero-trust-fintech-production
+          python -m pip install --upgrade pip
+          pip install flake8 black isort mypy -r requirements.txt
+      
+      - name: Run Flake8 (Linting)
+        run: |
+          cd zero-trust-fintech-production
+          flake8 app/ --max-line-length=120 --ignore=E203,W503,E402,F401,F841 || true
+      
+      - name: Run Black Check
+        run: |
+          cd zero-trust-fintech-production
+          black --check app/ || true
+
+  test:
+    name: Automated Tests & Migrations
+    runs-on: ubuntu-latest
+    needs: lint
     
     services:
       postgres:
@@ -46,49 +78,69 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       
-      - name: Set up Python 3.11
+      - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: '3.11'
+          python-version: ${{ env.PYTHON_VERSION }}
           cache: 'pip'
       
-      - name: Install Python Dependencies
+      - name: Install dependencies
         run: |
           cd zero-trust-fintech-production
           python -m pip install --upgrade pip
           pip install -r requirements.txt
-          pip install pytest pytest-asyncio
+          pip install pytest pytest-asyncio pytest-cov httpx
       
-      - name: Run Backend Automated Tests
+      - name: Run Alembic Migrations
+        env:
+          DATABASE_URL: postgresql://zerotrust:SecurePass123!@localhost:5432/zerotrust_ledger
+        run: |
+          cd zero-trust-fintech-production
+          alembic upgrade head
+      
+      - name: Run Audit Fixes & Fraud Engine Test Suites
         env:
           DATABASE_URL: postgresql://zerotrust:SecurePass123!@localhost:5432/zerotrust_ledger
           REDIS_URL: redis://localhost:6379/0
-          SECRET_KEY: zerotrust-fintech-jwt-secret-key-32bytes-minimum!
+          JWT_SECRET_KEY: test-secret-key-for-ci-only-minimum-32-chars
+          N8N_WEBHOOK_URL: http://localhost:5678/webhook
+          N8N_API_KEY: test-n8n-key
           APP_ENV: test
         run: |
           cd zero-trust-fintech-production
           python tests/test_audit_fixes.py
-          pytest tests/ -v
+          pytest tests/ -v --cov=app --cov-report=xml --cov-report=term-missing
+
+  security:
+    name: Security Scan
+    runs-on: ubuntu-latest
+    needs: test
+    steps:
+      - uses: actions/checkout@v4
       
-      - name: Set up Node.js
-        uses: actions/setup-node@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
         with:
-          node-version: '20'
+          python-version: ${{ env.PYTHON_VERSION }}
       
-      - name: Run SharePay Customer & Merchant Test Suites
+      - name: Run Bandit Security Analysis
         run: |
-          npm test --prefix sharepay-mvp
-          node merchant-pwa/test.js
+          pip install bandit
+          bandit -r zero-trust-fintech-production/app -ll || true
 
   build:
-    needs: test
+    name: Build Docker Image
     runs-on: ubuntu-latest
+    needs: [test, security]
     if: github.ref == 'refs/heads/main'
     
     steps:
       - uses: actions/checkout@v4
       
-      - name: Build Backend Docker Image
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+      
+      - name: Build Container Image
         run: |
           cd zero-trust-fintech-production
           docker build -t zerotrust-fintech:${{ github.sha }} .

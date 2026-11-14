@@ -167,46 +167,20 @@ class FraudDetectionEngine:
             }
         
         try:
-            challenge_secret = await self.redis.get(f"challenge:{challenge_id}") if hasattr(self.redis, 'get') else None
+            from .challenge import challenge_manager
+            challenge_manager.redis = self.redis
+            result = await challenge_manager.verify_and_consume_challenge(
+                challenge_id=challenge_id,
+                merchant_id=merchant_id,
+                provided_response=challenge_response
+            )
             
-            # If challenge secret not found in Redis, reject immediately
-            if not challenge_secret:
-                return {
-                    "status": GateStatus.FAIL,
-                    "reason": "Challenge expired or already consumed"
-                }
-            
-            secret_str = challenge_secret.decode() if isinstance(challenge_secret, bytes) else str(challenge_secret)
-            expected_hash = hashlib.sha256(
-                f"{challenge_id}|{merchant_id}|{secret_str}".encode()
-            ).hexdigest()
-            
-            # Execute atomic check-and-delete via Lua script
-            try:
-                res = await self.redis.eval(
-                    LUA_ATOMIC_VERIFY_AND_CONSUME,
-                    2,
-                    f"challenge:{challenge_id}",
-                    f"challenge_meta:{challenge_id}",
-                    expected_hash,
-                    challenge_response
-                )
-            except Exception:
-                # Direct comparison fallback
-                if challenge_response == expected_hash:
-                    if hasattr(self.redis, 'delete'):
-                        await self.redis.delete(f"challenge:{challenge_id}")
-                        await self.redis.delete(f"challenge_meta:{challenge_id}")
-                    res = 1
-                else:
-                    res = -1
-            
-            if res == 1:
+            if result.get("status") == "success":
                 return {
                     "status": GateStatus.PASS,
                     "reason": "Challenge verified and consumed atomically"
                 }
-            elif res == 0:
+            elif result.get("status") in ("not_found", "already_consumed"):
                 return {
                     "status": GateStatus.FAIL,
                     "reason": "Challenge expired or already consumed"
@@ -214,7 +188,7 @@ class FraudDetectionEngine:
             else:
                 return {
                     "status": GateStatus.FAIL,
-                    "reason": "Challenge response mismatch"
+                    "reason": result.get("message", "Challenge verification failed")
                 }
         except Exception as e:
             logger.error(f"❌ Challenge verification error (failing closed): {e}")

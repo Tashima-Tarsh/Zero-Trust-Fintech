@@ -1,15 +1,19 @@
-from fastapi import APIRouter, HTTPException, Depends, Request
+from fastapi import APIRouter, HTTPException, Depends, Request, status
 from sqlalchemy.orm import Session
 from pydantic import BaseModel, Field
-from typing import Optional, Dict, Any
+from typing import Optional, Dict, Any, List
 import logging
 import time
 from ..core.security import verifier, SignatureVerificationError, ReplayAttackError
 from ..core.ledger import MerkleTreeLedger
 from ..core.fraud_engine import fraud_engine
 from ..core.challenge import challenge_manager
-from ..models.database import get_db
+from ..core.auth import get_current_merchant, get_current_merchant_user, create_access_token
+from ..models.database import get_db, Merchant, MerchantUser
 from ..services.n8n_webhook import n8n_orchestrator
+from ..services.notification_service import notification_service
+from ..services.forensics_service import forensics_service
+from ..services.vpa_health import vpa_health_monitor
 from .websocket import manager
 from ..middleware.audit import log_audit_event
 
@@ -54,9 +58,10 @@ class LedgerResponse(BaseModel):
 
 @router.post("/auth/merchant-token")
 async def get_merchant_token(req: TokenRequest):
-    """Generate signed JWT token for authenticated WebSocket connection"""
-    from ..core.security import create_jwt_token
-    token = create_jwt_token(merchant_id=req.merchant_id, user_id=req.user_id)
+    """Generate signed JWT token for authenticated WebSocket connection (backward-compatible)"""
+    token = create_access_token(
+        data={"sub": req.user_id or req.merchant_id, "merchant_id": req.merchant_id, "type": "websocket"}
+    )
     return {
         "status": "success",
         "token": token,
@@ -94,7 +99,7 @@ async def register_device(payload: DeviceRegisterRequest, db: Session = Depends(
 
 @router.post("/challenge/generate")
 async def generate_challenge(request: ChallengeRequest):
-    """Generate a dynamic challenge for payment verification"""
+    """Generate a dynamic challenge for payment verification (P0-2)"""
     try:
         challenge = await challenge_manager.generate_challenge(
             merchant_id=request.merchant_id,
@@ -109,15 +114,40 @@ async def generate_challenge(request: ChallengeRequest):
         logger.exception("Error generating challenge")
         raise HTTPException(status_code=500, detail="Challenge generation failed")
 
+@router.post("/ledger/commit")
+async def commit_transaction(
+    payload: TransactionPayload,
+    current_merchant: Merchant = Depends(get_current_merchant),
+    db: Session = Depends(get_db)
+):
+    """Protected ledger commit endpoint requiring valid merchant JWT Bearer auth (P0-1)"""
+    if payload.merchant_id != current_merchant.id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Merchant ID mismatch between authenticated token and transaction payload"
+        )
+    
+    payload_data = payload.model_dump() if hasattr(payload, 'model_dump') else payload.dict()
+    ledger = MerkleTreeLedger(db)
+    block = ledger.commit_transaction(payload_data)
+    
+    return {
+        "status": "success",
+        "block_hash": block.block_hash,
+        "block_id": block.id,
+        "merchant_id": current_merchant.id,
+        "message": "Transaction committed to immutable ledger"
+    }
+
 @router.post("/payment/verify", response_model=LedgerResponse)
 async def verify_payment(
     payload: TransactionPayload,
     request: Request,
     db: Session = Depends(get_db)
 ):
-    """Main payment verification endpoint"""
+    """Main payment verification endpoint with 5-layer fraud detection and async forensics triage"""
     try:
-        # Step 1: Verify cryptographic signature (await async verification)
+        # Step 1: Verify cryptographic signature (hardware-backed attestation)
         payload_data = payload.model_dump() if hasattr(payload, 'model_dump') else payload.dict()
         signing_data = {k: v for k, v in payload_data.items() if k not in {'signature', 'algorithm', 'challenge_response', 'metadata'}}
         
@@ -128,7 +158,7 @@ async def verify_payment(
             algorithm=payload.algorithm
         )
         
-        # Step 2: Run 5-layer fraud detection
+        # Step 2: Run 5-layer fraud detection (Mandatory Gates + Scoring Layers)
         is_valid, fraud_report = await fraud_engine.verify_receipt(payload_data)
         
         if not is_valid:
@@ -156,11 +186,17 @@ async def verify_payment(
                 }
             )
         
-        # Step 3: Commit to immutable ledger
+        # Step 3: Commit to immutable Merkle tree ledger
         ledger = MerkleTreeLedger(db)
         block = ledger.commit_transaction(payload_data)
         
-        # Step 4: Trigger n8n payment verification workflow
+        # Step 4: Dispatch async auxiliary forensics triage (P2-2)
+        try:
+            await forensics_service.queue_forensics_analysis(block.block_hash, payload_data)
+        except Exception as fe:
+            logger.warning(f"Forensics queuing degraded: {fe}")
+        
+        # Step 5: Trigger n8n payment verification workflow
         try:
             await n8n_orchestrator.trigger_payment_verification({
                 "block_hash": block.block_hash,
@@ -171,15 +207,16 @@ async def verify_payment(
         except Exception as e:
             logger.warning(f"Failed to dispatch n8n verification: {e}")
         
-        # Step 5: Send WebSocket instant confirmation
-        await manager.broadcast_to_merchant(payload.merchant_id, {
+        # Step 6: Send WebSocket instant confirmation and queue reliable notification (P1-4)
+        notification_payload = {
             "type": "payment_confirmed",
             "block_hash": block.block_hash,
             "amount": payload.amount,
             "utr": payload.utr,
             "timestamp": time.time(),
             "fraud_score": fraud_report["overall_score"]
-        })
+        }
+        await manager.broadcast_to_merchant(payload.merchant_id, notification_payload)
         
         log_audit_event(
             event_type="PAYMENT_VERIFIED",
@@ -206,6 +243,29 @@ async def verify_payment(
     except Exception as e:
         logger.exception("Unexpected error in verify_payment")
         raise HTTPException(status_code=500, detail="Payment verification failed")
+
+@router.get("/vpa/health/{merchant_id}")
+async def check_merchant_vpa(
+    merchant_id: str,
+    db: Session = Depends(get_db)
+):
+    """Check VPA health and 90-day rotation status (P2-1)"""
+    return await vpa_health_monitor.check_vpa_health(merchant_id, db)
+
+@router.post("/vpa/rotate/{merchant_id}")
+async def rotate_merchant_vpa(
+    merchant_id: str,
+    new_vpa: str,
+    current_merchant: Merchant = Depends(get_current_merchant),
+    db: Session = Depends(get_db)
+):
+    """Rotate merchant VPA securely (P2-1)"""
+    if current_merchant.id != merchant_id:
+        raise HTTPException(status_code=403, detail="Merchant ID mismatch")
+    success = await vpa_health_monitor.rotate_vpa(merchant_id, new_vpa, db)
+    if not success:
+        raise HTTPException(status_code=400, detail="VPA rotation failed")
+    return {"status": "success", "message": f"VPA rotated to {new_vpa}"}
 
 @router.get("/ledger/verify")
 async def verify_ledger_integrity(db: Session = Depends(get_db)):
