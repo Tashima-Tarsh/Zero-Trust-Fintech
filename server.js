@@ -30,8 +30,8 @@ const MERCHANT_UPI_ID = process.env.MERCHANT_UPI_ID || 'disha82@ybl';
 const MERCHANT_NAME = process.env.MERCHANT_NAME || 'DISHA 8.2 Store';
 
 // Middleware
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
+app.use(express.json({ limit: '1mb' }));
+app.use(express.urlencoded({ extended: true, limit: '1mb' }));
 app.use(express.static(path.join(__dirname, 'public')));
 
 // ═══════════════════════════════════════════════════════════════════
@@ -90,7 +90,7 @@ function generateChallengeAmount(baseAmount) {
   // Excludes multiples of 10 and 05 (never 00, 10, 20... 90, 01, 05)
   let cents;
   do {
-    cents = Math.floor(Math.random() * (97 - 11 + 1)) + 11;
+    cents = crypto.randomInt(11, 98);
   } while (cents % 10 === 0 || cents === 5);
 
   const challenge = Math.round((Number(baseAmount) + (cents / 100)) * 100) / 100;
@@ -155,7 +155,10 @@ function generateUPILink(session) {
 // Create or refresh session
 app.get('/api/session/new', async (req, res) => {
   try {
-    const baseAmount = parseFloat(req.query.amount) || 100.0;
+    const baseAmount = req.query.amount === undefined ? 100.0 : Number(req.query.amount);
+    if (!Number.isFinite(baseAmount) || baseAmount <= 0 || baseAmount > 100000) {
+      return res.status(400).json({ success: false, error: 'Amount must be between 0 and 100000 INR' });
+    }
     const description = req.query.description || req.query.desc || req.query.item || 'Kirana Order';
     const session = generateSession(baseAmount, description);
     const upiLink = generateUPILink(session);
@@ -472,6 +475,10 @@ app.post('/api/npci-callback', (req, res) => {
 
 // Simulation helper for one-click developer testing
 app.post('/api/simulate-payment', (req, res) => {
+  // Never allow a publicly reachable deployment to fabricate a successful payment.
+  if (process.env.NODE_ENV === 'production' || process.env.ENABLE_PAYMENT_SIMULATION !== 'true') {
+    return res.status(404).json({ success: false, error: 'Not found' });
+  }
   const { orderId } = req.body;
   const session = db.findSessionByOrderId(orderId);
   if (!session) {
@@ -529,8 +536,23 @@ app.get('/api/ledger/:orderId', (req, res) => {
 // TASK 12: 1000 VPA ROUTING, TELEMETRY & ANTI-BAN REST ENDPOINTS
 // ═══════════════════════════════════════════════════════════════════
 
+// Administrative VPA operations require an independently configured secret.
+function requireVpaAdmin(req, res, next) {
+  const expected = process.env.VPA_ADMIN_API_KEY;
+  if (!expected || expected.length < 32) {
+    return res.status(503).json({ success: false, error: 'VPA administration not configured' });
+  }
+  const supplied = req.get('x-vpa-admin-key') || '';
+  const actual = Buffer.from(supplied);
+  const target = Buffer.from(expected);
+  if (actual.length !== target.length || !crypto.timingSafeEqual(actual, target)) {
+    return res.status(401).json({ success: false, error: 'Unauthorized' });
+  }
+  next();
+}
+
 // 1. Select optimal VPA (5-Factor anti-ban scoring + chaos jitter)
-app.post('/api/vpa/select', async (req, res) => {
+app.post('/api/vpa/select', requireVpaAdmin, async (req, res) => {
   try {
     const { merchantId = 'mer_default', amount = 100, customerRegion = 'MH', timeOfDay = null, customerVpa = null } = req.body;
     const selected = await db.vpaRouter.selectVPA(merchantId, parseFloat(amount), customerRegion, timeOfDay, customerVpa);
@@ -541,7 +563,7 @@ app.post('/api/vpa/select', async (req, res) => {
 });
 
 // 2. Bulk upload VPAs (CSV text or JSON rows)
-app.post('/api/vpa/upload', async (req, res) => {
+app.post('/api/vpa/upload', requireVpaAdmin, async (req, res) => {
   try {
     const { csv, csvContent, rows, merchantId = 'mer_default' } = req.body;
     const { parseCSV } = require('./vpa-importer');
@@ -561,7 +583,7 @@ app.post('/api/vpa/upload', async (req, res) => {
 });
 
 // 3. Emergency quarantine (7-day cooldown + health reduction)
-app.post('/api/vpa/quarantine', (req, res) => {
+app.post('/api/vpa/quarantine', requireVpaAdmin, (req, res) => {
   try {
     const { vpaId, reason } = req.body;
     if (!vpaId) {
@@ -575,7 +597,7 @@ app.post('/api/vpa/quarantine', (req, res) => {
 });
 
 // 4. Pool analytics & bank diversity breakdown
-app.get('/api/vpa/analytics', (req, res) => {
+app.get('/api/vpa/analytics', requireVpaAdmin, (req, res) => {
   try {
     const merchantId = req.query.merchantId || 'mer_default';
     const analytics = db.vpaRouter.getPoolAnalytics(merchantId);
@@ -586,7 +608,7 @@ app.get('/api/vpa/analytics', (req, res) => {
 });
 
 // 5. Daily health reset & rebalance (6 AM Cron trigger)
-app.post('/api/vpa/health-check', (req, res) => {
+app.post('/api/vpa/health-check', requireVpaAdmin, (req, res) => {
   try {
     const result = db.vpaRouter.dailyHealthResetAndRebalance();
     res.json({
