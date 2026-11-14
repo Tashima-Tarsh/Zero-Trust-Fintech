@@ -187,7 +187,16 @@ function findMerchantByEmail(email) {
   if (!email) return null;
   const normalized = email.toLowerCase().trim();
   const stmt = db.prepare('SELECT * FROM merchants WHERE LOWER(email) = ? OR LOWER(primary_vpa) = ?');
-  return stmt.get(normalized, normalized) || null;
+  let row = stmt.get(normalized, normalized);
+  if (row) return row;
+
+  // Dual alias check: if user entered Nitish@oksbi but account is nkumar906099-7@oksbi (or vice versa)
+  if (normalized === 'nitish@oksbi' || normalized === 'nkumar906099-7@oksbi') {
+    const aliasStmt = db.prepare("SELECT * FROM merchants WHERE LOWER(email) IN ('nitish@oksbi', 'nkumar906099-7@oksbi') OR LOWER(primary_vpa) IN ('nitish@oksbi', 'nkumar906099-7@oksbi') LIMIT 1");
+    return aliasStmt.get() || null;
+  }
+
+  return null;
 }
 
 function findMerchantById(id) {
