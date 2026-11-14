@@ -28,8 +28,8 @@ const server = http.createServer(app);
 const wss = new WebSocketServer({ server, path: '/ws' });
 
 const PORT = process.env.PORT || 3000;
-const MERCHANT_UPI_ID = process.env.MERCHANT_UPI_ID || 'disha82@ybl';
-const MERCHANT_NAME = process.env.MERCHANT_NAME || 'DISHA 8.2 Store';
+const MERCHANT_UPI_ID = process.env.MERCHANT_UPI_ID || 'nkumar906099-7@oksbi';
+const MERCHANT_NAME = process.env.MERCHANT_NAME || 'Nitish Enterprise';
 
 const ipWhitelist = new IPWhitelistMiddleware(db);
 
@@ -127,7 +127,7 @@ function generateChallengeAmount(baseAmount) {
 // ═══════════════════════════════════════════════════════════════════
 // TASK 3: SESSION TOKEN GENERATION
 // ═══════════════════════════════════════════════════════════════════
-function generateSession(baseAmount = 100, description = '') {
+function generateSession(baseAmount = 100, description = '', customVpa = null) {
   const sessionId = crypto.randomBytes(16).toString('hex');
   const now = Date.now();
   const expiresAt = now + (180 * 1000); // 3 minutes TTL
@@ -136,8 +136,11 @@ function generateSession(baseAmount = 100, description = '') {
   const txnRef = 'TXN_' + now + '_' + crypto.randomBytes(3).toString('hex').toUpperCase();
   const challengeAmount = generateChallengeAmount(baseAmount);
 
-  // TASK 9: Select optimal VPA to prevent bans
-  const vpaAddress = db.selectVPA('mer_default', challengeAmount);
+  // TASK 9: Select optimal VPA to prevent bans or primary VPA
+  let vpaAddress = (customVpa && String(customVpa).trim()) ? String(customVpa).trim() : null;
+  if (!vpaAddress) {
+    vpaAddress = process.env.MERCHANT_UPI_ID || db.selectVPA('mer_default', challengeAmount) || 'nkumar906099-7@oksbi';
+  }
 
   const session = {
     sessionId,
@@ -184,7 +187,8 @@ app.get('/api/session/new', async (req, res) => {
   try {
     const baseAmount = parseFloat(req.query.amount) || 100.0;
     const description = req.query.description || req.query.desc || req.query.item || 'Kirana Order';
-    const session = generateSession(baseAmount, description);
+    const customVpa = req.query.vpa || req.query.pa || req.query.vpaAddress || null;
+    const session = generateSession(baseAmount, description, customVpa);
     const upiLink = generateUPILink(session);
 
     // Generate base64 QR as helper, though frontend renders direct to canvas

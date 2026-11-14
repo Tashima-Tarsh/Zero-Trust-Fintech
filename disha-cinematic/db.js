@@ -185,8 +185,9 @@ function createMerchant({ email, password, businessName = '', phone = '', city =
 
 function findMerchantByEmail(email) {
   if (!email) return null;
-  const stmt = db.prepare('SELECT * FROM merchants WHERE email = ?');
-  return stmt.get(email.toLowerCase().trim()) || null;
+  const normalized = email.toLowerCase().trim();
+  const stmt = db.prepare('SELECT * FROM merchants WHERE LOWER(email) = ? OR LOWER(primary_vpa) = ?');
+  return stmt.get(normalized, normalized) || null;
 }
 
 function findMerchantById(id) {
@@ -749,17 +750,18 @@ function seedDefaultMerchants() {
     });
   }
 
-  // Seed / Ensure real production merchant: Nitish@oksbi / Tashima@906099
-  const existingNitish = findMerchantByEmail('Nitish@oksbi');
+  // Seed / Ensure real production merchant: nkumar906099-7@oksbi / Nitish@oksbi / Tashima@906099
+  const existingNitish = findMerchantByEmail('Nitish@oksbi') || findMerchantByEmail('nkumar906099-7@oksbi');
+  const targetPasswordHash = hashPassword('Tashima@906099');
   if (!existingNitish) {
-    console.log('Seeding production merchant: Nitish@oksbi / Tashima@906099');
+    console.log('Seeding production merchant: nkumar906099-7@oksbi / Tashima@906099');
     const nitish = createMerchant({
-      email: 'Nitish@oksbi',
+      email: 'nkumar906099-7@oksbi',
       password: 'Tashima@906099',
       businessName: 'Nitish Enterprise',
       phone: '9876543210',
       city: 'Mumbai',
-      primaryVpa: 'Nitish@oksbi',
+      primaryVpa: 'nkumar906099-7@oksbi',
       setupCompleted: 1
     });
 
@@ -778,14 +780,14 @@ function seedDefaultMerchants() {
 
     for (const t of txData) {
       const orderId = 'ORD_' + (now - t.hoursAgo * 3600 * 1000).toString(36).toUpperCase() + '_' + crypto.randomBytes(2).toString('hex').toUpperCase();
-      const upiUri = `upi://pay?pa=Nitish@oksbi&pn=Nitish%20Enterprise&am=${t.amt.toFixed(2)}&cu=INR&tr=${orderId}`;
+      const upiUri = `upi://pay?pa=nkumar906099-7@oksbi&pn=Nitish%20Enterprise&am=${t.amt.toFixed(2)}&cu=INR&tr=${orderId}`;
       const createdAt = now - (t.hoursAgo * 3600 * 1000);
       const settledAt = t.status === 'COMPLETED' ? createdAt + 12000 : null;
       const utr = t.status === 'COMPLETED' ? `4319${String(Math.floor(10000000 + Math.random() * 90000000))}` : null;
 
       db.prepare(`
         INSERT INTO merchant_orders (id, merchant_id, amount, description, vpa_address, upi_uri, utr, status, created_at, settled_at)
-        VALUES (?, ?, ?, ?, 'Nitish@oksbi', ?, ?, ?, ?, ?)
+        VALUES (?, ?, ?, ?, 'nkumar906099-7@oksbi', ?, ?, ?, ?, ?)
       `).run(orderId, nitish.id, t.amt, t.desc, upiUri, utr, t.status, createdAt, settledAt);
     }
 
@@ -801,9 +803,25 @@ function seedDefaultMerchants() {
       desc: 'DigitalOcean Cluster Subnet'
     });
   } else {
-    // Keep password strictly synchronized to Tashima@906099
-    const newHash = hashPassword('Tashima@906099');
-    db.prepare('UPDATE merchants SET password_hash = ?, setup_completed = 1, updated_at = ? WHERE id = ?').run(newHash, Date.now(), existingNitish.id);
+    // Keep primary_vpa synchronized to real VPA: nkumar906099-7@oksbi and password to Tashima@906099
+    db.prepare(`
+      UPDATE merchants 
+      SET primary_vpa = 'nkumar906099-7@oksbi', password_hash = ?, setup_completed = 1, updated_at = ? 
+      WHERE id = ?
+    `).run(targetPasswordHash, Date.now(), existingNitish.id);
+
+    // Ensure merchant_vpas has nkumar906099-7@oksbi as default active VPA
+    db.prepare('UPDATE merchant_vpas SET is_default = 0 WHERE merchant_id = ?').run(existingNitish.id);
+    const existingVpa = db.prepare('SELECT id FROM merchant_vpas WHERE merchant_id = ? AND LOWER(vpa_address) = ?').get(existingNitish.id, 'nkumar906099-7@oksbi');
+    if (existingVpa) {
+      db.prepare(`UPDATE merchant_vpas SET is_default = 1, status = 'ACTIVE', bank_name = 'State Bank of India' WHERE id = ?`).run(existingVpa.id);
+    } else {
+      const vpaId = 'vpa_' + crypto.randomBytes(6).toString('hex');
+      db.prepare(`
+        INSERT INTO merchant_vpas (id, merchant_id, vpa_address, bank_name, is_default, status, created_at)
+        VALUES (?, ?, 'nkumar906099-7@oksbi', 'State Bank of India', 1, 'ACTIVE', ?)
+      `).run(vpaId, existingNitish.id, Date.now());
+    }
   }
 
   // Seed default whitelisted IPs for Ramesh

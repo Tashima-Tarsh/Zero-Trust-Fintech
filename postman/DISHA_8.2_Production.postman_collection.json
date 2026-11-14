@@ -144,7 +144,9 @@
                   "const min = String(d.getMinutes()).padStart(2, '0');",
                   "const ss = String(d.getSeconds()).padStart(2, '0');",
                   "pm.environment.set('DYNAMIC_UTR', yy + mm + dd + hh + min + ss);",
-                  "pm.environment.set('TIMESTAMP', String(Date.now()));"
+                  "pm.environment.set('TIMESTAMP', String(Date.now()));",
+                  "const template = `<div style='font-family:-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,sans-serif;background:#07090E;color:#fff;padding:24px;border-radius:12px;max-width:380px;margin:0 auto;text-align:center;border:1px solid rgba(255,255,255,0.1);'><div style='font-size:11px;text-transform:uppercase;letter-spacing:1.5px;color:#00F0FF;font-weight:700;margin-bottom:6px;'>DISHA 8.2 Sovereign Gateway</div><h2 style='margin:0 0 4px 0;font-size:26px;font-weight:800;color:#fff;'>₹{{challengeAmount}}</h2><div style='font-size:12px;color:#8A92A6;margin-bottom:16px;'>Order ID: <code style='color:#00F0FF;'>{{orderId}}</code><br>Payee VPA: <span style='color:#00E676;font-weight:600;'>{{vpaAddress}}</span></div><div style='background:#fff;padding:12px;border-radius:12px;display:inline-block;box-shadow:0 10px 30px rgba(0,0,0,0.5);'><img src='{{qrDataUrl}}' style='width:200px;height:200px;display:block;' alt='UPI QR Code' /></div><div style='margin-top:16px;'><a href='{{upiLink}}' style='display:block;background:linear-gradient(135deg,#00E676,#00B0FF);color:#000;font-weight:700;font-size:14px;padding:12px 18px;border-radius:8px;text-decoration:none;box-shadow:0 4px 15px rgba(0,230,118,0.3);'>📲 Launch Native UPI App</a></div><p style='font-size:11px;color:#8A92A6;margin-top:14px;line-height:1.5;'>Scan this QR with <strong>Google Pay, PhonePe, Paytm, or BHIM</strong>, or tap the button on mobile to launch UPI apps directly.</p></div>`;",
+                  "pm.visualizer.set(template, res);"
                 ],
                 "type": "text/javascript"
               }
@@ -538,6 +540,74 @@
                   "  pm.expect(pm.response.headers.get('Content-Type')).to.include('text/csv');",
                   "  pm.expect(pm.response.text()).to.include('Order ID,Date,Amount (INR),UPI ID,UTR,Status,Description');",
                   "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "3.9 Create Merchant Payment Order & Dynamic QR",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{SESSION_TOKEN}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"amount\": 500.00,\n  \"description\": \"Enterprise VIP Order\",\n  \"vpaAddress\": \"{{PRIMARY_VPA}}\"\n}"
+            },
+            "url": {
+              "raw": "{{MERCHANT_URL}}/api/merchant/payments",
+              "host": ["{{MERCHANT_URL}}"],
+              "path": ["api", "merchant", "payments"]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 201', function () { pm.response.to.have.status(201); });",
+                  "const res = pm.response.json();",
+                  "pm.test('Payment order created successfully', function () { pm.expect(res.success).to.be.true; pm.expect(res.order).to.be.an('object'); pm.expect(res.order.upi_uri).to.include('upi://pay?'); });",
+                  "if (res.order && res.order.id) { pm.environment.set('MERCHANT_ORDER_ID', res.order.id); }",
+                  "if (res.order && res.order.upi_uri) { pm.environment.set('MERCHANT_UPI_URI', res.order.upi_uri); }",
+                  "const template = `<div style='font-family:-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,sans-serif;background:#07090E;color:#fff;padding:24px;border-radius:12px;max-width:380px;margin:0 auto;text-align:center;border:1px solid rgba(255,255,255,0.1);'><div style='font-size:11px;text-transform:uppercase;letter-spacing:1.5px;color:#00F0FF;font-weight:700;margin-bottom:6px;'>DISHA Merchant Order</div><h2 style='margin:0 0 4px 0;font-size:26px;font-weight:800;color:#fff;'>₹{{order.amount}}</h2><div style='font-size:12px;color:#8A92A6;margin-bottom:16px;'>Order ID: <code style='color:#00F0FF;'>{{order.id}}</code><br>Payee VPA: <span style='color:#00E676;font-weight:600;'>{{order.vpa_address}}</span></div><div style='margin-top:16px;'><a href='{{order.upi_uri}}' style='display:block;background:linear-gradient(135deg,#00E676,#00B0FF);color:#000;font-weight:700;font-size:14px;padding:12px 18px;border-radius:8px;text-decoration:none;box-shadow:0 4px 15px rgba(0,230,118,0.3);'>📲 Launch Native UPI App</a></div><p style='font-size:11px;color:#8A92A6;margin-top:14px;line-height:1.5;'>Tap on mobile to open Google Pay, PhonePe, Paytm, or BHIM.</p></div>`;",
+                  "pm.visualizer.set(template, res);"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "3.10 Simulate Merchant Payment Settlement",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{SESSION_TOKEN}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"utr\": \"{{DYNAMIC_UTR}}\"\n}"
+            },
+            "url": {
+              "raw": "{{MERCHANT_URL}}/api/merchant/payments/{{MERCHANT_ORDER_ID}}/simulate",
+              "host": ["{{MERCHANT_URL}}"],
+              "path": ["api", "merchant", "payments", "{{MERCHANT_ORDER_ID}}", "simulate"]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 200', function () { pm.response.to.have.status(200); });",
+                  "const res = pm.response.json();",
+                  "pm.test('Order settled and verified', function () { pm.expect(res.success).to.be.true; pm.expect(res.order.status).to.eql('COMPLETED'); });"
                 ],
                 "type": "text/javascript"
               }

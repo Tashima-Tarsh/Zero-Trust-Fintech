@@ -174,7 +174,10 @@ async function runTestSuite() {
                 };
               }
             }
-          })
+          }),
+          visualizer: {
+            set: () => {}
+          }
         };
 
         // Execute Postman Test Scripts
