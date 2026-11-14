@@ -93,19 +93,26 @@ def create_refresh_token(data: dict) -> str:
     secret = _get_jwt_secret()
     return _jwt_encode(to_encode, secret, algorithm=getattr(settings, "JWT_ALGORITHM", "HS256"))
 
-def verify_token(token: str) -> dict:
-    """Verify and decode JWT token"""
+def verify_token(token: str, expected_type: Optional[str] = None) -> dict:
+    """Verify and decode JWT token with consistent purpose enforcement"""
     secret = _get_jwt_secret()
     try:
-        return _jwt_decode(token, secret, algorithms=[getattr(settings, "JWT_ALGORITHM", "HS256")])
+        payload = _jwt_decode(token, secret, algorithms=[getattr(settings, "JWT_ALGORITHM", "HS256")])
     except Exception as e:
         raise AuthError(f"Invalid token: {str(e)}")
+    
+    if expected_type is not None:
+        token_type = payload.get("type")
+        if token_type != expected_type:
+            raise AuthError(f"Invalid token purpose: expected '{expected_type}', got '{token_type or 'unspecified'}'")
+    
+    return payload
 
 async def get_current_merchant_user(
     credentials: Optional[HTTPAuthorizationCredentials] = Depends(security),
     db: Session = Depends(get_db)
 ) -> MerchantUser:
-    """Get authenticated merchant user from JWT token"""
+    """Get authenticated merchant user from JWT access token, enforcing intended purpose"""
     if not credentials:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -114,7 +121,7 @@ async def get_current_merchant_user(
         )
     
     try:
-        payload = verify_token(credentials.credentials)
+        payload = verify_token(credentials.credentials, expected_type="access")
         user_id = payload.get("sub")
         merchant_id = payload.get("merchant_id")
         
@@ -169,10 +176,10 @@ def verify_websocket_token(token: str, merchant_id: str) -> dict:
         if token_merchant != merchant_id and token_user != "admin":
             raise AuthError("Token not authorized for this merchant")
         
-        # Check token type (allow 'websocket' or 'access' tokens)
+        # Check token type (strictly allow 'websocket' or 'access' tokens)
         token_type = payload.get("type")
-        if token_type not in ("websocket", "access", None):
-            raise AuthError(f"Invalid token type for WebSocket: {token_type}")
+        if token_type not in ("websocket", "access"):
+            raise AuthError(f"Invalid token type for WebSocket: {token_type or 'unspecified'}")
         
         return payload
         

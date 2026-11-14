@@ -57,34 +57,54 @@ class LedgerResponse(BaseModel):
     message: str
 
 @router.post("/auth/merchant-token")
-async def get_merchant_token(req: TokenRequest):
-    """Generate signed JWT token for authenticated WebSocket connection (backward-compatible)"""
+async def get_merchant_token(
+    req: TokenRequest,
+    current_merchant: Merchant = Depends(get_current_merchant)
+):
+    """Generate signed JWT token for authenticated WebSocket connection (scoped to authenticated merchant)"""
+    if current_merchant.id != req.merchant_id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Merchant ID mismatch: cannot generate token for another merchant"
+        )
     token = create_access_token(
-        data={"sub": req.user_id or req.merchant_id, "merchant_id": req.merchant_id, "type": "websocket"}
+        data={"sub": req.user_id or current_merchant.id, "merchant_id": current_merchant.id, "type": "websocket"}
     )
     return {
         "status": "success",
         "token": token,
         "token_type": "Bearer",
         "expires_in": 86400,
-        "merchant_id": req.merchant_id
+        "merchant_id": current_merchant.id
     }
 
 @router.post("/device/register")
-async def register_device(payload: DeviceRegisterRequest, db: Session = Depends(get_db)):
-    """Register client device hardware attestation public key"""
+async def register_device(
+    payload: DeviceRegisterRequest,
+    current_merchant: Merchant = Depends(get_current_merchant),
+    db: Session = Depends(get_db)
+):
+    """Register client device hardware attestation public key with merchant authentication"""
     from ..models.database import DeviceKey
     try:
         existing = db.query(DeviceKey).filter_by(device_id=payload.device_id).first()
         if existing:
+            # Verify caller owns this device before allowing key update
+            if existing.merchant_id and existing.merchant_id != current_merchant.id:
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail="Device is registered to a different merchant; unauthorized key replacement"
+                )
             existing.public_key = payload.public_key
             existing.algorithm = payload.algorithm
+            existing.merchant_id = current_merchant.id
             existing.is_active = True
             db.commit()
             return {"status": "success", "message": "Device key updated", "device_id": payload.device_id}
         
         new_device = DeviceKey(
             device_id=payload.device_id,
+            merchant_id=current_merchant.id,
             public_key=payload.public_key,
             algorithm=payload.algorithm,
             is_active=True
@@ -92,6 +112,9 @@ async def register_device(payload: DeviceRegisterRequest, db: Session = Depends(
         db.add(new_device)
         db.commit()
         return {"status": "success", "message": "Device key registered", "device_id": payload.device_id}
+    except HTTPException:
+        db.rollback()
+        raise
     except Exception as e:
         db.rollback()
         logger.exception(f"Error registering device: {e}")

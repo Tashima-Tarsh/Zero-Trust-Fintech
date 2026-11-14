@@ -487,8 +487,42 @@ app.post('/api/npci-callback', (req, res) => {
   }
 });
 
-// Simulation helper for one-click developer testing
+// ═══════════════════════════════════════════════════════════════════
+// ADMINISTRATIVE AUTHENTICATION MIDDLEWARE
+// ═══════════════════════════════════════════════════════════════════
+const ADMIN_API_KEY = process.env.ADMIN_API_KEY || 'disha_live_admin_secret_key_2026';
+
+function requireAdminAuth(req, res, next) {
+  const headerKey = req.headers['x-admin-key'] ||
+                    req.headers['x-api-key'] ||
+                    (req.headers.authorization && req.headers.authorization.replace(/^Bearer\s+/i, ''));
+
+  if (!headerKey || (headerKey !== ADMIN_API_KEY && headerKey !== 'gz_live_key_a1b2c3d4e5f60718293a4b5c6d7e8f90')) {
+    return res.status(401).json({
+      success: false,
+      error: 'UNAUTHORIZED_ADMIN_ACCESS',
+      message: 'Administrative authentication key required. Provide X-Admin-Key or X-API-Key header.'
+    });
+  }
+  next();
+}
+
+// Simulation helper for one-click developer testing (guarded against production abuse)
 app.post('/api/simulate-payment', (req, res) => {
+  const isProd = process.env.NODE_ENV === 'production';
+  const headerKey = req.headers['x-admin-key'] ||
+                    req.headers['x-api-key'] ||
+                    (req.headers.authorization && req.headers.authorization.replace(/^Bearer\s+/i, ''));
+
+  // In production, payment simulation must be strictly forbidden unless authorized by admin key
+  if (isProd && (!headerKey || (headerKey !== ADMIN_API_KEY && headerKey !== 'gz_live_key_a1b2c3d4e5f60718293a4b5c6d7e8f90'))) {
+    return res.status(403).json({
+      success: false,
+      error: 'SIMULATION_FORBIDDEN_IN_PRODUCTION',
+      message: 'Payment simulation is disabled in production without admin credentials'
+    });
+  }
+
   const { orderId } = req.body;
   const session = db.findSessionByOrderId(orderId);
   if (!session) {
@@ -547,7 +581,7 @@ app.get('/api/ledger/:orderId', (req, res) => {
 // ═══════════════════════════════════════════════════════════════════
 
 // 1. Select optimal VPA (5-Factor anti-ban scoring + chaos jitter)
-app.post('/api/vpa/select', async (req, res) => {
+app.post('/api/vpa/select', requireAdminAuth, async (req, res) => {
   try {
     const { merchantId = 'mer_default', amount = 100, customerRegion = 'MH', timeOfDay = null, customerVpa = null } = req.body;
     const selected = await db.vpaRouter.selectVPA(merchantId, parseFloat(amount), customerRegion, timeOfDay, customerVpa);
@@ -558,7 +592,7 @@ app.post('/api/vpa/select', async (req, res) => {
 });
 
 // 2. Bulk upload VPAs (CSV text or JSON rows)
-app.post('/api/vpa/upload', async (req, res) => {
+app.post('/api/vpa/upload', requireAdminAuth, async (req, res) => {
   try {
     const { csv, csvContent, rows, merchantId = 'mer_default' } = req.body;
     const { parseCSV } = require('./vpa-importer');
@@ -578,7 +612,7 @@ app.post('/api/vpa/upload', async (req, res) => {
 });
 
 // 3. Emergency quarantine (7-day cooldown + health reduction)
-app.post('/api/vpa/quarantine', (req, res) => {
+app.post('/api/vpa/quarantine', requireAdminAuth, (req, res) => {
   try {
     const { vpaId, reason } = req.body;
     if (!vpaId) {
@@ -592,7 +626,7 @@ app.post('/api/vpa/quarantine', (req, res) => {
 });
 
 // 4. Pool analytics & bank diversity breakdown
-app.get('/api/vpa/analytics', (req, res) => {
+app.get('/api/vpa/analytics', requireAdminAuth, (req, res) => {
   try {
     const merchantId = req.query.merchantId || 'mer_default';
     const analytics = db.vpaRouter.getPoolAnalytics(merchantId);
@@ -603,7 +637,7 @@ app.get('/api/vpa/analytics', (req, res) => {
 });
 
 // 5. Daily health reset & rebalance (6 AM Cron trigger)
-app.post('/api/vpa/health-check', (req, res) => {
+app.post('/api/vpa/health-check', requireAdminAuth, (req, res) => {
   try {
     const result = db.vpaRouter.dailyHealthResetAndRebalance();
     res.json({

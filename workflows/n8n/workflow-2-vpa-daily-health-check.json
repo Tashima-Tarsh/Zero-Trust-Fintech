@@ -22,6 +22,15 @@
       "parameters": {
         "method": "POST",
         "url": "http://localhost:3000/api/vpa/health-check",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-Admin-Key",
+              "value": "={{ $env.DISHA_ADMIN_KEY || 'disha_live_admin_secret_key_2026' }}"
+            }
+          ]
+        },
         "options": {}
       },
       "id": "node-http-health-recal",
@@ -34,6 +43,15 @@
       "parameters": {
         "method": "GET",
         "url": "http://localhost:3000/api/vpa/analytics?merchantId=mer_default",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-Admin-Key",
+              "value": "={{ $env.DISHA_ADMIN_KEY || 'disha_live_admin_secret_key_2026' }}"
+            }
+          ]
+        },
         "options": {}
       },
       "id": "node-http-analytics",

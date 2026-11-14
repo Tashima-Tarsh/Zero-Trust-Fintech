@@ -37,17 +37,17 @@ jobs:
         run: |
           cd zero-trust-fintech-production
           python -m pip install --upgrade pip
-          pip install flake8 black isort -r requirements.txt || true
+          pip install flake8 black isort -r requirements.txt
       
       - name: Run Flake8 (Linting)
         run: |
           cd zero-trust-fintech-production
-          flake8 app/ --max-line-length=140 --ignore=E203,W503,E402,F401,F841 || true
+          flake8 app/ --max-line-length=140 --ignore=E203,W503,E402,F401,F841
       
       - name: Run Black Check
         run: |
           cd zero-trust-fintech-production
-          black --check app/ || true
+          black --check app/
 
   test:
     name: Automated Tests & Migrations
@@ -144,7 +144,7 @@ jobs:
       - name: Run Bandit Security Analysis
         run: |
           pip install bandit
-          bandit -r zero-trust-fintech-production/app -ll || true
+          bandit -r zero-trust-fintech-production/app -ll
 
   build:
     name: Build Docker Image

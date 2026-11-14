@@ -36,6 +36,15 @@
       "parameters": {
         "method": "POST",
         "url": "http://localhost:3000/api/vpa/upload",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-Admin-Key",
+              "value": "={{ $env.DISHA_ADMIN_KEY || 'disha_live_admin_secret_key_2026' }}"
+            }
+          ]
+        },
         "sendBody": true,
         "specifyBody": "json",
         "jsonBody": "={\n  \"rows\": {{ JSON.stringify($json.rows) }},\n  \"merchantId\": \"{{ $json.merchantId }}\"\n}",

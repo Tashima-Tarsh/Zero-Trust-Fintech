@@ -19,6 +19,15 @@
       "parameters": {
         "method": "POST",
         "url": "http://localhost:3000/api/vpa/quarantine",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-Admin-Key",
+              "value": "={{ $env.DISHA_ADMIN_KEY || 'disha_live_admin_secret_key_2026' }}"
+            }
+          ]
+        },
         "sendBody": true,
         "specifyBody": "json",
         "jsonBody": "={\n  \"vpaId\": \"{{ $json.body.vpaId }}\",\n  \"reason\": \"{{ $json.body.reason || 'Consecutive UPI dropoffs / Bank warning' }}\"\n}",
@@ -34,6 +43,15 @@
       "parameters": {
         "method": "POST",
         "url": "http://localhost:3000/api/vpa/select",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-Admin-Key",
+              "value": "={{ $env.DISHA_ADMIN_KEY || 'disha_live_admin_secret_key_2026' }}"
+            }
+          ]
+        },
         "sendBody": true,
         "specifyBody": "json",
         "jsonBody": "={\n  \"merchantId\": \"mer_default\",\n  \"amount\": 500\n}",
@@ -47,7 +65,7 @@
     },
     {
       "parameters": {
-        "jsCode": "const original = $('Webhook: Bank Anomaly / Failure Alert').first().json.body || {};\nconst quarRes = $('Execute 7-Day Emergency Quarantine').first().json;\nconst replRes = $input.first().json.selectedVpa || {};\n\nconst alertMsg = `🚨 *DISHA 8.2 EMERGENCY ANTI-BAN ACTION* 🚨\\n\\n` +\n  `• Quarantined VPA: \`${original.vpaAddress || original.vpaId}\`\\n` +\n  `• Reason: ${original.reason || 'Algorithmic Anomaly'}\\n` +\n  `• Action Taken: Health lowered to 30. Enforced 7-day cooldown.\\n` +\n  `• Failover Activated: Traffic rerouted to \`${replRes.vpaAddress}\` (${replRes.bankName})\\n` +\n  `• New Node Health: ${replRes.healthScore}/100`;\n\nreturn [{\n  json: {\n    quarantineStatus: quarRes.status,\n    quarantinedVpaId: quarRes.vpaId,\n    cooldownUntil: quarRes.cooldownUntil,\n    replacementVpa: replRes.vpaAddress,\n    replacementBank: replRes.bankName,\n    emergencyMessage: alertMsg\n  }\n}];"
+        "jsCode": "const original = $('Webhook: Bank Anomaly / Failure Alert').first().json.body || {};\nconst quarRes = $('Execute 7-Day Emergency Quarantine').first().json;\nconst replRes = $input.first().json.selectedVpa || {};\n\nconst alertMsg = '🚨 *DISHA 8.2 EMERGENCY ANTI-BAN ACTION* 🚨\\n\\n' +\n  '• Quarantined VPA: `' + (original.vpaAddress || original.vpaId) + '`\\n' +\n  '• Reason: ' + (original.reason || 'Algorithmic Anomaly') + '\\n' +\n  '• Action Taken: Health lowered to 30. Enforced 7-day cooldown.\\n' +\n  '• Failover Activated: Traffic rerouted to `' + (replRes.vpaAddress || 'N/A') + '` (' + (replRes.bankName || 'N/A') + ')\\n' +\n  '• New Node Health: ' + (replRes.healthScore || 100) + '/100';\n\nreturn [{\n  json: {\n    quarantineStatus: quarRes.status,\n    quarantinedVpaId: quarRes.vpaId,\n    cooldownUntil: quarRes.cooldownUntil,\n    replacementVpa: replRes.vpaAddress,\n    replacementBank: replRes.bankName,\n    emergencyMessage: alertMsg\n  }\n}];"
       },
       "id": "node-emergency-format",
       "name": "Format Incident & Replacement",

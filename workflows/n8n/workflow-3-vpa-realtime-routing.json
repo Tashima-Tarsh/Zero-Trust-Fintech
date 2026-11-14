@@ -19,6 +19,15 @@
       "parameters": {
         "method": "POST",
         "url": "http://localhost:3000/api/vpa/select",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-Admin-Key",
+              "value": "={{ $env.DISHA_ADMIN_KEY || 'disha_live_admin_secret_key_2026' }}"
+            }
+          ]
+        },
         "sendBody": true,
         "specifyBody": "json",
         "jsonBody": "={\n  \"merchantId\": \"{{ $json.body.merchantId || 'mer_default' }}\",\n  \"amount\": {{ $json.body.amount || 100 }},\n  \"customerRegion\": \"{{ $json.body.customerRegion || 'MH' }}\",\n  \"customerVpa\": \"{{ $json.body.customerVpa || '' }}\"\n}",
