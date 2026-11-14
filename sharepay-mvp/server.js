@@ -18,9 +18,9 @@ const app = express();
 const server = createServer(app);
 const wss = new WebSocketServer({ server });
 
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
-app.use(express.static('public'));
+app.use(express.json({ limit: '256kb' }));
+app.use(express.urlencoded({ extended: true, limit: '256kb' }));
+app.use(express.static(join(__dirname, 'public')));
 
 // Parse HTTP cookies helper
 function parseCookies(cookieHeader) {
@@ -35,8 +35,15 @@ function parseCookies(cookieHeader) {
   return list;
 }
 
-// WebSocket connections map: orderId -> WebSocket
-const wsClients = new Map();
+// Preserve every authorized subscriber for an order, not just the last socket.
+const wsClients = new Map(); // orderId -> Set<WebSocket>
+
+function equalTokens(a, b) {
+  if (!a || !b) return false;
+  const left = Buffer.from(String(a));
+  const right = Buffer.from(String(b));
+  return left.length === right.length && crypto.timingSafeEqual(left, right);
+}
 
 wss.on('connection', (ws, req) => {
   try {
@@ -57,14 +64,20 @@ wss.on('connection', (ws, req) => {
     }
 
     // P0-Security: Require session token match to prevent cross-origin order eavesdropping
-    if (!sessionToken || order.session_token !== sessionToken) {
+    if (!equalTokens(sessionToken, order.session_token)) {
       ws.close(4401, 'Unauthorized: session token mismatch');
       return;
     }
 
-    wsClients.set(orderId, ws);
+    if (!wsClients.has(orderId)) wsClients.set(orderId, new Set());
+    wsClients.get(orderId).add(ws);
     ws.send(JSON.stringify({ type: 'CONNECTED', orderId, status: order.status }));
-    ws.on('close', () => wsClients.delete(orderId));
+    ws.on('close', () => {
+      const sockets = wsClients.get(orderId);
+      if (!sockets) return;
+      sockets.delete(ws);
+      if (sockets.size === 0) wsClients.delete(orderId);
+    });
   } catch (err) {
     console.error('WebSocket connection error:', err);
     try { ws.close(4500, 'Server error'); } catch (_) {}
@@ -72,9 +85,11 @@ wss.on('connection', (ws, req) => {
 });
 
 function broadcastOrderUpdate(orderId, payload) {
-  const ws = wsClients.get(orderId);
-  if (ws && ws.readyState === 1) {
-    ws.send(JSON.stringify(payload));
+  const clients = wsClients.get(orderId);
+  if (!clients) return;
+  const message = JSON.stringify(payload);
+  for (const ws of clients) {
+    if (ws.readyState === 1) ws.send(message);
   }
 }
 
@@ -119,7 +134,7 @@ app.post('/api/create-order', (req, res) => {
   
   // Base amount ₹100.00 with random dynamic instant discount between ₹0.01 and ₹0.99
   const baseAmount = 100.00;
-  const discountPaise = Math.floor(Math.random() * 90 + 10) / 100; // 0.10 to 0.99
+  const discountPaise = crypto.randomInt(10, 100) / 100; // 0.10 to 0.99
   const challengeAmount = parseFloat((baseAmount - discountPaise).toFixed(2));
   
   const now = Date.now();
@@ -140,7 +155,8 @@ app.post('/api/create-order', (req, res) => {
   const upiLink = `upi://pay?pa=${encodeURIComponent(upiId)}&pn=${encodeURIComponent(merchantName)}&am=${challengeAmount}&tn=${orderId}&cu=INR`;
 
   // Bind session via HttpOnly Cookie for Web Share Target routing
-  res.setHeader('Set-Cookie', `sharepay_session=${sessionToken}; Path=/; HttpOnly; SameSite=Lax; Max-Age=300`);
+  const secureCookie = process.env.NODE_ENV === 'production' ? '; Secure' : '';
+  res.setHeader('Set-Cookie', `sharepay_session=${sessionToken}; Path=/; HttpOnly; SameSite=Lax; Max-Age=300${secureCookie}`);
   res.json({
     orderId,
     sessionToken,
@@ -225,11 +241,24 @@ app.post('/handle-share', (req, res) => {
 app.get('/api/order/:orderId', (req, res) => {
   const order = database.getOrder(req.params.orderId);
   if (!order) return res.status(404).json({ error: 'ORDER_NOT_FOUND' });
-  res.json(order);
+  const sessionToken = parseCookies(req.headers.cookie).sharepay_session;
+  if (!equalTokens(sessionToken, order.session_token)) {
+    return res.status(401).json({ error: 'UNAUTHORIZED' });
+  }
+  // Never expose the cookie-equivalent session secret in an order response.
+  const { session_token: _secret, ...safeOrder } = order;
+  res.json(safeOrder);
 });
 
 // 5. Audit Log (Forensic Triage & Inspection)
 app.get('/api/audit-log', (req, res) => {
+  const key = process.env.AUDIT_API_KEY;
+  if (!key || key.length < 32) {
+    return res.status(503).json({ error: 'AUDIT_ACCESS_UNCONFIGURED' });
+  }
+  if (!equalTokens(req.get('x-audit-key'), key)) {
+    return res.status(401).json({ error: 'UNAUTHORIZED' });
+  }
   res.json(database.getAuditLog(50));
 });
 
