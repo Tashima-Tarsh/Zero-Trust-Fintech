@@ -41,14 +41,14 @@ class ClientAttestation(BaseModel):
     device_id: str = Field(min_length=1, max_length=128, pattern=r"^[A-Za-z0-9_-]+$")
     utr: str = Field(min_length=1, max_length=50)
     amount: str = Field(pattern=r"^(?:0|[1-9][0-9]{0,8})\.[0-9]{2}$")
-    timestamp: datetime
+    timestamp: str = Field(pattern=r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,6})?(?:Z|[+-]\d{2}:\d{2})$")
     integrity: DeviceIntegrity
     client_signature: str = Field(min_length=1, max_length=256)
 
 
 def canonical_attestation_bytes(body: ClientAttestation) -> bytes:
     """Exact UTF-8 bytes to be signed, including integrity metrics and identity."""
-    signed = body.model_dump(mode="json", exclude={"client_signature"})
+    signed = body.model_dump(mode="json", exclude={"client_signature"}, exclude_unset=True)
     return json.dumps(signed, sort_keys=True, separators=(",", ":"), ensure_ascii=False).encode("utf-8")
 
 
@@ -95,10 +95,14 @@ def attest_payment(body: ClientAttestation):
     Everything is checked and recorded in one database transaction.
     """
     now = datetime.now(timezone.utc)
-    if body.timestamp.utcoffset() is None:
+    try:
+        claimed_time = datetime.fromisoformat(body.timestamp.replace("Z", "+00:00"))
+    except ValueError as exc:
+        raise HTTPException(422, "Invalid timestamp") from exc
+    if claimed_time.utcoffset() is None:
         raise HTTPException(422, "Timestamp must include timezone")
     skew = int(os.getenv("CLIENT_ATTESTATION_MAX_SKEW_SECONDS", "300"))
-    if not 1 <= skew <= 3600 or abs((now - body.timestamp).total_seconds()) > skew:
+    if not 1 <= skew <= 3600 or abs((now - claimed_time).total_seconds()) > skew:
         raise HTTPException(409, "Stale or future-dated attestation")
     result = device_integrity_result(body)
     if result["decision"] != "DEVICE_INTEGRITY_PASS":
