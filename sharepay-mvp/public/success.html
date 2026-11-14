@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Payment Successful</title>
+  <style>
+    body { font-family: Arial, sans-serif; max-width: 400px; margin: 50px auto; padding: 20px; text-align: center; }
+    .success { color: #28a745; font-size: 48px; }
+    .utr { background: #f0f0f0; padding: 10px; border-radius: 8px; margin: 20px 0; }
+  </style>
+</head>
+<body>
+  <div class="success">✓</div>
+  <h1>Payment Successful!</h1>
+  <div class="utr">
+    <strong>UTR:</strong> <span id="utr"></span>
+  </div>
+  <p>Thank you for your payment.</p>
+  
+  <script>
+    const params = new URLSearchParams(window.location.search);
+    document.getElementById('utr').textContent = params.get('utr') || 'N/A';
+  </script>
+</body>
+</html>
