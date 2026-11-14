@@ -146,7 +146,7 @@
 
         <!-- QR Code Canvas with Dynamic Refresh & Expired State -->
         <div class="qr-presentation-card">
-          <a id="qrDirectLink" href="javascript:void(0)" onclick="triggerDirectUpiPay()" class="qr-canvas-wrapper" title="Tap QR to pay directly with your UPI app">
+          <div id="qrDirectLink" onclick="triggerDirectUpiPay()" class="qr-canvas-wrapper" title="Tap QR to pay directly with your UPI app">
             <canvas id="qrCanvas" width="258" height="258" class="qr-canvas-render"></canvas>
 
             <!-- Floating Scan / Tap Instruction -->
@@ -194,24 +194,72 @@
         </div>
 
         <!-- Mobile Direct Intent Button -->
-        <a id="mobilePayButton" href="javascript:void(0)" onclick="triggerDirectUpiPay()" class="btn-mobile-upi-pay">
+        <button type="button" id="mobilePayButton" onclick="triggerDirectUpiPay()" class="btn-mobile-upi-pay" title="Tap to open UPI app directly">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
             <rect x="5" y="2" width="14" height="20" rx="2" ry="2"></rect>
             <line x1="12" y1="18" x2="12.01" y2="18"></line>
           </svg>
-          <span>Open Installed UPI App to Pay</span>
-        </a>
+          <span>Tap to Pay with UPI App</span>
+        </button>
 
-        <!-- Supported UPI Apps Logo Strip -->
+        <!-- Supported UPI Apps with 1-Tap Launchers -->
         <div class="supported-apps-strip">
-          <span class="strip-label">Supported Apps:</span>
+          <span class="strip-label">Tap your UPI app to pay directly:</span>
           <div class="apps-pills-row">
-            <span class="app-pill">Google Pay</span>
-            <span class="app-pill">PhonePe</span>
-            <span class="app-pill">Paytm</span>
-            <span class="app-pill">BHIM</span>
-            <span class="app-pill">CRED</span>
-            <span class="app-pill">Navi</span>
+            <button type="button" class="app-pill-btn" onclick="launchSpecificUpi('gpay')" title="Pay using Google Pay">
+              <span class="pill-dot gpay"></span> Google Pay
+            </button>
+            <button type="button" class="app-pill-btn" onclick="launchSpecificUpi('phonepe')" title="Pay using PhonePe">
+              <span class="pill-dot phonepe"></span> PhonePe
+            </button>
+            <button type="button" class="app-pill-btn" onclick="launchSpecificUpi('paytm')" title="Pay using Paytm">
+              <span class="pill-dot paytm"></span> Paytm
+            </button>
+            <button type="button" class="app-pill-btn" onclick="launchSpecificUpi('bhim')" title="Pay using BHIM or Any UPI">
+              <span class="pill-dot bhim"></span> BHIM / Other
+            </button>
+          </div>
+        </div>
+
+        <!-- Desktop UPI Assistance Modal -->
+        <div id="desktopUpiModal" class="desktop-upi-modal" style="display: none;" onclick="if(event.target===this)closeDesktopModal()">
+          <div class="desktop-modal-content">
+            <div class="desktop-modal-header">
+              <div class="desktop-modal-icon">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="5" y="2" width="14" height="20" rx="2" ry="2"></rect><line x1="12" y1="18" x2="12.01" y2="18"></line></svg>
+              </div>
+              <div style="flex: 1; text-align: left;">
+                <h4 style="margin: 0; font-size: 1rem; font-weight: 700; color: var(--text-primary);">UPI Apps Run on Mobile Phones</h4>
+                <p style="margin: 3px 0 0; font-size: 0.78rem; color: var(--text-secondary);">Google Pay, PhonePe, and Paytm cannot be opened directly from a desktop PC.</p>
+              </div>
+              <button type="button" class="btn-close-modal" onclick="closeDesktopModal()" title="Close dialog">✕</button>
+            </div>
+            <div class="desktop-modal-body">
+              <div class="desktop-modal-steps">
+                <div class="step-item">
+                  <div class="step-num">1</div>
+                  <div><strong>Scan the QR code:</strong> Open Google Pay, PhonePe, or Paytm on your phone and scan the screen.</div>
+                </div>
+                <div class="step-item">
+                  <div class="step-num">2</div>
+                  <div><strong>Send payment link:</strong> Copy the link below and open it in your mobile phone browser to launch UPI instantly.</div>
+                </div>
+                <div class="step-item">
+                  <div class="step-num">3</div>
+                  <div><strong>Testing on Desktop?</strong> Click Simulate below to test the instant settlement and tax receipt right now.</div>
+                </div>
+              </div>
+            </div>
+            <div class="desktop-modal-footer">
+              <button type="button" class="btn-modal-copy" onclick="copyUpiLink()">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
+                <span id="copyUpiBtnText">Copy UPI Link</span>
+              </button>
+              <button type="button" class="btn-modal-sim" onclick="simulatePaymentFromModal()">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon></svg>
+                <span>Simulate Instant Payment</span>
+              </button>
+            </div>
           </div>
         </div>
 

@@ -551,20 +551,118 @@ function renderGeneratedQr(order) {
   simBtn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align: -2px; margin-right: 6px;"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon></svg><span>Simulate Customer Payment (Tests Soundbox)</span>';
 }
 
-window.openUpiAppDirectly = function() {
-  if (activeCreatedOrder && activeCreatedOrder.upi_uri) {
-    const uri = activeCreatedOrder.upi_uri;
-    try {
-      const a = document.createElement('a');
-      a.href = uri;
-      a.target = '_top';
-      a.rel = 'noopener';
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-    } catch (_) {}
-    setTimeout(() => { window.location.href = uri; }, 80);
+function isMobileDevice() {
+  const ua = navigator.userAgent || '';
+  const isMobileUA = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini|Mobile|mobile|CriOS/i.test(ua);
+  const isTouchDevice = ('ontouchstart' in window) || (navigator.maxTouchPoints > 1);
+  return isMobileUA || (isTouchDevice && window.innerWidth <= 820);
+}
+
+function getAppSpecificUri(app, baseUpi) {
+  if (!baseUpi) return '';
+  const query = baseUpi.includes('?') ? baseUpi.split('?')[1] : baseUpi.replace(/^upi:\/\/pay\??/, '');
+  const isAndroid = /Android/i.test(navigator.userAgent);
+  const isIOS = /iPhone|iPad|iPod/i.test(navigator.userAgent);
+
+  if (app === 'gpay') {
+    if (isAndroid) {
+      return `intent://pay?${query}#Intent;scheme=upi;package=com.google.android.apps.nbu.paisa.user;end`;
+    } else if (isIOS) {
+      return `tez://upi/pay?${query}`;
+    }
+    return `upi://pay?${query}`;
   }
+
+  if (app === 'phonepe') {
+    if (isAndroid) {
+      return `intent://pay?${query}#Intent;scheme=upi;package=com.phonepe.app;end`;
+    } else if (isIOS) {
+      return `phonepe://pay?${query}`;
+    }
+    return `phonepe://pay?${query}`;
+  }
+
+  if (app === 'paytm') {
+    if (isAndroid) {
+      return `intent://pay?${query}#Intent;scheme=upi;package=net.one97.paytm;end`;
+    } else if (isIOS) {
+      return `paytmmp://pay?${query}`;
+    }
+    return `paytmmp://pay?${query}`;
+  }
+
+  if (app === 'bhim') {
+    if (isAndroid) {
+      return `intent://pay?${query}#Intent;scheme=upi;package=in.org.npci.upiapp;end`;
+    }
+    return `upi://pay?${query}`;
+  }
+
+  return baseUpi;
+}
+
+function dispatchDashUpi(uri) {
+  if (!uri) return;
+  window.__lastDispatchedUri = uri;
+  try {
+    const a = document.createElement('a');
+    a.href = uri;
+    a.target = '_top';
+    a.rel = 'noopener';
+    document.body.appendChild(a);
+    a.click();
+    setTimeout(() => {
+      if (document.body.contains(a)) document.body.removeChild(a);
+    }, 120);
+  } catch (_) {
+    window.location.href = uri;
+  }
+}
+
+window.openUpiAppDirectly = function() {
+  if (!activeCreatedOrder || !activeCreatedOrder.upi_uri) {
+    alert('Please generate a payment QR first.');
+    return;
+  }
+
+  if (isMobileDevice()) {
+    // Launch directly into mobile UPI chooser
+    dispatchDashUpi(activeCreatedOrder.upi_uri);
+  } else {
+    // Desktop: show guidance modal
+    const modal = document.getElementById('dashUpiModal');
+    if (modal) modal.style.display = 'flex';
+  }
+};
+
+window.openSpecificUpiApp = function(app) {
+  if (!activeCreatedOrder || !activeCreatedOrder.upi_uri) {
+    alert('Please generate a payment QR first.');
+    return;
+  }
+
+  if (isMobileDevice()) {
+    const targetUri = getAppSpecificUri(app, activeCreatedOrder.upi_uri);
+    dispatchDashUpi(targetUri);
+  } else {
+    const modal = document.getElementById('dashUpiModal');
+    if (modal) modal.style.display = 'flex';
+  }
+};
+
+window.closeDashUpiModal = function() {
+  const modal = document.getElementById('dashUpiModal');
+  if (modal) modal.style.display = 'none';
+};
+
+window.copyPaymentLinkFromModal = function() {
+  window.copyPaymentLink();
+  window.closeDashUpiModal();
+};
+
+window.simulateFromModal = function() {
+  window.closeDashUpiModal();
+  window.simulatePaymentForActiveOrder();
 };
 
 window.copyPaymentLink = function() {

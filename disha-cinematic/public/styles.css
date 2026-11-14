@@ -6430,3 +6430,142 @@ html, body {
     text-align: center;
   }
 }
+
+
+/* Quick UPI App Launcher Buttons on Dashboard */
+.btn-dash-subtle-app {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 0.72rem;
+  font-weight: 600;
+  padding: 5px 10px;
+  background: #FFFFFF;
+  border: 1px solid #E2E8F0;
+  border-radius: 8px;
+  color: #475569;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.btn-dash-subtle-app:hover {
+  background: #F8FAFC;
+  border-color: #6366F1;
+  color: #4F46E5;
+  transform: translateY(-1px);
+}
+
+.app-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  display: inline-block;
+}
+
+.app-dot.gpay { background: #34A853; }
+.app-dot.phonepe { background: #5F259F; }
+.app-dot.paytm { background: #00BAF2; }
+.app-dot.bhim { background: #F26722; }
+
+/* Dashboard UPI Assistance Modal */
+.dash-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.6);
+  backdrop-filter: blur(4px);
+  z-index: 9999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  animation: modalFadeIn 0.2s ease-out;
+}
+
+.dash-modal-card {
+  background: #FFFFFF;
+  border-radius: 16px;
+  width: 100%;
+  max-width: 440px;
+  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+  border: 1px solid #E2E8F0;
+  overflow: hidden;
+}
+
+.dash-modal-header {
+  padding: 18px 20px;
+  border-bottom: 1px solid #E2E8F0;
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.dash-modal-icon {
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  background: #EEF2FF;
+  color: #4F46E5;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.btn-dash-modal-close {
+  background: transparent;
+  border: none;
+  font-size: 1.1rem;
+  color: #94A3B8;
+  cursor: pointer;
+  padding: 4px 8px;
+  border-radius: 6px;
+  transition: all 0.15s ease;
+}
+
+.btn-dash-modal-close:hover {
+  background: #F1F5F9;
+  color: #1E293B;
+}
+
+.dash-modal-body {
+  padding: 20px;
+}
+
+.modal-instruction-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.modal-inst-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  font-size: 0.82rem;
+  line-height: 1.45;
+  color: #475569;
+}
+
+.inst-num {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: #EEF2FF;
+  color: #4338CA;
+  font-size: 0.72rem;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+
+.dash-modal-footer {
+  padding: 14px 20px;
+  background: #F8FAFC;
+  border-top: 1px solid #E2E8F0;
+  display: flex;
+  gap: 10px;
+  justify-content: flex-end;
+}

@@ -41,7 +41,7 @@ class UntouchableQR {
       return false;
     });
 
-    // 4. Block Long-Press (Touch devices)
+    // 4. Block Long-Press and handle tap (Touch devices)
     c.addEventListener('touchstart', (e) => {
       this.touchStartTime = Date.now();
       this.longPressTimeout = setTimeout(() => {
@@ -55,6 +55,7 @@ class UntouchableQR {
       const touchDuration = Date.now() - this.touchStartTime;
       if (touchDuration < 500) {
         // Quick tap: trigger touch-to-pay
+        e.preventDefault();
         this.triggerPay();
       }
     });
@@ -64,20 +65,30 @@ class UntouchableQR {
     });
 
     // 5. Desktop Click: Touch-to-Pay
-    c.addEventListener('click', () => {
+    c.addEventListener('click', (e) => {
+      e.preventDefault();
       this.triggerPay();
     });
   }
 
   triggerPay() {
-    if (!this.upiLink) return;
+    // Debounce triggers (avoid touch + click double execution)
+    if (this._lastTrigger && (Date.now() - this._lastTrigger < 800)) return;
+    this._lastTrigger = Date.now();
 
-    // Haptic feedback (10ms vibration)
+    // Haptic feedback (12ms vibration)
     if (window.navigator && typeof window.navigator.vibrate === 'function') {
-      window.navigator.vibrate(10);
+      window.navigator.vibrate(12);
     }
 
-    console.log('⚡ [UntouchableQR] Touch-to-Pay triggered ->', this.upiLink);
+    // Delegate to centralized application UPI launcher
+    if (typeof window.triggerDirectUpiPay === 'function') {
+      window.triggerDirectUpiPay();
+      return;
+    }
+
+    if (!this.upiLink) return;
+    console.log('⚡ [UntouchableQR] Fallback Touch-to-Pay ->', this.upiLink);
     window.location.href = this.upiLink;
   }
 

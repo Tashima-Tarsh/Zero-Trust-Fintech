@@ -188,29 +188,133 @@ function updateUIWithSession(s) {
   }
 }
 
-window.triggerDirectUpiPay = function(e) {
-  if (e && e.preventDefault) {
-    // allow native anchor navigation when href is ready
-  }
-  if (activeSession && activeSession.upiLink) {
-    // Direct intent launch for mobile browsers
-    const targetUri = activeSession.upiLink;
-    try {
-      const anchor = document.createElement('a');
-      anchor.href = targetUri;
-      anchor.target = '_top';
-      anchor.rel = 'noopener noreferrer';
-      document.body.appendChild(anchor);
-      anchor.click();
-      document.body.removeChild(anchor);
-    } catch (_) {}
+function isMobileDevice() {
+  const ua = navigator.userAgent || '';
+  const isMobileUA = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini|Mobile|mobile|CriOS/i.test(ua);
+  const isTouchDevice = ('ontouchstart' in window) || (navigator.maxTouchPoints > 1);
+  return isMobileUA || (isTouchDevice && window.innerWidth <= 820);
+}
 
-    // Fallback navigation
+function getAppSpecificUri(app, baseUpi) {
+  if (!baseUpi) return '';
+  const query = baseUpi.includes('?') ? baseUpi.split('?')[1] : baseUpi.replace(/^upi:\/\/pay\??/, '');
+  const isAndroid = /Android/i.test(navigator.userAgent);
+  const isIOS = /iPhone|iPad|iPod/i.test(navigator.userAgent);
+
+  if (app === 'gpay') {
+    if (isAndroid) {
+      return `intent://pay?${query}#Intent;scheme=upi;package=com.google.android.apps.nbu.paisa.user;end`;
+    } else if (isIOS) {
+      return `tez://upi/pay?${query}`;
+    }
+    return `upi://pay?${query}`;
+  }
+
+  if (app === 'phonepe') {
+    if (isAndroid) {
+      return `intent://pay?${query}#Intent;scheme=upi;package=com.phonepe.app;end`;
+    } else if (isIOS) {
+      return `phonepe://pay?${query}`;
+    }
+    return `phonepe://pay?${query}`;
+  }
+
+  if (app === 'paytm') {
+    if (isAndroid) {
+      return `intent://pay?${query}#Intent;scheme=upi;package=net.one97.paytm;end`;
+    } else if (isIOS) {
+      return `paytmmp://pay?${query}`;
+    }
+    return `paytmmp://pay?${query}`;
+  }
+
+  if (app === 'bhim') {
+    if (isAndroid) {
+      return `intent://pay?${query}#Intent;scheme=upi;package=in.org.npci.upiapp;end`;
+    }
+    return `upi://pay?${query}`;
+  }
+
+  return baseUpi;
+}
+
+function dispatchUpiUri(uri) {
+  if (!uri) return;
+  window.__lastDispatchedUri = uri;
+  try {
+    const a = document.createElement('a');
+    a.href = uri;
+    a.target = '_top';
+    a.rel = 'noopener';
+    document.body.appendChild(a);
+    a.click();
     setTimeout(() => {
-      window.location.href = targetUri;
-    }, 50);
-  } else {
+      if (document.body.contains(a)) document.body.removeChild(a);
+    }, 120);
+  } catch (_) {
+    window.location.href = uri;
+  }
+}
+
+window.triggerDirectUpiPay = function(e) {
+  if (e && e.preventDefault) e.preventDefault();
+  if (!activeSession || !activeSession.upiLink) {
     console.warn('Session not ready for direct UPI intent.');
+    return;
+  }
+
+  if (isMobileDevice()) {
+    // On mobile devices, launch the native UPI intent chooser directly
+    dispatchUpiUri(activeSession.upiLink);
+  } else {
+    // On desktop PC/Laptop, show clear guidance modal with instant copy & simulation
+    openDesktopModal();
+  }
+};
+
+window.launchSpecificUpi = function(app) {
+  if (!activeSession || !activeSession.upiLink) return;
+
+  if (isMobileDevice()) {
+    const targetUri = getAppSpecificUri(app, activeSession.upiLink);
+    dispatchUpiUri(targetUri);
+  } else {
+    openDesktopModal();
+  }
+};
+
+function openDesktopModal() {
+  const modal = document.getElementById('desktopUpiModal');
+  if (modal) modal.style.display = 'flex';
+}
+
+window.closeDesktopModal = function() {
+  const modal = document.getElementById('desktopUpiModal');
+  if (modal) modal.style.display = 'none';
+};
+
+window.copyUpiLink = function() {
+  if (!activeSession || !activeSession.upiLink) return;
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(activeSession.upiLink).then(() => {
+      const btnText = document.getElementById('copyUpiBtnText');
+      if (btnText) {
+        const orig = btnText.textContent;
+        btnText.textContent = '✓ Copied to Clipboard!';
+        setTimeout(() => { btnText.textContent = orig; }, 2200);
+      }
+    }).catch(() => {
+      prompt('Copy your UPI payment link:', activeSession.upiLink);
+    });
+  } else {
+    prompt('Copy your UPI payment link:', activeSession.upiLink);
+  }
+};
+
+window.simulatePaymentFromModal = function() {
+  closeDesktopModal();
+  if (typeof window.simulateTestPayment === 'function') {
+    window.simulateTestPayment();
   }
 };
 

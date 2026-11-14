@@ -430,6 +430,58 @@
                   </a>
                 </div>
 
+                <!-- 1-Tap Mobile UPI App Launchers -->
+                <div class="upi-apps-quick-row" style="display: flex; gap: 6px; flex-wrap: wrap; margin-top: 10px;">
+                  <button type="button" class="btn-dash-subtle-app" onclick="openSpecificUpiApp('gpay')" title="Launch Google Pay">
+                    <span class="app-dot gpay"></span> Google Pay
+                  </button>
+                  <button type="button" class="btn-dash-subtle-app" onclick="openSpecificUpiApp('phonepe')" title="Launch PhonePe">
+                    <span class="app-dot phonepe"></span> PhonePe
+                  </button>
+                  <button type="button" class="btn-dash-subtle-app" onclick="openSpecificUpiApp('paytm')" title="Launch Paytm">
+                    <span class="app-dot paytm"></span> Paytm
+                  </button>
+                  <button type="button" class="btn-dash-subtle-app" onclick="openSpecificUpiApp('bhim')" title="Launch BHIM or Any UPI App">
+                    <span class="app-dot bhim"></span> Any UPI App
+                  </button>
+                </div>
+
+                <!-- Desktop Guidance Modal for Dashboard -->
+                <div id="dashUpiModal" class="dash-modal-overlay" style="display: none;" onclick="if(event.target===this)closeDashUpiModal()">
+                  <div class="dash-modal-card">
+                    <div class="dash-modal-header">
+                      <div class="dash-modal-icon">
+                        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="5" y="2" width="14" height="20" rx="2" ry="2"></rect><line x1="12" y1="18" x2="12.01" y2="18"></line></svg>
+                      </div>
+                      <div style="flex: 1;">
+                        <h4 style="margin: 0; font-size: 0.95rem; font-weight: 700; color: #0F172A;">UPI Apps Run on Mobile Phones</h4>
+                        <p style="margin: 2px 0 0; font-size: 0.78rem; color: #64748B;">Google Pay, PhonePe, and Paytm cannot be opened directly from a desktop PC.</p>
+                      </div>
+                      <button type="button" class="btn-dash-modal-close" onclick="closeDashUpiModal()">✕</button>
+                    </div>
+                    <div class="dash-modal-body">
+                      <div class="modal-instruction-list">
+                        <div class="modal-inst-item">
+                          <span class="inst-num">1</span>
+                          <span><strong>Scan with your phone:</strong> Point Google Pay, PhonePe, or Paytm at this screen to pay.</span>
+                        </div>
+                        <div class="modal-inst-item">
+                          <span class="inst-num">2</span>
+                          <span><strong>Share payment link:</strong> Send the payment link to your customer via WhatsApp, SMS, or QR display.</span>
+                        </div>
+                        <div class="modal-inst-item">
+                          <span class="inst-num">3</span>
+                          <span><strong>Testing Voice Soundbox?</strong> Click the button below to simulate an instant customer payment and hear your live soundbox announcement.</span>
+                        </div>
+                      </div>
+                    </div>
+                    <div class="dash-modal-footer">
+                      <button type="button" class="btn-dash-secondary" onclick="copyPaymentLinkFromModal()">Copy Link</button>
+                      <button type="button" class="btn-dash-primary" onclick="simulateFromModal()">Simulate Customer Payment</button>
+                    </div>
+                  </div>
+                </div>
+
                 <div class="simulate-test-box">
                   <div class="sim-header">
                     <strong>Testing & Verification</strong>
