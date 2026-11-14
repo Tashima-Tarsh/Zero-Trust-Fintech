@@ -1,0 +1,30 @@
+{
+  "name": "disha-8.2-checkout",
+  "version": "8.2.0",
+  "description": "DISHA 8.2 — Zero-Fee, Fraud-Proof Sovereign UPI Checkout for Indian Merchants",
+  "main": "server.js",
+  "type": "commonjs",
+  "scripts": {
+    "start": "node server.js",
+    "test": "node test-disha.js"
+  },
+  "dependencies": {
+    "dotenv": "^16.4.5",
+    "express": "^4.19.2",
+    "pg": "^8.11.5",
+    "qrcode": "^1.5.3",
+    "ws": "^8.17.0"
+  },
+  "keywords": [
+    "upi",
+    "npci",
+    "fintech",
+    "zero-fee",
+    "pwa",
+    "web-share-target",
+    "double-entry-ledger",
+    "fraud-proof"
+  ],
+  "author": "DISHA 8.2 Architecture Team",
+  "license": "Apache-2.0"
+}

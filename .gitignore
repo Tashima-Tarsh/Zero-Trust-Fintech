@@ -19,6 +19,9 @@ build/
 .env.*.local
 screenshots/
 **/screenshots/
+*.db
+*.db-shm
+*.db-wal
 
 # OS & Editor
 .DS_Store

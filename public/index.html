@@ -1,0 +1,337 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>DISHA 8.2 — Zero-Fee, Fraud-Proof UPI Checkout</title>
+  <meta name="description" content="DISHA 8.2 Sovereign Direct UPI Payment Rail with Dynamic Mathematical Challenge, Untouchable Canvas QR, and 7-Layer Fraud Verification.">
+
+  <!-- Manifest for PWA & Android Share Target -->
+  <link rel="manifest" href="/manifest.json">
+  <meta name="theme-color" content="#6366f1">
+  <link rel="icon" type="image/png" href="/icon-192.png">
+
+  <!-- Google Fonts: Space Grotesk + Inter + JetBrains Mono -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;600;700&family=Space+Grotesk:wght@600;700;800&display=swap" rel="stylesheet">
+
+  <link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+
+  <!-- Ambient Animated Mesh Gradient -->
+  <div class="mesh-gradient-bg" aria-hidden="true"></div>
+
+  <div class="checkout-wrapper">
+
+    <!-- Top Navigation Bar -->
+    <header class="top-navbar">
+      <div class="brand-group">
+        <div class="brand-logo-icon">
+          <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2.2">
+            <polygon points="12 2 22 8.5 22 15.5 12 22 2 15.5 2 8.5 12 2"></polygon>
+            <circle cx="12" cy="12" r="3" fill="#14B8A6"></circle>
+          </svg>
+        </div>
+        <div>
+          <span class="brand-text">DISHA</span>
+          <span class="brand-version">8.2 PRO</span>
+        </div>
+      </div>
+
+      <div class="live-badge">
+        <span class="pulse-dot"></span>
+        <span>NPCI DIRECT · 0% MDR</span>
+      </div>
+    </header>
+
+    <!-- Main Two-Column Checkout Grid -->
+    <main class="checkout-grid">
+
+      <!-- LEFT: Order Summary & Mathematical Challenge Breakdown -->
+      <section class="glass-card">
+        <div class="order-summary-header">
+          <div class="section-label">Direct Settlement Checkout</div>
+          <h1 class="order-headline">Order Payment</h1>
+        </div>
+
+        <div class="line-item-row">
+          <span>Order Base Amount</span>
+          <strong id="baseAmountVal" class="font-mono">₹100.00</strong>
+        </div>
+
+        <div class="line-item-row highlight">
+          <div>
+            <div class="challenge-math-badge">
+              <span>🛡️ Anti-Replay Challenge</span>
+            </div>
+            <div style="font-size: 0.75rem; color: var(--text-muted); margin-top: 2px;">
+              Unique decimal cents foil receipt spoofing & old transaction replays
+            </div>
+          </div>
+          <span id="challengeCentsBadge" class="challenge-math-badge">+₹0.37 Cents</span>
+        </div>
+
+        <div class="total-due-card">
+          <div>
+            <div class="total-due-label">Total Payable to Merchant</div>
+            <div style="font-size: 0.75rem; color: var(--teal-600); font-weight: 600;">Zero Gateway Commission</div>
+          </div>
+          <div class="total-due-amount" id="challengeAmountVal">₹100.37</div>
+        </div>
+
+        <div class="merchant-meta-list">
+          <div class="meta-item">
+            <span class="meta-label">Order Identifier:</span>
+            <span class="meta-val" id="orderIdVal">Order_XXXXXXXXX</span>
+          </div>
+          <div class="meta-item">
+            <span class="meta-label">Transaction Reference:</span>
+            <span class="meta-val" id="txnRefVal">TXN_XXXXXXXXX</span>
+          </div>
+          <div class="meta-item">
+            <span class="meta-label">Settlement VPA Handle:</span>
+            <span class="meta-val" id="vpaAddressVal" style="color: var(--indigo-600);">disha82@okaxis</span>
+          </div>
+        </div>
+
+        <!-- Testing & Developer Simulation Helper -->
+        <div class="sim-panel">
+          <div style="font-size: 0.8rem; font-weight: 700; color: var(--text-main); margin-bottom: 6px;">
+            ⚡ Instant Verification Test
+          </div>
+          <p style="font-size: 0.75rem; color: var(--text-muted); margin-bottom: 12px;">
+            Simulate a customer payment receipt scan. Verifies 7-Layer Fraud Engine, writes Double-Entry Ledger, and sends WebSocket notification.
+          </p>
+          <button id="btnSimulatePay" class="btn-primary-gradient" onclick="simulateTestPayment()" style="margin-top: 0; padding: 12px 18px; font-size: 0.85rem;">
+            ⚡ Simulate Instant Payment (Tests WebSocket)
+          </button>
+        </div>
+      </section>
+
+      <!-- RIGHT: Untouchable Canvas QR & Touch-to-Pay -->
+      <section class="glass-card qr-card-center">
+        <div class="section-label">Scan or Tap to Pay via Any UPI App</div>
+        <h2 style="font-family: var(--font-display); font-size: 1.4rem; font-weight: 700; margin: 4px 0 12px;">
+          Untouchable QR Engine
+        </h2>
+
+        <!-- Canvas QR Container -->
+        <div class="qr-canvas-container" id="qrCanvasBox" title="Tap canvas to pay directly via UPI app">
+          <canvas id="qrCanvas" width="258" height="258"></canvas>
+          <div class="tap-to-pay-pill">👆 TAP CANVAS TO PAY</div>
+        </div>
+
+        <!-- 15-Second Refresh Countdown Progress -->
+        <div class="qr-timer-bar">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+            <circle cx="12" cy="12" r="10"></circle>
+            <polyline points="12 6 12 12 16 14"></polyline>
+          </svg>
+          <span>Dynamic Refresh in:</span>
+          <span class="timer-pill" id="timerSeconds">15s</span>
+        </div>
+
+        <div style="width: 180px; height: 4px; background: #E2E8F0; border-radius: 2px; margin-top: 6px; overflow: hidden;">
+          <div id="timerProgressBar" style="width: 100%; height: 100%; background: var(--indigo-500); transition: width 1s linear;"></div>
+        </div>
+
+        <!-- Listening for Receipt Telemetry HUD -->
+        <div class="telemetry-status-box">
+          <div class="radar-orb">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M4.9 19.1C1 15.2 1 8.8 4.9 4.9"></path>
+              <path d="M7.8 16.2c-2.3-2.3-2.3-6.1 0-8.5"></path>
+              <circle cx="12" cy="12" r="2"></circle>
+              <path d="M16.2 7.8c2.3 2.3 2.3 6.1 0 8.5"></path>
+              <path d="M19.1 4.9C23 8.8 23 15.2 19.1 19.1"></path>
+            </svg>
+          </div>
+          <div class="telemetry-text">
+            <div class="telemetry-title" id="telemetryStatusText">Listening for UPI Share...</div>
+            <div class="telemetry-sub">Web Share Target + WebSocket Live Receiver</div>
+          </div>
+        </div>
+
+        <!-- Customer 2-Step Share Guide -->
+        <div class="share-guide-card">
+          <h4>📱 How Customer Verifies:</h4>
+          <ul class="step-flow">
+            <li>
+              <span class="step-num">1</span>
+              <span>Tap <strong>"Share Receipt"</strong> in PhonePe, GPay, Paytm, or BHIM.</span>
+            </li>
+            <li>
+              <span class="step-num">2</span>
+              <span>Select <strong>"DISHA 8.2"</strong> from the Android Share Sheet.</span>
+            </li>
+          </ul>
+        </div>
+      </section>
+
+    </main>
+
+    <!-- ═══════════════════════════════════════════════════════════════════
+         TASK 12: BENTO GRID (4 High-Impact Feature Cards)
+         ═══════════════════════════════════════════════════════════════════ -->
+    <section class="bento-section">
+      <div class="bento-header">
+        <div class="section-label">Enterprise Architecture</div>
+        <h2 class="bento-title">Engineered for Sovereign Merchants</h2>
+        <p class="bento-sub">Zero aggregators. Zero commission deductions. Zero multi-day escrow holdbacks.</p>
+      </div>
+
+      <div class="bento-grid">
+
+        <!-- CARD 1: The Gateway Tax -->
+        <div class="bento-card">
+          <div>
+            <div class="section-label" style="color: var(--coral-500);">MDR Commission Elimination</div>
+            <h3 style="font-family: var(--font-display); font-size: 1.4rem; font-weight: 700; margin-top: 4px;">
+              The Gateway Tax
+            </h3>
+            <p style="font-size: 0.85rem; color: var(--text-muted); margin-top: 6px;">
+              Legacy payment gateways siphon 2% to 2.5% on every transaction. DISHA operates directly on NPCI interbank rails for ₹0.00 fee.
+            </p>
+          </div>
+
+          <div class="counter-box">
+            <span class="counter-strike">2.36%</span>
+            <span class="counter-arrow">→</span>
+            <span class="counter-zero">0.00%</span>
+          </div>
+
+          <div style="font-size: 0.8rem; font-family: var(--font-mono); color: var(--teal-600); font-weight: 600;">
+            ✓ 100% Customer Revenue Kept in Merchant Bank
+          </div>
+        </div>
+
+        <!-- CARD 2: Receipt as Proof Motion -->
+        <div class="bento-card">
+          <div>
+            <div class="section-label" style="color: var(--indigo-500);">W3C Web Share Target</div>
+            <h3 style="font-family: var(--font-display); font-size: 1.4rem; font-weight: 700; margin-top: 4px;">
+              Receipt as Proof
+            </h3>
+            <p style="font-size: 0.85rem; color: var(--text-muted); margin-top: 6px;">
+              The customer's bank-issued receipt serves as cryptographic attestation with immutable 12-digit NPCI Bank UTR.
+            </p>
+          </div>
+
+          <div class="receipt-motion-stage">
+            <div class="node-box">
+              <div class="node-icon-circle">📱</div>
+              <span>UPI App</span>
+            </div>
+
+            <div class="connecting-laser">
+              <div class="laser-packet"></div>
+            </div>
+
+            <div class="node-box">
+              <div class="node-icon-circle" style="color: var(--indigo-600);">⚡</div>
+              <span>DISHA 8.2</span>
+            </div>
+
+            <div class="node-box">
+              <div class="node-icon-circle">🏦</div>
+              <span>Your Bank</span>
+            </div>
+          </div>
+
+          <div style="font-size: 0.8rem; font-family: var(--font-mono); color: var(--indigo-600); font-weight: 600;">
+            ✓ Sub-second Android Native Intent Attestation
+          </div>
+        </div>
+
+        <!-- CARD 3: Savings Calculator -->
+        <div class="bento-card">
+          <div>
+            <div class="section-label" style="color: var(--teal-600);">Interactive Economics</div>
+            <h3 style="font-family: var(--font-display); font-size: 1.4rem; font-weight: 700; margin-top: 4px;">
+              Savings Calculator
+            </h3>
+            <p style="font-size: 0.85rem; color: var(--text-muted); margin-top: 6px;">
+              Move the slider to calculate the exact commission retained by switching from legacy aggregators:
+            </p>
+          </div>
+
+          <div class="calc-slider-box">
+            <div style="display: flex; justify-content: space-between; margin-bottom: 8px;">
+              <span style="font-size: 0.8rem; color: var(--text-muted);">Monthly Turnover:</span>
+              <strong id="calcTurnoverVal" style="font-family: var(--font-mono); color: var(--indigo-600);">₹5,00,000/mo</strong>
+            </div>
+            <input type="range" id="turnoverSlider" class="calc-slider" min="50000" max="5000000" step="25000" value="500000">
+          </div>
+
+          <div class="calc-metrics-row">
+            <div class="calc-metric-card">
+              <span style="font-size: 0.75rem; color: var(--text-muted);">Monthly Kept:</span>
+              <div class="calc-val-big" id="calcMonthlySavedVal">₹11,800</div>
+            </div>
+            <div class="calc-metric-card">
+              <span style="font-size: 0.75rem; color: var(--text-muted);">Annual Kept:</span>
+              <div class="calc-val-big" id="calcAnnualSavedVal">₹1,41,600</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- CARD 4: 7-Layer Fraud Proof -->
+        <div class="bento-card">
+          <div>
+            <div class="section-label" style="color: var(--purple-500);">Zero-Trust Security Engine</div>
+            <h3 style="font-family: var(--font-display); font-size: 1.4rem; font-weight: 700; margin-top: 4px;">
+              7-Layer Fraud Proof
+            </h3>
+            <p style="font-size: 0.85rem; color: var(--text-muted); margin-top: 6px;">
+              Every incoming transaction passes 7 sequential mathematical, cryptographic, and accounting checks:
+            </p>
+          </div>
+
+          <div class="fraud-layers-row">
+            <div class="fraud-node-col">
+              <div class="fraud-dot active">1</div>
+              <span class="fraud-dot-label">Session</span>
+            </div>
+            <div class="fraud-node-col">
+              <div class="fraud-dot active">2</div>
+              <span class="fraud-dot-label">Amount</span>
+            </div>
+            <div class="fraud-node-col">
+              <div class="fraud-dot active">3</div>
+              <span class="fraud-dot-label">UTR</span>
+            </div>
+            <div class="fraud-node-col">
+              <div class="fraud-dot active">4</div>
+              <span class="fraud-dot-label">Freshness</span>
+            </div>
+            <div class="fraud-node-col">
+              <div class="fraud-dot active">5</div>
+              <span class="fraud-dot-label">Note</span>
+            </div>
+            <div class="fraud-node-col">
+              <div class="fraud-dot active">6</div>
+              <span class="fraud-dot-label">Rate</span>
+            </div>
+            <div class="fraud-node-col">
+              <div class="fraud-dot active">7</div>
+              <span class="fraud-dot-label">Ledger</span>
+            </div>
+          </div>
+
+          <div style="font-size: 0.8rem; font-family: var(--font-mono); color: var(--teal-600); font-weight: 600;">
+            ✓ Double-Entry Balance Assertion: Sum(Debits) == Sum(Credits)
+          </div>
+        </div>
+
+      </div>
+    </section>
+
+  </div>
+
+  <!-- Scripts -->
+  <script src="/qr.js"></script>
+  <script src="/app.js"></script>
+</body>
+</html>

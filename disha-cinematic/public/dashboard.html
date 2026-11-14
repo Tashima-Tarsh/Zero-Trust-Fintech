@@ -1,0 +1,648 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Merchant Dashboard — DISHA Sovereign Merchant Console</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/styles.css">
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><polygon points='50,5 90,25 90,75 50,95 10,75 10,25' fill='none' stroke='%2310b981' stroke-width='8'/><circle cx='50' cy='50' r='14' fill='%2310b981'/></svg>">
+  <script src="/vendor/qrcode.min.js"></script>
+</head>
+<body class="dashboard-body">
+
+  <div class="dash-shell">
+    <!-- MOBILE OVERLAY BACKDROP -->
+    <div id="sidebarBackdrop" class="sidebar-backdrop" onclick="toggleMobileSidebar(false)"></div>
+
+    <!-- SIDEBAR -->
+    <aside id="dashSidebar" class="dash-sidebar">
+      <div class="sidebar-brand">
+        <a href="/" class="sidebar-logo-link">
+          <div class="brand-hexagon">
+            <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2">
+              <polygon points="12 2 22 8.5 22 15.5 12 22 2 15.5 2 8.5 12 2"></polygon>
+              <circle cx="12" cy="12" r="3" fill="#10b981"></circle>
+            </svg>
+          </div>
+          <div class="sidebar-title-group">
+            <span class="brand-title">DISHA</span>
+            <span class="brand-sub">MERCHANT CONSOLE</span>
+          </div>
+        </a>
+      </div>
+
+      <!-- Business Profile Pill -->
+      <div class="sidebar-merchant-info">
+        <div class="merchant-avatar">🏪</div>
+        <div class="merchant-meta">
+          <strong id="sideMerchantName">Loading...</strong>
+          <span id="sideMerchantVpa" class="font-mono">...</span>
+        </div>
+      </div>
+
+      <!-- Navigation Links -->
+      <nav class="sidebar-nav">
+        <a href="#overview" class="side-nav-item active" data-workspace="overview" onclick="switchWorkspace('overview')">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"></rect><rect x="14" y="3" width="7" height="7"></rect><rect x="14" y="14" width="7" height="7"></rect><rect x="3" y="14" width="7" height="7"></rect></svg>
+          <span>Overview</span>
+        </a>
+        <a href="#payments" class="side-nav-item" data-workspace="payments" onclick="switchWorkspace('payments')">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="1" y="4" width="22" height="16" rx="2" ry="2"></rect><line x1="1" y1="10" x2="23" y2="10"></line></svg>
+          <span>Payments</span>
+        </a>
+        <a href="#create-payment" class="side-nav-item" data-workspace="create-payment" onclick="switchWorkspace('create-payment')">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+          <span>Create Payment</span>
+        </a>
+        <a href="#upi-ids" class="side-nav-item" data-workspace="upi-ids" onclick="switchWorkspace('upi-ids')">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 21h18M3 10h18M5 6l7-3 7 3M4 10v11M20 10v11M8 14v4M12 14v4M16 14v4"></path></svg>
+          <span>UPI IDs</span>
+        </a>
+        <a href="#reports" class="side-nav-item" data-workspace="reports" onclick="switchWorkspace('reports')">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
+          <span>Reports & Taxes</span>
+        </a>
+        <a href="#soundbox" class="side-nav-item" data-workspace="soundbox" onclick="switchWorkspace('soundbox')">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon><path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"></path></svg>
+          <span>Voice Soundbox</span>
+        </a>
+        <a href="#notifications" class="side-nav-item" data-workspace="notifications" onclick="switchWorkspace('notifications')">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path><path d="M13.73 21a2 2 0 0 1-3.46 0"></path></svg>
+          <span>Notifications</span>
+          <span id="sideNotifBadge" class="nav-badge" style="display: none;">0</span>
+        </a>
+        <a href="#settings" class="side-nav-item" data-workspace="settings" onclick="switchWorkspace('settings')">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
+          <span>Settings</span>
+        </a>
+      </nav>
+
+      <!-- Sidebar Bottom: Account & Logout -->
+      <div class="sidebar-footer">
+        <div class="user-strip">
+          <span id="sideUserEmail" class="user-email-text">user@store.in</span>
+          <button type="button" class="btn-logout" onclick="handleLogout()" title="Log out">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path><polyline points="16 17 21 12 16 7"></polyline><line x1="21" y1="12" x2="9" y2="12"></line></svg>
+            <span>Logout</span>
+          </button>
+        </div>
+      </div>
+    </aside>
+
+    <!-- MAIN SHELL CONTAINER -->
+    <div class="dash-main">
+      <!-- HEADER -->
+      <header class="dash-header">
+        <div class="header-left">
+          <button type="button" class="btn-sidebar-toggle" onclick="toggleMobileSidebar(true)" aria-label="Toggle navigation">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="3" y1="12" x2="21" y2="12"></line><line x1="3" y1="6" x2="21" y2="6"></line><line x1="3" y1="18" x2="21" y2="18"></line></svg>
+          </button>
+          <div class="header-breadcrumb">
+            <span class="bc-root">Workspace</span>
+            <span class="bc-sep">/</span>
+            <span class="bc-active" id="headerWorkspaceTitle">Overview</span>
+          </div>
+        </div>
+
+        <div class="header-right">
+          <!-- Date Filter -->
+          <div class="header-date-filter">
+            <select id="dateFilterSelect" class="date-select" onchange="onDateFilterChange()">
+              <option value="today">Today</option>
+              <option value="7d">Last 7 Days</option>
+              <option value="30d" selected>Last 30 Days</option>
+              <option value="all">All Time</option>
+            </select>
+          </div>
+
+          <!-- Soundbox status indicator -->
+          <div class="header-soundbox-pill" title="Hardware soundbox readiness">
+            <span class="status-indicator-green"></span>
+            <span class="soundbox-pill-text" id="headerSoundboxText">Soundbox Active</span>
+          </div>
+
+          <!-- Notification Bell -->
+          <div class="header-notif-wrapper">
+            <button type="button" class="btn-notif-bell" onclick="toggleNotifPopup()" aria-label="Notifications">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path><path d="M13.73 21a2 2 0 0 1-3.46 0"></path></svg>
+              <span id="headerNotifBadge" class="bell-badge" style="display: none;">0</span>
+            </button>
+
+            <!-- Popup -->
+            <div id="notifPopup" class="notif-dropdown" style="display: none;">
+              <div class="notif-drop-header">
+                <strong>Notifications</strong>
+                <button type="button" class="btn-mark-all-read" onclick="markAllNotificationsRead()">Mark read</button>
+              </div>
+              <div id="notifDropList" class="notif-drop-list">
+                <div class="empty-notif-drop">No new notifications</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Primary Quick Action -->
+          <button type="button" class="btn-header-cta" onclick="switchWorkspace('create-payment')">
+            <span>+ Create Payment</span>
+          </button>
+        </div>
+      </header>
+
+      <!-- DYNAMIC WORKSPACES CONTENT -->
+      <main class="dash-content">
+        
+        <!-- WORKSPACE 1: OVERVIEW -->
+        <section id="ws-overview" class="workspace-section active">
+          <!-- Metrics Row -->
+          <div class="metrics-grid">
+            <div class="dash-metric-card">
+              <div class="m-card-top">
+                <span class="m-card-title">Total Collected</span>
+                <span class="m-card-icon">💰</span>
+              </div>
+              <div class="m-card-val" id="metricTotalVolume">₹0.00</div>
+              <div class="m-card-foot text-success">
+                <span>Direct bank credit</span>
+              </div>
+            </div>
+
+            <div class="dash-metric-card">
+              <div class="m-card-top">
+                <span class="m-card-title">Completed Orders</span>
+                <span class="m-card-icon">✅</span>
+              </div>
+              <div class="m-card-val" id="metricCompletedOrders">0</div>
+              <div class="m-card-foot">
+                <span id="metricSuccessRate">100% success rate</span>
+              </div>
+            </div>
+
+            <div class="dash-metric-card">
+              <div class="m-card-top">
+                <span class="m-card-title">Gateway Fees Saved</span>
+                <span class="m-card-icon">🛡️</span>
+              </div>
+              <div class="m-card-val text-success" id="metricFeesSaved">₹0.00</div>
+              <div class="m-card-foot">
+                <span>vs traditional 2.36% gateway tax</span>
+              </div>
+            </div>
+
+            <div class="dash-metric-card">
+              <div class="m-card-top">
+                <span class="m-card-title">Average Order Ticket</span>
+                <span class="m-card-icon">📈</span>
+              </div>
+              <div class="m-card-val" id="metricAvgTicket">₹0.00</div>
+              <div class="m-card-foot">
+                <span>Per transaction average</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Chart & Settlement Row -->
+          <div class="overview-split-row">
+            <!-- Left: Volume Trend Chart -->
+            <div class="dash-panel chart-panel">
+              <div class="panel-header">
+                <h3>Daily Collection Trend</h3>
+                <span class="panel-badge">Real-Time Ledger</span>
+              </div>
+              <div class="chart-container" id="chartContainer">
+                <div class="empty-chart-state" id="emptyChart">
+                  <span>No completed collections in this date range yet.</span>
+                </div>
+                <!-- Dynamic SVG Bars rendered by JS -->
+                <div id="chartBars" class="chart-bars-wrap"></div>
+              </div>
+            </div>
+
+            <!-- Right: Active Settlement UPIs -->
+            <div class="dash-panel settlement-panel">
+              <div class="panel-header">
+                <h3>Settlement Handles</h3>
+                <a href="#upi-ids" onclick="switchWorkspace('upi-ids')" class="panel-link">Manage →</a>
+              </div>
+              <div id="overviewVpaList" class="overview-vpa-list">
+                <!-- Injected via JS -->
+              </div>
+              <div class="quick-create-box">
+                <h4>Generate Instant Payment</h4>
+                <p>Accept payments from customers in front of you.</p>
+                <button type="button" class="btn-dash-primary" onclick="switchWorkspace('create-payment')">
+                  <span>Create Payment Link & QR</span>
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Recent Transactions -->
+          <div class="dash-panel">
+            <div class="panel-header">
+              <h3>Recent Transactions</h3>
+              <a href="#payments" onclick="switchWorkspace('payments')" class="panel-link">View All Payments →</a>
+            </div>
+            <div class="table-responsive">
+              <table class="dash-table">
+                <thead>
+                  <tr>
+                    <th>Reference</th>
+                    <th>Date & Time</th>
+                    <th>Amount</th>
+                    <th>Settlement UPI</th>
+                    <th>Bank UTR</th>
+                    <th>Status</th>
+                    <th>Action</th>
+                  </tr>
+                </thead>
+                <tbody id="overviewRecentTable">
+                  <!-- Populated by JS -->
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </section>
+
+        <!-- WORKSPACE 2: PAYMENTS -->
+        <section id="ws-payments" class="workspace-section">
+          <div class="dash-panel">
+            <div class="payments-toolbar">
+              <div class="search-box">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+                <input type="text" id="paymentsSearchInput" placeholder="Search by Order ID, UTR, Amount..." oninput="onPaymentsSearch()">
+              </div>
+
+              <div class="filter-pills">
+                <button type="button" class="pill active" data-status="ALL" onclick="filterPaymentsByStatus('ALL')">All</button>
+                <button type="button" class="pill" data-status="COMPLETED" onclick="filterPaymentsByStatus('COMPLETED')">Completed</button>
+                <button type="button" class="pill" data-status="PENDING" onclick="filterPaymentsByStatus('PENDING')">Pending</button>
+              </div>
+
+              <div class="toolbar-actions">
+                <button type="button" class="btn-dash-export" onclick="exportPaymentsCsv()">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+                  <span>Export CSV</span>
+                </button>
+              </div>
+            </div>
+
+            <div class="table-responsive">
+              <table class="dash-table">
+                <thead>
+                  <tr>
+                    <th>Order Reference</th>
+                    <th>Timestamp</th>
+                    <th>Amount (INR)</th>
+                    <th>Settlement VPA</th>
+                    <th>Bank UTR</th>
+                    <th>Status</th>
+                    <th>Details</th>
+                  </tr>
+                </thead>
+                <tbody id="paymentsTableBody">
+                  <!-- Populated by JS -->
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </section>
+
+        <!-- WORKSPACE 3: CREATE PAYMENT -->
+        <section id="ws-create-payment" class="workspace-section">
+          <div class="create-payment-grid">
+            <!-- Form Card -->
+            <div class="dash-panel">
+              <div class="panel-header">
+                <h3>Generate Payment Link & QR</h3>
+                <span class="panel-badge">Zero Fees</span>
+              </div>
+              <form id="createPaymentForm" class="payment-form">
+                <div class="form-group">
+                  <label for="orderAmount" class="form-label">Payment Amount (INR) <span class="required">*</span></label>
+                  <div class="currency-input-wrap">
+                    <span class="currency-symbol">₹</span>
+                    <input type="number" step="0.01" min="1" id="orderAmount" class="form-input currency-input" placeholder="e.g. 1000.00" required autofocus>
+                  </div>
+                </div>
+
+                <div class="form-group">
+                  <label for="orderDesc" class="form-label">Order Note / Description</label>
+                  <input type="text" id="orderDesc" class="form-input" placeholder="e.g. Grocery items, Invoice #401, Table 4">
+                </div>
+
+                <div class="form-group">
+                  <label for="orderVpaSelect" class="form-label">Settlement UPI Handle</label>
+                  <select id="orderVpaSelect" class="form-input form-select">
+                    <!-- Populated dynamically with merchant's VPAs -->
+                  </select>
+                </div>
+
+                <button type="submit" id="btnGeneratePayment" class="btn-dash-primary w-full">
+                  <span>Generate Dynamic QR & Payment Link</span>
+                </button>
+              </form>
+            </div>
+
+            <!-- Result Card -->
+            <div class="dash-panel result-panel">
+              <div class="panel-header">
+                <h3>Customer QR Presentation</h3>
+                <span id="qrStatusBadge" class="status-pill-idle">Awaiting generation</span>
+              </div>
+
+              <div id="qrIdleState" class="qr-idle-state">
+                <div class="qr-placeholder-box">
+                  <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="3" width="7" height="7"></rect><rect x="14" y="3" width="7" height="7"></rect><rect x="14" y="14" width="7" height="7"></rect><rect x="3" y="14" width="7" height="7"></rect></svg>
+                </div>
+                <p>Enter an amount on the left and click Generate to present a dynamic UPI QR code.</p>
+              </div>
+
+              <div id="qrActiveState" class="qr-active-state" style="display: none;">
+                <div class="qr-container-card">
+                  <div class="qr-merchant-tag" id="qrShopTitle">Shop Name</div>
+                  <div id="qrcode" class="qrcode-wrapper"></div>
+                  <div class="qr-amount-tag" id="qrAmountTag">₹0.00</div>
+                  <div class="qr-apps-tag">Supports GPay · PhonePe · Paytm · BHIM · Any Bank UPI</div>
+                </div>
+
+                <div class="payment-link-bar">
+                  <input type="text" id="generatedLinkInput" class="form-input font-mono" readonly>
+                  <button type="button" class="btn-dash-secondary" onclick="copyPaymentLink()">
+                    <span>Copy Link</span>
+                  </button>
+                </div>
+
+                <div class="simulate-test-box">
+                  <div class="sim-header">
+                    <strong>Testing & Verification</strong>
+                    <span>Simulate customer scan & payment:</span>
+                  </div>
+                  <button type="button" id="btnSimulatePayment" class="btn-simulate" onclick="simulatePaymentForActiveOrder()">
+                    <span>⚡ Simulate Customer Payment (Tests Soundbox)</span>
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- WORKSPACE 4: UPI IDS -->
+        <section id="ws-upi-ids" class="workspace-section">
+          <div class="dash-panel">
+            <div class="panel-header">
+              <div>
+                <h3>Configured UPI Settlement Handles</h3>
+                <p class="panel-subtitle">Manage the bank accounts where your customer collections land directly.</p>
+              </div>
+              <button type="button" class="btn-dash-primary" onclick="openAddVpaModal()">
+                <span>+ Add New UPI ID</span>
+              </button>
+            </div>
+
+            <div class="table-responsive">
+              <table class="dash-table">
+                <thead>
+                  <tr>
+                    <th>UPI Handle (VPA)</th>
+                    <th>Linked Bank</th>
+                    <th>Status</th>
+                    <th>Default</th>
+                    <th>Actions</th>
+                  </tr>
+                </thead>
+                <tbody id="vpaTableBody">
+                  <!-- Populated by JS -->
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </section>
+
+        <!-- WORKSPACE 5: REPORTS & TAXES -->
+        <section id="ws-reports" class="workspace-section">
+          <div class="dash-panel">
+            <div class="panel-header">
+              <div>
+                <h3>Business Settlement & Tax Reports</h3>
+                <p class="panel-subtitle">Clean, accountant-ready financial ledgers and GST summaries.</p>
+              </div>
+              <button type="button" class="btn-dash-export" onclick="exportPaymentsCsv()">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+                <span>Download Full CSV</span>
+              </button>
+            </div>
+
+            <!-- Tax Summary Cards -->
+            <div class="reports-summary-grid">
+              <div class="report-box">
+                <span class="report-box-title">Total Taxable Turnover</span>
+                <strong class="report-box-val" id="repTaxableTurnover">₹0.00</strong>
+                <span class="report-box-sub">Direct collections</span>
+              </div>
+              <div class="report-box">
+                <span class="report-box-title">Calculated CGST (9%)</span>
+                <strong class="report-box-val" id="repCgst">₹0.00</strong>
+                <span class="report-box-sub">Intra-state central tax</span>
+              </div>
+              <div class="report-box">
+                <span class="report-box-title">Calculated SGST (9%)</span>
+                <strong class="report-box-val" id="repSgst">₹0.00</strong>
+                <span class="report-box-sub">Intra-state state tax</span>
+              </div>
+              <div class="report-box">
+                <span class="report-box-title">Gateway Commission Avoided</span>
+                <strong class="report-box-val text-success" id="repCommissionAvoided">₹0.00</strong>
+                <span class="report-box-sub">100% saved in your account</span>
+              </div>
+            </div>
+
+            <div class="compliance-note-box">
+              <h4>📋 Compliance Note</h4>
+              <p>Every transaction recorded in this workspace contains an immutable 12-digit NPCI Bank UTR and timestamp. You can supply this CSV report directly to your Chartered Accountant or GST tax consultant for filing GSTR-1 and GSTR-3B with zero manual reconciliation errors.</p>
+            </div>
+          </div>
+        </section>
+
+        <!-- WORKSPACE 6: VOICE SOUNDBOX -->
+        <section id="ws-soundbox" class="workspace-section">
+          <div class="dash-panel">
+            <div class="panel-header">
+              <div>
+                <h3>Browser-Native Counter Soundbox</h3>
+                <p class="panel-subtitle">Audible voice confirmation on this device whenever payment is received.</p>
+              </div>
+              <div class="soundbox-status-pill">
+                <span class="status-indicator-green"></span>
+                <span id="sbReadinessText">Audio Ready</span>
+              </div>
+            </div>
+
+            <div class="soundbox-settings-layout">
+              <div class="sb-card">
+                <div class="soundbox-toggle-row">
+                  <div>
+                    <strong>Voice Announcements Active</strong>
+                    <p>Speaks out customer payment amounts out loud.</p>
+                  </div>
+                  <label class="switch">
+                    <input type="checkbox" id="sbMasterSwitch" checked onchange="onSoundboxSettingChange()">
+                    <span class="slider round"></span>
+                  </label>
+                </div>
+
+                <div class="form-group" style="margin-top: 24px;">
+                  <label for="sbLangSelect" class="form-label">Announcement Language</label>
+                  <select id="sbLangSelect" class="form-input form-select" onchange="onSoundboxSettingChange()">
+                    <option value="en">English ("Payment of ₹500 received")</option>
+                    <option value="hi">हिंदी / Hindi ("५०० रुपये प्राप्त हुए")</option>
+                    <option value="mr">मराठी / Marathi ("५०० रुपये मिळाले")</option>
+                  </select>
+                </div>
+
+                <div class="form-group" style="margin-top: 18px;">
+                  <label for="sbVolumeSlider" class="form-label">Speaker Volume (<span id="sbVolPercent">80%</span>)</label>
+                  <input type="range" id="sbVolumeSlider" min="10" max="100" value="80" class="vol-slider" oninput="onVolumeSliderChange()">
+                </div>
+
+                <div class="test-sound-section">
+                  <button type="button" class="btn-dash-primary" onclick="testSoundboxAnnouncement()">
+                    <span>🔊 Play Test Announcement</span>
+                  </button>
+                  <span class="test-sound-disclaimer">Note: Test announcements are purely audio simulations and do not create transactions in your ledger.</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- WORKSPACE 7: NOTIFICATIONS -->
+        <section id="ws-notifications" class="workspace-section">
+          <div class="dash-panel">
+            <div class="panel-header">
+              <div>
+                <h3>Business Alerts & Activity</h3>
+                <p class="panel-subtitle">Real-time alerts for customer payments, settings changes, and settlement updates.</p>
+              </div>
+              <button type="button" class="btn-dash-secondary" onclick="markAllNotificationsRead()">
+                <span>Mark All as Read</span>
+              </button>
+            </div>
+
+            <div id="fullNotifList" class="full-notif-list">
+              <!-- Populated by JS -->
+            </div>
+          </div>
+        </section>
+
+        <!-- WORKSPACE 8: SETTINGS -->
+        <section id="ws-settings" class="workspace-section">
+          <div class="settings-grid">
+            <!-- Profile Card -->
+            <div class="dash-panel">
+              <div class="panel-header">
+                <h3>Business Profile</h3>
+                <span class="panel-badge">Visible to Customers</span>
+              </div>
+              <form id="profileForm" class="settings-form">
+                <div class="form-group">
+                  <label for="setBizName" class="form-label">Business Display Name</label>
+                  <input type="text" id="setBizName" class="form-input" required>
+                </div>
+
+                <div class="form-group">
+                  <label for="setContactPhone" class="form-label">Contact Phone Number</label>
+                  <input type="tel" id="setContactPhone" class="form-input" required>
+                </div>
+
+                <div class="form-group">
+                  <label for="setCity" class="form-label">City / Region</label>
+                  <input type="text" id="setCity" class="form-input" required>
+                </div>
+
+                <button type="submit" class="btn-dash-primary">
+                  <span>Save Profile Changes</span>
+                </button>
+              </form>
+            </div>
+
+            <!-- Password Card -->
+            <div class="dash-panel">
+              <div class="panel-header">
+                <h3>Account Security</h3>
+                <span class="panel-badge">Encrypted</span>
+              </div>
+              <form id="passwordForm" class="settings-form">
+                <div class="form-group">
+                  <label for="currPassword" class="form-label">Current Password</label>
+                  <input type="password" id="currPassword" class="form-input" required>
+                </div>
+
+                <div class="form-group">
+                  <label for="newPassword" class="form-label">New Password (min 8 chars)</label>
+                  <input type="password" id="newPassword" class="form-input" minlength="8" required>
+                </div>
+
+                <div class="form-group">
+                  <label for="confirmNewPassword" class="form-label">Confirm New Password</label>
+                  <input type="password" id="confirmNewPassword" class="form-input" minlength="8" required>
+                </div>
+
+                <button type="submit" class="btn-dash-secondary">
+                  <span>Update Password</span>
+                </button>
+              </form>
+            </div>
+          </div>
+        </section>
+
+      </main>
+    </div>
+  </div>
+
+  <!-- TRANSACTION DETAILS DRAWER -->
+  <div id="txDrawerBackdrop" class="drawer-backdrop" onclick="closeTxDrawer()"></div>
+  <aside id="txDrawer" class="tx-details-drawer">
+    <div class="drawer-header">
+      <h3>Transaction Details</h3>
+      <button type="button" class="btn-close-drawer" onclick="closeTxDrawer()" aria-label="Close">✕</button>
+    </div>
+    <div class="drawer-body" id="txDrawerBody">
+      <!-- Populated dynamically -->
+    </div>
+  </aside>
+
+  <!-- ADD VPA MODAL -->
+  <div id="addVpaModal" class="modal-backdrop" style="display: none;">
+    <div class="modal-dialog">
+      <div class="modal-header">
+        <h3>Add New UPI Settlement Handle</h3>
+        <button type="button" class="btn-close-modal" onclick="closeAddVpaModal()">✕</button>
+      </div>
+      <form id="addVpaForm" class="modal-body">
+        <div class="form-group">
+          <label for="newVpaAddress" class="form-label">UPI ID (VPA) <span class="required">*</span></label>
+          <input type="text" id="newVpaAddress" class="form-input font-mono" placeholder="e.g. store.pune@ybl" required>
+          <div id="newVpaValidation" class="vpa-feedback-box empty">
+            <span id="newVpaIcon">ℹ️</span>
+            <span id="newVpaText">Format: handle@bank</span>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label for="newVpaBank" class="form-label">Bank Name</label>
+          <input type="text" id="newVpaBank" class="form-input" placeholder="e.g. YES Bank, SBI, HDFC">
+        </div>
+
+        <div class="modal-actions">
+          <button type="button" class="btn-dash-secondary" onclick="closeAddVpaModal()">Cancel</button>
+          <button type="submit" id="btnSaveNewVpa" class="btn-dash-primary" disabled>Save UPI ID</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <script src="/dashboard.js"></script>
+</body>
+</html>

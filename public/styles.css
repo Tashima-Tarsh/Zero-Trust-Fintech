@@ -1,0 +1,762 @@
+/* ═══════════════════════════════════════════════════════════════════
+   DISHA 8.2 — Sovereign Fintech Design System
+   Palette: Mesh Gradient #F8FAFC, Indigo #6366F1, Purple #A855F7, Teal #14B8A6, Coral #F43F5E
+   Typography: Space Grotesk (Headlines), Inter (Body), JetBrains Mono (Data/UTR)
+   ═══════════════════════════════════════════════════════════════════ */
+
+:root {
+  --bg-primary: #F8FAFC;
+  --text-main: #0F172A;
+  --text-muted: #64748B;
+  --text-subtle: #94A3B8;
+  
+  --indigo-500: #6366F1;
+  --indigo-600: #4F46E5;
+  --purple-500: #A855F7;
+  --teal-500: #14B8A6;
+  --teal-600: #0D9488;
+  --coral-500: #F43F5E;
+  
+  --card-bg: rgba(255, 255, 255, 0.82);
+  --card-border: rgba(255, 255, 255, 0.65);
+  --card-shadow: 0 20px 40px -15px rgba(99, 102, 241, 0.12);
+  
+  --font-display: 'Space Grotesk', -apple-system, BlinkMacSystemFont, sans-serif;
+  --font-body: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+  --font-mono: 'JetBrains Mono', monospace;
+}
+
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: var(--font-body);
+  background-color: var(--bg-primary);
+  color: var(--text-main);
+  min-height: 100vh;
+  position: relative;
+  overflow-x: hidden;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Animated Mesh Gradient Background */
+.mesh-gradient-bg {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: -1;
+  background: 
+    radial-gradient(circle at 15% 20%, rgba(224, 231, 255, 0.7) 0%, transparent 45%),
+    radial-gradient(circle at 85% 30%, rgba(204, 251, 241, 0.7) 0%, transparent 50%),
+    radial-gradient(circle at 50% 85%, rgba(243, 232, 255, 0.6) 0%, transparent 55%),
+    #F8FAFC;
+  filter: blur(40px);
+  animation: meshDrift 18s ease-in-out infinite alternate;
+}
+
+@keyframes meshDrift {
+  0% { transform: scale(1) translateY(0); }
+  100% { transform: scale(1.05) translateY(-20px); }
+}
+
+/* Container */
+.checkout-wrapper {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 24px 20px 80px;
+}
+
+/* Top Navigation Bar */
+.top-navbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 24px;
+  background: var(--card-bg);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid var(--card-border);
+  border-radius: 20px;
+  box-shadow: 0 10px 25px -10px rgba(0, 0, 0, 0.05);
+  margin-bottom: 36px;
+}
+
+.brand-group {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.brand-logo-icon {
+  width: 36px;
+  height: 36px;
+  background: linear-gradient(135deg, var(--indigo-500), var(--purple-500));
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #FFFFFF;
+  box-shadow: 0 4px 12px rgba(99, 102, 241, 0.3);
+}
+
+.brand-text {
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-size: 1.25rem;
+  letter-spacing: -0.02em;
+  color: var(--text-main);
+}
+
+.brand-version {
+  font-family: var(--font-mono);
+  font-size: 0.7rem;
+  font-weight: 700;
+  background: rgba(99, 102, 241, 0.1);
+  color: var(--indigo-500);
+  padding: 3px 8px;
+  border-radius: 6px;
+}
+
+.live-badge {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--teal-600);
+  background: rgba(20, 184, 166, 0.12);
+  border: 1px solid rgba(20, 184, 166, 0.25);
+  padding: 6px 14px;
+  border-radius: 999px;
+}
+
+.pulse-dot {
+  width: 8px;
+  height: 8px;
+  background-color: var(--teal-500);
+  border-radius: 50%;
+  box-shadow: 0 0 10px var(--teal-500);
+  animation: pulseAnimation 1.6s infinite;
+}
+
+@keyframes pulseAnimation {
+  0%, 100% { transform: scale(1); opacity: 1; }
+  50% { transform: scale(1.4); opacity: 0.5; }
+}
+
+/* Two-Column Checkout Layout */
+.checkout-grid {
+  display: grid;
+  grid-template-columns: 1fr 1.15fr;
+  gap: 32px;
+  align-items: start;
+  margin-bottom: 60px;
+}
+
+/* Glassmorphic Cards */
+.glass-card {
+  background: var(--card-bg);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  border: 1px solid var(--card-border);
+  border-radius: 28px;
+  padding: 32px;
+  box-shadow: var(--card-shadow);
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+/* Left: Order Summary */
+.order-summary-header {
+  border-bottom: 1px solid rgba(0, 0, 0, 0.06);
+  padding-bottom: 20px;
+  margin-bottom: 24px;
+}
+
+.section-label {
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--indigo-500);
+  font-weight: 700;
+  margin-bottom: 6px;
+}
+
+.order-headline {
+  font-family: var(--font-display);
+  font-size: 1.65rem;
+  font-weight: 700;
+  letter-spacing: -0.03em;
+  color: var(--text-main);
+}
+
+.line-item-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 0;
+  font-size: 0.95rem;
+  color: var(--text-muted);
+}
+
+.line-item-row.highlight {
+  background: rgba(99, 102, 241, 0.04);
+  padding: 12px 14px;
+  border-radius: 12px;
+  border: 1px dashed rgba(99, 102, 241, 0.25);
+  margin: 6px 0 16px;
+}
+
+.challenge-math-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  color: var(--indigo-600);
+  font-weight: 600;
+}
+
+.total-due-card {
+  background: linear-gradient(135deg, rgba(99, 102, 241, 0.08), rgba(168, 85, 247, 0.08));
+  border: 1px solid rgba(99, 102, 241, 0.2);
+  border-radius: 20px;
+  padding: 20px 24px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 16px;
+}
+
+.total-due-label {
+  font-family: var(--font-body);
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--text-muted);
+}
+
+.total-due-amount {
+  font-family: var(--font-display);
+  font-size: 2.25rem;
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  color: var(--indigo-600);
+}
+
+.merchant-meta-list {
+  margin-top: 24px;
+  padding-top: 20px;
+  border-top: 1px solid rgba(0, 0, 0, 0.06);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.meta-item {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.85rem;
+}
+
+.meta-label {
+  color: var(--text-muted);
+}
+
+.meta-val {
+  font-family: var(--font-mono);
+  font-weight: 600;
+  color: var(--text-main);
+}
+
+/* Right: Untouchable QR & Pay Card */
+.qr-card-center {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+}
+
+.qr-canvas-container {
+  position: relative;
+  width: 290px;
+  height: 290px;
+  background: #FFFFFF;
+  border-radius: 24px;
+  padding: 16px;
+  box-shadow: 0 15px 35px -10px rgba(0, 0, 0, 0.08);
+  border: 2px solid rgba(99, 102, 241, 0.2);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 16px 0;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+  touch-action: manipulation;
+}
+
+#qrCanvas {
+  width: 258px;
+  height: 258px;
+  border-radius: 12px;
+  cursor: pointer;
+}
+
+/* Pulsing "Tap to Pay" Badge */
+.tap-to-pay-pill {
+  position: absolute;
+  bottom: -14px;
+  background: linear-gradient(135deg, var(--indigo-500), var(--purple-500));
+  color: #FFFFFF;
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  font-weight: 700;
+  padding: 6px 16px;
+  border-radius: 999px;
+  box-shadow: 0 6px 18px rgba(99, 102, 241, 0.4);
+  letter-spacing: 0.05em;
+  animation: tapFloat 2s ease-in-out infinite alternate;
+}
+
+@keyframes tapFloat {
+  0% { transform: translateY(0); box-shadow: 0 4px 12px rgba(99, 102, 241, 0.3); }
+  100% { transform: translateY(-4px); box-shadow: 0 8px 24px rgba(99, 102, 241, 0.6); }
+}
+
+/* QR Countdown Timer Ring */
+.qr-timer-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 24px;
+  font-family: var(--font-mono);
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--text-muted);
+}
+
+.timer-pill {
+  background: rgba(99, 102, 241, 0.1);
+  color: var(--indigo-600);
+  padding: 2px 8px;
+  border-radius: 6px;
+}
+
+/* Telemetry Orb & Listening Status */
+.telemetry-status-box {
+  margin-top: 20px;
+  width: 100%;
+  background: rgba(255, 255, 255, 0.6);
+  border: 1px solid rgba(0, 0, 0, 0.06);
+  border-radius: 18px;
+  padding: 16px 20px;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.radar-orb {
+  position: relative;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: rgba(99, 102, 241, 0.15);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.radar-orb::after {
+  content: '';
+  position: absolute;
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  border: 2px solid var(--indigo-500);
+  animation: radarPing 1.8s cubic-bezier(0, 0.2, 0.8, 1) infinite;
+}
+
+@keyframes radarPing {
+  0% { transform: scale(0.6); opacity: 1; }
+  100% { transform: scale(2.2); opacity: 0; }
+}
+
+.telemetry-text {
+  text-align: left;
+}
+
+.telemetry-title {
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: var(--text-main);
+}
+
+.telemetry-sub {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  margin-top: 2px;
+}
+
+/* Action Buttons */
+.btn-primary-gradient {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  width: 100%;
+  background: linear-gradient(135deg, var(--indigo-500), var(--purple-500));
+  color: #FFFFFF;
+  border: none;
+  border-radius: 16px;
+  padding: 16px 24px;
+  font-family: var(--font-body);
+  font-size: 1rem;
+  font-weight: 700;
+  cursor: pointer;
+  box-shadow: 0 10px 25px -5px rgba(99, 102, 241, 0.4);
+  transition: all 0.2s ease;
+  margin-top: 16px;
+  text-decoration: none;
+}
+
+.btn-primary-gradient:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 15px 35px -5px rgba(99, 102, 241, 0.55);
+}
+
+.btn-secondary-outline {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+  background: transparent;
+  color: var(--text-main);
+  border: 1px solid rgba(0, 0, 0, 0.12);
+  border-radius: 14px;
+  padding: 12px 20px;
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+  margin-top: 10px;
+  transition: all 0.2s ease;
+}
+
+.btn-secondary-outline:hover {
+  background: rgba(0, 0, 0, 0.03);
+}
+
+/* Bottom Sheet / Guide Drawer */
+.share-guide-card {
+  margin-top: 20px;
+  background: rgba(99, 102, 241, 0.05);
+  border: 1px solid rgba(99, 102, 241, 0.2);
+  border-radius: 18px;
+  padding: 18px;
+  text-align: left;
+}
+
+.share-guide-card h4 {
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: var(--indigo-600);
+  margin-bottom: 8px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.step-flow {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  font-size: 0.8rem;
+  color: var(--text-muted);
+}
+
+.step-flow li {
+  list-style: none;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.step-num {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: var(--indigo-500);
+  color: #FFFFFF;
+  font-family: var(--font-mono);
+  font-size: 0.7rem;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   TASK 12: BENTO GRID (4 High-Impact Feature Cards)
+   ═══════════════════════════════════════════════════════════════════ */
+.bento-section {
+  margin-top: 40px;
+}
+
+.bento-header {
+  text-align: center;
+  margin-bottom: 36px;
+}
+
+.bento-title {
+  font-family: var(--font-display);
+  font-size: 2.2rem;
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  color: var(--text-main);
+  margin-bottom: 8px;
+}
+
+.bento-sub {
+  font-size: 1rem;
+  color: var(--text-muted);
+  max-width: 600px;
+  margin: 0 auto;
+}
+
+.bento-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 24px;
+}
+
+.bento-card {
+  background: var(--card-bg);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  border: 1px solid var(--card-border);
+  border-radius: 28px;
+  padding: 32px;
+  box-shadow: var(--card-shadow);
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  position: relative;
+  overflow: hidden;
+}
+
+/* Card 1: The Gateway Tax */
+.counter-box {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  margin: 20px 0;
+}
+
+.counter-strike {
+  font-family: var(--font-display);
+  font-size: 2.5rem;
+  font-weight: 800;
+  color: var(--coral-500);
+  text-decoration: line-through;
+  opacity: 0.6;
+}
+
+.counter-arrow {
+  font-size: 1.8rem;
+  color: var(--text-subtle);
+}
+
+.counter-zero {
+  font-family: var(--font-display);
+  font-size: 3.5rem;
+  font-weight: 900;
+  color: var(--teal-600);
+}
+
+/* Card 2: Receipt as Proof Motion */
+.receipt-motion-stage {
+  position: relative;
+  height: 120px;
+  background: rgba(99, 102, 241, 0.04);
+  border-radius: 18px;
+  margin: 20px 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-around;
+  padding: 0 20px;
+}
+
+.node-box {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: var(--text-main);
+  z-index: 2;
+}
+
+.node-icon-circle {
+  width: 44px;
+  height: 44px;
+  border-radius: 14px;
+  background: #FFFFFF;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.08);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.25rem;
+}
+
+.connecting-laser {
+  position: absolute;
+  top: 42px;
+  left: 18%;
+  right: 18%;
+  height: 3px;
+  background: linear-gradient(90deg, var(--indigo-500), var(--teal-500));
+  z-index: 1;
+}
+
+.laser-packet {
+  width: 14px;
+  height: 14px;
+  background: var(--teal-500);
+  border-radius: 50%;
+  position: absolute;
+  top: -5.5px;
+  box-shadow: 0 0 12px var(--teal-500);
+  animation: packetSlide 2.5s infinite ease-in-out;
+}
+
+@keyframes packetSlide {
+  0% { left: 0%; opacity: 0; }
+  20% { opacity: 1; }
+  80% { opacity: 1; }
+  100% { left: 95%; opacity: 0; }
+}
+
+/* Card 3: Savings Calculator Slider */
+.calc-slider-box {
+  margin: 20px 0;
+}
+
+.calc-slider {
+  width: 100%;
+  height: 8px;
+  border-radius: 4px;
+  background: #E2E8F0;
+  outline: none;
+  -webkit-appearance: none;
+}
+
+.calc-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: var(--indigo-500);
+  cursor: pointer;
+  box-shadow: 0 4px 12px rgba(99, 102, 241, 0.4);
+}
+
+.calc-metrics-row {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 14px;
+}
+
+.calc-metric-card {
+  background: rgba(255, 255, 255, 0.7);
+  padding: 14px 18px;
+  border-radius: 16px;
+  border: 1px solid rgba(0, 0, 0, 0.05);
+  flex: 1;
+}
+
+.calc-metric-card:first-child {
+  margin-right: 12px;
+}
+
+.calc-val-big {
+  font-family: var(--font-display);
+  font-size: 1.5rem;
+  font-weight: 800;
+  color: var(--teal-600);
+  margin-top: 4px;
+}
+
+/* Card 4: 7-Layer Fraud Nodes */
+.fraud-layers-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin: 24px 0 16px;
+  position: relative;
+}
+
+.fraud-node-col {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+}
+
+.fraud-dot {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: #CBD5E1;
+  color: #FFFFFF;
+  font-family: var(--font-mono);
+  font-size: 0.65rem;
+  font-weight: 800;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.3s ease;
+}
+
+.fraud-dot.active {
+  background: var(--teal-500);
+  box-shadow: 0 0 12px var(--teal-500);
+}
+
+.fraud-dot-label {
+  font-size: 0.65rem;
+  font-family: var(--font-mono);
+  color: var(--text-muted);
+}
+
+/* Modal / Developer Simulation Sheet */
+.sim-panel {
+  margin-top: 24px;
+  background: rgba(255, 255, 255, 0.75);
+  border: 1px dashed rgba(99, 102, 241, 0.3);
+  border-radius: 20px;
+  padding: 20px;
+}
+
+/* Mobile Responsive */
+@media (max-width: 900px) {
+  .checkout-grid {
+    grid-template-columns: 1fr;
+  }
+  
+  .bento-grid {
+    grid-template-columns: 1fr;
+  }
+  
+  .bento-title {
+    font-size: 1.8rem;
+  }
+}

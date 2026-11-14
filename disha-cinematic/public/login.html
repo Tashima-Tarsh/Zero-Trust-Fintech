@@ -1,0 +1,248 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Merchant Login — DISHA Sovereign Merchant Console</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/styles.css">
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><polygon points='50,5 90,25 90,75 50,95 10,75 10,25' fill='none' stroke='%2310b981' stroke-width='8'/><circle cx='50' cy='50' r='14' fill='%2310b981'/></svg>">
+</head>
+<body class="auth-body">
+
+  <div class="auth-wrapper">
+    <!-- Back to public home -->
+    <div class="auth-top-nav">
+      <a href="/" class="back-link">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
+        <span>Back to Public Website</span>
+      </a>
+    </div>
+
+    <div class="auth-card">
+      <div class="auth-header">
+        <div class="auth-brand-logo">
+          <svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" stroke-width="2">
+            <polygon points="12 2 22 8.5 22 15.5 12 22 2 15.5 2 8.5 12 2"></polygon>
+            <circle cx="12" cy="12" r="3" fill="#10b981"></circle>
+          </svg>
+        </div>
+        <h1 class="auth-title">Merchant Login</h1>
+        <p class="auth-subtitle">Sign in to your sovereign business payment workspace</p>
+      </div>
+
+      <!-- Error Alert Banner -->
+      <div id="errorAlert" class="auth-alert-danger" style="display: none;" role="alert">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+        <span id="errorMessage">Invalid email or password</span>
+      </div>
+
+      <form id="loginForm" class="auth-form" novalidate>
+        <div class="form-group">
+          <label for="email" class="form-label">Email or Login ID</label>
+          <div class="input-wrapper">
+            <input 
+              type="email" 
+              id="email" 
+              name="email" 
+              class="form-input" 
+              placeholder="e.g. ramesh@kirana.in" 
+              required 
+              autocomplete="username"
+              autofocus
+            >
+          </div>
+          <span class="field-error" id="emailError"></span>
+        </div>
+
+        <div class="form-group">
+          <div class="label-row">
+            <label for="password" class="form-label">Password</label>
+          </div>
+          <div class="input-wrapper password-input-wrapper">
+            <input 
+              type="password" 
+              id="password" 
+              name="password" 
+              class="form-input" 
+              placeholder="Enter your password" 
+              required 
+              autocomplete="current-password"
+            >
+            <button 
+              type="button" 
+              id="togglePassword" 
+              class="btn-toggle-password" 
+              aria-label="Show password"
+              tabindex="-1"
+            >
+              <svg id="eyeIcon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+              <svg id="eyeOffIcon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="display: none;"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
+            </button>
+          </div>
+          <span class="field-error" id="passwordError"></span>
+        </div>
+
+        <div class="form-actions">
+          <button type="submit" id="submitBtn" class="btn-auth-submit">
+            <span id="btnText">Sign In to Dashboard</span>
+            <div id="btnSpinner" class="spinner" style="display: none;"></div>
+          </button>
+        </div>
+      </form>
+
+      <!-- Provisioned Credentials Helper -->
+      <div class="provision-helper-card">
+        <div class="provision-header">
+          <span class="helper-badge">ADMIN PROVISIONED ACCESS</span>
+          <p class="helper-text">Merchant logins are provisioned by your system administrator. Use one of the test merchant credentials below:</p>
+        </div>
+
+        <div class="preset-merchants-list">
+          <div class="preset-merchant-item" onclick="fillCredentials('ramesh@kirana.in', 'Ramesh@123')">
+            <div class="preset-details">
+              <strong>Ramesh Provision Stores (Active Merchant)</strong>
+              <span>ramesh@kirana.in · Pre-configured with historic collections & UPI IDs</span>
+            </div>
+            <button type="button" class="btn-preset-use">Use Credentials</button>
+          </div>
+
+          <div class="preset-merchant-item" onclick="fillCredentials('new@merchant.in', 'Merchant@123')">
+            <div class="preset-details">
+              <strong>New Merchant (First-Time Setup Demo)</strong>
+              <span>new@merchant.in · Shows guided onboarding & fresh empty workspace</span>
+            </div>
+            <button type="button" class="btn-preset-use">Use Credentials</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="auth-card-footer">
+        <p>🔒 256-bit encrypted session · Direct bank-to-bank settlement</p>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const loginForm = document.getElementById('loginForm');
+    const emailInput = document.getElementById('email');
+    const passwordInput = document.getElementById('password');
+    const togglePasswordBtn = document.getElementById('togglePassword');
+    const eyeIcon = document.getElementById('eyeIcon');
+    const eyeOffIcon = document.getElementById('eyeOffIcon');
+    const submitBtn = document.getElementById('submitBtn');
+    const btnText = document.getElementById('btnText');
+    const btnSpinner = document.getElementById('btnSpinner');
+    const errorAlert = document.getElementById('errorAlert');
+    const errorMessage = document.getElementById('errorMessage');
+
+    // Quick fill helper
+    window.fillCredentials = function(email, pass) {
+      emailInput.value = email;
+      passwordInput.value = pass;
+      errorAlert.style.display = 'none';
+      submitBtn.focus();
+    };
+
+    // Password visibility toggle
+    togglePasswordBtn.addEventListener('click', () => {
+      const isPassword = passwordInput.getAttribute('type') === 'password';
+      passwordInput.setAttribute('type', isPassword ? 'text' : 'password');
+      eyeIcon.style.display = isPassword ? 'none' : 'block';
+      eyeOffIcon.style.display = isPassword ? 'block' : 'none';
+      togglePasswordBtn.setAttribute('aria-label', isPassword ? 'Hide password' : 'Show password');
+    });
+
+    // Check if already authenticated
+    (async () => {
+      const token = sessionStorage.getItem('disha_token');
+      if (token) {
+        try {
+          const res = await fetch('/api/auth/me', {
+            headers: { 'Authorization': 'Bearer ' + token }
+          });
+          if (res.ok) {
+            const data = await res.json();
+            if (data.merchant) {
+              if (data.merchant.setup_completed) {
+                window.location.href = '/dashboard';
+              } else {
+                window.location.href = '/setup';
+              }
+            }
+          }
+        } catch (_) {}
+      }
+    })();
+
+    // Form submission
+    loginForm.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      errorAlert.style.display = 'none';
+
+      const email = emailInput.value.trim();
+      const password = passwordInput.value;
+
+      if (!email) {
+        showError('Please enter your email or login ID.');
+        emailInput.focus();
+        return;
+      }
+
+      if (!password) {
+        showError('Please enter your password.');
+        passwordInput.focus();
+        return;
+      }
+
+      // Set loading state
+      submitBtn.disabled = true;
+      btnText.textContent = 'Verifying credentials...';
+      btnSpinner.style.display = 'inline-block';
+
+      try {
+        const response = await fetch('/api/auth/login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email, password })
+        });
+
+        const result = await response.json();
+
+        if (!response.ok) {
+          showError(result.error || 'Login failed. Please check your credentials.');
+          submitBtn.disabled = false;
+          btnText.textContent = 'Sign In to Dashboard';
+          btnSpinner.style.display = 'none';
+          return;
+        }
+
+        // Store session token securely in sessionStorage
+        sessionStorage.setItem('disha_token', result.token);
+        sessionStorage.setItem('disha_merchant', JSON.stringify(result.merchant));
+
+        btnText.textContent = 'Success! Opening workspace...';
+
+        // Check if first-time setup is completed
+        if (result.merchant && result.merchant.setup_completed) {
+          window.location.href = '/dashboard';
+        } else {
+          window.location.href = '/setup';
+        }
+      } catch (err) {
+        showError('Unable to connect to server. Please check your network connection.');
+        submitBtn.disabled = false;
+        btnText.textContent = 'Sign In to Dashboard';
+        btnSpinner.style.display = 'none';
+      }
+    });
+
+    function showError(msg) {
+      errorMessage.textContent = msg;
+      errorAlert.style.display = 'flex';
+    }
+  </script>
+</body>
+</html>

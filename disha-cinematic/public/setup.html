@@ -1,0 +1,418 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>First-Time Merchant Setup — DISHA Sovereign Merchant Console</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/styles.css">
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><polygon points='50,5 90,25 90,75 50,95 10,75 10,25' fill='none' stroke='%2310b981' stroke-width='8'/><circle cx='50' cy='50' r='14' fill='%2310b981'/></svg>">
+</head>
+<body class="setup-body">
+
+  <div class="setup-wrapper">
+    <div class="setup-card">
+      <div class="setup-header">
+        <div class="setup-badge">FIRST-TIME ONBOARDING</div>
+        <h1 class="setup-title">Configure Your Merchant Workspace</h1>
+        <p class="setup-subtitle">Complete these 3 quick steps to start generating dynamic UPI QR codes and receiving zero-fee payments.</p>
+      </div>
+
+      <!-- Stepper indicator -->
+      <div class="setup-stepper">
+        <div class="step-indicator active" id="step1Indicator">
+          <span class="step-number">1</span>
+          <span class="step-label">Business Info</span>
+        </div>
+        <div class="step-line" id="stepLine1"></div>
+        <div class="step-indicator" id="step2Indicator">
+          <span class="step-number">2</span>
+          <span class="step-label">UPI ID</span>
+        </div>
+        <div class="step-line" id="stepLine2"></div>
+        <div class="step-indicator" id="step3Indicator">
+          <span class="step-number">3</span>
+          <span class="step-label">Soundbox</span>
+        </div>
+      </div>
+
+      <div id="setupAlert" class="auth-alert-danger" style="display: none;" role="alert">
+        <span id="setupErrorMsg">Please check the required fields.</span>
+      </div>
+
+      <form id="setupForm" novalidate>
+        <!-- STEP 1: BUSINESS PROFILE -->
+        <div class="setup-step-panel" id="step1Panel">
+          <h2 class="step-heading">1. Business Profile</h2>
+          <p class="step-desc">Enter the name that customers will see when scanning your payment QR codes.</p>
+
+          <div class="form-group">
+            <label for="businessName" class="form-label">Business / Shop Name <span class="required">*</span></label>
+            <input 
+              type="text" 
+              id="businessName" 
+              class="form-input" 
+              placeholder="e.g. Ramesh Provision Stores or Patil Supermarket" 
+              required
+              autofocus
+            >
+            <span class="input-hint">This name is encoded into your dynamic UPI intent payload.</span>
+          </div>
+
+          <div class="form-row-2">
+            <div class="form-group">
+              <label for="contactPhone" class="form-label">Contact Phone Number <span class="required">*</span></label>
+              <input 
+                type="tel" 
+                id="contactPhone" 
+                class="form-input" 
+                placeholder="10-digit mobile number" 
+                maxlength="10"
+                required
+              >
+            </div>
+            <div class="form-group">
+              <label for="city" class="form-label">City / Region <span class="required">*</span></label>
+              <input 
+                type="text" 
+                id="city" 
+                class="form-input" 
+                placeholder="e.g. Narayan Peth, Pune" 
+                required
+              >
+            </div>
+          </div>
+
+          <div class="step-nav-buttons">
+            <div></div>
+            <button type="button" class="btn-step-next" onclick="goToStep(2)">
+              <span>Next: Settlement UPI ID →</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- STEP 2: SETTLEMENT UPI ID -->
+        <div class="setup-step-panel" id="step2Panel" style="display: none;">
+          <h2 class="step-heading">2. Settlement UPI ID</h2>
+          <p class="step-desc">This is your primary bank VPA where customer payments land directly with zero intermediary delays.</p>
+
+          <div class="form-group">
+            <label for="primaryVpa" class="form-label">Primary UPI ID (VPA) <span class="required">*</span></label>
+            <input 
+              type="text" 
+              id="primaryVpa" 
+              class="form-input font-mono" 
+              placeholder="e.g. store@okaxis, shop@ybl, merchant@oksbi" 
+              required
+            >
+            
+            <!-- Real-time inline feedback -->
+            <div id="vpaValidationFeedback" class="vpa-feedback-box empty">
+              <span id="vpaFeedbackIcon">ℹ️</span>
+              <span id="vpaFeedbackText">Enter your UPI handle (format: name@bank).</span>
+            </div>
+            <span class="input-hint">Note: Format validation checks syntax structure. Payments settle directly through your bank's UPI network.</span>
+          </div>
+
+          <div class="step-nav-buttons">
+            <button type="button" class="btn-step-back" onclick="goToStep(1)">
+              <span>← Back</span>
+            </button>
+            <button type="button" class="btn-step-next" id="btnStep2Next" onclick="goToStep(3)" disabled>
+              <span>Next: Voice Soundbox →</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- STEP 3: SOUNDBOX & PREFERENCES -->
+        <div class="setup-step-panel" id="step3Panel" style="display: none;">
+          <h2 class="step-heading">3. Soundbox & Announcements</h2>
+          <p class="step-desc">Configure instant audio confirmations whenever a customer payment is received on your counter.</p>
+
+          <div class="soundbox-pref-box">
+            <div class="soundbox-toggle-row">
+              <div>
+                <strong>Enable Browser Voice Soundbox</strong>
+                <p>Announces payment confirmations out loud on this device.</p>
+              </div>
+              <label class="switch">
+                <input type="checkbox" id="soundboxEnabled" checked>
+                <span class="slider round"></span>
+              </label>
+            </div>
+
+            <div class="form-group" style="margin-top: 18px;">
+              <label for="soundboxLang" class="form-label">Announcement Language</label>
+              <select id="soundboxLang" class="form-input form-select">
+                <option value="en">English ("Payment of ₹500 received")</option>
+                <option value="hi">हिंदी / Hindi ("५०० रुपये प्राप्त हुए")</option>
+                <option value="mr">मराठी / Marathi ("५०० रुपये मिळाले")</option>
+              </select>
+            </div>
+
+            <button type="button" class="btn-test-sound-sample" onclick="testSoundSample()">
+              <span>🔊 Test Announcement Voice</span>
+            </button>
+          </div>
+
+          <!-- Summary Card -->
+          <div class="setup-summary-card">
+            <h4>Setup Summary</h4>
+            <div class="summary-item">
+              <span>Business Name:</span>
+              <strong id="summaryBizName">—</strong>
+            </div>
+            <div class="summary-item">
+              <span>Primary UPI ID:</span>
+              <strong id="summaryVpa" class="font-mono">—</strong>
+            </div>
+            <div class="summary-item">
+              <span>Location:</span>
+              <strong id="summaryCity">—</strong>
+            </div>
+          </div>
+
+          <div class="step-nav-buttons">
+            <button type="button" class="btn-step-back" onclick="goToStep(2)">
+              <span>← Back</span>
+            </button>
+            <button type="submit" id="btnFinishSetup" class="btn-step-finish">
+              <span id="finishBtnText">Complete Setup & Open Dashboard ✓</span>
+              <div id="finishSpinner" class="spinner" style="display: none;"></div>
+            </button>
+          </div>
+        </div>
+      </form>
+
+      <div class="setup-footer">
+        <a href="javascript:void(0)" onclick="handleLogout()" class="logout-link">Sign out and complete later</a>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    let currentStep = 1;
+    let token = sessionStorage.getItem('disha_token');
+
+    // Auth Guard
+    (async () => {
+      if (!token) {
+        window.location.href = '/login';
+        return;
+      }
+
+      try {
+        const res = await fetch('/api/auth/me', {
+          headers: { 'Authorization': 'Bearer ' + token }
+        });
+        if (!res.ok) {
+          sessionStorage.clear();
+          window.location.href = '/login';
+          return;
+        }
+
+        const data = await res.json();
+        // If already completed setup, redirect to dashboard
+        if (data.merchant && data.merchant.setup_completed) {
+          window.location.href = '/dashboard';
+        }
+      } catch (_) {
+        window.location.href = '/login';
+      }
+    })();
+
+    const vpaInput = document.getElementById('primaryVpa');
+    const vpaFeedbackBox = document.getElementById('vpaValidationFeedback');
+    const vpaFeedbackIcon = document.getElementById('vpaFeedbackIcon');
+    const vpaFeedbackText = document.getElementById('vpaFeedbackText');
+    const btnStep2Next = document.getElementById('btnStep2Next');
+    const setupAlert = document.getElementById('setupAlert');
+    const setupErrorMsg = document.getElementById('setupErrorMsg');
+
+    const vpaRegex = /^[a-zA-Z0-9.\-_]{2,256}@[a-zA-Z]{2,64}$/;
+
+    // Live Inline UPI Validation
+    vpaInput.addEventListener('input', () => {
+      const val = vpaInput.value.trim().toLowerCase();
+      if (!val) {
+        vpaFeedbackBox.className = 'vpa-feedback-box empty';
+        vpaFeedbackIcon.textContent = 'ℹ️';
+        vpaFeedbackText.textContent = 'Enter your UPI handle (format: name@bank).';
+        btnStep2Next.disabled = true;
+        return;
+      }
+
+      if (vpaRegex.test(val)) {
+        vpaFeedbackBox.className = 'vpa-feedback-box valid';
+        vpaFeedbackIcon.textContent = '✓';
+        vpaFeedbackText.textContent = 'Valid UPI format. Ready to accept customer payments.';
+        btnStep2Next.disabled = false;
+      } else {
+        vpaFeedbackBox.className = 'vpa-feedback-box invalid';
+        vpaFeedbackIcon.textContent = '⚠️';
+        vpaFeedbackText.textContent = 'Invalid format. Must include username and bank handle (e.g. store@okaxis).';
+        btnStep2Next.disabled = true;
+      }
+    });
+
+    window.goToStep = function(step) {
+      setupAlert.style.display = 'none';
+
+      // Validation before leaving Step 1
+      if (currentStep === 1 && step === 2) {
+        const bizName = document.getElementById('businessName').value.trim();
+        const phone = document.getElementById('contactPhone').value.trim();
+        const city = document.getElementById('city').value.trim();
+
+        if (!bizName) {
+          showError('Please enter your business or shop display name.');
+          document.getElementById('businessName').focus();
+          return;
+        }
+        if (!phone || phone.length < 10) {
+          showError('Please enter a valid 10-digit mobile contact number.');
+          document.getElementById('contactPhone').focus();
+          return;
+        }
+        if (!city) {
+          showError('Please enter your business city or region.');
+          document.getElementById('city').focus();
+          return;
+        }
+      }
+
+      // Validation before leaving Step 2
+      if (currentStep === 2 && step === 3) {
+        const vpa = vpaInput.value.trim().toLowerCase();
+        if (!vpaRegex.test(vpa)) {
+          showError('Please enter a valid UPI address before proceeding.');
+          vpaInput.focus();
+          return;
+        }
+
+        // Populate summary
+        document.getElementById('summaryBizName').textContent = document.getElementById('businessName').value.trim();
+        document.getElementById('summaryVpa').textContent = vpa;
+        document.getElementById('summaryCity').textContent = document.getElementById('city').value.trim();
+      }
+
+      // Update Panels
+      document.getElementById(`step${currentStep}Panel`).style.display = 'none';
+      document.getElementById(`step${step}Panel`).style.display = 'block';
+
+      // Update Stepper
+      for (let i = 1; i <= 3; i++) {
+        const ind = document.getElementById(`step${i}Indicator`);
+        if (i === step) {
+          ind.className = 'step-indicator active';
+        } else if (i < step) {
+          ind.className = 'step-indicator completed';
+        } else {
+          ind.className = 'step-indicator';
+        }
+      }
+
+      currentStep = step;
+    };
+
+    function showError(msg) {
+      setupErrorMsg.textContent = msg;
+      setupAlert.style.display = 'flex';
+    }
+
+    window.testSoundSample = function() {
+      const lang = document.getElementById('soundboxLang').value;
+      if (!('speechSynthesis' in window)) {
+        alert('Voice synthesis ready.');
+        return;
+      }
+      window.speechSynthesis.cancel();
+      let text = 'DISHA Pay: Payment received of five hundred rupees.';
+      let code = 'en-IN';
+      if (lang === 'hi') {
+        text = 'दिशा पे: पांच सौ रुपये प्राप्त हुए।';
+        code = 'hi-IN';
+      } else if (lang === 'mr') {
+        text = 'दिशा पे: पाचशे रुपये मिळाले आहेत.';
+        code = 'mr-IN';
+      }
+
+      const u = new SpeechSynthesisUtterance(text);
+      u.lang = code;
+      window.speechSynthesis.speak(u);
+    };
+
+    window.handleLogout = async function() {
+      try {
+        await fetch('/api/auth/logout', { method: 'POST' });
+      } catch (_) {}
+      sessionStorage.clear();
+      window.location.href = '/login';
+    };
+
+    // Form submit: final setup commit
+    document.getElementById('setupForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      setupAlert.style.display = 'none';
+
+      const businessName = document.getElementById('businessName').value.trim();
+      const contactPhone = document.getElementById('contactPhone').value.trim();
+      const city = document.getElementById('city').value.trim();
+      const primaryVpa = document.getElementById('primaryVpa').value.trim().toLowerCase();
+      const soundboxEnabled = document.getElementById('soundboxEnabled').checked;
+      const soundboxLang = document.getElementById('soundboxLang').value;
+
+      const finishBtn = document.getElementById('btnFinishSetup');
+      const finishBtnText = document.getElementById('finishBtnText');
+      const finishSpinner = document.getElementById('finishSpinner');
+
+      finishBtn.disabled = true;
+      finishBtnText.textContent = 'Saving workspace settings...';
+      finishSpinner.style.display = 'inline-block';
+
+      try {
+        const response = await fetch('/api/merchant/setup', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': 'Bearer ' + token
+          },
+          body: JSON.stringify({
+            businessName,
+            contactPhone,
+            city,
+            primaryVpa,
+            soundboxEnabled,
+            soundboxLang
+          })
+        });
+
+        const result = await response.json();
+
+        if (!response.ok) {
+          showError(result.error || 'Setup failed. Please check your inputs.');
+          finishBtn.disabled = false;
+          finishBtnText.textContent = 'Complete Setup & Open Dashboard ✓';
+          finishSpinner.style.display = 'none';
+          return;
+        }
+
+        // Persist updated merchant
+        sessionStorage.setItem('disha_merchant', JSON.stringify(result.merchant));
+
+        finishBtnText.textContent = 'Success! Launching Dashboard...';
+        setTimeout(() => {
+          window.location.href = '/dashboard';
+        }, 600);
+      } catch (err) {
+        showError('Network error. Failed to save configuration.');
+        finishBtn.disabled = false;
+        finishBtnText.textContent = 'Complete Setup & Open Dashboard ✓';
+        finishSpinner.style.display = 'none';
+      }
+    });
+  </script>
+</body>
+</html>
