@@ -7,7 +7,10 @@
       "name": "Manual / Test Trigger",
       "type": "n8n-nodes-base.manualTrigger",
       "typeVersion": 1,
-      "position": [220, 300]
+      "position": [
+        220,
+        300
+      ]
     },
     {
       "parameters": {
@@ -19,7 +22,10 @@
       "name": "Webhook: Ingest VPA Batch",
       "type": "n8n-nodes-base.webhook",
       "typeVersion": 2,
-      "position": [220, 480],
+      "position": [
+        220,
+        480
+      ],
       "webhookId": "disha-vpa-bulk-upload"
     },
     {
@@ -30,22 +36,37 @@
       "name": "Sanitize & Distribute Slots",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [460, 380]
+      "position": [
+        460,
+        380
+      ]
     },
     {
       "parameters": {
         "method": "POST",
-        "url": "http://localhost:3000/api/vpa/upload",
+        "url": "={{ ($env.DISHA_API_BASE_URL || 'http://localhost:3000') + '/api/vpa/upload' }}",
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={\n  \"rows\": {{ JSON.stringify($json.rows) }},\n  \"merchantId\": \"{{ $json.merchantId }}\"\n}",
-        "options": {}
+        "jsonBody": "={{ JSON.stringify({ rows: $json.rows, merchantId: String($json.merchantId || 'mer_default') }) }}",
+        "options": {},
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "x-vpa-admin-key",
+              "value": "={{ $env.VPA_ADMIN_API_KEY }}"
+            }
+          ]
+        }
       },
       "id": "node-http-upload",
       "name": "POST to DISHA 8.2 API",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [700, 380]
+      "position": [
+        700,
+        380
+      ]
     },
     {
       "parameters": {
@@ -62,7 +83,10 @@
       "name": "Bank Concentration Warning?",
       "type": "n8n-nodes-base.if",
       "typeVersion": 1,
-      "position": [940, 380]
+      "position": [
+        940,
+        380
+      ]
     },
     {
       "parameters": {
@@ -72,7 +96,10 @@
       "name": "Format Warning Alert",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [1180, 280]
+      "position": [
+        1180,
+        280
+      ]
     },
     {
       "parameters": {
@@ -82,7 +109,10 @@
       "name": "Format Success Alert",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [1180, 480]
+      "position": [
+        1180,
+        480
+      ]
     }
   ],
   "connections": {
