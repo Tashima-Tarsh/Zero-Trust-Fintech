@@ -12,48 +12,78 @@
       "name": "Webhook: Bank Anomaly / Failure Alert",
       "type": "n8n-nodes-base.webhook",
       "typeVersion": 2,
-      "position": [220, 320],
+      "position": [
+        220,
+        320
+      ],
       "webhookId": "disha-bank-anomaly"
     },
     {
       "parameters": {
         "method": "POST",
-        "url": "http://localhost:3000/api/vpa/quarantine",
+        "url": "={{ ($env.DISHA_API_BASE_URL || 'http://localhost:3000') + '/api/vpa/quarantine' }}",
         "sendBody": true,
         "specifyBody": "json",
         "jsonBody": "={\n  \"vpaId\": \"{{ $json.body.vpaId }}\",\n  \"reason\": \"{{ $json.body.reason || 'Consecutive UPI dropoffs / Bank warning' }}\"\n}",
-        "options": {}
+        "options": {},
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "x-vpa-admin-key",
+              "value": "={{ $env.VPA_ADMIN_API_KEY }}"
+            }
+          ]
+        }
       },
       "id": "node-http-quarantine",
       "name": "Execute 7-Day Emergency Quarantine",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [460, 320]
+      "position": [
+        460,
+        320
+      ]
     },
     {
       "parameters": {
         "method": "POST",
-        "url": "http://localhost:3000/api/vpa/select",
+        "url": "={{ ($env.DISHA_API_BASE_URL || 'http://localhost:3000') + '/api/vpa/select' }}",
         "sendBody": true,
         "specifyBody": "json",
         "jsonBody": "={\n  \"merchantId\": \"mer_default\",\n  \"amount\": 500\n}",
-        "options": {}
+        "options": {},
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "x-vpa-admin-key",
+              "value": "={{ $env.VPA_ADMIN_API_KEY }}"
+            }
+          ]
+        }
       },
       "id": "node-http-replacement",
       "name": "Acquire Immediate Healthy Replacement",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [700, 320]
+      "position": [
+        700,
+        320
+      ]
     },
     {
       "parameters": {
-        "jsCode": "const original = $('Webhook: Bank Anomaly / Failure Alert').first().json.body || {};\nconst quarRes = $('Execute 7-Day Emergency Quarantine').first().json;\nconst replRes = $input.first().json.selectedVpa || {};\n\nconst alertMsg = `🚨 *DISHA 8.2 EMERGENCY ANTI-BAN ACTION* 🚨\\n\\n` +\n  `• Quarantined VPA: \`${original.vpaAddress || original.vpaId}\`\\n` +\n  `• Reason: ${original.reason || 'Algorithmic Anomaly'}\\n` +\n  `• Action Taken: Health lowered to 30. Enforced 7-day cooldown.\\n` +\n  `• Failover Activated: Traffic rerouted to \`${replRes.vpaAddress}\` (${replRes.bankName})\\n` +\n  `• New Node Health: ${replRes.healthScore}/100`;\n\nreturn [{\n  json: {\n    quarantineStatus: quarRes.status,\n    quarantinedVpaId: quarRes.vpaId,\n    cooldownUntil: quarRes.cooldownUntil,\n    replacementVpa: replRes.vpaAddress,\n    replacementBank: replRes.bankName,\n    emergencyMessage: alertMsg\n  }\n}];"
+        "jsCode": "const original = $('Webhook: Bank Anomaly / Failure Alert').first().json.body || {};\nconst quarRes = $('Execute 7-Day Emergency Quarantine').first().json;\nconst replRes = $input.first().json.selectedVpa || {};\n\nconst alertMsg = `🚨 *DISHA 8.2 EMERGENCY ANTI-BAN ACTION* 🚨\\n\\n` +\n  `• Quarantined VPA: \\`${original.vpaAddress || original.vpaId}\\`\\n` +\n  `• Reason: ${original.reason || 'Algorithmic Anomaly'}\\n` +\n  `• Action Taken: Health lowered to 30. Enforced 7-day cooldown.\\n` +\n  `• Failover Activated: Traffic rerouted to \\`${replRes.vpaAddress}\\` (${replRes.bankName})\\n` +\n  `• New Node Health: ${replRes.healthScore}/100`;\n\nreturn [{\n  json: {\n    quarantineStatus: quarRes.status,\n    quarantinedVpaId: quarRes.vpaId,\n    cooldownUntil: quarRes.cooldownUntil,\n    replacementVpa: replRes.vpaAddress,\n    replacementBank: replRes.bankName,\n    emergencyMessage: alertMsg\n  }\n}];"
       },
       "id": "node-emergency-format",
       "name": "Format Incident & Replacement",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [940, 320]
+      "position": [
+        940,
+        320
+      ]
     },
     {
       "parameters": {
@@ -67,7 +97,10 @@
       "name": "Send Ops Telegram / Slack Alert",
       "type": "n8n-nodes-base.telegram",
       "typeVersion": 1.2,
-      "position": [1180, 220]
+      "position": [
+        1180,
+        220
+      ]
     },
     {
       "parameters": {
@@ -81,7 +114,10 @@
       "name": "Respond to Anomaly Reporter",
       "type": "n8n-nodes-base.respondToWebhook",
       "typeVersion": 1.1,
-      "position": [1180, 420]
+      "position": [
+        1180,
+        420
+      ]
     }
   ],
   "connections": {
