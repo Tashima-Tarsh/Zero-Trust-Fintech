@@ -42,12 +42,32 @@ wss.on('connection', (ws, req) => {
   try {
     const urlParams = new URL(req.url, `http://${req.headers.host}`).searchParams;
     const orderId = urlParams.get('orderId');
-    if (orderId) {
-      wsClients.set(orderId, ws);
-      ws.on('close', () => wsClients.delete(orderId));
+    const cookies = parseCookies(req.headers.cookie);
+    const sessionToken = cookies.sharepay_session || urlParams.get('token');
+
+    if (!orderId) {
+      ws.close(4400, 'Missing orderId parameter');
+      return;
     }
+
+    const order = database.getOrder(orderId);
+    if (!order) {
+      ws.close(4404, 'Order not found');
+      return;
+    }
+
+    // P0-Security: Require session token match to prevent cross-origin order eavesdropping
+    if (!sessionToken || order.session_token !== sessionToken) {
+      ws.close(4401, 'Unauthorized: session token mismatch');
+      return;
+    }
+
+    wsClients.set(orderId, ws);
+    ws.send(JSON.stringify({ type: 'CONNECTED', orderId, status: order.status }));
+    ws.on('close', () => wsClients.delete(orderId));
   } catch (err) {
     console.error('WebSocket connection error:', err);
+    try { ws.close(4500, 'Server error'); } catch (_) {}
   }
 });
 
@@ -57,6 +77,20 @@ function broadcastOrderUpdate(orderId, payload) {
     ws.send(JSON.stringify(payload));
   }
 }
+
+// P1-Reliability: Background worker to sweep expired pending orders (>180s)
+const EXPIRY_SWEEPER_INTERVAL_MS = 15000;
+setInterval(() => {
+  try {
+    const now = Date.now();
+    const swept = database.sweepExpiredOrders(now);
+    if (swept > 0) {
+      console.log(`[ExpirySweeper] Marked ${swept} pending order(s) as EXPIRED`);
+    }
+  } catch (sweepErr) {
+    console.warn('[ExpirySweeper] Error sweeping expired orders:', sweepErr.message);
+  }
+}, EXPIRY_SWEEPER_INTERVAL_MS);
 
 // Optional n8n webhook notification dispatch
 async function notifyN8nWorkflow(eventType, payload) {

@@ -91,7 +91,10 @@
     </button>
 
     <div id="manualBox" class="manual-box">
-      <div style="font-weight: 600; font-size: 13px; margin-bottom: 6px;">Desktop / iOS Manual Fallback:</div>
+      <div style="font-weight: 600; font-size: 13px; margin-bottom: 6px;">iOS / Desktop Manual Fallback:</div>
+      <button type="button" class="btn btn-secondary" style="padding: 8px 12px; font-size: 12px; margin-top: 0; margin-bottom: 10px; width: 100%; display: flex; align-items: center; justify-content: center; gap: 6px;" onclick="pasteFromClipboard()">
+        <span>📋 Paste from Clipboard</span>
+      </button>
       <textarea id="manualReceiptInput" placeholder="Paste bank SMS, transaction receipt text, or enter 12-digit UTR..."></textarea>
       <button id="verifyManualBtn" class="btn" style="padding: 10px; font-size: 14px;" onclick="submitManualReceipt()">
         <span>Verify Receipt</span>
@@ -166,7 +169,8 @@
 
     function connectWebSocket(orderId) {
       const protocol = location.protocol === 'https:' ? 'wss:' : 'ws:';
-      ws = new WebSocket(`${protocol}//${location.host}?orderId=${encodeURIComponent(orderId)}`);
+      const tokenParam = orderData && orderData.sessionToken ? `&token=${encodeURIComponent(orderData.sessionToken)}` : '';
+      ws = new WebSocket(`${protocol}//${location.host}?orderId=${encodeURIComponent(orderId)}${tokenParam}`);
 
       ws.onmessage = (event) => {
         try {
@@ -180,6 +184,35 @@
           console.error('WS parse error:', e);
         }
       };
+    }
+
+    // Auto-detect iOS / non-WebShare environments and highlight fallback UI (P2-UX/Compat)
+    window.addEventListener('DOMContentLoaded', () => {
+      const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) || 
+                    (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+      if (isIOS) {
+        document.getElementById('manualBox').style.display = 'block';
+        document.getElementById('manualToggleBtn').style.display = 'none';
+        showStatus('iOS Safari detected: After paying in UPI app, copy receipt text or UTR and paste below.', 'info');
+      }
+    });
+
+    async function pasteFromClipboard() {
+      try {
+        if (!navigator.clipboard || !navigator.clipboard.readText) {
+          showStatus('Clipboard API not supported on this browser. Please paste manually.', 'error');
+          return;
+        }
+        const text = await navigator.clipboard.readText();
+        if (text) {
+          document.getElementById('manualReceiptInput').value = text;
+          showStatus('Pasted from clipboard! Tap "Verify Receipt".', 'info');
+        } else {
+          showStatus('Clipboard is empty.', 'error');
+        }
+      } catch (err) {
+        showStatus('Clipboard permission denied. Please long-press and paste into the box.', 'info');
+      }
     }
 
     function openUpiApp() {

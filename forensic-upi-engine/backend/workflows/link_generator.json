@@ -22,7 +22,7 @@
     {
       "parameters": {
         "method": "POST",
-        "url": "http://worker:8000/v1/sessions",
+        "url": "={{ ($env.FINTECH_API_BASE_URL || $env.WORKER_API_BASE_URL || 'http://worker:8000') + '/v1/sessions' }}",
         "authentication": "genericCredentialType",
         "genericAuthType": "httpHeaderAuth",
         "sendBody": true,

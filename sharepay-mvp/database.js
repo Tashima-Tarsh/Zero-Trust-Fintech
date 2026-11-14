@@ -203,19 +203,19 @@ export const database = {
     if (db) {
       try {
         db.exec(`
-          DELETE FROM processed_utrs WHERE order_id LIKE 'Order_TEST_%';
-          DELETE FROM rejected_shares WHERE order_id LIKE 'Order_TEST_%';
-          DELETE FROM orders WHERE id LIKE 'Order_TEST_%';
+          DELETE FROM processed_utrs WHERE order_id LIKE 'Order_TEST_%' OR order_id LIKE 'Order_STALE_%';
+          DELETE FROM rejected_shares WHERE order_id LIKE 'Order_TEST_%' OR order_id LIKE 'Order_STALE_%';
+          DELETE FROM orders WHERE id LIKE 'Order_TEST_%' OR id LIKE 'Order_STALE_%';
         `);
       } catch (e) {
         console.warn('Test reset error:', e.message);
       }
     }
     for (const [id] of memOrders.entries()) {
-      if (id.startsWith('Order_TEST_')) memOrders.delete(id);
+      if (id.startsWith('Order_TEST_') || id.startsWith('Order_STALE_')) memOrders.delete(id);
     }
     for (const [utr, rec] of memProcessedUtrs.entries()) {
-      if (rec.order_id && rec.order_id.startsWith('Order_TEST_')) memProcessedUtrs.delete(utr);
+      if (rec.order_id && (rec.order_id.startsWith('Order_TEST_') || rec.order_id.startsWith('Order_STALE_'))) memProcessedUtrs.delete(utr);
     }
   },
 
@@ -254,5 +254,25 @@ export const database = {
       settled: Array.from(memProcessedUtrs.values()).slice(-limit),
       rejections: memRejectedShares.slice(-limit)
     };
+  },
+
+  sweepExpiredOrders(now = Date.now()) {
+    if (db) {
+      const stmt = db.prepare(`
+        UPDATE orders 
+        SET status = 'EXPIRED' 
+        WHERE status = 'PENDING' AND expires_at < ?
+      `);
+      const result = stmt.run(now);
+      return result.changes || 0;
+    }
+    let count = 0;
+    for (const [id, order] of memOrders.entries()) {
+      if (order.status === 'PENDING' && now > order.expires_at) {
+        order.status = 'EXPIRED';
+        count++;
+      }
+    }
+    return count;
   }
 };

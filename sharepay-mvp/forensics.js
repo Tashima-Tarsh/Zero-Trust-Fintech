@@ -127,9 +127,10 @@ export function extractReceiptData(rawText) {
   const text = rawText.trim();
 
   // 1. Extract UTR (12 digits)
-  // Look for labeled UTR first, then fallback to standalone 12-digit number
+  // Supports PhonePe ("Reference ID: ..."), Google Pay ("UPI transaction ID: ..."), 
+  // Paytm ("UPI Ref: ..."), CRED ("UTR: ..."), BHIM ("RRN: ..."), and Bank SMS
   let utr = null;
-  const labeledUtrMatch = text.match(/(?:UTR|Ref(?:erence)?\s*(?:No|Number)?|UPI\s*(?:Transaction\s*ID|Ref\s*No)|RRN)[\s:=-]+([0-9]{12})\b/i);
+  const labeledUtrMatch = text.match(/(?:UTR|Ref(?:erence)?\s*(?:No|Number|ID)?|UPI\s*(?:Transaction\s*ID|Ref\s*No)?|RRN|Txn\s*(?:ID|Ref|No)?|Payment\s*ID)[\s:=-]+([0-9]{12})\b/i);
   if (labeledUtrMatch) {
     utr = labeledUtrMatch[1];
   } else {
@@ -140,18 +141,20 @@ export function extractReceiptData(rawText) {
   }
 
   // 2. Extract Amount
-  // Matches "₹ 100.37", "₹100.37", "Rs. 100.37", "Rs 100.37", "INR 100.37", "Paid 100.37"
+  // Matches "₹ 100.37", "₹100.37", "Rs. 100.37", "Rs 100.37", "INR 100.37", "Paid 100.37", "Payment of ₹100.37"
   let amount = null;
-  const amountMatch = text.match(/(?:(?:₹|Rs\.?|INR)\s*|paid\s+|amount\s*:?\s*)([0-9]+(?:\.[0-9]{1,2})?)/i) ||
-                      text.match(/\b([0-9]+\.[0-9]{2})\b/);
+  const amountMatch = text.match(/(?:(?:₹|Rs\.?|INR)\s*|paid\s+|payment\s+of\s+(?:₹|Rs\.?|INR)?\s*|amount\s*:?\s*)([0-9,]+(?:\.[0-9]{1,2})?)/i) ||
+                      text.match(/\b([0-9,]+\.[0-9]{2})\b/);
   if (amountMatch) {
-    amount = parseFloat(amountMatch[1]);
+    const cleanNum = amountMatch[1].replace(/,/g, '');
+    amount = parseFloat(cleanNum);
   }
 
   // 3. Extract Transaction Note / Order ID
-  // e.g. "Order_99X_7f3a" or "Note: Order_..."
+  // e.g. "Order_99X_7f3a" or "Note: Order_..." or "Remarks: Order_..."
   let note = null;
-  const noteMatch = text.match(/\b(Order_[A-Za-z0-9_-]+)\b/i);
+  const noteMatch = text.match(/\b(Order_[A-Za-z0-9_-]+)\b/i) ||
+                    text.match(/(?:Note|Remarks?|Ref|For)[\s:=-]+([A-Za-z0-9_-]+)/i);
   if (noteMatch) {
     note = noteMatch[1];
   }

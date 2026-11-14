@@ -37,7 +37,7 @@
     {
       "parameters": {
         "method": "GET",
-        "url": "={{'http://worker:8000/v1/client/attestations/recent?after_id='+$json.after_id}}",
+        "url": "={{ ($env.FINTECH_API_BASE_URL || $env.WORKER_API_BASE_URL || 'http://worker:8000') + '/v1/client/attestations/recent?after_id=' + $json.after_id }}",
         "authentication": "genericCredentialType",
         "genericAuthType": "httpHeaderAuth",
         "options": {}
