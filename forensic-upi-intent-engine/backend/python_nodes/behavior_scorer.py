@@ -26,8 +26,8 @@ def score_behavior(
     return {
         "risk_score": min(100, score),
         "flags": flags,
-        "decision": "DEVICE_INTEGRITY_REJECT" if score >= 40 else "DEVICE_INTEGRITY_PASS",
-        "integrity_passed": score < 40,
+        "decision": "DEVICE_INTEGRITY_REJECT" if flags else "DEVICE_INTEGRITY_PASS",
+        "integrity_passed": not flags,
         "can_confirm_payment": False,
         "note": "Integrity threshold policy applied to signed device observations.",
     }
