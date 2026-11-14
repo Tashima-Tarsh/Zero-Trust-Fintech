@@ -153,8 +153,8 @@ def analyze_intent(
     return {
         "session_id": str(body.session_id),
         "submission_id": str(body.submission_id),
-        "decision": "DEVICE_INTEGRITY_REJECT" if score >= 40 else "DEVICE_INTEGRITY_PASS",
-        "integrity_passed": score < 40,
+        "decision": "DEVICE_INTEGRITY_REJECT" if any(x not in ("no_image_supplied", "unverified_success_claim") for x in flags) else "DEVICE_INTEGRITY_PASS",
+        "integrity_passed": not any(x not in ("no_image_supplied", "unverified_success_claim") for x in flags),
         "risk_score": score,
         "risk_flags": flags,
         "ocr_status_keywords": sorted(keywords),
