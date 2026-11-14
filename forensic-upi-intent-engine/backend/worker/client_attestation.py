@@ -121,6 +121,15 @@ def attest_payment(body: ClientAttestation):
         if session["amount_paise"] != amount_paise:
             raise HTTPException(409, "Amount does not match session")
         cur.execute(
+            """SELECT EXISTS (
+                 SELECT 1 FROM phase2_forensic_submissions
+                 WHERE session_id=%s AND decision='DEVICE_INTEGRITY_REJECT'
+            ) AS rejected""",
+            (body.session_id,),
+        )
+        if cur.fetchone()["rejected"]:
+            raise HTTPException(422, "Prior device-integrity rejection on session")
+        cur.execute(
             """SELECT public_key_b64, hardware_attested FROM client_device_keys
                WHERE user_id=%s AND device_id=%s AND is_active=TRUE FOR SHARE""",
             (body.user_id, body.device_id),
