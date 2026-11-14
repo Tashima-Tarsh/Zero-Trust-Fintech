@@ -154,7 +154,7 @@ function updateUIWithSession(s) {
 
   const cents = Math.round((s.challengeAmount - s.baseAmount) * 100);
   const centsEl = document.getElementById('challengeCentsBadge');
-  if (centsEl) centsEl.textContent = `+₹0.${cents < 10 ? '0' + cents : cents} Challenge Cents`;
+  if (centsEl) centsEl.textContent = `+₹0.${cents < 10 ? '0' + cents : cents}`;
 
   const orderIdEl = document.getElementById('orderIdVal');
   if (orderIdEl) orderIdEl.textContent = s.orderId;
@@ -167,7 +167,25 @@ function updateUIWithSession(s) {
 
   const simOrderEl = document.getElementById('simOrderIdInput');
   if (simOrderEl) simOrderEl.value = s.orderId;
+
+  // Hide expired overlay if previously shown
+  const expiredOverlay = document.getElementById('qrExpiredOverlay');
+  if (expiredOverlay) expiredOverlay.style.display = 'none';
+
+  // Update mobile intent button
+  const mobilePayBtn = document.getElementById('mobilePayButton');
+  if (mobilePayBtn && s.upiLink) {
+    mobilePayBtn.href = s.upiLink;
+  }
 }
+
+window.triggerDirectUpiPay = function() {
+  if (activeSession && activeSession.upiLink) {
+    window.location.href = activeSession.upiLink;
+  }
+};
+
+window.fetchNewSession = fetchNewSession;
 
 // 6. Interactive Savings Calculator (Bento Card 3)
 function initSavingsCalculator() {

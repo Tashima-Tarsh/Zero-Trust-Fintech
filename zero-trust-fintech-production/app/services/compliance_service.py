@@ -23,13 +23,16 @@ def generate_gst_invoice(
     merchant_gstin: Optional[str] = "27AABCV1234F1Z8",
     merchant_name: Optional[str] = "Ramesh Provision Stores",
     is_interstate: bool = False,
-    gst_rate: float = 0.0
+    gst_rate: float = 0.0,
 ) -> GSTInvoice:
     """Generate GST Tax Invoice following Section 31 of CGST Act"""
     now = datetime.now(timezone.utc)
-    inv_sequence = db.query(func.count(GSTInvoice.id)).filter(
-        GSTInvoice.merchant_id == merchant_id
-    ).scalar() or 0
+    inv_sequence = (
+        db.query(func.count(GSTInvoice.id))
+        .filter(GSTInvoice.merchant_id == merchant_id)
+        .scalar()
+        or 0
+    )
     inv_number = f"INV-{now.year}-{now.month:02d}-{inv_sequence + 1:06d}"
 
     if gst_rate > 0:
@@ -64,7 +67,7 @@ def generate_gst_invoice(
         invoice_date=date.today(),
         financial_year="2026-27",
         hsn_code="997199",
-        status="GENERATED"
+        status="GENERATED",
     )
 
     db.add(invoice)
@@ -73,10 +76,7 @@ def generate_gst_invoice(
 
 
 def check_and_record_tds(
-    db: Session,
-    merchant_id: str,
-    annual_turnover: float,
-    current_tx_amount: float
+    db: Session, merchant_id: str, annual_turnover: float, current_tx_amount: float
 ) -> Optional[TDSRecord]:
     """Section 194Q: 0.1% TDS on aggregate value exceeding ₹50,00,000"""
     threshold = 5000000.0
@@ -91,7 +91,7 @@ def check_and_record_tds(
             total_volume=annual_turnover,
             tds_amount=tds_amount,
             deducted_at=datetime.now(timezone.utc),
-            deposited=False
+            deposited=False,
         )
         db.add(tds)
         db.commit()

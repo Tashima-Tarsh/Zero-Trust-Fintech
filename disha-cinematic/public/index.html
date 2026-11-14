@@ -97,7 +97,7 @@
       <a href="#scene-ledger" class="mobile-link">05. Double-Entry Accounting</a>
       <a href="#scene-calculator" class="mobile-link">06. P&amp;L Savings Calculator</a>
       <a href="#scene-soundbox" class="mobile-link">07. Browser Voice Soundbox</a>
-      <a href="/login" class="mobile-link highlight">🔐 Open Merchant Workspace</a>
+      <a href="/login" class="mobile-link highlight">Open Merchant Workspace →</a>
     </div>
   </div>
 
@@ -229,7 +229,7 @@
 
                     <div class="hud-qr-actions">
                       <div class="hud-prompt-text" id="scanPromptText">
-                        ⚡ Click QR code to simulate customer scan
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align: -2px; margin-right: 4px;"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon></svg>Click QR code to simulate customer scan
                       </div>
                       <div class="hud-sub-text">
                         Supports PhonePe · Google Pay · Paytm · BHIM
@@ -415,7 +415,9 @@
           
           <div class="pipeline-step-card">
             <div class="step-num-badge">01</div>
-            <div class="step-icon">📱</div>
+            <div class="step-icon">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="5" y="2" width="14" height="20" rx="2" ry="2"></rect><line x1="12" y1="18" x2="12.01" y2="18"></line></svg>
+            </div>
             <h4 class="step-title">Customer Device</h4>
             <p class="step-desc">
               Customer triggers payment using their existing UPI app (GPay, PhonePe, Paytm) via standard NPCI deep links.
@@ -425,7 +427,9 @@
 
           <div class="pipeline-step-card">
             <div class="step-num-badge">02</div>
-            <div class="step-icon">🔄</div>
+            <div class="step-icon">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="16 3 21 3 21 8"></polyline><line x1="4" y1="20" x2="21" y2="3"></line><polyline points="21 16 21 21 16 21"></polyline><line x1="15" y1="15" x2="21" y2="21"></line><line x1="4" y1="4" x2="9" y2="9"></line></svg>
+            </div>
             <h4 class="step-title">Smart VPA Routing</h4>
             <p class="step-desc">
               Incoming payments are dynamically assigned across merchant bank VPAs to prevent banking velocity bans.
@@ -435,7 +439,9 @@
 
           <div class="pipeline-step-card">
             <div class="step-num-badge">03</div>
-            <div class="step-icon">🛡️</div>
+            <div class="step-icon">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path><path d="M9 12l2 2 4-4"></path></svg>
+            </div>
             <h4 class="step-title">7-Layer Fraud Engine</h4>
             <p class="step-desc">
               Verifies session TTL, exact challenge cents, 12-digit UTR freshness, and blacklist replay detection.
@@ -445,7 +451,9 @@
 
           <div class="pipeline-step-card">
             <div class="step-num-badge">04</div>
-            <div class="step-icon">🏦</div>
+            <div class="step-icon">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 21h18M3 10h18M5 6l7-3 7 3M4 10v11M20 10v11M8 14v4M12 14v4M16 14v4"></path></svg>
+            </div>
             <h4 class="step-title">Bank Ledger &amp; Voice</h4>
             <p class="step-desc">
               Direct credit into merchant bank account, atomic double-entry ledger posting, and counter voice announcement.
@@ -529,7 +537,8 @@
           <div class="vpa-sim-header">
             <span>ALGORITHM TELEMETRY: WEIGHTED VPA SCORING &amp; PATTERN MASKING</span>
             <button class="btn-terminal-action" id="btnSimulateOrder">
-              ⚡ Simulate Incoming ₹500 Transaction
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align: -2px; margin-right: 4px;"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon></svg>
+              <span>Simulate Incoming ₹500 Transaction</span>
             </button>
           </div>
           <div class="vpa-sim-body font-mono" id="algoLogBody">
@@ -693,7 +702,8 @@
 
             <div class="soundbox-controls-row">
               <button class="btn-soundbox-play" id="testSoundboxEnBtn" onclick="window.dishaAudio && window.dishaAudio.speakPayment(1000)">
-                🔊 Test Audio Voice Announcement
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align: -3px; margin-right: 6px;"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon><path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"></path></svg>
+                <span>Test Audio Voice Announcement</span>
               </button>
             </div>
           </div>

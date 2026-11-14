@@ -153,7 +153,8 @@
             </div>
 
             <button type="button" class="btn-test-sound-sample" onclick="testSoundSample()">
-              <span>🔊 Test Announcement Voice</span>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align: -3px; margin-right: 6px;"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon><path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"></path></svg>
+              <span>Test Announcement Voice</span>
             </button>
           </div>
 
@@ -179,7 +180,7 @@
               <span>← Back</span>
             </button>
             <button type="submit" id="btnFinishSetup" class="btn-step-finish">
-              <span id="finishBtnText">Complete Setup & Open Dashboard ✓</span>
+              <span id="finishBtnText">Complete Setup & Open Dashboard</span>
               <div id="finishSpinner" class="spinner" style="display: none;"></div>
             </button>
           </div>
@@ -394,7 +395,7 @@
         if (!response.ok) {
           showError(result.error || 'Setup failed. Please check your inputs.');
           finishBtn.disabled = false;
-          finishBtnText.textContent = 'Complete Setup & Open Dashboard ✓';
+          finishBtnText.textContent = 'Complete Setup & Open Dashboard';
           finishSpinner.style.display = 'none';
           return;
         }
@@ -409,7 +410,7 @@
       } catch (err) {
         showError('Network error. Failed to save configuration.');
         finishBtn.disabled = false;
-        finishBtnText.textContent = 'Complete Setup & Open Dashboard ✓';
+        finishBtnText.textContent = 'Complete Setup & Open Dashboard';
         finishSpinner.style.display = 'none';
       }
     });

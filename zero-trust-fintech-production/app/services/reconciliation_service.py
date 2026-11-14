@@ -9,21 +9,20 @@ from ..models.database import Transaction
 
 
 def reconcile_bank_statement(
-    db: Session,
-    merchant_id: str,
-    bank_statement_entries: List[Dict[str, Any]]
+    db: Session, merchant_id: str, bank_statement_entries: List[Dict[str, Any]]
 ) -> Dict[str, Any]:
     """
     Reconciles external bank statement records with internal ledger transactions.
-    
+
     bank_statement_entries format:
     [{ "utr": "311400000123", "amount": 1249.37, "date": "2026-11-15" }, ...]
     """
     # Fetch all merchant transactions
     db_txs = {
-        tx.utr: tx for tx in db.query(Transaction).filter(
-            Transaction.merchant_id == merchant_id
-        ).all()
+        tx.utr: tx
+        for tx in db.query(Transaction)
+        .filter(Transaction.merchant_id == merchant_id)
+        .all()
     }
 
     matched: List[Dict[str, Any]] = []
@@ -43,40 +42,37 @@ def reconcile_bank_statement(
             tx = db_txs[utr]
             total_ledger_volume += float(tx.amount)
             if abs(float(tx.amount) - amt) < 0.01:
-                matched.append({
-                    "utr": utr,
-                    "amount": amt,
-                    "status": "RECONCILED",
-                    "tx_id": tx.id
-                })
+                matched.append(
+                    {"utr": utr, "amount": amt, "status": "RECONCILED", "tx_id": tx.id}
+                )
             else:
-                unreconciled.append({
-                    "utr": utr,
-                    "bank_amount": amt,
-                    "ledger_amount": float(tx.amount),
-                    "reason": "AMOUNT_MISMATCH"
-                })
+                unreconciled.append(
+                    {
+                        "utr": utr,
+                        "bank_amount": amt,
+                        "ledger_amount": float(tx.amount),
+                        "reason": "AMOUNT_MISMATCH",
+                    }
+                )
         else:
-            unreconciled.append({
-                "utr": utr,
-                "bank_amount": amt,
-                "reason": "NOT_FOUND_IN_LEDGER"
-            })
+            unreconciled.append(
+                {"utr": utr, "bank_amount": amt, "reason": "NOT_FOUND_IN_LEDGER"}
+            )
 
     # Find transactions in ledger not yet in bank statement (in-transit)
     pending: List[Dict[str, Any]] = []
     for utr, tx in db_txs.items():
         if utr not in seen_utrs:
-            pending.append({
-                "utr": utr,
-                "amount": float(tx.amount),
-                "status": "PENDING_IN_TRANSIT"
-            })
+            pending.append(
+                {"utr": utr, "amount": float(tx.amount), "status": "PENDING_IN_TRANSIT"}
+            )
 
     variance = abs(total_bank_volume - total_ledger_volume)
 
     return {
-        "status": "MATCHED" if variance < 0.01 and len(unreconciled) == 0 else "DISCREPANCY",
+        "status": (
+            "MATCHED" if variance < 0.01 and len(unreconciled) == 0 else "DISCREPANCY"
+        ),
         "matched_count": len(matched),
         "matched_volume": sum(m["amount"] for m in matched),
         "unreconciled_count": len(unreconciled),
@@ -85,5 +81,5 @@ def reconcile_bank_statement(
         "pending_volume": sum(p["amount"] for p in pending),
         "total_bank_volume": total_bank_volume,
         "total_ledger_volume": total_ledger_volume,
-        "variance": variance
+        "variance": variance,
     }

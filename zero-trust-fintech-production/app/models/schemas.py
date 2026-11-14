@@ -1,6 +1,7 @@
 from pydantic import BaseModel, Field
 from typing import Dict, Any, Optional
 
+
 class TransactionPayload(BaseModel):
     utr: str = Field(..., min_length=10, max_length=20)
     amount: float = Field(..., gt=0)
@@ -17,9 +18,11 @@ class TransactionPayload(BaseModel):
     ip_address: Optional[str] = "127.0.0.1"
     user_agent: Optional[str] = "Mozilla/5.0 (Linux; Android)"
 
+
 class ChallengeRequest(BaseModel):
     merchant_id: str
     amount: float
+
 
 class LedgerResponse(BaseModel):
     status: str

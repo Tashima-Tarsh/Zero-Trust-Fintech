@@ -20,9 +20,10 @@ settings = get_settings()
 
 logging.basicConfig(
     level=getattr(logging, settings.LOG_LEVEL, logging.INFO),
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
 )
 logger = logging.getLogger(__name__)
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -34,13 +35,13 @@ async def lifespan(app: FastAPI):
         logger.warning(f"Database schema init notice: {e}")
     await init_redis()
     setup_audit_logging()
-    
+
     # Background workers (P1-4 Notification Retry & P2-2 Forensics Triage)
     retry_task = asyncio.create_task(notification_service.process_retry_queue())
     forensics_task = asyncio.create_task(forensics_service.process_forensics_queue())
-    
+
     yield
-    
+
     # Shutdown
     logger.info("🛑 Shutting down Zero-Trust Fintech API")
     retry_task.cancel()
@@ -51,16 +52,18 @@ async def lifespan(app: FastAPI):
         pass
     await close_redis()
 
+
 app = FastAPI(
     title="Zero-Trust Fintech API",
     description="SharePay MVP: Direct UPI checkout with 5-layer fraud detection, atomic challenge verification, and Merkle ledger",
     version="2.0.0",
-    lifespan=lifespan
+    lifespan=lifespan,
 )
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=getattr(settings, "CORS_ORIGINS", None) or [
+    allow_origins=getattr(settings, "CORS_ORIGINS", None)
+    or [
         "http://localhost:3000",
         "http://localhost:5000",
         "http://localhost:5173",
@@ -79,14 +82,18 @@ app.include_router(auth_router)
 app.include_router(api_router, prefix="/api/v1")
 app.include_router(auth_router, prefix="/api/v1")
 
+
 @app.websocket("/ws/{merchant_id}")
 async def websocket_route(
     websocket: WebSocket,
     merchant_id: str,
-    token: Optional[str] = Query(None, description="JWT token with merchant authorization scope")
+    token: Optional[str] = Query(
+        None, description="JWT token with merchant authorization scope"
+    ),
 ):
     """Authenticated WebSocket endpoint with merchant scoping (P0-1)"""
     await websocket_endpoint(websocket, merchant_id, token)
+
 
 @app.exception_handler(Exception)
 async def global_exception_handler(request, exc):

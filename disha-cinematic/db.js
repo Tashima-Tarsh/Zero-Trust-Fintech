@@ -124,6 +124,32 @@ function generateToken() {
   return crypto.randomBytes(32).toString('hex');
 }
 
+// Helper: Canonical Bank Name Resolution from VPA
+function deriveBankFromVpa(vpaAddress, customBank = '') {
+  if (customBank && customBank.trim()) return customBank.trim();
+  const v = (vpaAddress || '').toLowerCase().trim();
+  if (v.includes('@oksbi') || v.includes('@sbi')) return 'State Bank of India';
+  if (v.includes('@okhdfcbank') || v.includes('@hdfcbank') || v.includes('@hdfc')) return 'HDFC Bank';
+  if (v.includes('@okicici') || v.includes('@icici') || v.includes('@ibl')) return 'ICICI Bank';
+  if (v.includes('@okaxis') || v.includes('@axisbank') || v.includes('@axis')) return 'Axis Bank';
+  if (v.includes('@ybl') || v.includes('@yesbank') || v.includes('@yes')) return 'YES Bank';
+  if (v.includes('@paytm')) return 'Paytm Payments Bank';
+  if (v.includes('@kotak') || v.includes('@kmbl')) return 'Kotak Mahindra Bank';
+  if (v.includes('@barodampay') || v.includes('@bob')) return 'Bank of Baroda';
+  if (v.includes('@pnb')) return 'Punjab National Bank';
+  if (v.includes('@apl')) return 'Amazon Pay (Axis Bank)';
+  if (v.includes('@fbl')) return 'Federal Bank';
+  if (v.includes('@idfc') || v.includes('@idfcbank')) return 'IDFC FIRST Bank';
+  if (v.includes('@unionbank') || v.includes('@uboi')) return 'Union Bank of India';
+  if (v.includes('@canara')) return 'Canara Bank';
+  if (v.includes('@indus')) return 'IndusInd Bank';
+  if (v.includes('@')) {
+    const handle = v.split('@')[1].toUpperCase();
+    return `${handle} Bank`;
+  }
+  return 'UPI Bank';
+}
+
 // Merchant functions
 function createMerchant({ email, password, businessName = '', phone = '', city = '', primaryVpa = '', setupCompleted = 0 }) {
   const id = 'm_' + crypto.randomBytes(8).toString('hex');
@@ -138,12 +164,12 @@ function createMerchant({ email, password, businessName = '', phone = '', city =
 
   if (primaryVpa) {
     const vpaId = 'vpa_' + crypto.randomBytes(6).toString('hex');
-    const bank = primaryVpa.includes('@') ? primaryVpa.split('@')[1].toUpperCase() : 'UPI';
+    const bank = deriveBankFromVpa(primaryVpa);
     const vpaStmt = db.prepare(`
       INSERT INTO merchant_vpas (id, merchant_id, vpa_address, bank_name, is_default, status, created_at)
       VALUES (?, ?, ?, ?, 1, 'ACTIVE', ?)
     `);
-    vpaStmt.run(vpaId, id, primaryVpa, bank, now);
+    vpaStmt.run(vpaId, id, primaryVpa.toLowerCase().trim(), bank, now);
   }
 
   // Welcome notification
@@ -198,23 +224,29 @@ function deleteSession(token) {
 
 function completeSetup(merchantId, { businessName, contactPhone, city, primaryVpa, soundboxEnabled = true, soundboxLang = 'en' }) {
   const now = Date.now();
+  const normalizedVpa = primaryVpa ? primaryVpa.toLowerCase().trim() : '';
+
   const stmt = db.prepare(`
     UPDATE merchants
     SET business_name = ?, contact_phone = ?, city = ?, primary_vpa = ?, setup_completed = 1, soundbox_enabled = ?, soundbox_lang = ?, updated_at = ?
     WHERE id = ?
   `);
-  stmt.run(businessName, contactPhone, city, primaryVpa, soundboxEnabled ? 1 : 0, soundboxLang, now, merchantId);
+  stmt.run(businessName, contactPhone, city, normalizedVpa, soundboxEnabled ? 1 : 0, soundboxLang, now, merchantId);
 
-  // Add primary VPA to list if not already added
-  if (primaryVpa) {
-    const existing = db.prepare('SELECT id FROM merchant_vpas WHERE merchant_id = ? AND vpa_address = ?').get(merchantId, primaryVpa);
+  // Enforce single default: clear is_default on any existing VPAs for this merchant
+  if (normalizedVpa) {
+    db.prepare('UPDATE merchant_vpas SET is_default = 0 WHERE merchant_id = ?').run(merchantId);
+
+    const existing = db.prepare('SELECT id FROM merchant_vpas WHERE merchant_id = ? AND vpa_address = ?').get(merchantId, normalizedVpa);
     if (!existing) {
       const vpaId = 'vpa_' + crypto.randomBytes(6).toString('hex');
-      const bank = primaryVpa.includes('@') ? primaryVpa.split('@')[1].toUpperCase() : 'UPI';
+      const bank = deriveBankFromVpa(normalizedVpa);
       db.prepare(`
         INSERT INTO merchant_vpas (id, merchant_id, vpa_address, bank_name, is_default, status, created_at)
         VALUES (?, ?, ?, ?, 1, 'ACTIVE', ?)
-      `).run(vpaId, merchantId, primaryVpa, bank, now);
+      `).run(vpaId, merchantId, normalizedVpa, bank, now);
+    } else {
+      db.prepare("UPDATE merchant_vpas SET is_default = 1, status = 'ACTIVE' WHERE id = ?").run(existing.id);
     }
   }
 
@@ -268,7 +300,27 @@ function updateMerchantPassword(merchantId, currentPassword, newPassword) {
 // VPA Management
 function getMerchantVPAs(merchantId) {
   const stmt = db.prepare('SELECT id, vpa_address, bank_name, is_default, status, created_at FROM merchant_vpas WHERE merchant_id = ? ORDER BY is_default DESC, created_at DESC');
-  return stmt.all(merchantId);
+  let rows = stmt.all(merchantId);
+
+  // Database Integrity Self-Repair: Strictly enforce exactly ONE default VPA per merchant
+  if (rows && rows.length > 0) {
+    const defaultRows = rows.filter(r => r.is_default === 1);
+    if (defaultRows.length > 1) {
+      // Keep only the first default row, reset the rest to 0
+      const keepDefaultId = defaultRows[0].id;
+      db.prepare('UPDATE merchant_vpas SET is_default = 0 WHERE merchant_id = ? AND id != ?').run(merchantId, keepDefaultId);
+      rows.forEach(r => {
+        if (r.id !== keepDefaultId) r.is_default = 0;
+      });
+    } else if (defaultRows.length === 0) {
+      // If no default exists, promote the first active row
+      const candidate = rows.find(r => r.status === 'ACTIVE') || rows[0];
+      db.prepare('UPDATE merchant_vpas SET is_default = 1 WHERE id = ?').run(candidate.id);
+      candidate.is_default = 1;
+    }
+  }
+
+  return rows;
 }
 
 function addMerchantVPA(merchantId, vpaAddress, bankName = '') {
@@ -278,10 +330,14 @@ function addMerchantVPA(merchantId, vpaAddress, bankName = '') {
 
   const vpaId = 'vpa_' + crypto.randomBytes(6).toString('hex');
   const now = Date.now();
-  const derivedBank = bankName || (normalized.includes('@') ? normalized.split('@')[1].toUpperCase() : 'UPI');
+  const derivedBank = deriveBankFromVpa(normalized, bankName);
 
   const count = db.prepare('SELECT COUNT(*) as count FROM merchant_vpas WHERE merchant_id = ?').get(merchantId).count;
   const isDefault = count === 0 ? 1 : 0;
+
+  if (isDefault) {
+    db.prepare('UPDATE merchant_vpas SET is_default = 0 WHERE merchant_id = ?').run(merchantId);
+  }
 
   db.prepare(`
     INSERT INTO merchant_vpas (id, merchant_id, vpa_address, bank_name, is_default, status, created_at)
@@ -315,12 +371,17 @@ function setDefaultVPA(merchantId, vpaId) {
 function deleteVPA(merchantId, vpaId) {
   const vpa = db.prepare('SELECT is_default, vpa_address FROM merchant_vpas WHERE id = ? AND merchant_id = ?').get(vpaId, merchantId);
   if (!vpa) throw new Error('VPA not found');
-  if (vpa.is_default) {
-    const total = db.prepare('SELECT COUNT(*) as count FROM merchant_vpas WHERE merchant_id = ?').get(merchantId).count;
-    if (total > 1) {
-      throw new Error('Cannot delete default UPI ID. Please set another UPI ID as default first.');
+  
+  const total = db.prepare('SELECT COUNT(*) as count FROM merchant_vpas WHERE merchant_id = ?').get(merchantId).count;
+  if (vpa.is_default && total > 1) {
+    // Automatically designate another active VPA as default before deleting
+    const nextCandidate = db.prepare("SELECT id, vpa_address FROM merchant_vpas WHERE merchant_id = ? AND id != ? ORDER BY (status = 'ACTIVE') DESC, created_at DESC").get(merchantId, vpaId);
+    if (nextCandidate) {
+      db.prepare('UPDATE merchant_vpas SET is_default = 1 WHERE id = ?').run(nextCandidate.id);
+      db.prepare('UPDATE merchants SET primary_vpa = ? WHERE id = ?').run(nextCandidate.vpa_address, merchantId);
     }
   }
+
   db.prepare('DELETE FROM merchant_vpas WHERE id = ? AND merchant_id = ?').run(vpaId, merchantId);
   return true;
 }
@@ -347,22 +408,18 @@ function bulkImportMerchantVPAs(merchantId, rows) {
     }
 
     const vpaId = 'vpa_' + crypto.randomBytes(6).toString('hex');
-    let bank = r.bank_name || '';
-    if (!bank) {
-      if (vpa.includes('@oksbi') || vpa.includes('@sbi')) bank = 'SBI';
-      else if (vpa.includes('@okhdfcbank') || vpa.includes('@hdfcbank')) bank = 'HDFC Bank';
-      else if (vpa.includes('@okicici') || vpa.includes('@icici')) bank = 'ICICI Bank';
-      else if (vpa.includes('@okaxis') || vpa.includes('@axisbank')) bank = 'Axis Bank';
-      else if (vpa.includes('@ybl') || vpa.includes('@yesbank')) bank = 'YES Bank';
-      else if (vpa.includes('@paytm')) bank = 'Paytm Payments Bank';
-      else bank = vpa.split('@')[1].toUpperCase();
-    }
+    const bank = deriveBankFromVpa(vpa, r.bank_name);
+    const existingCount = db.prepare('SELECT COUNT(*) as count FROM merchant_vpas WHERE merchant_id = ?').get(merchantId).count;
+    const isDefault = existingCount === 0 && results.added === 0 ? 1 : 0;
 
     try {
       db.prepare(`
         INSERT INTO merchant_vpas (id, merchant_id, vpa_address, bank_name, is_default, status, created_at)
-        VALUES (?, ?, ?, ?, 0, 'ACTIVE', ?)
-      `).run(vpaId, merchantId, vpa, bank, now);
+        VALUES (?, ?, ?, ?, ?, 'ACTIVE', ?)
+      `).run(vpaId, merchantId, vpa, bank, isDefault, now);
+      if (isDefault) {
+        db.prepare('UPDATE merchants SET primary_vpa = ? WHERE id = ?').run(vpa, merchantId);
+      }
       results.added++;
     } catch (err) {
       results.errors.push({ row: i + 1, vpa, error: err.message });
@@ -572,7 +629,7 @@ function getMerchantDashboardData(merchantId, dateFilter = '30d') {
   }
 
   const totalTxns = orders.length;
-  const successRate = totalTxns > 0 ? ((completedCount / totalTxns) * 100).toFixed(1) : '100.0';
+  const successRate = totalTxns > 0 ? parseFloat(((completedCount / totalTxns) * 100).toFixed(1)) : null;
   const savedMdr = (totalVolume * 0.0236).toFixed(2); // Typical 2% gateway + 18% GST savings
   const avgTicket = completedCount > 0 ? (totalVolume / completedCount).toFixed(2) : '0.00';
 
@@ -604,7 +661,7 @@ function getMerchantDashboardData(merchantId, dateFilter = '30d') {
       totalTransactions: totalTxns,
       completedTransactions: completedCount,
       pendingTransactions: pendingCount,
-      successRate: parseFloat(successRate),
+      successRate: successRate,
       feesSaved: parseFloat(savedMdr),
       averageTicket: parseFloat(avgTicket)
     },

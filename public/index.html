@@ -3,24 +3,24 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>DISHA 8.2 — Zero-Fee, Fraud-Proof UPI Checkout</title>
-  <meta name="description" content="DISHA 8.2 Sovereign Direct UPI Payment Rail with Dynamic Mathematical Challenge, Untouchable Canvas QR, and 7-Layer Fraud Verification.">
+  <title>Pay with UPI — DISHA Sovereign Checkout</title>
+  <meta name="description" content="Pay securely using any UPI app. Direct zero-fee settlement directly to merchant bank account.">
 
   <!-- Manifest for PWA & Android Share Target -->
   <link rel="manifest" href="/manifest.json">
-  <meta name="theme-color" content="#6366f1">
+  <meta name="theme-color" content="#4F46E5">
   <link rel="icon" type="image/png" href="/icon-192.png">
 
-  <!-- Google Fonts: Space Grotesk + Inter + JetBrains Mono -->
+  <!-- Fonts: Inter & JetBrains Mono -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;600;700&family=Space+Grotesk:wght@600;700;800&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;600;700&display=swap" rel="stylesheet">
 
   <link rel="stylesheet" href="/styles.css">
 </head>
 <body>
 
-  <!-- Ambient Animated Mesh Gradient -->
+  <!-- Ambient Subtle Background -->
   <div class="mesh-gradient-bg" aria-hidden="true"></div>
 
   <div class="checkout-wrapper">
@@ -29,308 +29,250 @@
     <header class="top-navbar">
       <div class="brand-group">
         <div class="brand-logo-icon">
-          <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2.2">
+          <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.2">
             <polygon points="12 2 22 8.5 22 15.5 12 22 2 15.5 2 8.5 12 2"></polygon>
-            <circle cx="12" cy="12" r="3" fill="#14B8A6"></circle>
+            <circle cx="12" cy="12" r="3" fill="#0D9488"></circle>
           </svg>
         </div>
-        <div>
+        <div class="brand-titles">
           <span class="brand-text">DISHA</span>
-          <span class="brand-version">8.2 PRO</span>
+          <span class="brand-sub">Sovereign Payments</span>
         </div>
       </div>
 
-      <div class="live-badge">
-        <span class="pulse-dot"></span>
-        <span>NPCI DIRECT · 0% MDR</span>
+      <div class="security-badge">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#0D9488" stroke-width="2.2">
+          <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path>
+          <polyline points="9 12 11 14 15 10"></polyline>
+        </svg>
+        <span>Direct Bank Settlement · 0% Fee</span>
       </div>
     </header>
 
-    <!-- Main Two-Column Checkout Grid -->
-    <main class="checkout-grid">
+    <!-- Main Focused Checkout Card -->
+    <main class="checkout-card">
 
-      <!-- LEFT: Order Summary & Mathematical Challenge Breakdown -->
-      <section class="glass-card">
-        <div class="order-summary-header">
-          <div class="section-label">Direct Settlement Checkout</div>
-          <h1 class="order-headline">Order Payment</h1>
-        </div>
-
-        <div class="line-item-row">
-          <span>Order Base Amount</span>
-          <strong id="baseAmountVal" class="font-mono">₹100.00</strong>
-        </div>
-
-        <div class="line-item-row highlight">
+      <!-- LEFT: Order Summary & Transparent Price Breakdown -->
+      <section class="checkout-left">
+        <!-- Merchant Identity Header -->
+        <div class="merchant-header">
+          <div class="merchant-avatar" id="merchantAvatarIcon">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#4F46E5" stroke-width="2">
+              <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path>
+              <polyline points="9 22 9 12 15 12 15 22"></polyline>
+            </svg>
+          </div>
           <div>
-            <div class="challenge-math-badge">
-              <span>🛡️ Anti-Replay Challenge</span>
+            <div class="merchant-name-row">
+              <h1 class="merchant-name" id="merchantDisplayName">Ramesh Provision Stores</h1>
+              <span class="verified-pill" title="Verified Sovereign Merchant">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="#0D9488" stroke="none">
+                  <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/>
+                </svg>
+                <span>Verified</span>
+              </span>
             </div>
-            <div style="font-size: 0.75rem; color: var(--text-muted); margin-top: 2px;">
-              Unique decimal cents foil receipt spoofing & old transaction replays
+            <p class="order-subtext" id="orderDescriptionText">Kirana & Grocery Order</p>
+          </div>
+        </div>
+
+        <!-- Transparent Price Breakdown -->
+        <div class="price-breakdown-box">
+          <div class="breakdown-row">
+            <span class="breakdown-label">Order Base Amount</span>
+            <span id="baseAmountVal" class="breakdown-val font-mono">₹100.00</span>
+          </div>
+
+          <div class="breakdown-row adjustment-row">
+            <div class="adjustment-label-group">
+              <span class="breakdown-label">Verification Adjustment</span>
+              <span class="adjustment-info" title="Direct settlement verification adjustment — ensures instant, automatic payment matching without third-party fees.">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <circle cx="12" cy="12" r="10"></circle>
+                  <line x1="12" y1="16" x2="12" y2="12"></line>
+                  <line x1="12" y1="8" x2="12.01" y2="8"></line>
+                </svg>
+              </span>
             </div>
+            <span id="challengeCentsBadge" class="breakdown-val text-teal font-mono">+₹0.37</span>
           </div>
-          <span id="challengeCentsBadge" class="challenge-math-badge">+₹0.37 Cents</span>
-        </div>
 
-        <div class="total-due-card">
-          <div>
-            <div class="total-due-label">Total Payable to Merchant</div>
-            <div style="font-size: 0.75rem; color: var(--teal-600); font-weight: 600;">Zero Gateway Commission</div>
-          </div>
-          <div class="total-due-amount" id="challengeAmountVal">₹100.37</div>
-        </div>
+          <div class="breakdown-divider"></div>
 
-        <div class="merchant-meta-list">
-          <div class="meta-item">
-            <span class="meta-label">Order Identifier:</span>
-            <span class="meta-val" id="orderIdVal">Order_XXXXXXXXX</span>
-          </div>
-          <div class="meta-item">
-            <span class="meta-label">Transaction Reference:</span>
-            <span class="meta-val" id="txnRefVal">TXN_XXXXXXXXX</span>
-          </div>
-          <div class="meta-item">
-            <span class="meta-label">Settlement VPA Handle:</span>
-            <span class="meta-val" id="vpaAddressVal" style="color: var(--indigo-600);">disha82@okaxis</span>
+          <div class="breakdown-row total-row">
+            <div>
+              <span class="total-label">Total Payable</span>
+              <span class="total-sub">Direct credit to merchant account</span>
+            </div>
+            <div class="total-amount font-mono" id="challengeAmountVal">₹100.37</div>
           </div>
         </div>
 
-        <!-- Testing & Developer Simulation Helper -->
-        <div class="sim-panel">
-          <div style="font-size: 0.8rem; font-weight: 700; color: var(--text-main); margin-bottom: 6px;">
-            ⚡ Instant Verification Test
+        <!-- Payment Meta Details -->
+        <div class="order-meta-box">
+          <div class="meta-row">
+            <span class="meta-title">Order Reference:</span>
+            <span class="meta-value font-mono" id="orderIdVal">Order_XXXXXXXXX</span>
           </div>
-          <p style="font-size: 0.75rem; color: var(--text-muted); margin-bottom: 12px;">
-            Simulate a customer payment receipt scan. Verifies 7-Layer Fraud Engine, writes Double-Entry Ledger, and sends WebSocket notification.
-          </p>
-          <button id="btnSimulatePay" class="btn-primary-gradient" onclick="simulateTestPayment()" style="margin-top: 0; padding: 12px 18px; font-size: 0.85rem;">
-            ⚡ Simulate Instant Payment (Tests WebSocket)
-          </button>
+          <div class="meta-row">
+            <span class="meta-title">Payee UPI ID:</span>
+            <span class="meta-value font-mono text-indigo" id="vpaAddressVal">disha82@okaxis</span>
+          </div>
+          <!-- Hidden reference for automation scripts -->
+          <span id="txnRefVal" style="display: none;">TXN_XXXXXXXXX</span>
+        </div>
+
+        <!-- Security & Bank Reassurance -->
+        <div class="trust-reassurance">
+          <div class="trust-icon">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#0D9488" stroke-width="2">
+              <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
+              <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
+            </svg>
+          </div>
+          <div class="trust-text">
+            <strong>Direct Interbank Settlement via NPCI UPI</strong>
+            <p>Your payment clears directly to the merchant's bank account. No intermediary wallet or escrow deductions.</p>
+          </div>
         </div>
       </section>
 
-      <!-- RIGHT: Untouchable Canvas QR & Touch-to-Pay -->
-      <section class="glass-card qr-card-center">
-        <div class="section-label">Scan or Tap to Pay via Any UPI App</div>
-        <h2 style="font-family: var(--font-display); font-size: 1.4rem; font-weight: 700; margin: 4px 0 12px;">
-          Untouchable QR Engine
-        </h2>
-
-        <!-- Canvas QR Container -->
-        <div class="qr-canvas-container" id="qrCanvasBox" title="Tap canvas to pay directly via UPI app">
-          <canvas id="qrCanvas" width="258" height="258"></canvas>
-          <div class="tap-to-pay-pill">👆 TAP CANVAS TO PAY</div>
+      <!-- RIGHT: Payment QR, Supported UPI Apps & Telemetry Status -->
+      <section class="checkout-right">
+        <div class="payment-action-header">
+          <h2 class="payment-title">Pay with UPI</h2>
+          <p class="payment-subtitle">Scan this QR code with any UPI app on your phone</p>
         </div>
 
-        <!-- 15-Second Refresh Countdown Progress -->
-        <div class="qr-timer-bar">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
-            <circle cx="12" cy="12" r="10"></circle>
-            <polyline points="12 6 12 12 16 14"></polyline>
+        <!-- QR Code Canvas with Dynamic Refresh & Expired State -->
+        <div class="qr-presentation-card">
+          <div class="qr-canvas-wrapper" id="qrCanvasBox" title="Tap QR to pay directly on mobile">
+            <canvas id="qrCanvas" width="258" height="258" class="qr-canvas-render"></canvas>
+
+            <!-- Floating Scan Instruction -->
+            <div class="qr-scan-badge">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+                <path d="M3 7V5a2 2 0 0 1 2-2h2M17 3h2a2 2 0 0 1 2 2v2M21 17v2a2 2 0 0 1-2 2h-2M7 21H5a2 2 0 0 1-2-2v-2"></path>
+              </svg>
+              <span>Scan with GPay, PhonePe, Paytm or BHIM</span>
+            </div>
+
+            <!-- EXPIRED OVERLAY STATE -->
+            <div id="qrExpiredOverlay" class="qr-expired-overlay" style="display: none;">
+              <div class="expired-icon">
+                <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#F43F5E" stroke-width="2.2">
+                  <circle cx="12" cy="12" r="10"></circle>
+                  <polyline points="12 6 12 12 16 14"></polyline>
+                </svg>
+              </div>
+              <h3 class="expired-title">This payment link has expired</h3>
+              <p class="expired-desc">For security, payment sessions expire after inactivity. Generate a fresh link to continue.</p>
+              <button type="button" class="btn-refresh-session" onclick="fetchNewSession()">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+                  <path d="M23 4v6h-6M1 20v-6h6"></path>
+                  <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path>
+                </svg>
+                <span>Try Again / Refresh QR</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- Session Expiry Progress Bar -->
+          <div class="qr-countdown-row">
+            <div class="countdown-label-group">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#64748B" stroke-width="2">
+                <circle cx="12" cy="12" r="10"></circle>
+                <polyline points="12 6 12 12 16 14"></polyline>
+              </svg>
+              <span>Auto-refresh in:</span>
+              <strong id="timerSeconds" class="timer-display font-mono">15s</strong>
+            </div>
+            <div class="countdown-progress-track">
+              <div id="timerProgressBar" class="countdown-progress-bar"></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Mobile Direct Intent Button -->
+        <a id="mobilePayButton" href="javascript:void(0)" onclick="triggerDirectUpiPay()" class="btn-mobile-upi-pay">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+            <rect x="5" y="2" width="14" height="20" rx="2" ry="2"></rect>
+            <line x1="12" y1="18" x2="12.01" y2="18"></line>
           </svg>
-          <span>Dynamic Refresh in:</span>
-          <span class="timer-pill" id="timerSeconds">15s</span>
-        </div>
+          <span>Open Installed UPI App to Pay</span>
+        </a>
 
-        <div style="width: 180px; height: 4px; background: #E2E8F0; border-radius: 2px; margin-top: 6px; overflow: hidden;">
-          <div id="timerProgressBar" style="width: 100%; height: 100%; background: var(--indigo-500); transition: width 1s linear;"></div>
-        </div>
-
-        <!-- Listening for Receipt Telemetry HUD -->
-        <div class="telemetry-status-box">
-          <div class="radar-orb">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <path d="M4.9 19.1C1 15.2 1 8.8 4.9 4.9"></path>
-              <path d="M7.8 16.2c-2.3-2.3-2.3-6.1 0-8.5"></path>
-              <circle cx="12" cy="12" r="2"></circle>
-              <path d="M16.2 7.8c2.3 2.3 2.3 6.1 0 8.5"></path>
-              <path d="M19.1 4.9C23 8.8 23 15.2 19.1 19.1"></path>
-            </svg>
-          </div>
-          <div class="telemetry-text">
-            <div class="telemetry-title" id="telemetryStatusText">Listening for UPI Share...</div>
-            <div class="telemetry-sub">Web Share Target + WebSocket Live Receiver</div>
+        <!-- Supported UPI Apps Logo Strip -->
+        <div class="supported-apps-strip">
+          <span class="strip-label">Supported Apps:</span>
+          <div class="apps-pills-row">
+            <span class="app-pill">Google Pay</span>
+            <span class="app-pill">PhonePe</span>
+            <span class="app-pill">Paytm</span>
+            <span class="app-pill">BHIM</span>
+            <span class="app-pill">CRED</span>
+            <span class="app-pill">Navi</span>
           </div>
         </div>
 
-        <!-- Customer 2-Step Share Guide -->
-        <div class="share-guide-card">
-          <h4>📱 How Customer Verifies:</h4>
-          <ul class="step-flow">
-            <li>
-              <span class="step-num">1</span>
-              <span>Tap <strong>"Share Receipt"</strong> in PhonePe, GPay, Paytm, or BHIM.</span>
-            </li>
-            <li>
-              <span class="step-num">2</span>
-              <span>Select <strong>"DISHA 8.2"</strong> from the Android Share Sheet.</span>
-            </li>
-          </ul>
+        <!-- Live Payment Status Telemetry -->
+        <div class="payment-status-card">
+          <div class="status-indicator-pulse">
+            <span class="pulse-ring"></span>
+            <span class="pulse-core"></span>
+          </div>
+          <div class="status-details">
+            <strong id="telemetryStatusText" class="status-main-text">Waiting for payment confirmation...</strong>
+            <p class="status-sub-text">Once payment is approved on your device, this screen updates automatically.</p>
+          </div>
         </div>
       </section>
 
     </main>
 
     <!-- ═══════════════════════════════════════════════════════════════════
-         TASK 12: BENTO GRID (4 High-Impact Feature Cards)
+         DISCREET DEVELOPER & TESTING DRAWER (ISOLATED AT BOTTOM)
+         Preserves automated test targets (#btnSimulatePay, #turnoverSlider)
+         without cluttering customer payment interface
          ═══════════════════════════════════════════════════════════════════ -->
-    <section class="bento-section">
-      <div class="bento-header">
-        <div class="section-label">Enterprise Architecture</div>
-        <h2 class="bento-title">Engineered for Sovereign Merchants</h2>
-        <p class="bento-sub">Zero aggregators. Zero commission deductions. Zero multi-day escrow holdbacks.</p>
+    <footer class="checkout-footer">
+      <div class="dev-tools-drawer">
+        <div class="dev-tools-header">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="12" cy="12" r="3"></circle>
+            <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+          </svg>
+          <span>Developer Integration & Sandbox Testing</span>
+        </div>
+        <div class="dev-tools-body">
+          <div class="dev-tool-row">
+            <div>
+              <strong>Instant Payment Simulation</strong>
+              <p>Simulates real-time bank settlement, double-entry ledger posting, and WebSocket event dispatch.</p>
+            </div>
+            <button id="btnSimulatePay" type="button" class="btn-dev-action" onclick="simulateTestPayment()">
+              ⚡ Simulate Instant Payment (Tests WebSocket)
+            </button>
+          </div>
+
+          <div class="dev-tool-row">
+            <div>
+              <strong>Merchant Revenue & Savings Calculator</strong>
+              <p>Monthly Turnover: <span id="calcTurnoverVal" class="font-mono">₹10,00,000/mo</span> | Annual Gateway Savings: <strong id="calcAnnualSavedVal" class="font-mono text-teal">₹2,83,200</strong></p>
+              <input type="range" id="turnoverSlider" min="100000" max="5000000" step="50000" value="1000000" style="width: 240px; margin-top: 6px;">
+              <span id="calcMonthlySavedVal" style="display: none;">₹23,600</span>
+            </div>
+          </div>
+        </div>
       </div>
 
-      <div class="bento-grid">
-
-        <!-- CARD 1: The Gateway Tax -->
-        <div class="bento-card">
-          <div>
-            <div class="section-label" style="color: var(--coral-500);">MDR Commission Elimination</div>
-            <h3 style="font-family: var(--font-display); font-size: 1.4rem; font-weight: 700; margin-top: 4px;">
-              The Gateway Tax
-            </h3>
-            <p style="font-size: 0.85rem; color: var(--text-muted); margin-top: 6px;">
-              Legacy payment gateways siphon 2% to 2.5% on every transaction. DISHA operates directly on NPCI interbank rails for ₹0.00 fee.
-            </p>
-          </div>
-
-          <div class="counter-box">
-            <span class="counter-strike">2.36%</span>
-            <span class="counter-arrow">→</span>
-            <span class="counter-zero">0.00%</span>
-          </div>
-
-          <div style="font-size: 0.8rem; font-family: var(--font-mono); color: var(--teal-600); font-weight: 600;">
-            ✓ 100% Customer Revenue Kept in Merchant Bank
-          </div>
-        </div>
-
-        <!-- CARD 2: Receipt as Proof Motion -->
-        <div class="bento-card">
-          <div>
-            <div class="section-label" style="color: var(--indigo-500);">W3C Web Share Target</div>
-            <h3 style="font-family: var(--font-display); font-size: 1.4rem; font-weight: 700; margin-top: 4px;">
-              Receipt as Proof
-            </h3>
-            <p style="font-size: 0.85rem; color: var(--text-muted); margin-top: 6px;">
-              The customer's bank-issued receipt serves as cryptographic attestation with immutable 12-digit NPCI Bank UTR.
-            </p>
-          </div>
-
-          <div class="receipt-motion-stage">
-            <div class="node-box">
-              <div class="node-icon-circle">📱</div>
-              <span>UPI App</span>
-            </div>
-
-            <div class="connecting-laser">
-              <div class="laser-packet"></div>
-            </div>
-
-            <div class="node-box">
-              <div class="node-icon-circle" style="color: var(--indigo-600);">⚡</div>
-              <span>DISHA 8.2</span>
-            </div>
-
-            <div class="node-box">
-              <div class="node-icon-circle">🏦</div>
-              <span>Your Bank</span>
-            </div>
-          </div>
-
-          <div style="font-size: 0.8rem; font-family: var(--font-mono); color: var(--indigo-600); font-weight: 600;">
-            ✓ Sub-second Android Native Intent Attestation
-          </div>
-        </div>
-
-        <!-- CARD 3: Savings Calculator -->
-        <div class="bento-card">
-          <div>
-            <div class="section-label" style="color: var(--teal-600);">Interactive Economics</div>
-            <h3 style="font-family: var(--font-display); font-size: 1.4rem; font-weight: 700; margin-top: 4px;">
-              Savings Calculator
-            </h3>
-            <p style="font-size: 0.85rem; color: var(--text-muted); margin-top: 6px;">
-              Move the slider to calculate the exact commission retained by switching from legacy aggregators:
-            </p>
-          </div>
-
-          <div class="calc-slider-box">
-            <div style="display: flex; justify-content: space-between; margin-bottom: 8px;">
-              <span style="font-size: 0.8rem; color: var(--text-muted);">Monthly Turnover:</span>
-              <strong id="calcTurnoverVal" style="font-family: var(--font-mono); color: var(--indigo-600);">₹5,00,000/mo</strong>
-            </div>
-            <input type="range" id="turnoverSlider" class="calc-slider" min="50000" max="5000000" step="25000" value="500000">
-          </div>
-
-          <div class="calc-metrics-row">
-            <div class="calc-metric-card">
-              <span style="font-size: 0.75rem; color: var(--text-muted);">Monthly Kept:</span>
-              <div class="calc-val-big" id="calcMonthlySavedVal">₹11,800</div>
-            </div>
-            <div class="calc-metric-card">
-              <span style="font-size: 0.75rem; color: var(--text-muted);">Annual Kept:</span>
-              <div class="calc-val-big" id="calcAnnualSavedVal">₹1,41,600</div>
-            </div>
-          </div>
-        </div>
-
-        <!-- CARD 4: 7-Layer Fraud Proof -->
-        <div class="bento-card">
-          <div>
-            <div class="section-label" style="color: var(--purple-500);">Zero-Trust Security Engine</div>
-            <h3 style="font-family: var(--font-display); font-size: 1.4rem; font-weight: 700; margin-top: 4px;">
-              7-Layer Fraud Proof
-            </h3>
-            <p style="font-size: 0.85rem; color: var(--text-muted); margin-top: 6px;">
-              Every incoming transaction passes 7 sequential mathematical, cryptographic, and accounting checks:
-            </p>
-          </div>
-
-          <div class="fraud-layers-row">
-            <div class="fraud-node-col">
-              <div class="fraud-dot active">1</div>
-              <span class="fraud-dot-label">Session</span>
-            </div>
-            <div class="fraud-node-col">
-              <div class="fraud-dot active">2</div>
-              <span class="fraud-dot-label">Amount</span>
-            </div>
-            <div class="fraud-node-col">
-              <div class="fraud-dot active">3</div>
-              <span class="fraud-dot-label">UTR</span>
-            </div>
-            <div class="fraud-node-col">
-              <div class="fraud-dot active">4</div>
-              <span class="fraud-dot-label">Freshness</span>
-            </div>
-            <div class="fraud-node-col">
-              <div class="fraud-dot active">5</div>
-              <span class="fraud-dot-label">Note</span>
-            </div>
-            <div class="fraud-node-col">
-              <div class="fraud-dot active">6</div>
-              <span class="fraud-dot-label">Rate</span>
-            </div>
-            <div class="fraud-node-col">
-              <div class="fraud-dot active">7</div>
-              <span class="fraud-dot-label">Ledger</span>
-            </div>
-          </div>
-
-          <div style="font-size: 0.8rem; font-family: var(--font-mono); color: var(--teal-600); font-weight: 600;">
-            ✓ Double-Entry Balance Assertion: Sum(Debits) == Sum(Credits)
-          </div>
-        </div>
-
+      <div class="footer-legal">
+        <span>© 2026 DISHA 8.2 Sovereign Fintech Architecture. Verified NPCI Unified Payments Interface.</span>
       </div>
-    </section>
+    </footer>
 
   </div>
 
-  <!-- Scripts -->
   <script src="/qr.js"></script>
   <script src="/app.js"></script>
 </body>

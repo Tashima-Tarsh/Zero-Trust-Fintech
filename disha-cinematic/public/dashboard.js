@@ -153,7 +153,11 @@ async function loadDashboardOverview() {
     // Metrics
     document.getElementById('metricTotalVolume').textContent = '₹' + parseFloat(metrics.totalVolume).toLocaleString('en-IN', { minimumFractionDigits: 2 });
     document.getElementById('metricCompletedOrders').textContent = metrics.completedTransactions;
-    document.getElementById('metricSuccessRate').textContent = `${metrics.successRate}% completion rate (${metrics.totalTransactions} total)`;
+    if (metrics.totalTransactions === 0) {
+      document.getElementById('metricSuccessRate').textContent = 'No transactions yet';
+    } else {
+      document.getElementById('metricSuccessRate').textContent = `${metrics.successRate}% completion rate (${metrics.totalTransactions} total)`;
+    }
     document.getElementById('metricFeesSaved').textContent = '₹' + parseFloat(metrics.feesSaved).toLocaleString('en-IN', { minimumFractionDigits: 2 });
     document.getElementById('metricAvgTicket').textContent = '₹' + parseFloat(metrics.averageTicket).toLocaleString('en-IN', { minimumFractionDigits: 2 });
 
@@ -185,7 +189,7 @@ function renderRecentTable(transactions) {
     const isSuccess = t.status === 'COMPLETED';
     const statusBadge = isSuccess 
       ? '<span class="badge-success">● COMPLETED</span>'
-      : (t.status === 'PENDING' ? '<span class="badge-pending">⏳ PENDING</span>' : '<span class="badge-expired">✕ EXPIRED</span>');
+      : (t.status === 'PENDING' ? '<span class="badge-pending">● PENDING</span>' : '<span class="badge-expired">● EXPIRED</span>');
 
     return `
       <tr>
@@ -238,10 +242,12 @@ function renderOverviewVpas(vpas) {
     return `
       <div class="overview-vpa-card">
         <div class="ov-vpa-left">
-          <span class="ov-vpa-icon">🏦</span>
+          <span class="ov-vpa-icon">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 21h18M3 10h18M5 6l7-3 7 3M4 10v11M20 10v11M8 14v4M12 14v4M16 14v4"></path></svg>
+          </span>
           <div>
             <strong class="font-mono">${v.vpa_address}</strong>
-            <span class="ov-bank-name">${v.bank_name} ${v.is_default ? '· <span class="tag-default">DEFAULT</span>' : ''}</span>
+            <span class="ov-bank-name">${v.bank_name} ${v.is_default ? '· <span class="tag-default"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" style="margin-right:2px; vertical-align:-1px;"><polyline points="20 6 9 17 4 12"></polyline></svg>DEFAULT</span>' : ''}</span>
           </div>
         </div>
         <span class="${isActive ? 'status-pill-active' : 'status-pill-paused'}">
@@ -286,7 +292,7 @@ function renderPaymentsTable(orders) {
     const isCompleted = o.status === 'COMPLETED';
     const statusBadge = isCompleted 
       ? '<span class="badge-success">● COMPLETED</span>'
-      : (o.status === 'PENDING' ? '<span class="badge-pending">⏳ PENDING</span>' : '<span class="badge-expired">✕ EXPIRED</span>');
+      : (o.status === 'PENDING' ? '<span class="badge-pending">● PENDING</span>' : '<span class="badge-expired">● EXPIRED</span>');
 
     return `
       <tr>
@@ -504,7 +510,7 @@ function renderGeneratedQr(order) {
   // Reset simulate button
   const simBtn = document.getElementById('btnSimulatePayment');
   simBtn.disabled = false;
-  simBtn.textContent = '⚡ Simulate Customer Payment (Tests Soundbox)';
+  simBtn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align: -2px; margin-right: 6px;"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon></svg><span>Simulate Customer Payment (Tests Soundbox)</span>';
 }
 
 window.copyPaymentLink = function() {
@@ -535,7 +541,7 @@ window.simulatePaymentForActiveOrder = async function() {
     if (!res.ok) {
       alert(data.error || 'Simulation failed');
       simBtn.disabled = false;
-      simBtn.textContent = '⚡ Simulate Customer Payment';
+      simBtn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align: -2px; margin-right: 6px;"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon></svg><span>Simulate Customer Payment</span>';
       return;
     }
 
@@ -545,9 +551,9 @@ window.simulatePaymentForActiveOrder = async function() {
     // Update UI status
     const qrBadge = document.getElementById('qrStatusBadge');
     qrBadge.className = 'status-pill-active';
-    qrBadge.textContent = '✓ COMPLETED';
+    qrBadge.textContent = '● COMPLETED';
 
-    simBtn.textContent = `✓ Payment Verified! UTR: ${completed.utr}`;
+    simBtn.textContent = `Verified! Bank UTR: ${completed.utr}`;
 
     // Play Voice Soundbox Announcement
     playMerchantAnnouncement(completed.amount);
@@ -656,7 +662,7 @@ function renderVpaTable(vpas) {
         <td><strong class="font-mono">${v.vpa_address}</strong></td>
         <td>${v.bank_name}</td>
         <td>${statusBadge}</td>
-        <td>${v.is_default ? '<span class="tag-default">DEFAULT</span>' : '<button type="button" class="btn-table-action" onclick="setDefaultVpa(\'' + v.id + '\')">Set Default</button>'}</td>
+        <td>${v.is_default ? '<span class="tag-default"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" style="margin-right:3px; vertical-align:-1px;"><polyline points="20 6 9 17 4 12"></polyline></svg>DEFAULT</span>' : '<button type="button" class="btn-table-action" onclick="setDefaultVpa(\'' + v.id + '\')">Set Default</button>'}</td>
         <td>
           ${isActive ? '<button type="button" class="btn-table-action" onclick="toggleVpaStatus(\'' + v.id + '\', \'pause\')">Pause</button>' : ''}
           ${v.status === 'PAUSED' || isCooldown ? '<button type="button" class="btn-table-action" onclick="toggleVpaStatus(\'' + v.id + '\', \'resume\')">Resume</button>' : ''}
@@ -1030,7 +1036,9 @@ async function loadFullNotifications() {
 
     container.innerHTML = notifs.map(n => `
       <div class="full-notif-card ${n.is_read ? 'read' : 'unread'}">
-        <div class="fn-icon">🔔</div>
+        <div class="fn-icon">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path><path d="M13.73 21a2 2 0 0 1-3.46 0"></path></svg>
+        </div>
         <div class="fn-content">
           <h4>${n.title}</h4>
           <p>${n.message}</p>
