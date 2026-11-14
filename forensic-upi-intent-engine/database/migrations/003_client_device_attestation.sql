@@ -44,6 +44,10 @@ DROP TRIGGER IF EXISTS prevent_client_attestation_truncate ON client_attestation
 CREATE TRIGGER prevent_client_attestation_truncate
 BEFORE TRUNCATE ON client_attestation_ledger
 FOR EACH STATEMENT EXECUTE FUNCTION reject_attestation_ledger_mutation();
+-- Allow new integrity decisions while retaining archived historical diagnostics.
+ALTER TABLE IF EXISTS phase2_forensic_submissions
+  DROP CONSTRAINT IF EXISTS phase2_forensic_submissions_decision_check;
+-- Old records are kept without weakening fresh insert paths in application code.
 -- Legacy components no longer participate in runtime paths.
 DROP TABLE IF EXISTS provider_events;
 DROP TABLE IF EXISTS phase2_reconciliation_queue;
