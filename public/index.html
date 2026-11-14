@@ -146,15 +146,15 @@
 
         <!-- QR Code Canvas with Dynamic Refresh & Expired State -->
         <div class="qr-presentation-card">
-          <div class="qr-canvas-wrapper" id="qrCanvasBox" title="Tap QR to pay directly on mobile">
+          <a id="qrDirectLink" href="javascript:void(0)" onclick="triggerDirectUpiPay()" class="qr-canvas-wrapper" title="Tap QR to pay directly with your UPI app">
             <canvas id="qrCanvas" width="258" height="258" class="qr-canvas-render"></canvas>
 
-            <!-- Floating Scan Instruction -->
+            <!-- Floating Scan / Tap Instruction -->
             <div class="qr-scan-badge">
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
                 <path d="M3 7V5a2 2 0 0 1 2-2h2M17 3h2a2 2 0 0 1 2 2v2M21 17v2a2 2 0 0 1-2 2h-2M7 21H5a2 2 0 0 1-2-2v-2"></path>
               </svg>
-              <span>Scan with GPay, PhonePe, Paytm or BHIM</span>
+              <span>👆 Tap QR to Pay · Or Scan with Any App</span>
             </div>
 
             <!-- EXPIRED OVERLAY STATE -->

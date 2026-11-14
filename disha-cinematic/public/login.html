@@ -41,14 +41,14 @@
 
       <form id="loginForm" class="auth-form" novalidate>
         <div class="form-group">
-          <label for="email" class="form-label">Email or Login ID</label>
+          <label for="email" class="form-label">Merchant Login ID or Email</label>
           <div class="input-wrapper">
             <input 
-              type="email" 
+              type="text" 
               id="email" 
               name="email" 
               class="form-input" 
-              placeholder="e.g. ramesh@kirana.in" 
+              placeholder="e.g. Nitish@oksbi or yourname@domain.com" 
               required 
               autocomplete="username"
               autofocus
@@ -92,32 +92,6 @@
           </button>
         </div>
       </form>
-
-      <!-- Provisioned Credentials Helper -->
-      <div class="provision-helper-card">
-        <div class="provision-header">
-          <span class="helper-badge">ADMIN PROVISIONED ACCESS</span>
-          <p class="helper-text">Merchant logins are provisioned by your system administrator. Use one of the test merchant credentials below:</p>
-        </div>
-
-        <div class="preset-merchants-list">
-          <div class="preset-merchant-item" onclick="fillCredentials('ramesh@kirana.in', 'Ramesh@123')">
-            <div class="preset-details">
-              <strong>Ramesh Provision Stores (Active Merchant)</strong>
-              <span>ramesh@kirana.in · Pre-configured with historic collections & UPI IDs</span>
-            </div>
-            <button type="button" class="btn-preset-use">Use Credentials</button>
-          </div>
-
-          <div class="preset-merchant-item" onclick="fillCredentials('new@merchant.in', 'Merchant@123')">
-            <div class="preset-details">
-              <strong>New Merchant (First-Time Setup Demo)</strong>
-              <span>new@merchant.in · Shows guided onboarding & fresh empty workspace</span>
-            </div>
-            <button type="button" class="btn-preset-use">Use Credentials</button>
-          </div>
-        </div>
-      </div>
 
       <div class="auth-card-footer">
         <p>

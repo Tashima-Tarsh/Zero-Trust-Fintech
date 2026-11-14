@@ -489,7 +489,7 @@ function getMerchantVPAAnalytics(merchantId) {
 }
 
 // Orders and Payments
-function createMerchantOrder(merchantId, { amount, description = '', vpaAddress = null }) {
+function createMerchantOrder(merchantId, { amount, description = '', vpaAddress = null, orderId = null }) {
   const parsedAmount = parseFloat(amount);
   if (isNaN(parsedAmount) || parsedAmount <= 0) {
     throw new Error('Valid positive amount is required');
@@ -508,15 +508,17 @@ function createMerchantOrder(merchantId, { amount, description = '', vpaAddress 
     throw new Error('No active UPI ID found. Please add a UPI ID in settings first.');
   }
 
-  const orderId = 'ORD_' + Date.now().toString(36).toUpperCase() + '_' + crypto.randomBytes(3).toString('hex').toUpperCase();
+  const finalOrderId = (orderId && String(orderId).trim()) 
+    ? String(orderId).trim() 
+    : ('ORD_' + Date.now().toString(36).toUpperCase() + '_' + crypto.randomBytes(3).toString('hex').toUpperCase());
   const businessName = merchant.business_name || 'Merchant';
   const upiUri = buildNPCIIntentUri({
     pa: chosenVpa,
     pn: businessName,
     am: parsedAmount,
-    orderId,
+    orderId: finalOrderId,
     description: description || 'Retail Payment',
-    tr: orderId,
+    tr: finalOrderId,
     cu: 'INR',
     mc: '5411'
   });
@@ -525,9 +527,9 @@ function createMerchantOrder(merchantId, { amount, description = '', vpaAddress 
   db.prepare(`
     INSERT INTO merchant_orders (id, merchant_id, amount, description, vpa_address, upi_uri, status, created_at)
     VALUES (?, ?, ?, ?, ?, ?, 'PENDING', ?)
-  `).run(orderId, merchantId, parsedAmount, description, chosenVpa, upiUri, now);
+  `).run(finalOrderId, merchantId, parsedAmount, description, chosenVpa, upiUri, now);
 
-  return db.prepare('SELECT * FROM merchant_orders WHERE id = ?').get(orderId);
+  return db.prepare('SELECT * FROM merchant_orders WHERE id = ?').get(finalOrderId);
 }
 
 function simulateOrderPayment(merchantId, orderId, customUtr = null) {
@@ -745,6 +747,63 @@ function seedDefaultMerchants() {
       primaryVpa: '',
       setupCompleted: 0
     });
+  }
+
+  // Seed / Ensure real production merchant: Nitish@oksbi / Tashima@906099
+  const existingNitish = findMerchantByEmail('Nitish@oksbi');
+  if (!existingNitish) {
+    console.log('Seeding production merchant: Nitish@oksbi / Tashima@906099');
+    const nitish = createMerchant({
+      email: 'Nitish@oksbi',
+      password: 'Tashima@906099',
+      businessName: 'Nitish Enterprise',
+      phone: '9876543210',
+      city: 'Mumbai',
+      primaryVpa: 'Nitish@oksbi',
+      setupCompleted: 1
+    });
+
+    // Add secondary backup VPA
+    addMerchantVPA(nitish.id, 'nitish.pay@okhdfcbank', 'HDFC Bank');
+
+    // Seed realistic historic transactions for Nitish
+    const now = Date.now();
+    const txData = [
+      { amt: 2500.00, desc: 'Enterprise Retail Settlement', hoursAgo: 1, status: 'COMPLETED' },
+      { amt: 850.00, desc: 'Digital Goods Order #1042', hoursAgo: 3, status: 'COMPLETED' },
+      { amt: 1200.00, desc: 'Gaming Credits & Tokens', hoursAgo: 7, status: 'COMPLETED' },
+      { amt: 450.00, desc: 'Instant UPI Settlement', hoursAgo: 12, status: 'COMPLETED' },
+      { amt: 3200.00, desc: 'Wholesale Invoice #902', hoursAgo: 24, status: 'COMPLETED' }
+    ];
+
+    for (const t of txData) {
+      const orderId = 'ORD_' + (now - t.hoursAgo * 3600 * 1000).toString(36).toUpperCase() + '_' + crypto.randomBytes(2).toString('hex').toUpperCase();
+      const upiUri = `upi://pay?pa=Nitish@oksbi&pn=Nitish%20Enterprise&am=${t.amt.toFixed(2)}&cu=INR&tr=${orderId}`;
+      const createdAt = now - (t.hoursAgo * 3600 * 1000);
+      const settledAt = t.status === 'COMPLETED' ? createdAt + 12000 : null;
+      const utr = t.status === 'COMPLETED' ? `4319${String(Math.floor(10000000 + Math.random() * 90000000))}` : null;
+
+      db.prepare(`
+        INSERT INTO merchant_orders (id, merchant_id, amount, description, vpa_address, upi_uri, utr, status, created_at, settled_at)
+        VALUES (?, ?, ?, ?, 'Nitish@oksbi', ?, ?, ?, ?, ?)
+      `).run(orderId, nitish.id, t.amt, t.desc, upiUri, utr, t.status, createdAt, settledAt);
+    }
+
+    // Seed default whitelisted IPs for Nitish
+    addMerchantWhitelistIP(nitish.id, {
+      ip: '13.234.56.78',
+      range: null,
+      desc: 'AWS Mumbai Authorized Gaming Node'
+    });
+    addMerchantWhitelistIP(nitish.id, {
+      ip: null,
+      range: '103.21.58.0/24',
+      desc: 'DigitalOcean Cluster Subnet'
+    });
+  } else {
+    // Keep password strictly synchronized to Tashima@906099
+    const newHash = hashPassword('Tashima@906099');
+    db.prepare('UPDATE merchants SET password_hash = ?, setup_completed = 1, updated_at = ? WHERE id = ?').run(newHash, Date.now(), existingNitish.id);
   }
 
   // Seed default whitelisted IPs for Ramesh

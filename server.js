@@ -405,6 +405,7 @@ app.post('/api/verify', (req, res) => {
       amount: session.challengeAmount,
       baseAmount: session.baseAmount,
       vpaAddress: session.vpaAddress,
+      senderVpa: req.body.senderVpa || 'customer@okhdfcbank',
       txId,
       timestamp: now,
       message: 'Settlement confirmed via DISHA 8.2 7-Layer Zero-Trust Engine'
@@ -418,7 +419,10 @@ app.post('/api/verify', (req, res) => {
       utr: parsedUtr,
       amount: session.challengeAmount,
       baseAmount: session.baseAmount,
+      vpaAddress: session.vpaAddress,
+      senderVpa: req.body.senderVpa || 'customer@okhdfcbank',
       txId,
+      timestamp: now,
       ledgerVerification: verification
     });
   } catch (err) {

@@ -63,24 +63,22 @@
 
           <div class="form-row-2">
             <div class="form-group">
-              <label for="contactPhone" class="form-label">Contact Phone Number <span class="required">*</span></label>
+              <label for="contactPhone" class="form-label">Contact Phone Number <span class="text-muted" style="font-weight: 400; font-size: 0.8rem;">(Optional)</span></label>
               <input 
                 type="tel" 
                 id="contactPhone" 
                 class="form-input" 
-                placeholder="10-digit mobile number" 
+                placeholder="10-digit mobile number (optional)" 
                 maxlength="10"
-                required
               >
             </div>
             <div class="form-group">
-              <label for="city" class="form-label">City / Region <span class="required">*</span></label>
+              <label for="city" class="form-label">City / Region <span class="text-muted" style="font-weight: 400; font-size: 0.8rem;">(Optional)</span></label>
               <input 
                 type="text" 
                 id="city" 
                 class="form-input" 
-                placeholder="e.g. Narayan Peth, Pune" 
-                required
+                placeholder="e.g. Pune, Mumbai, Bangalore" 
               >
             </div>
           </div>
@@ -265,21 +263,16 @@
       if (currentStep === 1 && step === 2) {
         const bizName = document.getElementById('businessName').value.trim();
         const phone = document.getElementById('contactPhone').value.trim();
-        const city = document.getElementById('city').value.trim();
 
         if (!bizName) {
           showError('Please enter your business or shop display name.');
           document.getElementById('businessName').focus();
           return;
         }
-        if (!phone || phone.length < 10) {
-          showError('Please enter a valid 10-digit mobile contact number.');
+        // Phone number is optional. If provided, check length
+        if (phone && phone.length < 10) {
+          showError('If provided, please enter a valid 10-digit mobile contact number.');
           document.getElementById('contactPhone').focus();
-          return;
-        }
-        if (!city) {
-          showError('Please enter your business city or region.');
-          document.getElementById('city').focus();
           return;
         }
       }

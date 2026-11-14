@@ -233,7 +233,7 @@ const server = http.createServer(async (req, res) => {
       // Payments: Create Payment / Link
       if (pathname === '/api/merchant/payments' && method === 'POST') {
         const body = await readBody(req);
-        const { amount, description, vpaAddress } = body;
+        const { amount, description, vpaAddress, orderId } = body;
 
         if (!amount || isNaN(parseFloat(amount)) || parseFloat(amount) <= 0) {
           return sendError(res, 400, 'Valid positive payment amount is required');
@@ -242,7 +242,8 @@ const server = http.createServer(async (req, res) => {
         const order = db.createMerchantOrder(currentMerchant.id, {
           amount: parseFloat(amount),
           description: description || '',
-          vpaAddress: vpaAddress || null
+          vpaAddress: vpaAddress || null,
+          orderId: orderId || null
         });
 
         return sendJson(res, 201, { success: true, order });

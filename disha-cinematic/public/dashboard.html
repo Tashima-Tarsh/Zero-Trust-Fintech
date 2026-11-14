@@ -356,6 +356,21 @@
               </div>
               <form id="createPaymentForm" class="payment-form">
                 <div class="form-group">
+                  <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+                    <label for="orderCustomId" class="form-label" style="margin: 0;">Order Reference ID</label>
+                    <button type="button" class="btn-text-action" onclick="generateNewOrderId()" title="Generate new unique Order ID" style="background: none; border: none; color: var(--indigo-600); cursor: pointer; font-size: 0.78rem; font-weight: 600; display: inline-flex; align-items: center; gap: 4px; padding: 0;">
+                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/></svg>
+                      Regenerate
+                    </button>
+                  </div>
+                  <div style="position: relative;">
+                    <input type="text" id="orderCustomId" class="form-input font-mono" placeholder="Auto-generated (e.g. ORD_9A8B7C)" style="font-weight: 600; letter-spacing: 0.04em;">
+                    <span style="position: absolute; right: 10px; top: 50%; transform: translateY(-50%); font-size: 0.7rem; color: var(--teal-600); font-weight: 700; background: rgba(20,184,166,0.1); padding: 2px 8px; border-radius: 999px;">AUTOMATED</span>
+                  </div>
+                  <span class="field-hint" style="font-size: 0.75rem; color: var(--text-muted); margin-top: 4px; display: block;">Unique identifier tracked in real-time ledger</span>
+                </div>
+
+                <div class="form-group">
                   <label for="orderAmount" class="form-label">Payment Amount (INR) <span class="required">*</span></label>
                   <div class="currency-input-wrap">
                     <span class="currency-symbol">₹</span>
@@ -396,18 +411,23 @@
               </div>
 
               <div id="qrActiveState" class="qr-active-state" style="display: none;">
-                <div class="qr-container-card">
+                <div class="qr-container-card" id="qrCardBox" title="Tap QR to pay directly with your UPI app" onclick="openUpiAppDirectly()" style="cursor: pointer; transition: transform 0.18s ease;">
                   <div class="qr-merchant-tag" id="qrShopTitle">Shop Name</div>
                   <div id="qrcode" class="qrcode-wrapper"></div>
                   <div class="qr-amount-tag" id="qrAmountTag">₹0.00</div>
-                  <div class="qr-apps-tag">Supports GPay · PhonePe · Paytm · BHIM · Any Bank UPI</div>
+                  <div style="font-size: 0.78rem; font-weight: 600; color: var(--indigo-600); margin-top: 6px;">👆 Tap QR to Pay Directly with UPI App</div>
+                  <div class="qr-apps-tag" style="margin-top: 4px;">Supports GPay · PhonePe · Paytm · BHIM · Any Bank UPI</div>
                 </div>
 
-                <div class="payment-link-bar">
-                  <input type="text" id="generatedLinkInput" class="form-input font-mono" readonly>
+                <div class="payment-link-bar" style="display: flex; gap: 8px; flex-wrap: wrap;">
+                  <input type="text" id="generatedLinkInput" class="form-input font-mono" readonly style="flex: 1; min-width: 170px;">
                   <button type="button" class="btn-dash-secondary" onclick="copyPaymentLink()">
                     <span>Copy Link</span>
                   </button>
+                  <a id="btnOpenUpiApp" href="javascript:void(0)" onclick="openUpiAppDirectly()" class="btn-dash-primary" style="text-decoration: none; display: inline-flex; align-items: center; gap: 6px;">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><rect x="5" y="2" width="14" height="20" rx="2" ry="2"></rect><line x1="12" y1="18" x2="12.01" y2="18"></line></svg>
+                    <span>Pay with App</span>
+                  </a>
                 </div>
 
                 <div class="simulate-test-box">
@@ -419,6 +439,65 @@
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align: -2px; margin-right: 6px;"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon></svg>
                     <span>Simulate Customer Payment (Tests Soundbox)</span>
                   </button>
+                </div>
+
+                <!-- Complete User Payment Confirmation & Security Attestation Card -->
+                <div id="paymentConfirmationCard" class="payment-confirmation-card" style="display: none; margin-top: 20px; background: #FFFFFF; border: 1px solid rgba(20, 184, 166, 0.35); border-radius: 12px; padding: 18px; box-shadow: 0 4px 20px rgba(20, 184, 166, 0.1);">
+                  <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; padding-bottom: 10px; border-bottom: 1px solid rgba(0,0,0,0.06);">
+                    <div style="display: flex; align-items: center; gap: 8px;">
+                      <span style="display: inline-flex; width: 26px; height: 26px; border-radius: 50%; background: #10B981; color: white; align-items: center; justify-content: center; font-size: 14px; font-weight: bold;">✓</span>
+                      <div>
+                        <strong style="font-size: 0.95rem; color: #0F172A; display: block;">Payment Confirmed &amp; Settled</strong>
+                        <span id="confirmTimestamp" style="font-size: 0.75rem; color: #64748B;">15 Nov 2026, 04:30:00 IST</span>
+                      </div>
+                    </div>
+                    <span style="font-size: 0.72rem; font-weight: 700; background: rgba(16, 185, 129, 0.1); color: #059669; padding: 4px 10px; border-radius: 999px;">T+0 INSTANT</span>
+                  </div>
+
+                  <div class="confirm-grid" style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; font-size: 0.82rem; margin-bottom: 14px;">
+                    <div>
+                      <span style="color: #64748B; font-size: 0.74rem; display: block;">Payer / Customer UPI ID:</span>
+                      <strong id="confirmSenderVpa" class="font-mono" style="color: #0F172A;">customer@okhdfcbank</strong>
+                    </div>
+                    <div>
+                      <span style="color: #64748B; font-size: 0.74rem; display: block;">Settlement UPI ID:</span>
+                      <strong id="confirmMerchantVpa" class="font-mono" style="color: #0F172A;">merchant@okhdfcbank</strong>
+                    </div>
+                    <div>
+                      <span style="color: #64748B; font-size: 0.74rem; display: block;">Bank UTR (12-Digit):</span>
+                      <strong id="confirmUtr" class="font-mono" style="color: var(--indigo-600); letter-spacing: 0.04em;">631902884112</strong>
+                    </div>
+                    <div>
+                      <span style="color: #64748B; font-size: 0.74rem; display: block;">Order Reference ID:</span>
+                      <strong id="confirmOrderId" class="font-mono" style="color: #0F172A;">ORD_261115_A1B2</strong>
+                    </div>
+                  </div>
+
+                  <!-- Security Verification & Anti-Ban Checks -->
+                  <div style="background: rgba(15, 23, 42, 0.03); border-radius: 8px; padding: 10px 12px; margin-bottom: 12px; font-size: 0.75rem;">
+                    <div style="display: flex; justify-content: space-between; margin-bottom: 4px;">
+                      <span style="color: #475569;">🛡️ DISHA 7-Layer Fraud Engine:</span>
+                      <strong style="color: #059669;">Passed (7/7 Layers)</strong>
+                    </div>
+                    <div style="display: flex; justify-content: space-between; margin-bottom: 4px;">
+                      <span style="color: #475569;">🔒 Cryptographic Ledger Invariant:</span>
+                      <strong style="color: #059669;">Balanced (Debits == Credits)</strong>
+                    </div>
+                    <div style="display: flex; justify-content: space-between;">
+                      <span style="color: #475569;">⚡ Anti-Replay UTR Nonce:</span>
+                      <strong style="color: #059669;">Blacklisted &amp; Sealed</strong>
+                    </div>
+                  </div>
+
+                  <!-- Soundbox Replay & Receipt Actions -->
+                  <div style="display: flex; gap: 8px; justify-content: flex-end;">
+                    <button type="button" class="btn-dash-secondary" onclick="replaySoundboxAudio()" style="font-size: 0.78rem; padding: 6px 12px;">
+                      🔊 Replay Voice Soundbox
+                    </button>
+                    <button type="button" class="btn-dash-secondary" onclick="window.print()" style="font-size: 0.78rem; padding: 6px 12px;">
+                      📄 Print Receipt
+                    </button>
+                  </div>
                 </div>
               </div>
             </div>
@@ -710,13 +789,13 @@
                 </div>
 
                 <div class="form-group">
-                  <label for="setContactPhone" class="form-label">Contact Phone Number</label>
-                  <input type="tel" id="setContactPhone" class="form-input" required>
+                  <label for="setContactPhone" class="form-label">Contact Phone Number <span class="text-muted" style="font-weight: 400; font-size: 0.8rem;">(Optional)</span></label>
+                  <input type="tel" id="setContactPhone" class="form-input" placeholder="e.g. 9876543210 (Optional)">
                 </div>
 
                 <div class="form-group">
-                  <label for="setCity" class="form-label">City / Region</label>
-                  <input type="text" id="setCity" class="form-input" required>
+                  <label for="setCity" class="form-label">City / Region <span class="text-muted" style="font-weight: 400; font-size: 0.8rem;">(Optional)</span></label>
+                  <input type="text" id="setCity" class="form-input" placeholder="e.g. Pune, Mumbai (Optional)">
                 </div>
 
                 <button type="submit" class="btn-dash-primary">

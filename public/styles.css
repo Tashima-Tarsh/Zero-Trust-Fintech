@@ -415,6 +415,20 @@ body {
   display: flex;
   align-items: center;
   justify-content: center;
+  cursor: pointer;
+  text-decoration: none;
+  transition: transform 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease;
+  -webkit-tap-highlight-color: rgba(99, 102, 241, 0.2);
+}
+
+.qr-canvas-wrapper:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 24px rgba(99, 102, 241, 0.18);
+  border-color: var(--indigo-400);
+}
+
+.qr-canvas-wrapper:active {
+  transform: scale(0.98);
 }
 
 .qr-canvas-render {

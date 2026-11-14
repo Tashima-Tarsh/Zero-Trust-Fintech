@@ -122,7 +122,10 @@ window.switchWorkspace = function(wsId) {
   if (target === 'reports') loadReportsData();
   if (target === 'notifications') loadFullNotifications();
   if (target === 'settings') populateSettingsForm();
-  if (target === 'create-payment') populateCreatePaymentVpaSelect();
+  if (target === 'create-payment') {
+    populateCreatePaymentVpaSelect();
+    generateNewOrderId();
+  }
 };
 
 window.addEventListener('hashchange', () => {
@@ -430,6 +433,18 @@ window.closeTxDrawer = function() {
 };
 
 // Create Payment Form
+window.generateNewOrderId = function() {
+  const d = new Date();
+  const dateStr = d.getFullYear().toString().slice(-2) +
+    String(d.getMonth() + 1).padStart(2, '0') +
+    String(d.getDate()).padStart(2, '0');
+  const rand = Math.random().toString(36).substring(2, 7).toUpperCase();
+  const newId = `ORD_${dateStr}_${rand}`;
+  const input = document.getElementById('orderCustomId');
+  if (input) input.value = newId;
+  return newId;
+};
+
 async function populateCreatePaymentVpaSelect() {
   const select = document.getElementById('orderVpaSelect');
   if (currentVpas.length === 0) await loadVpas();
@@ -438,6 +453,11 @@ async function populateCreatePaymentVpaSelect() {
     .filter(v => v.status === 'ACTIVE')
     .map(v => `<option value="${v.vpa_address}" ${v.is_default ? 'selected' : ''}>${v.vpa_address} (${v.bank_name}) ${v.is_default ? '— Default' : ''}</option>`)
     .join('');
+
+  const orderIdInput = document.getElementById('orderCustomId');
+  if (orderIdInput && !orderIdInput.value) {
+    generateNewOrderId();
+  }
 }
 
 document.getElementById('createPaymentForm').addEventListener('submit', async (e) => {
@@ -446,6 +466,7 @@ document.getElementById('createPaymentForm').addEventListener('submit', async (e
   const amount = document.getElementById('orderAmount').value;
   const description = document.getElementById('orderDesc').value.trim();
   const vpaAddress = document.getElementById('orderVpaSelect').value;
+  const orderId = (document.getElementById('orderCustomId')?.value || '').trim() || generateNewOrderId();
 
   const btn = document.getElementById('btnGeneratePayment');
   btn.disabled = true;
@@ -458,7 +479,7 @@ document.getElementById('createPaymentForm').addEventListener('submit', async (e
         'Content-Type': 'application/json',
         'Authorization': 'Bearer ' + authToken
       },
-      body: JSON.stringify({ amount, description, vpaAddress })
+      body: JSON.stringify({ amount, description, vpaAddress, orderId })
     });
 
     const data = await res.json();
@@ -473,6 +494,9 @@ document.getElementById('createPaymentForm').addEventListener('submit', async (e
     renderGeneratedQr(data.order);
     btn.disabled = false;
     btn.textContent = 'Generate Dynamic QR & Payment Link';
+
+    // Prepare next unique order ID for subsequent link
+    setTimeout(generateNewOrderId, 500);
   } catch (err) {
     alert('Failed to connect to server');
     btn.disabled = false;
@@ -489,9 +513,17 @@ function renderGeneratedQr(order) {
   document.getElementById('qrAmountTag').textContent = '₹' + order.amount.toFixed(2);
   document.getElementById('generatedLinkInput').value = order.upi_uri;
 
+  // Direct Pay with App Button & clickable QR
+  const appBtn = document.getElementById('btnOpenUpiApp');
+  if (appBtn) appBtn.href = order.upi_uri;
+
   const qrBadge = document.getElementById('qrStatusBadge');
   qrBadge.className = 'status-pill-pending';
   qrBadge.textContent = 'Awaiting Scan';
+
+  // Hide confirmation card on fresh order
+  const confirmCard = document.getElementById('paymentConfirmationCard');
+  if (confirmCard) confirmCard.style.display = 'none';
 
   // Render QR
   const qrContainer = document.getElementById('qrcode');
@@ -507,17 +539,45 @@ function renderGeneratedQr(order) {
     });
   }
 
+  // Wire click to open UPI app
+  const qrCardBox = document.getElementById('qrCardBox');
+  if (qrCardBox) {
+    qrCardBox.onclick = () => window.openUpiAppDirectly();
+  }
+
   // Reset simulate button
   const simBtn = document.getElementById('btnSimulatePayment');
   simBtn.disabled = false;
   simBtn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align: -2px; margin-right: 6px;"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon></svg><span>Simulate Customer Payment (Tests Soundbox)</span>';
 }
 
+window.openUpiAppDirectly = function() {
+  if (activeCreatedOrder && activeCreatedOrder.upi_uri) {
+    const uri = activeCreatedOrder.upi_uri;
+    try {
+      const a = document.createElement('a');
+      a.href = uri;
+      a.target = '_top';
+      a.rel = 'noopener';
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+    } catch (_) {}
+    setTimeout(() => { window.location.href = uri; }, 80);
+  }
+};
+
 window.copyPaymentLink = function() {
   const input = document.getElementById('generatedLinkInput');
   input.select();
   navigator.clipboard.writeText(input.value);
   alert('Payment link copied to clipboard!');
+};
+
+window.replaySoundboxAudio = function() {
+  if (activeCreatedOrder && activeCreatedOrder.amount) {
+    playMerchantAnnouncement(activeCreatedOrder.amount);
+  }
 };
 
 // Simulate Customer Payment in Test Mode
@@ -554,6 +614,33 @@ window.simulatePaymentForActiveOrder = async function() {
     qrBadge.textContent = '● COMPLETED';
 
     simBtn.textContent = `Verified! Bank UTR: ${completed.utr}`;
+
+    // Reveal Full User Confirmation & Security Card
+    const confirmCard = document.getElementById('paymentConfirmationCard');
+    if (confirmCard) {
+      confirmCard.style.display = 'block';
+      const now = new Date();
+      const istTime = new Intl.DateTimeFormat('en-IN', {
+        dateStyle: 'medium',
+        timeStyle: 'medium',
+        timeZone: 'Asia/Kolkata'
+      }).format(now);
+
+      const confirmTimeEl = document.getElementById('confirmTimestamp');
+      if (confirmTimeEl) confirmTimeEl.textContent = istTime + ' IST';
+
+      const confirmSenderEl = document.getElementById('confirmSenderVpa');
+      if (confirmSenderEl) confirmSenderEl.textContent = 'customer@okhdfcbank';
+
+      const confirmMerchantEl = document.getElementById('confirmMerchantVpa');
+      if (confirmMerchantEl) confirmMerchantEl.textContent = completed.vpa_address || (currentMerchant ? currentMerchant.primary_vpa : 'merchant@upi');
+
+      const confirmUtrEl = document.getElementById('confirmUtr');
+      if (confirmUtrEl) confirmUtrEl.textContent = completed.utr;
+
+      const confirmOrderEl = document.getElementById('confirmOrderId');
+      if (confirmOrderEl) confirmOrderEl.textContent = completed.id;
+    }
 
     // Play Voice Soundbox Announcement
     playMerchantAnnouncement(completed.amount);

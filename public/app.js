@@ -138,9 +138,13 @@ function handlePaymentSuccess(data) {
     window.navigator.vibrate([100, 50, 150]);
   }
 
-  // Redirect to success screen with parameters
+  // Redirect to success screen with comprehensive user, amount, time, and security parameters
   setTimeout(() => {
-    window.location.href = `/success.html?utr=${encodeURIComponent(data.utr)}&amount=${encodeURIComponent(data.amount)}&orderId=${encodeURIComponent(data.orderId)}&txId=${encodeURIComponent(data.txId || '')}`;
+    const sender = data.senderVpa || (activeSession && activeSession.senderVpa) || 'customer@okhdfcbank';
+    const vpa = data.vpaAddress || (activeSession && activeSession.vpaAddress) || 'ramesh.kirana@okhdfcbank';
+    const base = data.baseAmount || (activeSession && activeSession.baseAmount) || '';
+    const time = data.timestamp || Date.now();
+    window.location.href = `/success.html?utr=${encodeURIComponent(data.utr)}&amount=${encodeURIComponent(data.amount)}&orderId=${encodeURIComponent(data.orderId)}&txId=${encodeURIComponent(data.txId || '')}&sender=${encodeURIComponent(sender)}&vpa=${encodeURIComponent(vpa)}&base=${encodeURIComponent(base)}&time=${encodeURIComponent(time)}`;
   }, 600);
 }
 
@@ -172,16 +176,41 @@ function updateUIWithSession(s) {
   const expiredOverlay = document.getElementById('qrExpiredOverlay');
   if (expiredOverlay) expiredOverlay.style.display = 'none';
 
-  // Update mobile intent button
+  // Update direct QR anchor link & mobile intent button
+  const qrDirectLink = document.getElementById('qrDirectLink');
+  if (qrDirectLink && s.upiLink) {
+    qrDirectLink.href = s.upiLink;
+  }
+
   const mobilePayBtn = document.getElementById('mobilePayButton');
   if (mobilePayBtn && s.upiLink) {
     mobilePayBtn.href = s.upiLink;
   }
 }
 
-window.triggerDirectUpiPay = function() {
+window.triggerDirectUpiPay = function(e) {
+  if (e && e.preventDefault) {
+    // allow native anchor navigation when href is ready
+  }
   if (activeSession && activeSession.upiLink) {
-    window.location.href = activeSession.upiLink;
+    // Direct intent launch for mobile browsers
+    const targetUri = activeSession.upiLink;
+    try {
+      const anchor = document.createElement('a');
+      anchor.href = targetUri;
+      anchor.target = '_top';
+      anchor.rel = 'noopener noreferrer';
+      document.body.appendChild(anchor);
+      anchor.click();
+      document.body.removeChild(anchor);
+    } catch (_) {}
+
+    // Fallback navigation
+    setTimeout(() => {
+      window.location.href = targetUri;
+    }, 50);
+  } else {
+    console.warn('Session not ready for direct UPI intent.');
   }
 };
 
