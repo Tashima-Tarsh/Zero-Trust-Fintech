@@ -32,7 +32,7 @@ MAX_SIGNATURE_BYTES = 64
 class DeviceIntegrity(BaseModel):
     elapsed_ms: int = Field(ge=0, le=86_400_000)
     retry_count: int = Field(ge=0, le=100)
-    image_ela_score: float | None = Field(default=None, ge=0, le=100)
+    image_ela_score: int | None = Field(default=None, ge=0, le=100)
 
 
 class ClientAttestation(BaseModel):
