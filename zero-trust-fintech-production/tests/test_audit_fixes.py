@@ -250,6 +250,23 @@ class TestLedgerConcurrencyAndIntegrity(unittest.TestCase):
             db.close()
 
 
+    def test_payload_tampering_is_detected_even_if_hash_links_are_unchanged(self):
+        """Changing stored transaction details must invalidate block integrity."""
+        db = SessionLocal()
+        try:
+            ledger = MerkleTreeLedger(db)
+            block = ledger.commit_transaction({
+                "tx_id": "payload-integrity-test", "amount": 200
+            })
+            block.tx_data = '{"amount": 1, "tx_id": "payload-integrity-test"}'
+            db.commit()
+            report = ledger.verify_integrity()
+            self.assertEqual(report["status"], "tampered")
+            self.assertIn(block.id, report["tampered_blocks"])
+        finally:
+            db.close()
+
+
 class TestFraudEngineFailClosed(unittest.IsolatedAsyncioTestCase):
     """M-01: Fail-closed policy and atomic challenge verification"""
 
