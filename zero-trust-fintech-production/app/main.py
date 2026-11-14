@@ -35,14 +35,14 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(
     title="Zero-Trust Fintech API",
-    description="SharePay MVP: Direct UPI checkout with 5-layer fraud detection and instant confirmation",
+    description="SharePay MVP: Direct UPI checkout with 5-layer fraud detection",
     version="2.0.0",
     lifespan=lifespan
 )
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=["*"],  # Restrict in production
     allow_credentials=True,
     allow_methods=["GET", "POST", "OPTIONS"],
     allow_headers=["*"],
@@ -50,7 +50,6 @@ app.add_middleware(
 
 app.include_router(router, prefix="/api/v1")
 
-# WebSocket endpoint for instant merchant confirmation
 @app.websocket("/ws/{merchant_id}")
 async def websocket_route(websocket: WebSocket, merchant_id: str):
     await websocket_endpoint(websocket, merchant_id)

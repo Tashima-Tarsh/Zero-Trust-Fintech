@@ -1,22 +1,24 @@
 from pydantic_settings import BaseSettings
 from functools import lru_cache
+import os
 
 class Settings(BaseSettings):
     # Database
-    DATABASE_URL: str = "postgresql://postgres:postgres@localhost:5432/fintech_db"
+    DATABASE_URL: str = "postgresql://zerotrust:SecurePass123!@localhost:5432/zerotrust_ledger"
     DATABASE_POOL_SIZE: int = 20
+    DATABASE_MAX_OVERFLOW: int = 10
     
     # Redis
     REDIS_URL: str = "redis://localhost:6379/0"
-    REDIS_CHALLENGE_TTL: int = 300  # 5 minutes
+    REDIS_CHALLENGE_TTL: int = 300
     
     # Security
     SIGNATURE_MAX_AGE_SECONDS: int = 60
     FRESHNESS_WINDOW_SECONDS: int = 120
     
     # n8n
-    N8N_WEBHOOK_URL: str = "http://n8n:5678/webhook"
-    N8N_API_KEY: str = "default_n8n_key"
+    N8N_WEBHOOK_URL: str = "http://localhost:5678/webhook"
+    N8N_API_KEY: str = ""
     
     # WebSocket
     WS_PING_INTERVAL: int = 30
@@ -24,6 +26,12 @@ class Settings(BaseSettings):
     
     # Logging
     LOG_LEVEL: str = "INFO"
+    AUDIT_LOG_PATH: str = "./logs/audit.log"
+    
+    # Application
+    APP_ENV: str = "development"
+    APP_HOST: str = "0.0.0.0"
+    APP_PORT: int = 8000
     
     class Config:
         env_file = ".env"

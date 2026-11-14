@@ -1,78 +1,106 @@
 import hashlib
 import json
 import logging
-from typing import Dict, Any, Optional, List
-from datetime import datetime, timezone
+from typing import Optional, List
 from sqlalchemy.orm import Session
-from ..models.database import MerkleLedger
+from datetime import datetime, timezone
+from ..models.database import TransactionBlock
 
 logger = logging.getLogger(__name__)
 
 class MerkleTreeLedger:
     """
-    Implements a cryptographic hash-chained immutable ledger
+    Tamper-evident blockchain-style ledger using hash chaining
     """
-
+    
     def __init__(self, db: Session):
         self.db = db
-
-    def commit_transaction(self, tx_data: Dict[str, Any]) -> MerkleLedger:
+    
+    @staticmethod
+    def _hash_data(data: str) -> str:
+        """Generate SHA-256 hash"""
+        return hashlib.sha256(data.encode('utf-8')).hexdigest()
+    
+    def get_last_block(self) -> Optional[TransactionBlock]:
+        """Get the most recent block in the chain"""
+        return self.db.query(TransactionBlock).order_by(
+            TransactionBlock.id.desc()
+        ).first()
+    
+    def commit_transaction(self, tx_data: dict) -> TransactionBlock:
         """
-        Appends a new block to the immutable ledger linked to the previous block hash
+        Add new transaction to the immutable ledger
         """
-        # Get latest block
-        latest_block = self.db.query(MerkleLedger).order_by(MerkleLedger.id.desc()).first()
-        prev_hash = latest_block.block_hash if latest_block else "0" * 64
-
-        # Compute deterministic block hash
-        canonical_tx = json.dumps(tx_data, sort_keys=True, separators=(",", ":"))
-        block_content = f"{prev_hash}|{canonical_tx}".encode("utf-8")
-        block_hash = hashlib.sha256(block_content).hexdigest()
-
-        # Insert new block
-        block = MerkleLedger(
-            tx_data=tx_data,
-            prev_hash=prev_hash,
-            block_hash=block_hash,
-            created_at=datetime.now(timezone.utc)
-        )
-        self.db.add(block)
-        self.db.commit()
-        self.db.refresh(block)
-
-        logger.info(f"⛓️ Block committed #{block.id}: {block_hash[:16]}... (prev: {prev_hash[:8]}...)")
-        return block
-
-    def verify_integrity(self) -> Dict[str, Any]:
+        try:
+            # 1. Get previous block hash
+            last_block = self.get_last_block()
+            prev_hash = last_block.block_hash if last_block else "0" * 64
+            
+            # 2. Create deterministic transaction hash
+            tx_json = json.dumps(tx_data, sort_keys=True, default=str)
+            current_tx_hash = self._hash_data(tx_json)
+            
+            # 3. Create block hash (chain previous + current)
+            block_hash_input = f"{current_tx_hash}{prev_hash}"
+            block_hash = self._hash_data(block_hash_input)
+            
+            # 4. Create and save new block
+            new_block = TransactionBlock(
+                tx_data=tx_json,
+                prev_hash=prev_hash,
+                block_hash=block_hash,
+                created_at=datetime.now(timezone.utc)
+            )
+            
+            self.db.add(new_block)
+            self.db.commit()
+            self.db.refresh(new_block)
+            
+            logger.info(f"✅ Ledger block committed: {block_hash[:16]}...")
+            return new_block
+            
+        except Exception as e:
+            self.db.rollback()
+            logger.error(f"❌ Failed to commit ledger block: {e}")
+            raise
+    
+    def verify_integrity(self) -> dict:
         """
-        Traverses the full chain to verify that no block has been modified or tampered with
+        Verify the entire ledger chain integrity
         """
-        blocks = self.db.query(MerkleLedger).order_by(MerkleLedger.id.asc()).all()
-        tampered_blocks: List[int] = []
-
-        for i, block in enumerate(blocks):
-            if i == 0:
-                expected_prev = "0" * 64
-            else:
-                expected_prev = blocks[i - 1].block_hash
-
-            if block.prev_hash != expected_prev:
-                tampered_blocks.append(block.id)
-                continue
-
-            # Verify block hash itself
-            canonical_tx = json.dumps(block.tx_data, sort_keys=True, separators=(",", ":"))
-            expected_hash = hashlib.sha256(f"{block.prev_hash}|{canonical_tx}".encode("utf-8")).hexdigest()
-
-            if block.block_hash != expected_hash:
-                tampered_blocks.append(block.id)
-
-        status = "verified" if len(tampered_blocks) == 0 else "tampered"
+        blocks = self.db.query(TransactionBlock).order_by(
+            TransactionBlock.id
+        ).all()
+        
+        if not blocks:
+            return {"status": "empty", "message": "No blocks in ledger"}
+        
+        tampered_blocks = []
+        
+        for i in range(1, len(blocks)):
+            current_block = blocks[i]
+            prev_block = blocks[i-1]
+            
+            if current_block.prev_hash != prev_block.block_hash:
+                tampered_blocks.append(current_block.id)
+                logger.error(f"🚨 TAMPERING DETECTED at block {current_block.id}")
+        
+        if tampered_blocks:
+            return {
+                "status": "tampered",
+                "tampered_blocks": tampered_blocks,
+                "message": "Ledger integrity compromised!"
+            }
+        
         return {
-            "status": status,
+            "status": "verified",
             "total_blocks": len(blocks),
-            "tampered_blocks": tampered_blocks
+            "latest_hash": blocks[-1].block_hash,
+            "message": "Ledger integrity confirmed"
         }
-
-    def get_block_by_hash(self, block_hash: str) -> Optional[MerkleLedger]:
-        return self.db.query(MerkleLedger).filter(MerkleLedger.block_hash == block_hash).first()
+    
+    def get_block_by_hash(self, block_hash: str) -> Optional[TransactionBlock]:
+        """Retrieve a specific block by its hash"""
+        return self.db.query(TransactionBlock).filter_by(
+            block_hash=block_hash
+        ).first()
