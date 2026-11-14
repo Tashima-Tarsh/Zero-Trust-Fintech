@@ -86,3 +86,25 @@ FOR EACH ROW EXECUTE FUNCTION reject_attestation_ledger_mutation();
 CREATE TRIGGER prevent_client_attestation_truncate
 BEFORE TRUNCATE ON client_attestation_ledger
 FOR EACH STATEMENT EXECUTE FUNCTION reject_attestation_ledger_mutation();
+
+-- Durable device-integrity diagnostic submissions on fresh deployments.
+CREATE TABLE phase2_forensic_submissions (
+  submission_id UUID PRIMARY KEY,
+  session_id UUID NOT NULL REFERENCES payment_sessions(id),
+  merchant_id VARCHAR(80) NOT NULL,
+  request_hash CHAR(64) NOT NULL,
+  image_sha256 CHAR(64),
+  risk_score INTEGER NOT NULL CHECK (risk_score BETWEEN 0 AND 100),
+  decision VARCHAR(48) NOT NULL CHECK (decision IN ('DEVICE_INTEGRITY_PASS','DEVICE_INTEGRITY_REJECT')),
+  response JSONB NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX phase2_submissions_image_hash ON phase2_forensic_submissions(image_sha256)
+  WHERE image_sha256 IS NOT NULL;
+CREATE FUNCTION reject_device_integrity_mutation() RETURNS trigger LANGUAGE plpgsql AS $$
+BEGIN
+  RAISE EXCEPTION 'phase2_forensic_submissions is append-only';
+END $$;
+CREATE TRIGGER forbid_device_integrity_update_delete
+BEFORE UPDATE OR DELETE ON phase2_forensic_submissions
+FOR EACH ROW EXECUTE FUNCTION reject_device_integrity_mutation();

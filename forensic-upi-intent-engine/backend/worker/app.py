@@ -16,7 +16,6 @@ from typing import Literal
 
 from fastapi.responses import JSONResponse
 from redis import Redis, RedisError
-from python_nodes.statement_parser import preview_bank_statement
 
 from python_nodes.behavior_scorer import score_behavior
 from python_nodes.utl_validator import validate_utr
@@ -78,10 +77,6 @@ class VpaReportRequest(BaseModel):
     merchant_id: str = Field(min_length=1, max_length=80, pattern=r"^[A-Za-z0-9_-]+$")
 
 
-class StatementPreviewRequest(BaseModel):
-    csv_text: str = Field(min_length=1, max_length=250_000)
-
-
 @app.post("/v1/vpas/canary")
 def passive_vpa_health(body: VpaReportRequest, authorization: str | None = Header(default=None)):
     check_api_key(authorization)
@@ -101,12 +96,6 @@ def passive_vpa_health(body: VpaReportRequest, authorization: str | None = Heade
         stats = cur.fetchone()
     return {"merchant_id": body.merchant_id, **stats, "bank_connectivity_tested": False,
             "note": "Passive database-only report; no unauthorized bank probing."}
-
-
-@app.post("/v1/statements/preview")
-def statement_preview(body: StatementPreviewRequest, authorization: str | None = Header(default=None)):
-    check_api_key(authorization)
-    return preview_bank_statement(body.csv_text)
 
 
 @app.get("/health")

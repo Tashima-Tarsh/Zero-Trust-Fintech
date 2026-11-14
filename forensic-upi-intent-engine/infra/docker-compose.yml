@@ -61,6 +61,7 @@ services:
       N8N_PORT: "5678"
       N8N_PROTOCOL: http
       GENERIC_TIMEZONE: Asia/Kolkata
+      CLIENT_ATTESTATION_NOTIFY_URL: ${CLIENT_ATTESTATION_NOTIFY_URL:-}
     depends_on:
       postgres: {condition: service_healthy}
       worker: {condition: service_started}
