@@ -56,12 +56,17 @@ self.addEventListener('fetch', (event) => {
           const utrMatch = rawReceipt.match(/\b\d{12}\b/);
           const utr = utrMatch ? utrMatch[0] : null;
 
-          // 3. Extract Amount
-          const amtMatch = rawReceipt.match(/[₹Rs\.]?\s*(\d+(?:\.\d{2})?)/i);
-          const amount = amtMatch ? parseFloat(amtMatch[1]) : null;
+          // 3. Extract Amount (Supports commas, e.g. ₹1,000.37)
+          const amtMatch = rawReceipt.match(/[₹RsINR\.]?\s*([\d,]+(?:\.\d{2})?)/i);
+          let amount = null;
+          if (amtMatch) {
+            const cleanStr = amtMatch[1].replace(/,/g, '');
+            const parsed = parseFloat(cleanStr);
+            if (!isNaN(parsed) && parsed > 0) amount = parsed;
+          }
 
-          // Extract optional order ID if present in note
-          const orderMatch = rawReceipt.match(/Order_[A-Z0-9]+/i);
+          // Extract optional order ID if present in transaction note
+          const orderMatch = rawReceipt.match(/Order_[A-Za-z0-9_-]+/i) || rawReceipt.match(/ORD_[A-Za-z0-9_-]+/i);
           const orderId = orderMatch ? orderMatch[0] : null;
 
           if (!utr || !amount) {

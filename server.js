@@ -12,6 +12,14 @@ const path = require('path');
 const crypto = require('crypto');
 const QRCode = require('qrcode');
 const db = require('./db');
+const {
+  buildNPCIIntentUri,
+  sanitizeTransactionNote,
+  sanitizeTxnRef,
+  parseNPCIIntentResponse,
+  parseUTRTimestamp,
+  NPCI_RESPONSE_CODES
+} = require('./npci-intent');
 
 const app = express();
 const server = http.createServer(app);
@@ -92,7 +100,7 @@ function generateChallengeAmount(baseAmount) {
 // ═══════════════════════════════════════════════════════════════════
 // TASK 3: SESSION TOKEN GENERATION
 // ═══════════════════════════════════════════════════════════════════
-function generateSession(baseAmount = 100) {
+function generateSession(baseAmount = 100, description = '') {
   const sessionId = crypto.randomBytes(16).toString('hex');
   const now = Date.now();
   const expiresAt = now + (180 * 1000); // 3 minutes TTL
@@ -107,9 +115,10 @@ function generateSession(baseAmount = 100) {
   const session = {
     sessionId,
     orderId,
+    description: String(description || '').trim(),
     challengeAmount,
     baseAmount: Number(baseAmount),
-    txnRef,
+    txnRef: sanitizeTxnRef(txnRef),
     vpaAddress,
     createdAt: now,
     expiresAt,
@@ -123,26 +132,20 @@ function generateSession(baseAmount = 100) {
 }
 
 // ═══════════════════════════════════════════════════════════════════
-// TASK 4: NPCI-COMPLIANT UPI DEEP LINK GENERATOR
+// TASK 4: NPCI-COMPLIANT UPI DEEP LINK GENERATOR (v3.2 Spec)
 // ═══════════════════════════════════════════════════════════════════
 function generateUPILink(session) {
-  // NPCI Specification: upi://pay?pa=&pn=&am=&tn=&tr=&cu=INR
-  // pa = Payee VPA
-  // pn = Payee Name
-  // am = Transaction Amount with 2 decimal places
-  // tn = Transaction Note (encoded order reference, max 80 chars)
-  // tr = System Tracking Reference
-  // cu = Currency (strictly "INR")
-  const params = new URLSearchParams({
+  // NPCI Specification v3.2: upi://pay?pa=&pn=&am=&tn=&tr=&cu=INR&mc=5411
+  return buildNPCIIntentUri({
     pa: session.vpaAddress || MERCHANT_UPI_ID,
     pn: MERCHANT_NAME,
-    am: session.challengeAmount.toFixed(2),
-    tn: session.orderId,
+    am: session.challengeAmount,
+    orderId: session.orderId,
+    description: session.description || 'Kirana Order',
     tr: session.txnRef,
-    cu: 'INR'
+    cu: 'INR',
+    mc: '5411'
   });
-
-  return 'upi://pay?' + params.toString();
 }
 
 // ═══════════════════════════════════════════════════════════════════
@@ -153,7 +156,8 @@ function generateUPILink(session) {
 app.get('/api/session/new', async (req, res) => {
   try {
     const baseAmount = parseFloat(req.query.amount) || 100.0;
-    const session = generateSession(baseAmount);
+    const description = req.query.description || req.query.desc || req.query.item || 'Kirana Order';
+    const session = generateSession(baseAmount, description);
     const upiLink = generateUPILink(session);
 
     // Generate base64 QR as helper, though frontend renders direct to canvas
@@ -167,6 +171,7 @@ app.get('/api/session/new', async (req, res) => {
       success: true,
       sessionId: session.sessionId,
       orderId: session.orderId,
+      description: session.description,
       baseAmount: session.baseAmount,
       challengeAmount: session.challengeAmount,
       txnRef: session.txnRef,
@@ -200,23 +205,23 @@ app.post('/api/verify', (req, res) => {
     const { utr, amount, receipt, orderId, txnRef } = req.body;
     const now = Date.now();
 
-    // Raw receipt fallback parsing if utr or amount are missing
+    // Use NPCI Intent Parser for raw receipt or callback data
     let parsedUtr = utr;
-    let parsedAmount = amount ? parseFloat(amount) : null;
+    let parsedAmount = amount ? parseFloat(String(amount).replace(/,/g, '')) : null;
+    let detectedOrderId = orderId;
 
-    if (receipt && (!parsedUtr || !parsedAmount)) {
-      const utrMatch = receipt.match(/\b\d{12}\b/);
-      if (utrMatch) parsedUtr = utrMatch[0];
-
-      const amtMatch = receipt.match(/[₹Rs\.]?\s*(\d+(?:\.\d{2})?)/i);
-      if (amtMatch) parsedAmount = parseFloat(amtMatch[1]);
+    if (receipt) {
+      const parsedReceipt = parseNPCIIntentResponse(receipt);
+      if (!parsedUtr && parsedReceipt.txnId) parsedUtr = parsedReceipt.txnId;
+      if (!parsedAmount && parsedReceipt.amount) parsedAmount = parsedReceipt.amount;
+      if (!detectedOrderId && parsedReceipt.orderId) detectedOrderId = parsedReceipt.orderId;
     }
 
     // ─────────────────────────────────────────────────────────────
     // LAYER 1: SESSION CHECK
     // ─────────────────────────────────────────────────────────────
     let session = null;
-    if (orderId) session = db.findSessionByOrderId(orderId);
+    if (detectedOrderId) session = db.findSessionByOrderId(detectedOrderId);
     if (!session && txnRef) session = db.findSessionByTxnRef(txnRef);
 
     if (!session) {
@@ -285,7 +290,7 @@ app.post('/api/verify', (req, res) => {
     }
 
     // ─────────────────────────────────────────────────────────────
-    // LAYER 4: UTR FRESHNESS (10-Minute Maximum Latency)
+    // LAYER 4: UTR FRESHNESS (10-Minute Maximum Latency & Timestamp Audit)
     // ─────────────────────────────────────────────────────────────
     // Ensure the order was initiated recently (< 10 minutes)
     const orderAgeMs = now - session.createdAt;
@@ -294,16 +299,27 @@ app.post('/api/verify', (req, res) => {
         success: false,
         layer: 4,
         code: 'UTR_TOO_OLD',
-        reason: 'UTR timestamp is stale (> 10 minutes old).'
+        reason: 'Session order age is stale (> 10 minutes old).'
+      });
+    }
+
+    // NPCI UTR Julian Day / Timestamp check
+    const utrTimestamp = parseUTRTimestamp(parsedUtr);
+    if (utrTimestamp && (now - utrTimestamp) > (10 * 60 * 1000)) {
+      return res.status(400).json({
+        success: false,
+        layer: 4,
+        code: 'UTR_TIMESTAMP_EXPIRED',
+        reason: 'Bank UTR internal timestamp indicates receipt is > 10 minutes old.'
       });
     }
 
     // ─────────────────────────────────────────────────────────────
-    // LAYER 5: TRANSACTION NOTE MATCH
+    // LAYER 5: TRANSACTION NOTE MATCH (Order Reference Cross-Verification)
     // ─────────────────────────────────────────────────────────────
     if (receipt) {
       // If receipt explicitly contains a transaction note or order ID, verify it matches
-      const noteMatches = receipt.match(/Order_[A-Z0-9]+/i);
+      const noteMatches = receipt.match(/Order_[A-Z0-9]+/i) || receipt.match(/ORD_[A-Z0-9_]+/i);
       if (noteMatches && noteMatches[0].toUpperCase() !== session.orderId.toUpperCase()) {
         return res.status(400).json({
           success: false,
@@ -385,7 +401,7 @@ app.post('/api/verify', (req, res) => {
 });
 
 // ═══════════════════════════════════════════════════════════════════
-// TASK 7: WEB SHARE TARGET HANDLER
+// TASK 7: WEB SHARE TARGET & NPCI INTENT CALLBACK HANDLERS
 // ═══════════════════════════════════════════════════════════════════
 app.post('/handle-share', (req, res) => {
   const { title, text, url } = req.body;
@@ -393,20 +409,65 @@ app.post('/handle-share', (req, res) => {
 
   console.log('📥 [Web Share Target] Received shared receipt payload:\n', rawReceipt);
 
-  const utrMatch = rawReceipt.match(/\b\d{12}\b/);
-  const amtMatch = rawReceipt.match(/[₹Rs\.]?\s*(\d+(?:\.\d{2})?)/i);
-  const orderMatch = rawReceipt.match(/Order_[A-Z0-9]+/i);
-
-  const utr = utrMatch ? utrMatch[0] : '';
-  const amount = amtMatch ? amtMatch[1] : '';
-  const orderId = orderMatch ? orderMatch[0] : '';
+  const parsed = parseNPCIIntentResponse(rawReceipt);
+  const utr = parsed.txnId || '';
+  const amount = parsed.amount ? String(parsed.amount) : '';
+  const orderId = parsed.orderId || '';
 
   if (!utr || !amount) {
     return res.redirect(`/failed.html?reason=${encodeURIComponent('Could not extract 12-digit UTR or amount from shared receipt')}`);
   }
 
-  // Redirect to success page or let client handle verify
+  // Redirect to success page with parameters
   res.redirect(`/success.html?utr=${encodeURIComponent(utr)}&amount=${encodeURIComponent(amount)}&orderId=${encodeURIComponent(orderId)}`);
+});
+
+// Official NPCI Intent Callback / Webhook Endpoint
+app.post('/api/npci-callback', (req, res) => {
+  try {
+    let payload = '';
+    if (typeof req.body === 'string') {
+      payload = req.body;
+    } else if (req.body && Object.keys(req.body).length > 0) {
+      payload = new URLSearchParams(req.body).toString();
+    } else if (req.query && Object.keys(req.query).length > 0) {
+      payload = new URLSearchParams(req.query).toString();
+    }
+
+    const parsed = parseNPCIIntentResponse(payload);
+    console.log('📡 [NPCI Intent Callback] Parsed payload:', parsed);
+
+    if (parsed.responseCode && parsed.responseCode !== '00') {
+      const codeInfo = NPCI_RESPONSE_CODES[parsed.responseCode] || { description: 'Payment Failed', action: 'SHOW_ERROR' };
+      return res.status(400).json({
+        success: false,
+        status: parsed.status || 'FAILED',
+        responseCode: parsed.responseCode,
+        action: codeInfo.action,
+        reason: codeInfo.description
+      });
+    }
+
+    if (!parsed.txnId || !parsed.amount) {
+      return res.status(400).json({
+        success: false,
+        error: 'INVALID_CALLBACK_PARAMETERS',
+        reason: 'Required UTR (txnId) or amount missing in callback'
+      });
+    }
+
+    return res.json({
+      success: true,
+      status: 'SUCCESS',
+      responseCode: '00',
+      utr: parsed.txnId,
+      amount: parsed.amount,
+      orderId: parsed.orderId
+    });
+  } catch (err) {
+    console.error('Callback error:', err);
+    res.status(500).json({ success: false, error: err.message });
+  }
 });
 
 // Simulation helper for one-click developer testing

@@ -2,6 +2,7 @@ const { DatabaseSync } = require('node:sqlite');
 const crypto = require('crypto');
 const fs = require('fs');
 const path = require('path');
+const { buildNPCIIntentUri } = require('./npci-intent');
 
 const DATA_DIR = path.join(__dirname, 'data');
 if (!fs.existsSync(DATA_DIR)) {
@@ -324,8 +325,16 @@ function createMerchantOrder(merchantId, { amount, description = '', vpaAddress 
 
   const orderId = 'ORD_' + Date.now().toString(36).toUpperCase() + '_' + crypto.randomBytes(3).toString('hex').toUpperCase();
   const businessName = merchant.business_name || 'Merchant';
-  const encodedName = encodeURIComponent(businessName);
-  const upiUri = `upi://pay?pa=${chosenVpa}&pn=${encodedName}&am=${parsedAmount.toFixed(2)}&cu=INR&tr=${orderId}`;
+  const upiUri = buildNPCIIntentUri({
+    pa: chosenVpa,
+    pn: businessName,
+    am: parsedAmount,
+    orderId,
+    description: description || 'Retail Payment',
+    tr: orderId,
+    cu: 'INR',
+    mc: '5411'
+  });
   const now = Date.now();
 
   db.prepare(`
