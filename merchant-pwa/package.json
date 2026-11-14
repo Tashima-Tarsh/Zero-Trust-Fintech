@@ -1,0 +1,17 @@
+{
+  "name": "sharepay-merchant-pwa",
+  "version": "1.0.0",
+  "description": "SharePay Merchant PWA Dashboard with Real-Time WebSocket Confirmation and Zero-Trust QR Generation",
+  "main": "server.js",
+  "type": "module",
+  "scripts": {
+    "start": "node server.js",
+    "test": "node test.js"
+  },
+  "dependencies": {
+    "express": "^4.19.2"
+  },
+  "keywords": ["pwa", "upi", "fintech", "zero-trust", "merchant-dashboard"],
+  "author": "NITISH KUMAR",
+  "license": "MIT"
+}

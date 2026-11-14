@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#2563eb">
+  <meta name="description" content="SharePay Merchant PWA - Zero-fee, Zero-Trust UPI Payment Acceptance">
+  
+  <title>SharePay Merchant Dashboard</title>
+  
+  <!-- PWA Manifest -->
+  <link rel="manifest" href="/manifest.json">
+  
+  <!-- Icons -->
+  <link rel="icon" type="image/png" href="/icons/icon-192.png">
+  <link rel="apple-touch-icon" href="/icons/icon-192.png">
+  
+  <!-- Styles -->
+  <link rel="stylesheet" href="/styles.css">
+  
+  <!-- QR Code Library -->
+  <script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script>
+</head>
+<body>
+  <div class="app">
+    <!-- Header -->
+    <header class="header">
+      <div class="brand-wrap">
+        <h1>🚀 SharePay</h1>
+        <span class="merchant-badge">Merchant</span>
+      </div>
+      <div style="display: flex; align-items: center; gap: 12px;">
+        <div class="status">
+          <span class="status-dot" id="connectionStatus"></span>
+          <span id="statusText">Connecting...</span>
+        </div>
+        <button class="settings-btn" id="openSettingsBtn" title="Settings" onclick="openSettingsModal()">⚙️</button>
+      </div>
+    </header>
+
+    <!-- Main Dashboard -->
+    <main class="dashboard">
+      <!-- Payment Request Section -->
+      <section class="card payment-request">
+        <h2>💰 Request UPI Payment</h2>
+        <form id="paymentForm">
+          <div class="form-group">
+            <label for="amount">Payable Amount (₹)</label>
+            <div class="input-with-symbol">
+              <span class="currency-sym">₹</span>
+              <input type="number" id="amount" step="0.01" min="1" placeholder="100.00" required>
+            </div>
+            <div class="quick-amounts">
+              <button type="button" class="amount-pill" onclick="setQuickAmount(50)">₹50</button>
+              <button type="button" class="amount-pill" onclick="setQuickAmount(100)">₹100</button>
+              <button type="button" class="amount-pill" onclick="setQuickAmount(250)">₹250</button>
+              <button type="button" class="amount-pill" onclick="setQuickAmount(500)">₹500</button>
+              <button type="button" class="amount-pill" onclick="setQuickAmount(1000)">₹1000</button>
+            </div>
+          </div>
+          <div class="form-group">
+            <label for="orderId">Order Reference / Note (Optional)</label>
+            <input type="text" id="orderId" placeholder="e.g. Order_99X_7f3a">
+          </div>
+          <button type="submit" id="generateBtn" class="btn btn-primary">
+            <span>⚡ Generate Challenge QR</span>
+          </button>
+        </form>
+      </section>
+
+      <!-- QR Code Section -->
+      <section class="card qr-section" id="qrSection" style="display: none;">
+        <h2>📲 Scan to Pay with Any UPI App</h2>
+        
+        <div class="qr-countdown" id="qrCountdown">
+          ⏱️ Challenge Valid for: <span id="timerDisplay">05:00</span>
+        </div>
+
+        <div class="qr-box-wrap">
+          <div id="qrcode"></div>
+        </div>
+
+        <p class="upi-id">Receiving VPA: <strong id="merchantVPA">merchant@upi</strong></p>
+
+        <div class="payment-info">
+          <div class="payment-info-row">
+            <span class="payment-info-label">Expected Amount:</span>
+            <span class="payment-info-value" style="color: var(--primary); font-size: 18px;">₹<span id="displayAmount">0.00</span></span>
+          </div>
+          <div class="payment-info-row">
+            <span class="payment-info-label">Challenge Token:</span>
+            <code id="challengeId">--------</code>
+          </div>
+        </div>
+
+        <button class="btn btn-secondary" id="copyLink">📋 Copy Direct UPI Intent Link</button>
+        <button class="btn btn-secondary" style="margin-top: 8px; color: var(--danger);" onclick="cancelActivePayment()">✕ Cancel Payment</button>
+      </section>
+
+      <!-- Recent Payments -->
+      <section class="card payments-list">
+        <h2>🧾 Real-Time Settled Payments</h2>
+        <div id="paymentsList" class="payments-grid">
+          <p class="empty-state">No payments received yet in this session</p>
+        </div>
+      </section>
+
+      <!-- Stats Summary -->
+      <section class="card stats">
+        <h2>📊 Today's Settled Summary</h2>
+        <div class="stats-grid">
+          <div class="stat">
+            <span class="stat-value" id="totalAmount">₹0.00</span>
+            <span class="stat-label">Total Volume</span>
+          </div>
+          <div class="stat">
+            <span class="stat-value" id="totalTransactions">0</span>
+            <span class="stat-label">Transactions</span>
+          </div>
+          <div class="stat">
+            <span class="stat-value" id="avgScore">100</span>
+            <span class="stat-label">Avg Fraud Score</span>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <!-- Settings Modal -->
+    <div class="modal-overlay" id="settingsModal">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h3>⚙️ Merchant Configuration</h3>
+          <button class="close-modal-btn" onclick="closeSettingsModal()">&times;</button>
+        </div>
+        <form id="settingsForm" onsubmit="saveSettings(event)">
+          <div class="form-group">
+            <label for="cfgMerchantId">Merchant ID</label>
+            <input type="text" id="cfgMerchantId" required>
+          </div>
+          <div class="form-group">
+            <label for="cfgMerchantVpa">Receiving UPI ID (VPA)</label>
+            <input type="text" id="cfgMerchantVpa" required>
+          </div>
+          <div class="form-group">
+            <label for="cfgApiUrl">Backend API URL</label>
+            <input type="text" id="cfgApiUrl" required>
+          </div>
+          <div class="form-group">
+            <label for="cfgWsUrl">Backend WebSocket URL</label>
+            <input type="text" id="cfgWsUrl" required>
+          </div>
+          <button type="submit" class="btn btn-primary" style="margin-top: 10px;">Save Configuration</button>
+        </form>
+      </div>
+    </div>
+
+    <!-- Toast Notifications -->
+    <div id="toast" class="toast"></div>
+  </div>
+
+  <!-- Audio Chime for Payment Confirmation -->
+  <audio id="paymentSound" preload="auto"></audio>
+
+  <!-- Application Logic -->
+  <script src="/app.js"></script>
+</body>
+</html>

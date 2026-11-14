@@ -21,6 +21,7 @@ Defensive research prototypes for UPI session orchestration, payment-integrity c
 
 ## 🔬 Additional Research & Production Engines
 
+* **[merchant-pwa](merchant-pwa/README.md)** — Progressive Web App (PWA) merchant dashboard for real-time payment generation, dynamic challenge QR codes, and sub-second WebSocket audio-visual confirmation.
 * **[zero-trust-fintech-production](zero-trust-fintech-production/README.md)** — Production-grade FastAPI service with sub-second WebSocket broadcasting, 5-layer fraud engine, n8n orchestration, Redis challenge TTL, and PLpgSQL / Merkle tree immutable audit ledgers.
 * **[forensic-upi-intent-engine](forensic-upi-intent-engine/README.md)** — Client device attestation engine featuring Ed25519 signing, append-only financial ledger schemas, n8n orchestration, and automated forensic verification.
 * **[forensic-upi-engine](forensic-upi-engine/README.md)** — Earlier research scaffold retained for compatibility and reference.
