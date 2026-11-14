@@ -35,7 +35,7 @@ Exact retries return duplicate:true. Different claims for an already-attested se
 
 ## Device Integrity Checks
 
-Signed elapsed_ms, retry_count, UTR formatting and optional image_ela_score are evaluated. Risk >=40 gives DEVICE_INTEGRITY_REJECT and blocks recording. These metrics define rejection policy, not independent cryptographic evidence of runtime behavior.
+Signed elapsed_ms, retry_count, UTR formatting and optional image_ela_score are evaluated. Any flagged integrity threshold violation gives DEVICE_INTEGRITY_REJECT and blocks recording. These metrics define rejection policy, not independent cryptographic evidence of runtime behavior.
 
 ## Outbound notifications
 
