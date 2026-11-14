@@ -604,12 +604,20 @@ function markNotificationsRead(merchantId) {
 
 // Initial Seed: Pre-provisions Ramesh Kirana & a brand new fresh merchant for onboarding testing
 function seedDefaultMerchants() {
+  // Demo records are never auto-provisioned on live or ordinary installs.
+  if (process.env.NODE_ENV === 'production' || process.env.ENABLE_DEMO_MERCHANTS !== 'true') return;
+  const rameshPassword = process.env.DEMO_RAMESH_PASSWORD;
+  const onboardingPassword = process.env.DEMO_ONBOARDING_PASSWORD;
+  if (!rameshPassword || !onboardingPassword ||
+      rameshPassword.length < 12 || onboardingPassword.length < 12) {
+    throw new Error('Demo provisioning requires two independent passwords (12+ characters) from environment');
+  }
   const existingRamesh = findMerchantByEmail('ramesh@kirana.in');
   if (!existingRamesh) {
-    console.log('Seeding pre-configured merchant: ramesh@kirana.in / Ramesh@123');
+    console.log('Seeding a development-only demo merchant');
     const ramesh = createMerchant({
       email: 'ramesh@kirana.in',
-      password: 'Ramesh@123',
+      password: rameshPassword,
       businessName: 'Ramesh Provision Stores',
       phone: '9822012345',
       city: 'Narayan Peth, Pune',
@@ -649,10 +657,10 @@ function seedDefaultMerchants() {
 
   const existingNew = findMerchantByEmail('new@merchant.in');
   if (!existingNew) {
-    console.log('Seeding fresh onboarding merchant: new@merchant.in / Merchant@123');
+    console.log('Seeding development-only onboarding merchant');
     createMerchant({
       email: 'new@merchant.in',
-      password: 'Merchant@123',
+      password: onboardingPassword,
       businessName: '',
       phone: '',
       city: '',
