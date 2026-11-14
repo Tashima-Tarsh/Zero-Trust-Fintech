@@ -36,12 +36,61 @@ class ChallengeRequest(BaseModel):
     merchant_id: str
     amount: float
 
+class TokenRequest(BaseModel):
+    merchant_id: str
+    user_id: Optional[str] = None
+
+class DeviceRegisterRequest(BaseModel):
+    device_id: str = Field(..., min_length=4, max_length=255)
+    public_key: str = Field(..., min_length=16)
+    algorithm: str = Field(default="ed25519")
+
 class LedgerResponse(BaseModel):
     status: str
     block_hash: str
     block_id: int
     fraud_score: int
     message: str
+
+@router.post("/auth/merchant-token")
+async def get_merchant_token(req: TokenRequest):
+    """Generate signed JWT token for authenticated WebSocket connection"""
+    from ..core.security import create_jwt_token
+    token = create_jwt_token(merchant_id=req.merchant_id, user_id=req.user_id)
+    return {
+        "status": "success",
+        "token": token,
+        "token_type": "Bearer",
+        "expires_in": 86400,
+        "merchant_id": req.merchant_id
+    }
+
+@router.post("/device/register")
+async def register_device(payload: DeviceRegisterRequest, db: Session = Depends(get_db)):
+    """Register client device hardware attestation public key"""
+    from ..models.database import DeviceKey
+    try:
+        existing = db.query(DeviceKey).filter_by(device_id=payload.device_id).first()
+        if existing:
+            existing.public_key = payload.public_key
+            existing.algorithm = payload.algorithm
+            existing.is_active = True
+            db.commit()
+            return {"status": "success", "message": "Device key updated", "device_id": payload.device_id}
+        
+        new_device = DeviceKey(
+            device_id=payload.device_id,
+            public_key=payload.public_key,
+            algorithm=payload.algorithm,
+            is_active=True
+        )
+        db.add(new_device)
+        db.commit()
+        return {"status": "success", "message": "Device key registered", "device_id": payload.device_id}
+    except Exception as e:
+        db.rollback()
+        logger.exception(f"Error registering device: {e}")
+        raise HTTPException(status_code=500, detail="Device registration failed")
 
 @router.post("/challenge/generate")
 async def generate_challenge(request: ChallengeRequest):

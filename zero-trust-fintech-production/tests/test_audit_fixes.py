@@ -310,11 +310,15 @@ class TestFraudEngineFailClosed(unittest.IsolatedAsyncioTestCase):
         class MockRedisSuccess:
             def __init__(self):
                 self.consumed = False
-            async def eval(self, script, numkeys, key, meta_key):
+            async def get(self, key):
+                if not self.consumed:
+                    return secret.encode()
+                return None
+            async def eval(self, *args, **kwargs):
                 if not self.consumed:
                     self.consumed = True
-                    return secret.encode()
-                return None  # Subsequent request sees empty (atomic consumption)
+                    return 1
+                return 0  # Subsequent request sees empty (atomic consumption)
 
         mock_redis = MockRedisSuccess()
         engine.redis = mock_redis

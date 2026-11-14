@@ -1,31 +1,42 @@
-from fastapi import WebSocket, WebSocketDisconnect
+from fastapi import WebSocket, WebSocketDisconnect, status
 import logging
-from typing import Dict, Set
+from typing import Dict, Set, Optional
+from ..core.security import verify_jwt_token, JWTError
+from ..core.config import get_settings
 
 logger = logging.getLogger(__name__)
+settings = get_settings()
 
 class ConnectionManager:
     """
-    Manages WebSocket connections for real-time payment confirmations
+    Manages authenticated WebSocket connections for real-time payment confirmations.
     """
     
     def __init__(self):
-        # merchant_id -> set of websocket connections
+        # merchant_id -> set of active websocket connections
         self.active_connections: Dict[str, Set[WebSocket]] = {}
+        # websocket -> merchant_id reverse map
+        self.connection_merchant_map: Dict[WebSocket, str] = {}
     
-    async def connect(self, websocket: WebSocket, merchant_id: str):
+    async def connect(self, websocket: WebSocket, merchant_id: str, merchant_user_id: str):
+        """Accept and register authenticated WebSocket connection"""
         await websocket.accept()
         if merchant_id not in self.active_connections:
             self.active_connections[merchant_id] = set()
         self.active_connections[merchant_id].add(websocket)
-        logger.info(f"✅ WebSocket connected: merchant {merchant_id}")
+        self.connection_merchant_map[websocket] = merchant_id
+        logger.info(f"✅ Authenticated WebSocket connected: merchant {merchant_id}, user {merchant_user_id}")
     
-    def disconnect(self, websocket: WebSocket, merchant_id: str):
-        if merchant_id in self.active_connections:
+    def disconnect(self, websocket: WebSocket):
+        """Clean up connection upon close"""
+        merchant_id = self.connection_merchant_map.get(websocket)
+        if merchant_id and merchant_id in self.active_connections:
             self.active_connections[merchant_id].discard(websocket)
             if not self.active_connections[merchant_id]:
                 del self.active_connections[merchant_id]
-        logger.info(f"❌ WebSocket disconnected: merchant {merchant_id}")
+        if websocket in self.connection_merchant_map:
+            del self.connection_merchant_map[websocket]
+        logger.info(f"❌ WebSocket disconnected: merchant {merchant_id or 'unknown'}")
     
     async def broadcast_to_merchant(self, merchant_id: str, message: Dict):
         """
@@ -45,29 +56,58 @@ class ConnectionManager:
                 logger.error(f"Error sending to websocket: {e}")
                 disconnected.add(connection)
         
-        # Clean up disconnected sockets
         for conn in disconnected:
-            self.active_connections[merchant_id].discard(conn)
+            self.disconnect(conn)
 
 manager = ConnectionManager()
 
-async def websocket_endpoint(websocket: WebSocket, merchant_id: str):
+async def websocket_endpoint(
+    websocket: WebSocket,
+    merchant_id: str,
+    token: Optional[str] = None
+):
     """
-    WebSocket endpoint for real-time payment confirmations
+    WebSocket endpoint with JWT-based merchant authentication
     """
-    await manager.connect(websocket, merchant_id)
+    merchant_user_id = merchant_id
     
+    # 1. Verify token if provided
+    if token:
+        try:
+            payload = verify_jwt_token(token)
+            token_merchant = payload.get("merchant_id")
+            token_user = payload.get("sub")
+            
+            # Ensure token belongs to the requested merchant or admin
+            if token_merchant and token_merchant != merchant_id and token_user != "admin":
+                logger.warning(f"❌ WebSocket auth violation: token for '{token_merchant}' attempted to access '{merchant_id}'")
+                await websocket.close(code=status.WS_1008_POLICY_VIOLATION)
+                return
+            
+            merchant_user_id = token_user or merchant_id
+            
+        except JWTError as e:
+            logger.warning(f"❌ WebSocket JWT authentication failed: {e}")
+            await websocket.close(code=status.WS_1008_POLICY_VIOLATION)
+            return
+    else:
+        # In production, require authentication token
+        if getattr(settings, "APP_ENV", "development").lower() == "production":
+            logger.warning(f"❌ WebSocket rejected: Missing required auth token in production for '{merchant_id}'")
+            await websocket.close(code=status.WS_1008_POLICY_VIOLATION)
+            return
+
+    # 2. Register connection
+    await manager.connect(websocket, merchant_id, merchant_user_id)
+    
+    # 3. Connection lifecycle loop
     try:
         while True:
-            # Keep connection alive with ping/pong
             data = await websocket.receive_text()
-            
-            # Handle client messages
             if data == "ping":
                 await websocket.send_json({"type": "pong"})
-                
     except WebSocketDisconnect:
-        manager.disconnect(websocket, merchant_id)
+        manager.disconnect(websocket)
     except Exception as e:
-        logger.warning(f"WebSocket closed: {e}")
-        manager.disconnect(websocket, merchant_id)
+        logger.warning(f"WebSocket session closed: {e}")
+        manager.disconnect(websocket)

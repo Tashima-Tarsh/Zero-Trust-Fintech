@@ -1,7 +1,8 @@
-from fastapi import FastAPI, WebSocket
+from fastapi import FastAPI, WebSocket, Query
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 import logging
+from typing import Optional
 from contextlib import asynccontextmanager
 from .core.config import get_settings
 from .api.routes import router
@@ -51,8 +52,12 @@ app.add_middleware(
 app.include_router(router, prefix="/api/v1")
 
 @app.websocket("/ws/{merchant_id}")
-async def websocket_route(websocket: WebSocket, merchant_id: str):
-    await websocket_endpoint(websocket, merchant_id)
+async def websocket_route(
+    websocket: WebSocket,
+    merchant_id: str,
+    token: Optional[str] = Query(None)
+):
+    await websocket_endpoint(websocket, merchant_id, token)
 
 @app.exception_handler(Exception)
 async def global_exception_handler(request, exc):

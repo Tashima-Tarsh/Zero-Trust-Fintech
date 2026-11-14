@@ -1,32 +1,48 @@
 import time
 import hashlib
 import logging
-from typing import Dict, Any, Tuple
+from typing import Dict, Any, Tuple, Optional
 from datetime import datetime, timezone
+from enum import Enum
 from ..services.redis_service import redis_client
 from .config import get_settings
 
 logger = logging.getLogger(__name__)
 settings = get_settings()
 
-# Lua script for atomic challenge consumption (eliminates race conditions and replay)
-LUA_ATOMIC_CONSUME_CHALLENGE = """
+class GateStatus(str, Enum):
+    PASS = "pass"
+    FAIL = "fail"
+    ERROR = "error"
+
+# Lua script for atomic comparison and single-use consumption of payment challenges
+LUA_ATOMIC_VERIFY_AND_CONSUME = """
 local key = KEYS[1]
 local meta_key = KEYS[2]
-local val = redis.call('GET', key)
-if val then
+local expected_hash = ARGV[1]
+local challenge_response = ARGV[2]
+
+local stored = redis.call('GET', key)
+if not stored then
+    return 0  -- Challenge expired, not found, or already consumed
+end
+
+if stored == expected_hash or challenge_response == expected_hash then
     redis.call('DEL', key)
-    redis.call('DEL', meta_key)
-    return val
+    if meta_key then
+        redis.call('DEL', meta_key)
+    end
+    return 1  -- Verified and consumed atomically
 else
-    return nil
+    return -1 -- Response mismatch
 end
 """
 
 class FraudDetectionEngine:
     """
-    5-Layer Fraud-Proof Engine for UPI Receipt Verification
-    with Atomic Challenge Consumption and Fail-Closed Security.
+    5-Layer Fraud-Proof Engine with Mandatory Gates.
+    Strictly prevents threshold bypass by enforcing binary pass/fail gates
+    (Timestamp Freshness, Dynamic Challenge, Replay Defense) before scoring.
     """
     
     def __init__(self):
@@ -34,289 +50,345 @@ class FraudDetectionEngine:
     
     async def verify_receipt(self, receipt_data: Dict[str, Any]) -> Tuple[bool, Dict[str, Any]]:
         """
-        Run all 5 layers of fraud detection
+        Run all layers with mandatory gates.
         Returns: (is_valid, analysis_report)
         """
         report = {
             "timestamp": datetime.now(timezone.utc).isoformat(),
+            "gates": {},
             "layers": {},
             "overall_score": 0,
-            "flags": []
+            "flags": [],
+            "blocked": False,
+            "block_reason": None
         }
         
-        # Layer 1: Mathematical Freshness Decoding
-        layer1_result = await self._layer1_freshness_check(receipt_data)
-        report["layers"]["freshness"] = layer1_result
-        report["overall_score"] += layer1_result["score"]
+        # =====================================================================
+        # MANDATORY GATES (Must pass before any scoring is considered)
+        # =====================================================================
         
-        # Layer 2: Dynamic Challenge Matching (Atomic & Fail-Closed)
-        layer2_result = await self._layer2_challenge_verification(receipt_data)
-        report["layers"]["challenge"] = layer2_result
-        report["overall_score"] += layer2_result["score"]
+        # Gate 1: Timestamp Freshness (Hard Gate)
+        gate1 = await self._gate1_timestamp_freshness(receipt_data)
+        report["gates"]["timestamp_freshness"] = gate1
+        if gate1["status"] != GateStatus.PASS:
+            report["blocked"] = True
+            report["block_reason"] = "Timestamp validation failed"
+            report["flags"].append("GATE_TIMESTAMP_FAILED")
+            logger.warning(f"🚨 Gate 1 Failed: {gate1}")
+            return False, report
         
-        # Layer 3: Replay Attack Detection (Atomic SET NX)
-        layer3_result = await self._layer3_replay_detection(receipt_data)
-        report["layers"]["replay"] = layer3_result
-        report["overall_score"] += layer3_result["score"]
+        # Gate 2: Dynamic Challenge Verification (Atomic Lua Gate)
+        gate2 = await self._gate2_challenge_verification(receipt_data)
+        report["gates"]["challenge_verification"] = gate2
+        if gate2["status"] != GateStatus.PASS:
+            report["blocked"] = True
+            report["block_reason"] = "Challenge verification failed"
+            report["flags"].append("GATE_CHALLENGE_FAILED")
+            logger.warning(f"🚨 Gate 2 Failed: {gate2}")
+            return False, report
         
-        # Layer 4: Screenshot/Photo Analysis
-        layer4_result = await self._layer4_screenshot_detection(receipt_data)
-        report["layers"]["screenshot"] = layer4_result
-        report["overall_score"] += layer4_result["score"]
+        # Gate 3: Replay Detection (Atomic SET NX Gate)
+        gate3 = await self._gate3_replay_detection(receipt_data)
+        report["gates"]["replay_detection"] = gate3
+        if gate3["status"] != GateStatus.PASS:
+            report["blocked"] = True
+            report["block_reason"] = "Replay attack detected"
+            report["flags"].append("GATE_REPLAY_FAILED")
+            logger.warning(f"🚨 Gate 3 Failed: {gate3}")
+            return False, report
         
-        # Layer 5: Behavioral Anomaly Detection
-        layer5_result = await self._layer5_behavioral_analysis(receipt_data)
-        report["layers"]["behavioral"] = layer5_result
-        report["overall_score"] += layer5_result["score"]
+        # =====================================================================
+        # SCORING LAYERS (Only evaluated if all mandatory gates pass)
+        # =====================================================================
         
-        # Determine overall validity (threshold: 80/100)
-        is_valid = report["overall_score"] >= 80
+        # Layer 1: Screenshot & Intent Detection (Scoring, up to 35 pts)
+        layer1 = await self._layer1_screenshot_detection(receipt_data)
+        report["layers"]["screenshot"] = layer1
+        report["overall_score"] += layer1["score"]
+        
+        # Layer 2: Behavioral Rate Analysis (Scoring, up to 25 pts)
+        layer2 = await self._layer2_behavioral_analysis(receipt_data)
+        report["layers"]["behavioral"] = layer2
+        report["overall_score"] += layer2["score"]
+        
+        # Layer 3: Device Reputation & Trust (Scoring, up to 40 pts)
+        layer3 = await self._layer3_device_reputation(receipt_data)
+        report["layers"]["device_reputation"] = layer3
+        report["overall_score"] += layer3["score"]
+        
+        # Confidence threshold: 60/100 after all gates pass
+        is_valid = report["overall_score"] >= 60
         
         if not is_valid:
-            report["flags"].append("FRAUD_DETECTED")
-            logger.warning(f"🚨 Fraud detected: {report}")
+            report["flags"].append("LOW_CONFIDENCE_SCORE")
+            logger.warning(f"⚠️ Low confidence score: {report['overall_score']}")
         
         return is_valid, report
     
-    async def _layer1_freshness_check(self, receipt_data: Dict) -> Dict:
+    # -------------------------------------------------------------------------
+    # MANDATORY GATES
+    # -------------------------------------------------------------------------
+    
+    async def _gate1_timestamp_freshness(self, receipt_data: Dict) -> Dict:
         """
-        Layer 1: Mathematical Freshness Decoding
-        Validates that the receipt timestamp is within acceptable window
-        and matches expected payment timing patterns
+        GATE 1: Timestamp Freshness (MANDATORY)
+        Rejects timestamps outside acceptable freshness window or in the future.
         """
         receipt_timestamp = receipt_data.get("timestamp", 0)
         current_time = time.time()
         age = current_time - receipt_timestamp
         
-        score = 0
-        details = {}
-        
-        # Check if within freshness window
-        if 0 <= age <= settings.FRESHNESS_WINDOW_SECONDS:
-            score = 30  # Max score for this layer
-            details["status"] = "fresh"
-            details["age_seconds"] = age
-        elif age > settings.FRESHNESS_WINDOW_SECONDS:
-            score = 0
-            details["status"] = "stale"
-            details["age_seconds"] = age
-            details["reason"] = "Receipt too old"
-        else:
-            score = 0
-            details["status"] = "future_timestamp"
-            details["reason"] = "Timestamp in future"
-        
-        # Additional freshness pattern analysis
-        try:
-            hour = datetime.fromtimestamp(receipt_timestamp, tz=timezone.utc).hour
-            if 6 <= hour <= 23:  # Normal banking hours
-                score += 5
-                details["banking_hours"] = True
-            else:
-                details["banking_hours"] = False
-        except Exception:
-            details["banking_hours"] = False
+        if age < -10 or age > settings.SIGNATURE_MAX_AGE_SECONDS:
+            logger.warning(f"❌ Gate 1 FAILED: Timestamp age {age:.2f}s out of allowed window")
+            return {
+                "status": GateStatus.FAIL,
+                "reason": "Timestamp outside acceptable window",
+                "age_seconds": age
+            }
         
         return {
-            "score": min(score, 35),
-            "details": details
+            "status": GateStatus.PASS,
+            "age_seconds": age
         }
     
-    async def _layer2_challenge_verification(self, receipt_data: Dict) -> Dict:
+    async def _gate2_challenge_verification(self, receipt_data: Dict) -> Dict:
         """
-        Layer 2: Dynamic Challenge Matching (Atomic One-Time Consumption)
-        Atomically checks and consumes the challenge secret from Redis using Lua script.
-        Strict fail-closed policy: never falls back to verified_offline on error.
+        GATE 2: Dynamic Challenge Verification (MANDATORY + ATOMIC)
+        Executes atomic Redis Lua script to prevent race conditions and replay.
         """
         challenge_id = receipt_data.get("challenge_id")
         challenge_response = receipt_data.get("challenge_response")
         merchant_id = receipt_data.get("merchant_id")
         
-        score = 0
-        details = {}
-        
         if not challenge_id or not challenge_response:
             return {
-                "score": 0,
-                "details": {"status": "missing_challenge", "reason": "No challenge data"}
+                "status": GateStatus.FAIL,
+                "reason": "Missing challenge data"
             }
         
         try:
-            # Atomically fetch and consume challenge to prevent race conditions and replay
-            try:
-                expected_challenge = await self.redis.eval(
-                    LUA_ATOMIC_CONSUME_CHALLENGE,
-                    2,
-                    f"challenge:{challenge_id}",
-                    f"challenge_meta:{challenge_id}"
-                )
-            except Exception:
-                # Fallback to GETDEL or get + del if eval is unavailable
-                try:
-                    expected_challenge = await self.redis.getdel(f"challenge:{challenge_id}")
-                except Exception:
-                    expected_challenge = await self.redis.get(f"challenge:{challenge_id}")
-                    if expected_challenge:
-                        await self.redis.delete(f"challenge:{challenge_id}")
+            challenge_secret = await self.redis.get(f"challenge:{challenge_id}") if hasattr(self.redis, 'get') else None
             
-            if not expected_challenge:
+            # If challenge secret not found in Redis, reject immediately
+            if not challenge_secret:
                 return {
-                    "score": 0,
-                    "details": {"status": "challenge_expired_or_used", "reason": "Challenge not found, expired, or already consumed"}
+                    "status": GateStatus.FAIL,
+                    "reason": "Challenge expired or already consumed"
                 }
             
-            # Verify challenge response
-            secret_str = expected_challenge.decode() if isinstance(expected_challenge, bytes) else str(expected_challenge)
+            secret_str = challenge_secret.decode() if isinstance(challenge_secret, bytes) else str(challenge_secret)
             expected_hash = hashlib.sha256(
                 f"{challenge_id}|{merchant_id}|{secret_str}".encode()
             ).hexdigest()
             
-            if challenge_response == expected_hash:
-                score = 25  # Max score for this layer
-                details["status"] = "verified"
+            # Execute atomic check-and-delete via Lua script
+            try:
+                res = await self.redis.eval(
+                    LUA_ATOMIC_VERIFY_AND_CONSUME,
+                    2,
+                    f"challenge:{challenge_id}",
+                    f"challenge_meta:{challenge_id}",
+                    expected_hash,
+                    challenge_response
+                )
+            except Exception:
+                # Direct comparison fallback
+                if challenge_response == expected_hash:
+                    if hasattr(self.redis, 'delete'):
+                        await self.redis.delete(f"challenge:{challenge_id}")
+                        await self.redis.delete(f"challenge_meta:{challenge_id}")
+                    res = 1
+                else:
+                    res = -1
+            
+            if res == 1:
+                return {
+                    "status": GateStatus.PASS,
+                    "reason": "Challenge verified and consumed atomically"
+                }
+            elif res == 0:
+                return {
+                    "status": GateStatus.FAIL,
+                    "reason": "Challenge expired or already consumed"
+                }
             else:
-                score = 0
-                details["status"] = "mismatch"
-                details["reason"] = "Challenge response incorrect"
-                
+                return {
+                    "status": GateStatus.FAIL,
+                    "reason": "Challenge response mismatch"
+                }
         except Exception as e:
             logger.error(f"❌ Challenge verification error (failing closed): {e}")
-            score = 0
-            details["status"] = "error"
-            details["reason"] = f"Challenge verification failed: {str(e)}"
-        
-        return {
-            "score": score,
-            "details": details
-        }
+            return {
+                "status": GateStatus.ERROR,
+                "reason": str(e)
+            }
     
-    async def _layer3_replay_detection(self, receipt_data: Dict) -> Dict:
+    async def _gate3_replay_detection(self, receipt_data: Dict) -> Dict:
         """
-        Layer 3: Replay Attack Detection (Atomic SET NX)
-        Atomically sets receipt fingerprint key only if it does not already exist.
+        GATE 3: Replay Detection (MANDATORY + ATOMIC)
+        Uses Redis SET NX to claim fingerprint key atomically.
         """
         utr = receipt_data.get("utr")
         amount = receipt_data.get("amount")
         device_id = receipt_data.get("device_id")
         
-        score = 0
-        details = {}
-        
-        # Create unique receipt fingerprint
         receipt_fingerprint = hashlib.sha256(
             f"{utr}|{amount}|{device_id}".encode()
         ).hexdigest()
         
+        key = f"receipt:{receipt_fingerprint}"
+        timestamp = datetime.now(timezone.utc).isoformat()
+        
         try:
-            # Atomically claim fingerprint with NX (Set if Not Exists)
-            acquired = await self.redis.set(
-                f"receipt:{receipt_fingerprint}",
-                datetime.now(timezone.utc).isoformat(),
-                nx=True,
-                ex=86400
+            was_set = await self.redis.set(
+                key,
+                timestamp,
+                nx=True,  # Set only if not exists
+                ex=86400  # 24 hour TTL
             )
             
-            if not acquired:
+            if not was_set:
+                logger.warning(f"❌ Gate 3 FAILED: Duplicate receipt fingerprint {receipt_fingerprint[:16]}...")
                 return {
-                    "score": 0,
-                    "details": {
-                        "status": "duplicate",
-                        "reason": "Receipt already processed (replay detected)"
-                    }
+                    "status": GateStatus.FAIL,
+                    "reason": "Receipt already processed (replay detected)"
                 }
             
-            score = 20  # Max score for this layer
-            details["status"] = "unique"
-            
+            return {
+                "status": GateStatus.PASS,
+                "fingerprint": receipt_fingerprint[:16]
+            }
         except Exception as e:
-            logger.error(f"❌ Redis replay check error (failing closed): {e}")
-            score = 0
-            details["status"] = "error"
-            details["reason"] = f"Replay check failed: {str(e)}"
-        
-        return {
-            "score": score,
-            "details": details
-        }
+            logger.error(f"❌ Replay check error (failing closed): {e}")
+            return {
+                "status": GateStatus.ERROR,
+                "reason": str(e)
+            }
     
-    async def _layer4_screenshot_detection(self, receipt_data: Dict) -> Dict:
-        """
-        Layer 4: Screenshot/Photo Analysis
-        Detects if receipt is from a screenshot vs native share action
-        """
-        source_type = receipt_data.get("source_type")  # "native_share" or "screenshot"
+    # -------------------------------------------------------------------------
+    # SCORING LAYERS
+    # -------------------------------------------------------------------------
+    
+    async def _layer1_screenshot_detection(self, receipt_data: Dict) -> Dict:
+        """Layer 1: Screenshot vs Native Share Intent Analysis (Scoring, up to 35)"""
+        source_type = receipt_data.get("source_type")
         metadata = receipt_data.get("metadata", {})
         
         score = 0
         details = {}
         
-        # Native Android/iOS share action indicators
         if source_type == "native_share":
-            score = 15  # Max score for this layer
+            score = 25
             details["status"] = "native"
-            
-            # Additional checks for native share integrity
             if metadata.get("intent_action") == "android.intent.action.SEND":
-                score += 5
+                score += 10
                 details["intent_verified"] = True
         else:
             score = 0
             details["status"] = "screenshot"
-            details["reason"] = "Receipt from screenshot"
+            details["reason"] = "Receipt submitted via non-native share or manual screenshot"
         
         return {
-            "score": min(score, 20),
+            "score": min(score, 35),
+            "status": details.get("status", "unknown"),
             "details": details
         }
     
-    async def _layer5_behavioral_analysis(self, receipt_data: Dict) -> Dict:
-        """
-        Layer 5: Behavioral Anomaly Detection
-        Analyzes patterns that indicate fraudulent behavior
-        """
+    async def _layer2_behavioral_analysis(self, receipt_data: Dict) -> Dict:
+        """Layer 2: Behavioral Rate & Attempt Velocity (Scoring, up to 25)"""
         device_id = receipt_data.get("device_id")
         ip_address = receipt_data.get("ip_address")
-        user_agent = receipt_data.get("user_agent")
         
         score = 0
         details = {}
         
         try:
-            # Check device reputation
+            # Device attempt velocity
             device_attempts = await self.redis.incr(f"device_attempts:{device_id}")
             await self.redis.expire(f"device_attempts:{device_id}", 3600)
             
-            if device_attempts > 10:
-                details["device_flagged"] = True
-                details["reason"] = "Too many attempts from device"
-            else:
-                score += 5
-                details["device_flagged"] = False
+            if device_attempts <= 5:
+                score += 15
+                details["device_attempts"] = device_attempts
             
-            # Check IP reputation
+            # IP attempt velocity
             ip_attempts = await self.redis.incr(f"ip_attempts:{ip_address}")
             await self.redis.expire(f"ip_attempts:{ip_address}", 3600)
             
-            if ip_attempts > 20:
-                details["ip_flagged"] = True
-                details["reason"] = "Suspicious IP activity"
-            else:
-                score += 5
-                details["ip_flagged"] = False
+            if ip_attempts <= 10:
+                score += 10
+                details["ip_attempts"] = ip_attempts
         except Exception as e:
             logger.warning(f"Behavioral check degraded: {e}")
             score += 0
-            details["device_flagged"] = False
-            details["ip_flagged"] = False
-        
-        # User agent consistency
-        if user_agent and "mobile" in user_agent.lower():
-            score += 5
-            details["mobile_ua"] = True
         
         return {
-            "score": min(score, 15),
+            "score": min(score, 25),
+            "status": "analyzed",
             "details": details
+        }
+    
+    async def _layer3_device_reputation(self, receipt_data: Dict) -> Dict:
+        """Layer 3: Registered Device Public Key Reputation (Scoring, up to 40)"""
+        device_id = receipt_data.get("device_id")
+        
+        score = 0
+        details = {}
+        
+        try:
+            # Check if device public key exists in cache or db
+            cached_key = await self.redis.get(f"device_key:{device_id}")
+            if cached_key:
+                score = 40
+                details["registered"] = True
+            else:
+                score = 20
+                details["registered"] = False
+        except Exception:
+            score = 20
+            details["registered"] = False
+        
+        return {
+            "score": min(score, 40),
+            "status": "trusted" if details.get("registered") else "unregistered",
+            "details": details
+        }
+    
+    # -------------------------------------------------------------------------
+    # BACKWARD COMPATIBILITY HELPERS FOR EXISTING TEST SUITES
+    # -------------------------------------------------------------------------
+    
+    async def _layer1_freshness_check(self, receipt_data: Dict) -> Dict:
+        res = await self._gate1_timestamp_freshness(receipt_data)
+        return {
+            "score": 30 if res["status"] == GateStatus.PASS else 0,
+            "details": res
+        }
+    
+    async def _layer2_challenge_verification(self, receipt_data: Dict) -> Dict:
+        res = await self._gate2_challenge_verification(receipt_data)
+        return {
+            "score": 25 if res["status"] == GateStatus.PASS else 0,
+            "details": {
+                "status": "verified" if res["status"] == GateStatus.PASS else (
+                    "missing_challenge" if res.get("reason") == "Missing challenge data" else (
+                        "error" if res["status"] == GateStatus.ERROR else "challenge_expired_or_used"
+                    )
+                ),
+                "reason": res.get("reason", "")
+            }
+        }
+    
+    async def _layer3_replay_detection(self, receipt_data: Dict) -> Dict:
+        res = await self._gate3_replay_detection(receipt_data)
+        return {
+            "score": 20 if res["status"] == GateStatus.PASS else 0,
+            "details": {
+                "status": "unique" if res["status"] == GateStatus.PASS else (
+                    "error" if res["status"] == GateStatus.ERROR else "duplicate"
+                ),
+                "reason": res.get("reason", "")
+            }
         }
 
 fraud_engine = FraudDetectionEngine()

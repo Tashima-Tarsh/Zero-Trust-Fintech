@@ -219,3 +219,74 @@ class DeviceAttestationVerifier:
         return "|".join(f"{k}={v}" for k, v in sorted_items if k != 'signature')
 
 verifier = DeviceAttestationVerifier()
+
+# =============================================================================
+# JWT AUTHENTICATION FOR WEBSOCKET & MERCHANT ACCESS
+# =============================================================================
+
+import hmac
+
+class JWTError(Exception):
+    pass
+
+def _b64url_encode(data: bytes) -> str:
+    return base64.urlsafe_b64encode(data).decode('utf-8').rstrip('=')
+
+def _b64url_decode(data_str: str) -> bytes:
+    pad = len(data_str) % 4
+    if pad:
+        data_str += '=' * (4 - pad)
+    return base64.urlsafe_b64decode(data_str)
+
+def create_jwt_token(merchant_id: str, user_id: str = None, expires_in_seconds: int = 86400) -> str:
+    """
+    Create signed HS256 JWT token for authenticated WebSocket and API access.
+    """
+    secret = getattr(settings, "SECRET_KEY", "zerotrust-fintech-jwt-secret-key-32bytes-minimum!")
+    user_id = user_id or merchant_id
+    now = time.time()
+    payload = {
+        "sub": user_id,
+        "merchant_id": merchant_id,
+        "iat": int(now),
+        "exp": int(now + expires_in_seconds)
+    }
+    header = {"alg": "HS256", "typ": "JWT"}
+    h_b64 = _b64url_encode(json.dumps(header, separators=(',', ':')).encode('utf-8'))
+    p_b64 = _b64url_encode(json.dumps(payload, separators=(',', ':')).encode('utf-8'))
+    msg = f"{h_b64}.{p_b64}"
+    # Use hashlib.sha256 directly for hmac
+    import hashlib
+    sig = hmac.new(secret.encode('utf-8'), msg.encode('utf-8'), hashlib.sha256).digest()
+    return f"{msg}.{_b64url_encode(sig)}"
+
+def verify_jwt_token(token: str) -> dict:
+    """
+    Verify and decode HS256 JWT token. Raises JWTError if signature mismatch or expired.
+    """
+    if not token or not isinstance(token, str):
+        raise JWTError("Token missing or not a string")
+    
+    parts = token.strip().split('.')
+    if len(parts) != 3:
+        raise JWTError("Invalid JWT token format")
+    
+    h_b64, p_b64, s_b64 = parts
+    secret = getattr(settings, "SECRET_KEY", "zerotrust-fintech-jwt-secret-key-32bytes-minimum!")
+    msg = f"{h_b64}.{p_b64}"
+    
+    import hashlib
+    expected_sig = hmac.new(secret.encode('utf-8'), msg.encode('utf-8'), hashlib.sha256).digest()
+    if not hmac.compare_digest(_b64url_encode(expected_sig), s_b64):
+        raise JWTError("JWT signature mismatch")
+    
+    try:
+        payload = json.loads(_b64url_decode(p_b64).decode('utf-8'))
+    except Exception as e:
+        raise JWTError(f"Malformed JWT payload: {e}")
+        
+    exp = payload.get("exp")
+    if exp and exp < time.time():
+        raise JWTError("JWT token has expired")
+        
+    return payload

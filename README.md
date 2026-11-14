@@ -2,8 +2,8 @@
 
 > **Autonomous, zero-fee direct UPI payment orchestration with sub-second WebSocket settlement and a mathematically verifiable 5-layer fraud prevention engine.**
 
-[![Test Suite](https://img.shields.io/badge/Automated%20Tests-29%2F29%20Passing-10b981?style=for-the-badge&logo=githubactions)](tests/)
-[![Security Audit](https://img.shields.io/badge/Security%20Audit-H--01%20to%20L--02%20Fixed-2563eb?style=for-the-badge&logo=shield)](zero-trust-fintech-production/)
+[![Test Suite](https://img.shields.io/badge/Automated%20Tests-37%2F37%20Passing-10b981?style=for-the-badge&logo=githubactions)](tests/)
+[![Security Audit](https://img.shields.io/badge/Security%20Audit-Issues%20A--E%20Fixed-2563eb?style=for-the-badge&logo=shield)](zero-trust-fintech-production/)
 [![Payment Rails](https://img.shields.io/badge/Payment%20Rails-NPCI%20UPI%20Direct-f59e0b?style=for-the-badge)](sharepay-mvp/)
 [![Architecture](https://img.shields.io/badge/Architecture-Zero--Trust%20Merkle%20Ledger-6366f1?style=for-the-badge)](zero-trust-fintech-production/)
 [![License](https://img.shields.io/badge/License-MIT-gray?style=for-the-badge)](LICENSE)
@@ -250,10 +250,11 @@ The repository is covered by automated unit, integration, concurrency, and secur
 
 | Test Suite | File Path | Total Tests | Status | Scope |
 |---|---|---|---|---|
-| **Backend & Audit Fixes** | `zero-trust-fintech-production/tests/test_audit_fixes.py` | **14** | ✅ Passed | Ed25519/ECDSA signatures, 10-thread ledger concurrency, fail-closed challenge verification |
+| **Backend Audit Fixes** | `zero-trust-fintech-production/tests/test_audit_fixes.py` | **14** | ✅ Passed | Ed25519/ECDSA signatures, 10-thread ledger concurrency, fail-closed challenge verification |
+| **Mandatory Fraud Gates** | `zero-trust-fintech-production/tests/test_fraud_engine.py` | **8** | ✅ Passed | Hard timestamp gate, atomic Lua challenge consumption, SET NX replay defense |
 | **Fraud Attack Matrix** | `sharepay-mvp/tests/attack-matrix.test.js` | **8** | ✅ Passed | UTR replay, Julian day manipulation, hourly window expiry, note mismatch, malformed text |
 | **Merchant PWA Dashboard** | `merchant-pwa/test.js` | **7** | ✅ Passed | Server routing, manifest.json, sw.js service worker, icons, static assets |
-| **Total** | — | **29** | ✅ **100% Passing** | Full End-to-End System Verification |
+| **Total** | — | **37** | ✅ **100% Passing** | Full End-to-End System Verification |
 
 ---
 

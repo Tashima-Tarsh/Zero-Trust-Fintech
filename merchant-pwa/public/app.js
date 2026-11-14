@@ -63,13 +63,33 @@ async function registerServiceWorker() {
   }
 }
 
+// Fetch JWT authentication token for secure WebSocket connection
+async function getAuthToken() {
+  try {
+    const res = await fetch(`${CONFIG.API_URL}/auth/merchant-token`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ merchant_id: CONFIG.MERCHANT_ID })
+    });
+    if (res.ok) {
+      const data = await res.json();
+      return data.token;
+    }
+  } catch (e) {
+    console.warn('Could not fetch JWT token from backend, connecting with dev fallback:', e);
+  }
+  return null;
+}
+
 // WebSocket Connection & Real-Time Settlement Broadcast
-function connectWebSocket() {
+async function connectWebSocket() {
   if (ws) {
     try { ws.close(); } catch (e) {}
   }
 
-  const wsUrl = `${CONFIG.WS_URL}/${encodeURIComponent(CONFIG.MERCHANT_ID)}`;
+  const token = await getAuthToken();
+  const tokenQuery = token ? `?token=${encodeURIComponent(token)}` : '';
+  const wsUrl = `${CONFIG.WS_URL}/${encodeURIComponent(CONFIG.MERCHANT_ID)}${tokenQuery}`;
   console.log(`Connecting to WebSocket: ${wsUrl}`);
   statusText.textContent = 'Connecting...';
   connectionStatus.className = 'status-dot';

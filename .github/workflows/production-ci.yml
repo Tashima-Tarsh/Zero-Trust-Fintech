@@ -1,0 +1,94 @@
+name: Production CI/CD
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'zero-trust-fintech-production/**'
+      - 'sharepay-mvp/**'
+      - 'merchant-pwa/**'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'zero-trust-fintech-production/**'
+      - 'sharepay-mvp/**'
+      - 'merchant-pwa/**'
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    
+    services:
+      postgres:
+        image: postgres:15-alpine
+        env:
+          POSTGRES_USER: zerotrust
+          POSTGRES_PASSWORD: SecurePass123!
+          POSTGRES_DB: zerotrust_ledger
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+      
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+      
+      - name: Install Python Dependencies
+        run: |
+          cd zero-trust-fintech-production
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install pytest pytest-asyncio
+      
+      - name: Run Backend Automated Tests
+        env:
+          DATABASE_URL: postgresql://zerotrust:SecurePass123!@localhost:5432/zerotrust_ledger
+          REDIS_URL: redis://localhost:6379/0
+          SECRET_KEY: zerotrust-fintech-jwt-secret-key-32bytes-minimum!
+          APP_ENV: test
+        run: |
+          cd zero-trust-fintech-production
+          python tests/test_audit_fixes.py
+          pytest tests/ -v
+      
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      
+      - name: Run SharePay Customer & Merchant Test Suites
+        run: |
+          npm test --prefix sharepay-mvp
+          node merchant-pwa/test.js
+
+  build:
+    needs: test
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
+    
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Build Backend Docker Image
+        run: |
+          cd zero-trust-fintech-production
+          docker build -t zerotrust-fintech:${{ github.sha }} .

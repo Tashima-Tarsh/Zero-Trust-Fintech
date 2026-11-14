@@ -15,6 +15,8 @@ class Settings(BaseSettings):
     # Security
     SIGNATURE_MAX_AGE_SECONDS: int = 60
     FRESHNESS_WINDOW_SECONDS: int = 120
+    SECRET_KEY: str = "zerotrust-fintech-jwt-secret-key-32bytes-minimum!"
+    JWT_ALGORITHM: str = "HS256"
     
     # n8n
     N8N_WEBHOOK_URL: str = "http://localhost:5678/webhook"
