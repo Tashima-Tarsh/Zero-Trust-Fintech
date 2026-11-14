@@ -59,6 +59,9 @@ def main() -> int:
             errors.append(f"{path}: {exc}")
 
     for path in source_paths(".json"):
+        # TypeScript tsconfig uses JSON-with-comments and is validated by tsc.
+        if path.name.startswith("tsconfig"):
+            continue
         json_count += 1
         try:
             obj = json.loads(path.read_text(encoding="utf-8"))
