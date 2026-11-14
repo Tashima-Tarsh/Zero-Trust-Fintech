@@ -58,12 +58,21 @@ app = FastAPI(
     lifespan=lifespan
 )
 
+# Production is same-origin unless explicit trusted origins are configured.
+# Development permits only local frontends, never wildcard credentialed CORS.
+allowed_origins = [origin.strip().rstrip("/") for origin in settings.CORS_ALLOWED_ORIGINS.split(",") if origin.strip()]
+if not allowed_origins and settings.APP_ENV.lower() != "production":
+    allowed_origins = ["http://localhost:3000", "http://localhost:5000",
+                       "http://127.0.0.1:3000", "http://127.0.0.1:5000"]
+if "*" in allowed_origins:
+    raise ValueError("Wildcard CORS origins are not supported with credentials")
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Restrict in production
+    allow_origins=allowed_origins,
     allow_credentials=True,
     allow_methods=["GET", "POST", "OPTIONS"],
-    allow_headers=["*"],
+    allow_headers=["Authorization", "Content-Type"],
 )
 
 # Core & Feature Routers
