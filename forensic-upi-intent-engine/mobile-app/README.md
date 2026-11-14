@@ -1,13 +1,17 @@
-# React Native client source scaffold
+# React Native client scaffold — device attestation
 
-Includes intent/QR UI, optional consented aggregate telemetry, server-assigned VPA retrieval, app-switch timing, and native Android module source. This is **not a full native application**: Android Gradle files and iOS Xcode projects must be generated and integrated before a device build.
+The client includes session display, handoff UI, optional user-consented
+integrity observations, and mobile-app/src/services/deviceAttestation.js.
 
-Security boundaries:
-- React Native and browser clients must never hold n8n credentials or `WORKER_API_KEY`.
-- Call only a merchant-controlled, tenant-scoped HTTPS proxy.
-- The `VPARotator` helper fetches a *server*-leased VPA and never selects one locally.
-- `AppStateTracker` and `TelemetrySDK` are opt-in and do not fingerprint devices or read sensor streams.
-- `SecureSnapshot` can only capture/discard the merchant application's own window after consent; other UPI apps cannot be silently screenshotted.
-- Payment app return is never evidence of bank credit.
+The attestation service constructs a canonical JSON claim containing session,
+user/device identity, action reference, exact amount, timestamp and integrity
+observations. The signed claim is sent over HTTPS to
+POST /v1/client/attest-payment.
 
-An iOS native scaffold requires Xcode, signing, a supported UPI scheme and compatible RN templates. No promise of iOS PSP app package inspection is made.
+The signBase64 callback is **not** a software placeholder key. It must be
+implemented by an enrolled, device-native secure signing module and must keep
+private key material outside the JS runtime.
+
+Android build files and native signing/enrollment code still need to be
+integrated for a running device application. iOS build scaffolding is also
+incomplete. No secret internal worker credentials belong in the mobile app.

@@ -1,19 +1,17 @@
-# Fraud matrix (defensive signals)
+# Device integrity and replay threat matrix
 
-| Threat | Detection input | Mitigation | Payment proof |
-| --- | --- | --- | --- |
-| Screenshot manipulation | ELA / optional user-consented OCR | Flag for review; compare with bank statement | No |
-| Faked UTR | Format and reused reference | Bank-side reference lookup and dedupe | No |
-| Fake intent return | Elapsed time and lifecycle | Never mark PAID from return | No |
-| Spoofed package ID | Installed-package signature report | Verify local certificate against signed allowlist; do not trust client claims | No |
-| VPA substitution | Requested vs provider-reported destination | Reject mismatched credit and investigate | No |
-| Webhook replay | Timestamp + HMAC + event ID | Window-bound signatures and idempotency | No, without bank verification |
-| Reused statement | Bank event ID and reconciliation trace | Dedupe authoritative bank feed | No, without bank verification |
-| Bulk API abuse | Redis counters | Fail-closed authenticated rate limiting | No |
-| Exhausted VPA pool | Passive health report | Alert; no unauthorized synthetic bank transactions | No |
+| Attack or anomaly | Prevention in current attestation API |
+| --- | --- |
+| Signature substitution | Verify registered Ed25519 public key, never key from request |
+| Amount substitution | Include exact amount in signature and compare with locked session |
+| Session substitution | Include session UUID in signature, require device/session binding |
+| Reused action reference | Enforce unique UTR claim in append-only event ledger |
+| Exact repeat | Return duplicate:true without second event |
+| Conflicting repeat | Reject already finalized session |
+| Delayed replay | Check signed timestamp and session expiry |
+| Short dwell or excessive attempts | Reject on Device Integrity Check flags |
+| High image recompression anomaly | Reject signed integrity payload when threshold violated |
+| Previously rejected evidence | Block if immutable prior device-integrity record rejects |
+| Spoofed device enrollment | Require separately validated enrollment and hardware_attested flag |
 
-### Forensic score
-A heuristic *triage score*, not a probability, evidence of a successful transfer, evidence of crime, or a justification for automatic account suspension. Validation needs labeled data and false-positive review.
-
-### Privacy
-No third-party app screen capture without platform-supported, prominent consent. Do not collect biometric identifiers or raw device motion traces. OCR images should be user-provided, access controlled, sanitized, and deleted under a documented retention policy.
+Thresholds are a configurable application rejection policy. Device hardware provenance validation and enrollment controls must be implemented at deployment time.

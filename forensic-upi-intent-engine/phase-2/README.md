@@ -1,26 +1,19 @@
-# Phase 2 — Intent Forensic Verifier & Reconciliation Holding Queue
+# Phase 2 — Device Integrity Checks
 
-Phase 2 implements **fraud triage** for the first minutes after the UPI app handoff, not a bank-less payment settlement system.
+This phase evaluates consented client observations and stores immutable
+diagnostic decisions. Its purpose is to **reject tampered or anomalous client
+action claims** before acceptance.
 
-See:
-- [Threat scenarios and limitations](threat_model.md)
-- [API contracts and workflow mapping](api_contracts.md)
-- [Native installation / migration runbook](operational_runbook.md)
+## Implemented
 
-## Implemented artifacts
+- backend/worker/phase2.py: bounded image decoding, ELA/OCR checks, behavioral metrics and integrity decisions.
+- backend/worker/app.py: authenticated /v1/intent/evaluate evidence intake.
+- database/migrations/002_phase2_reconciliation.sql: legacy filename for the immutable device-integrity diagnostic table.
+- backend/tests/test_phase2.py: consent, replay, mismatch and status regression tests.
+- n8n-workflows/02_intent_verifier.json: authenticated Device Integrity Checks request route.
 
-| Artifact | What it does |
-| --- | --- |
-| `n8n-workflows/02_intent_verifier.json` | Header-authenticated webhook `verify-payment` -> worker -> pending-reconciliation response |
-| `backend/worker/phase2.py` | Explainable forensic risk analysis, consent handling, screenshot hash, OCR/ELA integration |
-| `backend/worker/app.py` | Session-bound idempotent evidence intake and queue endpoints; no ledger credits |
-| `database/migrations/002_phase2_reconciliation.sql` | Immutable forensic-submission log, queued sessions and replay lookup |
-| `n8n-workflows/04_statement_parser.json` | Existing statement preview plus hourly *read-only* queue summary |
-| `backend/tests/test_phase2.py` | Pending, fake-success, replay, mismatch, consent and auth regression checks |
-| `config/systemd/forensic-worker.service` | Optional local Python worker daemon template |
+The decision is DEVICE_INTEGRITY_PASS or DEVICE_INTEGRITY_REJECT.
+A prior rejection for a session blocks its subsequent signed client action claim.
 
-## Non-negotiable invariant
-
-**No forensic score can cause a payment status of PAID, release goods or credit the ledger.** A photo of a success screen, package-name match, UTR format or a signed *mock* callback is not a bank credit. All client-originated payment claims remain `PENDING_RECONCILIATION` until authorized bank/PSP-side reconciliation is independently implemented.
-
-No automatic ₹1 transfers are issued to random VPAs. The existing 03 canary is passive database health only.
+Final acceptance occurs only via the separately signed
+POST /v1/client/attest-payment API. See docs/api_spec.md.
