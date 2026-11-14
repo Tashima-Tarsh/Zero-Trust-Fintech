@@ -19,8 +19,9 @@ Defensive research prototypes for UPI session orchestration, payment-integrity c
 
 ---
 
-## 🔬 Additional Research Projects
+## 🔬 Additional Research & Production Engines
 
+* **[zero-trust-fintech-production](zero-trust-fintech-production/README.md)** — Production-grade FastAPI service with sub-second WebSocket broadcasting, 5-layer fraud engine, n8n orchestration, Redis challenge TTL, and PLpgSQL / Merkle tree immutable audit ledgers.
 * **[forensic-upi-intent-engine](forensic-upi-intent-engine/README.md)** — Client device attestation engine featuring Ed25519 signing, append-only financial ledger schemas, n8n orchestration, and automated forensic verification.
 * **[forensic-upi-engine](forensic-upi-engine/README.md)** — Earlier research scaffold retained for compatibility and reference.
 

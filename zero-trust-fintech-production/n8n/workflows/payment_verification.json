@@ -1,0 +1,104 @@
+{
+  "name": "Payment Verification Workflow",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "payment-verification",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [250, 300]
+    },
+    {
+      "parameters": {
+        "functionCode": "const data = items[0].json.data;\n\n// Log payment for reconciliation\nreturn [{\n  json: {\n    block_hash: data.block_hash,\n    amount: data.payload.amount,\n    utr: data.payload.utr,\n    merchant_id: data.payload.merchant_id,\n    fraud_score: data.fraud_score,\n    timestamp: new Date().toISOString()\n  }\n}];"
+      },
+      "name": "Process Payment",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [450, 300]
+    },
+    {
+      "parameters": {
+        "url": "https://api.yourbank.com/v1/settlement",
+        "method": "POST",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "Bearer {{$env.BANK_API_KEY}}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "utr",
+              "value": "={{$json[\"utr\"]}}"
+            },
+            {
+              "name": "amount",
+              "value": "={{$json[\"amount\"]}}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "name": "Bank Settlement API",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 3,
+      "position": [650, 300]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={\"status\": \"settled\", \"block_hash\": \"{{ $json.block_hash }}\"}"
+      },
+      "name": "Respond to Webhook",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [850, 300]
+    }
+  ],
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Process Payment",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Process Payment": {
+      "main": [
+        [
+          {
+            "node": "Bank Settlement API",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Bank Settlement API": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}
