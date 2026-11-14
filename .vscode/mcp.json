@@ -1,0 +1,8 @@
+{
+  "servers": {
+    "n8n-cloud": {
+      "type": "http",
+      "url": "https://thenitishkr.app.n8n.cloud/mcp-server/http"
+    }
+  }
+}
