@@ -8,29 +8,34 @@
         "responseMode": "responseNode",
         "options": {}
       },
+      "id": "fa-node-0001",
       "name": "Fraud Webhook",
       "type": "n8n-nodes-base.webhook",
-      "typeVersion": 1,
-      "position": [250, 300]
+      "typeVersion": 2,
+      "position": [250, 300],
+      "webhookId": "fraud-alert"
     },
     {
       "parameters": {
-        "functionCode": "const alert = items[0].json.data;\n\n// Format fraud report\nreturn [{\n  json: {\n    alert_type: 'FRAUD_REJECTED',\n    device_id: alert.payload ? alert.payload.device_id : 'unknown',\n    utr: alert.payload ? alert.payload.utr : 'unknown',\n    amount: alert.payload ? alert.payload.amount : 0,\n    fraud_score: alert.fraud_report ? alert.fraud_report.overall_score : 0,\n    flags: alert.fraud_report ? alert.fraud_report.flags : [],\n    timestamp: new Date().toISOString()\n  }\n}];"
+        "jsCode": "// Format fraud alert report\nconst raw = $input.first().json;\nconst alert = raw.data || raw;\nconst payload = alert.payload || {};\nconst fraudReport = alert.fraud_report || {};\n\nreturn [{\n  json: {\n    alert_type: 'FRAUD_REJECTED',\n    device_id: payload.device_id || 'unknown',\n    utr: payload.utr || 'unknown',\n    amount: payload.amount || 0,\n    merchant_id: payload.merchant_id || 'unknown',\n    fraud_score: fraudReport.overall_score || 0,\n    flags: fraudReport.flags || ['FRAUD_DETECTED'],\n    layers: fraudReport.layers || {},\n    timestamp: new Date().toISOString()\n  }\n}];"
       },
-      "name": "Format Alert",
-      "type": "n8n-nodes-base.function",
-      "typeVersion": 1,
-      "position": [450, 300]
+      "id": "fa-node-0002",
+      "name": "Format Alert Data",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [460, 300]
     },
     {
       "parameters": {
         "respondWith": "json",
-        "responseBody": "={\"status\": \"alert_logged\", \"flags\": {{$json.flags}}}"
+        "responseBody": "={{ JSON.stringify({\n  status: 'alert_logged',\n  alert_type: $json.alert_type,\n  flags: $json.flags,\n  fraud_score: $json.fraud_score,\n  logged_at: $json.timestamp\n}) }}",
+        "options": {}
       },
+      "id": "fa-node-0003",
       "name": "Respond to Fraud Webhook",
       "type": "n8n-nodes-base.respondToWebhook",
-      "typeVersion": 1,
-      "position": [650, 300]
+      "typeVersion": 1.1,
+      "position": [680, 300]
     }
   ],
   "connections": {
@@ -38,14 +43,14 @@
       "main": [
         [
           {
-            "node": "Format Alert",
+            "node": "Format Alert Data",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Format Alert": {
+    "Format Alert Data": {
       "main": [
         [
           {

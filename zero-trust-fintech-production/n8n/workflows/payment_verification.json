@@ -8,18 +8,21 @@
         "responseMode": "responseNode",
         "options": {}
       },
-      "name": "Webhook",
+      "id": "pv-node-0001",
+      "name": "Webhook Trigger",
       "type": "n8n-nodes-base.webhook",
-      "typeVersion": 1,
-      "position": [250, 300]
+      "typeVersion": 2,
+      "position": [250, 300],
+      "webhookId": "payment-verification"
     },
     {
       "parameters": {
-        "functionCode": "const data = items[0].json.data;\n\n// Log payment for reconciliation\nreturn [{\n  json: {\n    block_hash: data.block_hash,\n    amount: data.payload.amount,\n    utr: data.payload.utr,\n    merchant_id: data.payload.merchant_id,\n    fraud_score: data.fraud_score,\n    timestamp: new Date().toISOString()\n  }\n}];"
+        "jsCode": "// Extract incoming payment payload\nconst raw = $input.first().json;\nconst data = raw.data || raw;\nconst payload = data.payload || {};\n\nreturn [{\n  json: {\n    block_hash: data.block_hash,\n    block_id: data.block_id,\n    amount: payload.amount,\n    utr: payload.utr,\n    merchant_id: payload.merchant_id,\n    fraud_score: data.fraud_score,\n    timestamp: new Date().toISOString()\n  }\n}];"
       },
+      "id": "pv-node-0002",
       "name": "Process Payment",
-      "type": "n8n-nodes-base.function",
-      "typeVersion": 1,
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
       "position": [450, 300]
     },
     {
@@ -40,34 +43,52 @@
           "parameters": [
             {
               "name": "utr",
-              "value": "={{$json[\"utr\"]}}"
+              "value": "={{ $json.utr }}"
             },
             {
               "name": "amount",
-              "value": "={{$json[\"amount\"]}}"
+              "value": "={{ $json.amount }}"
             }
           ]
         },
         "options": {}
       },
+      "id": "pv-node-0003",
       "name": "Bank Settlement API",
       "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 3,
-      "position": [650, 300]
+      "typeVersion": 4.2,
+      "position": [680, 300],
+      "onError": "continueErrorOutput"
     },
     {
       "parameters": {
         "respondWith": "json",
-        "responseBody": "={\"status\": \"settled\", \"block_hash\": \"{{ $json.block_hash }}\"}"
+        "responseBody": "={{ JSON.stringify({\n  status: 'settled',\n  block_hash: $('Process Payment').item.json.block_hash,\n  utr: $('Process Payment').item.json.utr,\n  bank_response: $json\n}) }}",
+        "options": {}
       },
-      "name": "Respond to Webhook",
+      "id": "pv-node-0004",
+      "name": "Respond Success",
       "type": "n8n-nodes-base.respondToWebhook",
-      "typeVersion": 1,
-      "position": [850, 300]
+      "typeVersion": 1.1,
+      "position": [920, 200]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({\n  status: 'bank_error',\n  block_hash: $('Process Payment').item.json.block_hash,\n  error: $json.message || 'Bank reconciliation timeout'\n}) }}",
+        "options": {
+          "responseCode": 502
+        }
+      },
+      "id": "pv-node-0005",
+      "name": "Respond Bank Error",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [920, 420]
     }
   ],
   "connections": {
-    "Webhook": {
+    "Webhook Trigger": {
       "main": [
         [
           {
@@ -93,7 +114,14 @@
       "main": [
         [
           {
-            "node": "Respond to Webhook",
+            "node": "Respond Success",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Respond Bank Error",
             "type": "main",
             "index": 0
           }
