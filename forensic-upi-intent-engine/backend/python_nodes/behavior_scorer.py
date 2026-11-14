@@ -1,4 +1,4 @@
-"""Explainable, low-confidence anomaly heuristics, not automated payment authorization."""
+"""Device Integrity Checks: configurable reject policy for abnormal observations."""
 from typing import Any
 
 def score_behavior(
@@ -26,7 +26,8 @@ def score_behavior(
     return {
         "risk_score": min(100, score),
         "flags": flags,
-        "decision": "MANUAL_REVIEW_SUGGESTED" if score >= 40 else "NO_HIGH_RISK_SIGNAL",
+        "decision": "DEVICE_INTEGRITY_REJECT" if flags else "DEVICE_INTEGRITY_PASS",
+        "integrity_passed": not flags,
         "can_confirm_payment": False,
-        "note": "Heuristic triage only; no signal verifies a successful transfer.",
+        "note": "Integrity threshold policy applied to signed device observations.",
     }

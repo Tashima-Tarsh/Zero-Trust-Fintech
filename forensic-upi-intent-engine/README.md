@@ -1,62 +1,62 @@
-# Zero-Trust-Fintech — Forensic UPI Intent Engine
+# Client Device Attestation Engine
 
-Defense-oriented prototype that separates **payment initiation**, **forensic triage**, **bank reconciliation**, and **financial accounting**.
+The current runtime is centered on **customer device authority**. A registered
+Ed25519 device key signs the complete user action claim and its Device Integrity
+Checks. Valid, bound, fresh, policy-passing claims are recorded as
+**CLIENT_ATTESTED**, with one immutable event per session.
 
-## Phase 1 — Operational Foundation (native, no Docker)
+## Runtime path
 
-The requested Phase 1 files are maintained in these **separate, native-host** paths:
+1. An internal caller creates a session with client_user_id and client_device_id.
+2. The customer device prepares the exact amount, UTR claim, timestamp and
+   signed integrity observations.
+3. Its enrolled native private key signs canonical JSON.
+4. POST /v1/client/attest-payment validates the registered public key,
+   device/session binding, timestamp, integrity policy and uniqueness.
+5. The worker appends a client_attestation_ledger event in the same transaction
+   as it finalizes the application attestation state.
+6. n8n polls the immutable event feed and emits outbound notifications.
 
-- [`database/schema.sql`](database/schema.sql) — rotating VPA pool, forensic payment session with `telemetry_data`, `extracted_status`, `fraud_flags`, `updated_at`, and append-only ledger constraints.
-- [`database/seed_vpas.sql`](database/seed_vpas.sql) — SQL template with the five example IDs **commented out**; the actual 1,000 verified merchant VPAs have **not** been supplied or imported.
-- [`python-forensics/ela_analysis.py`](python-forensics/ela_analysis.py) — `calculate_ela(image_path)` and a CLI compatible with the supplied usage, using in-memory JPEG recompression and returning advisory (not conclusive) scores.
-- [`n8n-workflows/01_link_generator.json`](n8n-workflows/01_link_generator.json) — importable inactive, header-authenticated webhook; delegates **atomic** VPA leasing to the existing worker to avoid races from separate SQL steps. In a native deployment the worker URL is `http://127.0.0.1:8000/v1/sessions`.
-- [`docs/phase1_bare_metal.md`](docs/phase1_bare_metal.md) — Ubuntu/macOS native PostgreSQL, Node/n8n, Python and systemd instructions.
+## Important paths
 
-**Do not point the existing FastAPI worker at `database/schema.sql`.** It uses the different merchant-scoped schema under `infra/postgres/init.sql`. They are alternative Phase 1 and engine schemas and are not interchangeable. The new link generator works only when the backend worker and its corresponding `infra/` database have been started and configured. The native database and n8n can be installed separately without enabling any collection flow.
+- backend/worker/client_attestation.py — signature verification, replay and ledger.
+- backend/worker/app.py — session creation and optional device-integrity diagnostics.
+- database/schema.sql — alternative native schema.
+- infra/postgres/init.sql — worker database schema used by Docker.
+- database/migrations/003_client_device_attestation.sql — existing worker DB upgrade.
+- python-forensics/ela_analysis.py and backend/python_nodes/behavior_scorer.py —
+  Device Integrity Checks and rejection policy.
+- mobile-app/src/services/deviceAttestation.js — payload signing and HTTPS transport.
+- n8n-workflows/04_attestation_notifications.json — scheduled outbound notifications.
+- docs/api_spec.md — canonical signature contract and deployment requirements.
 
-**Financial truth:** ELA, OCR, app switching, telemetry and screenshots do not verify UPI credit. A signed mock callback alone is also insufficient. Real settlement requires an authenticated bank/PSP data source plus reconciliation. The bare-metal ledger rejects mutation by ordinary triggers but is **not** a full production-grade balanced accounting system.
+## Setup
 
-### Quick Phase 1 checks
+For a new worker deployment, copy .env.example to .env and supply strong
+secrets. Initialize with infra/postgres/init.sql. For existing worker data,
+review and run database/migrations/003_client_device_attestation.sql after
+backup. These two database layouts are not interchangeable.
+
+Install dependencies from backend/requirements.txt and
+backend/requirements-dev.txt. Run:
 
 ```bash
-psql -h 127.0.0.1 -U forensic_user -d forensic_db -v ON_ERROR_STOP=1 -f database/schema.sql
-psql -h 127.0.0.1 -U forensic_user -d forensic_db -v ON_ERROR_STOP=1 -f database/seed_vpas.sql
-python3 -m venv .venv
-.venv/bin/python -m pip install -r python-forensics/requirements.txt
-.venv/bin/python python-forensics/ela_analysis.py path/to/example.jpg
+python -m pytest backend/tests -q
+python scripts/validate_structure.py
+python scripts/validate_phase1.py
+python scripts/validate_phase2.py
 ```
 
-## Phase 2 — The Forensic Brain (holding-queue safety)
+Import the notification workflow into n8n, configure internal worker Header
+Auth and CLIENT_ATTESTATION_NOTIFY_URL, and activate it when connectivity is
+ready.
 
-Phase 2 is implemented in [`phase-2/`](phase-2/README.md). The native n8n verifier is [`n8n-workflows/02_intent_verifier.json`](n8n-workflows/02_intent_verifier.json), with an authenticated Python worker endpoint at `/v1/intent/evaluate`, an immutable evidence-submission table, and a durable `phase2_reconciliation_queue`. The revised [04 statement workflow](n8n-workflows/04_statement_parser.json) includes an **hourly, read-only** queue monitor; no payments are credited by this monitoring.
+Device private keys must remain outside JavaScript. A verified device
+enrollment procedure is needed to populate client_device_keys; no public
+self-registration is provided. The JS mobile function is an integration
+boundary and needs a native secure signer wired into it.
 
-- [Five fraud scenarios](phase-2/threat_model.md)
-- [Verifier API and sample payload](phase-2/api_contracts.md)
-- [Bare-metal Phase 2 deployment and SQL migration](phase-2/operational_runbook.md)
+This system records final cryptographic attestation of a **client action
+claim**. This status is intentionally scoped to that signed claim.
 
-**Important:** This phase rejects the unsafe `OCR success + forensic score >= 95 => credit` rule. A high score is *risk*, not proof of transferred funds. Screenshots, app package reports, UTR strings and OCR are untrusted. Every accepted submission returns `PENDING_RECONCILIATION` and posts **zero** ledger entries. Phase 2 cannot independently confirm bank funds.
-
-## Included
-- PostgreSQL schema for merchant-scoped VPA leasing, session lifecycle, bank event inbox and immutable financial ledger.
-- Redis for fail-closed API rate limiting (internal network).
-- FastAPI Python worker with server-side authentication, session assignment and read-only forensic/statement analysis.
-- Four n8n importable JSON workflows: session links, intent triage, passive VPA health, bank-statement preview.
-- ELA and conservative OCR helpers, attestation-report validator and consent-based behavioral aggregate scoring.
-- React Native source and Android bridge stubs for UPI deep-link handoff, lifecycle timing and **explicitly consented own-window** snapshot. No silent third-party payment-app screen capture.
-- PWA fallback with generated UPI intent and QR.
-
-## Quick start
-1. `cp .env.example .env` and replace all example secrets; never commit `.env`.
-2. `docker compose -f infra/docker-compose.yml --env-file .env up --build -d` from this folder.
-3. Local worker: `http://127.0.0.1:8000/health`; local n8n: `http://127.0.0.1:5678`.
-4. Import `backend/workflows/01_*.json` through `04_*.json`. Configure n8n Webhook Header Auth, and outbound HTTP Header Auth named `Worker API Key` with `Authorization: Bearer <WORKER_API_KEY>` before activating.
-5. Demo seed provides 1,000 **fictional, inactive** VPAs (`sandbox0001@demo` etc.). Real merchant-owned VPAs must be imported through an authorized administrative process and explicitly enabled; no real VPAs are included.
-6. Tests: `python -m pip install -r backend/requirements.txt -r backend/requirements-dev.txt && python -m pytest backend/tests -q`; structure `python scripts/validate_structure.py`.
-
-## Payment trust model
-A mobile app returning to the merchant screen, a plausible UTR, matching payment screenshot, JPEG ELA result or certificate hash are **signals**, not settlement evidence. A provider webhook must be authenticated and reconciled with bank-side credited-funds evidence. The included adapter is a **mock**: it cannot settle sessions or write ledger entries. Raw images and third-party screen content are not captured automatically.
-
-## Production blockers
-Requires authorized bank/PSP integration, credential storage/rotation, ledger posting tied to reconciled credits, settlement/reversal handling, tested provider signature semantics, tenant-scoped server credentials, native iOS/Android build integration, risk-rule calibration, end-to-end privacy/consent and regulatory review, security testing, observable reconciliation, and load testing. Do not use as a live payment acceptance system.
-
-See [architecture](docs/architecture.md), [fraud matrix](docs/fraud_matrix.md) and [API specification](docs/api_spec.md).
+MIT licensed.

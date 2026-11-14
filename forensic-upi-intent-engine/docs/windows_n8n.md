@@ -1,30 +1,21 @@
 # Windows n8n editor
 
-Open the Git checkout in VS Code. Run **Tasks: Run Task  n8n: Set up and start**.
-Node.js 22 or 24 and network access to npm are required. This installs the latest
-n8n 2 release and records its exact version in the runtime package lock.
+Open the repository checkout in VS Code and run Tasks: Run Task — n8n: Set up and start.
 
-The editor opens at http://127.0.0.1:5678 after its readiness endpoint returns 200.
-Complete the owner-account screen yourself. The five existing `n8n-workflows/`
-JSON files are imported as unpublished workflows without editing their source.
-Imports are tracked so running setup again does not overwrite editor changes.
+The n8n editor can be opened at http://127.0.0.1:5678 when its readiness check
+passes. Editor state and logs are stored under the configured runtime directory;
+do not commit generated credentials.
 
-Packages, logs, import copies and SQLite editor state live outside Git under
-`D:\FintechRuntime\n8n` when the checkout is on D:. Back up this whole directory,
-including the n8n-generated encryption configuration. Do not commit it.
+The active workflow sources in n8n-workflows are:
+- 01_link_generator.json
+- 02_intent_verifier.json
+- 03_canary_tester.json
+- 04_attestation_notifications.json
 
-Use **n8n: Start server** on later runs and **n8n: Check connections** to inspect
-the editor and Python worker separately. The server runs in the background for
-the current Windows session; automatic restart after Windows reboot is not configured.
+The client-attestation notification workflow is **inactive on import**.
+Set internal worker Header Auth, configure CLIENT_ATTESTATION_NOTIFY_URL, and
+change worker:8000 to the reachable worker host if n8n is not running on the
+same Docker private network.
 
-This setup creates the editor database only. The Python worker, PostgreSQL and
-Redis must be provisioned independently using the engine's matching `infra/`
-schema and configuration. Existing native webhook workflows target
-`http://127.0.0.1:8000`. Configure their inbound Header Auth, outbound Worker API
-Key and any PostgreSQL credentials in the editor before publishing individual
-workflows. Nothing is automatically published or triggered by this setup.
-
-GitHub sync versions the source files; it does not automatically deploy changes
-into the running n8n database. Export editor changes to reviewed workflow JSON
-before committing them. n8n credentials remain in the runtime database.
-
+The native signing integration and enrolled device keys are configured outside
+the n8n editor. n8n only reads immutable events and sends outbound notifications.

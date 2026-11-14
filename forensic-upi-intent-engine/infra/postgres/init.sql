@@ -27,11 +27,16 @@ CREATE TABLE payment_sessions (
   vpa VARCHAR(255) NOT NULL REFERENCES upi_vpa_pool(vpa_address),
   note VARCHAR(100) NOT NULL DEFAULT '',
   status VARCHAR(20) NOT NULL DEFAULT 'PENDING'
-    CHECK (status IN ('PENDING','PAID','EXPIRED','REVIEW')),
+    CHECK (status IN ('PENDING','CLIENT_ATTESTED','EXPIRED','REVIEW')),
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   expires_at TIMESTAMPTZ NOT NULL,
   paid_at TIMESTAMPTZ,
-  provider_event_id VARCHAR(128) UNIQUE,
+  client_user_id VARCHAR(128),
+  client_device_id VARCHAR(128),
+  client_device_signature VARCHAR(256),
+  attestation_hash VARCHAR(64),
+  client_verified_at TIMESTAMPTZ,
+  is_client_finalized BOOLEAN NOT NULL DEFAULT FALSE,
   -- Optional low-confidence, consented client observations. No secrets/biometrics.
   user_device_hash VARCHAR(255),
   target_package VARCHAR(255),
@@ -45,37 +50,61 @@ CREATE TABLE payment_sessions (
 );
 CREATE INDEX payment_sessions_expiry_idx ON payment_sessions(status, expires_at);
 
-CREATE TABLE provider_events (
-  event_id VARCHAR(128) PRIMARY KEY,
-  session_id UUID NOT NULL REFERENCES payment_sessions(id),
-  event_hash CHAR(64) NOT NULL,
-  decision VARCHAR(60) NOT NULL,
-  received_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+-- Registered raw Ed25519 public keys, enrolled only after validating device key
+-- provenance. Enrollment is an administrative operation, not a public API.
+CREATE TABLE client_device_keys (
+  user_id VARCHAR(128) NOT NULL,
+  device_id VARCHAR(128) NOT NULL,
+  public_key_b64 VARCHAR(64) NOT NULL,
+  hardware_attested BOOLEAN NOT NULL DEFAULT FALSE,
+  is_active BOOLEAN NOT NULL DEFAULT TRUE,
+  enrolled_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  PRIMARY KEY (user_id, device_id)
 );
 
--- Accounting movements should be posted only by verified bank reconciliation.
--- Two entries (merchant receivable and clearing) must balance before authorization.
-CREATE TABLE financial_ledger (
+-- This records signed client actions; it is not a monetary balance ledger.
+CREATE TABLE client_attestation_ledger (
   id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
-  entry_group UUID NOT NULL,
-  session_id UUID NOT NULL REFERENCES payment_sessions(id),
-  bank_event_id VARCHAR(128) NOT NULL,
-  account VARCHAR(80) NOT NULL,
-  direction VARCHAR(6) NOT NULL CHECK (direction IN ('DEBIT','CREDIT')),
+  session_id UUID NOT NULL UNIQUE REFERENCES payment_sessions(id),
+  user_id VARCHAR(128) NOT NULL,
+  device_id VARCHAR(128) NOT NULL,
+  utr VARCHAR(50) NOT NULL UNIQUE,
   amount_paise BIGINT NOT NULL CHECK (amount_paise > 0),
-  currency CHAR(3) NOT NULL DEFAULT 'INR' CHECK (currency='INR'),
-  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  UNIQUE (bank_event_id, account, direction)
+  attestation_hash CHAR(64) NOT NULL UNIQUE,
+  signature VARCHAR(256) NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
-CREATE INDEX ledger_session_idx ON financial_ledger(session_id, created_at);
-CREATE FUNCTION reject_ledger_mutation() RETURNS trigger LANGUAGE plpgsql AS $$
+CREATE INDEX client_attestation_ledger_created_idx ON client_attestation_ledger(id);
+CREATE FUNCTION reject_attestation_ledger_mutation()
+RETURNS trigger LANGUAGE plpgsql AS $
 BEGIN
-  RAISE EXCEPTION 'financial_ledger is append-only; post a compensating entry';
-END
-$$;
-CREATE TRIGGER forbid_financial_ledger_update_delete
-BEFORE UPDATE OR DELETE ON financial_ledger
-FOR EACH ROW EXECUTE FUNCTION reject_ledger_mutation();
+  RAISE EXCEPTION 'client_attestation_ledger is append-only';
+END $;
+CREATE TRIGGER prevent_client_attestation_update_delete
+BEFORE UPDATE OR DELETE ON client_attestation_ledger
+FOR EACH ROW EXECUTE FUNCTION reject_attestation_ledger_mutation();
+CREATE TRIGGER prevent_client_attestation_truncate
+BEFORE TRUNCATE ON client_attestation_ledger
+FOR EACH STATEMENT EXECUTE FUNCTION reject_attestation_ledger_mutation();
 
--- Restrict direct INSERT grants to the dedicated reconciliation service role in production.
--- The prototype worker intentionally exposes no ledger posting endpoint.
+-- Durable device-integrity diagnostic submissions on fresh deployments.
+CREATE TABLE phase2_forensic_submissions (
+  submission_id UUID PRIMARY KEY,
+  session_id UUID NOT NULL REFERENCES payment_sessions(id),
+  merchant_id VARCHAR(80) NOT NULL,
+  request_hash CHAR(64) NOT NULL,
+  image_sha256 CHAR(64),
+  risk_score INTEGER NOT NULL CHECK (risk_score BETWEEN 0 AND 100),
+  decision VARCHAR(48) NOT NULL CHECK (decision IN ('DEVICE_INTEGRITY_PASS','DEVICE_INTEGRITY_REJECT')),
+  response JSONB NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX phase2_submissions_image_hash ON phase2_forensic_submissions(image_sha256)
+  WHERE image_sha256 IS NOT NULL;
+CREATE FUNCTION reject_device_integrity_mutation() RETURNS trigger LANGUAGE plpgsql AS $$
+BEGIN
+  RAISE EXCEPTION 'phase2_forensic_submissions is append-only';
+END $$;
+CREATE TRIGGER forbid_device_integrity_update_delete
+BEFORE UPDATE OR DELETE ON phase2_forensic_submissions
+FOR EACH ROW EXECUTE FUNCTION reject_device_integrity_mutation();

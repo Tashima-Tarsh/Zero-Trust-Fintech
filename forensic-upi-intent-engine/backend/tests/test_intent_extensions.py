@@ -38,5 +38,5 @@ def test_passive_health_requires_auth():
     assert client.post("/v1/vpas/canary", json={"merchant_id":"demo"}).status_code == 401
 
 
-def test_statement_requires_auth():
-    assert client.post("/v1/statements/preview", json={"csv_text":"hello"}).status_code == 401
+def test_retired_preview_route_is_not_registered():
+    assert client.post("/v1/statements/preview", json={"csv_text":"hello"}).status_code == 404

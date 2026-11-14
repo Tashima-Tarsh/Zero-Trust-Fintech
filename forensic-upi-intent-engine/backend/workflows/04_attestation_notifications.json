@@ -1,0 +1,163 @@
+{
+  "name": "D - Client Attestation Outbound Notifications",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "minutes",
+              "minutesInterval": 1
+            }
+          ]
+        }
+      },
+      "id": "847a2c4b-1240-44ed-a404-f1a55e4f0011",
+      "name": "Every Minute",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        200,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const s=$getWorkflowStaticData('global');return [{json:{after_id:s.after_id||0}}];"
+      },
+      "id": "847a2c4b-1240-44ed-a404-f1a55e4f0012",
+      "name": "Read Delivery Cursor",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        400,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "={{'http://worker:8000/v1/client/attestations/recent?after_id='+$json.after_id}}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "options": {}
+      },
+      "id": "847a2c4b-1240-44ed-a404-f1a55e4f0013",
+      "name": "Fetch Signed Events",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        600,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "return ($input.first().json.events||[]).map(ev=>({json:ev}));"
+      },
+      "id": "847a2c4b-1240-44ed-a404-f1a55e4f0014",
+      "name": "One Event Per Notification",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        800,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{$env.CLIENT_ATTESTATION_NOTIFY_URL}}",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{JSON.stringify({event:'client_attestation_recorded',status:'CLIENT_ATTESTED',attestation:$json})}}",
+        "options": {}
+      },
+      "id": "847a2c4b-1240-44ed-a404-f1a55e4f0015",
+      "name": "Send Outbound Notification",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1000,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const s=$getWorkflowStaticData('global');for(const i of $('One Event Per Notification').all()){if(i.json.id)s.after_id=Math.max(s.after_id||0,i.json.id)}return $input.all();"
+      },
+      "id": "847a2c4b-1240-44ed-a404-f1a55e4f0016",
+      "name": "Advance Cursor",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1200,
+        300
+      ]
+    }
+  ],
+  "connections": {
+    "Every Minute": {
+      "main": [
+        [
+          {
+            "node": "Read Delivery Cursor",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read Delivery Cursor": {
+      "main": [
+        [
+          {
+            "node": "Fetch Signed Events",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Signed Events": {
+      "main": [
+        [
+          {
+            "node": "One Event Per Notification",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "One Event Per Notification": {
+      "main": [
+        [
+          {
+            "node": "Send Outbound Notification",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send Outbound Notification": {
+      "main": [
+        [
+          {
+            "node": "Advance Cursor",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "saveDataSuccessExecution": "none",
+    "saveDataErrorExecution": "none",
+    "saveManualExecutions": false
+  }
+}

@@ -1,130 +1,50 @@
-# Phase 1 — Operational Foundation (without Docker)
+# Native host setup — client device attestation
 
-This is an **additive** native-host setup to accompany the original Phase 1 outline. Existing `infra/`, `backend/`, `mobile-app/`, `web-fallback/`, and Docker configs have not been replaced.
+## Schema choice
 
-## Layout (new files)
+The native database/schema.sql is a simplified alternative schema using a string
+session ID. The Python worker uses UUID sessions and requires
+infra/postgres/init.sql, with the full event ledger and registry.
 
-```text
-forensic-upi-intent-engine/
-├── config/
-│   ├── database.js
-│   ├── n8n_config.json
-│   └── systemd/forensic-n8n.service
-├── database/
-│   ├── schema.sql
-│   └── seed_vpas.sql
-├── n8n-workflows/
-│   ├── 01_link_generator.json
-│   ├── 02_intent_verifier.json
-│   ├── 03_canary_tester.json
-│   └── 04_statement_parser.json
-├── python-forensics/
-│   ├── requirements.txt
-│   ├── ela_analysis.py
-│   └── ocr_extractor.py
-└── mobile-app/  # existing code, unchanged
-```
+Do **not** combine both schemas in one database.
 
-## Step A — Native PostgreSQL (Ubuntu/Debian)
+## Local runtime
 
-```bash
-sudo apt-get update
-sudo apt-get install -y postgresql postgresql-contrib
-sudo systemctl enable --now postgresql
-sudo -u postgres psql
-```
+Install PostgreSQL, Redis, Python 3.12 or a supported newer version, and n8n.
+For a fresh worker database, provision the database and run
+infra/postgres/init.sql once. This init script also creates a separate n8n
+database; do not re-run it on populated volumes.
 
-Inside `psql` (replace the illustrative password with a unique strong secret):
+For existing worker databases, back up the data, review
+database/migrations/003_client_device_attestation.sql and apply it as a
+controlled upgrade. Run the Phase 2 diagnostic migration only on legacy
+databases where those records are missing.
 
-```sql
-CREATE DATABASE forensic_db;
-CREATE USER forensic_user WITH PASSWORD 'REPLACE_WITH_RANDOM_SECRET';
-GRANT ALL PRIVILEGES ON DATABASE forensic_db TO forensic_user;
-\connect forensic_db
-GRANT USAGE, CREATE ON SCHEMA public TO forensic_user;
-\q
-```
-
-Apply the updated Phase 1 schema, including additive columns and append-only ledger triggers:
-
-```bash
-export PGPASSWORD='REPLACE_WITH_RANDOM_SECRET'
-psql -h 127.0.0.1 -U forensic_user -d forensic_db -v ON_ERROR_STOP=1 -f database/schema.sql
-psql -h 127.0.0.1 -U forensic_user -d forensic_db -v ON_ERROR_STOP=1 -f database/seed_vpas.sql
-unset PGPASSWORD
-```
-
-The `seed_vpas.sql` file is a safe template: five supplied merchant-style example addresses are **commented out**, and no real VPAs were provided. Insert your own **verified, authorized** 1,000 IDs in the documented `INSERT ... ON CONFLICT` form. Do not treat the example addresses as authorized accounts.
-
-**Compatibility limitation:** This Phase 1 SQL schema implements the requested fields, additive migrations, and update/delete/truncate guards for the ledger. It is *not compatible* with the richer, merchant-scoped FastAPI worker schema in `infra/postgres/init.sql`. Run Phase 1 on a **separate empty** `forensic_db`; use the `infra/` schema for the existing worker, not both in the same database. Ledger triggers are only one control, not proof of independent bank settlement or a complete production accounting implementation.
-
-On macOS, `brew install postgresql`, followed by the Homebrew service and equivalent role/database creation, is the native alternative. systemd commands in this guide apply to Linux.
-
-## Step B — Native Node.js and n8n
-
-Install a supported current Node.js LTS using your trusted OS/package-manager channel and confirm your installed n8n version supports that runtime. Then:
-
-```bash
-sudo npm install -g n8n
-n8n --version
-```
-
-**Never use example admin passwords in production.** n8n uses its own supported owner/user-management setup. Legacy `N8N_BASIC_AUTH_*` settings in the pasted proposal should not be relied upon as the sole protection. Do not expose its editor or webhook endpoints to the public internet without TLS, authorization, and a reverse proxy.
-
-`config/n8n_config.json` documents the intended values. **n8n does not automatically read this JSON file**: provide real values as process environment variables. For a host install, set these privately in `/etc/forensic-upi-intent-engine/n8n.env` (restrict to root and the service account):
-
-```dotenv
-DB_TYPE=postgresdb
-DB_POSTGRESDB_HOST=127.0.0.1
-DB_POSTGRESDB_PORT=5432
-DB_POSTGRESDB_DATABASE=forensic_db
-DB_POSTGRESDB_USER=forensic_user
-DB_POSTGRESDB_PASSWORD=REPLACE_WITH_RANDOM_SECRET
-N8N_ENCRYPTION_KEY=REPLACE_WITH_32_PLUS_RANDOM_CHARACTERS
-N8N_HOST=127.0.0.1
-N8N_PORT=5678
-N8N_PROTOCOL=http
-```
-
-Create the unprivileged account and directories on Ubuntu:
-
-```bash
-sudo useradd --system --home-dir /var/lib/forensic-n8n --shell /usr/sbin/nologin forensic
-sudo install -d -m 750 /etc/forensic-upi-intent-engine
-sudo install -m 640 -o root -g forensic /dev/null /etc/forensic-upi-intent-engine/n8n.env
-# Edit the environment file securely, never store real secrets in Git.
-sudo install -d -m 755 /opt/forensic-upi-intent-engine
-# Copy or clone this project into /opt/forensic-upi-intent-engine as appropriate.
-sudo install -m 644 config/systemd/forensic-n8n.service /etc/systemd/system/forensic-n8n.service
-sudo systemctl daemon-reload
-sudo systemctl enable --now forensic-n8n
-sudo systemctl status forensic-n8n
-```
-
-Make sure `/etc/forensic-upi-intent-engine/n8n.env` is populated **before** enabling the service. `n8n start` can also run in a terminal for a manual smoke test. Use `journalctl -u forensic-n8n -f` for errors.
-
-**n8n workflows:** `02`–`04` are copies of the existing `backend/workflows/` exports. `01_link_generator.json` has been adapted for Phase 1 native deployment and points to `http://127.0.0.1:8000/v1/sessions`; it delegates both VPA selection and leasing to the worker **in one transaction**, rather than relying on unsafe separate SQL nodes. All workflows remain inactive until webhook Header Auth and outbound worker API credentials are configured. Running n8n alone does not start the Python worker; the native worker still requires its own supported schema under `infra/postgres/init.sql`. For workflows `02`–`04`, replace Docker hostnames with authorized native worker addresses before activation.
-
-## Step C — Native Python forensics
-
-```bash
-sudo apt-get install -y python3 python3-pip python3-venv tesseract-ocr
+~~~bash
 python3 -m venv .venv
-.venv/bin/python -m pip install -r python-forensics/requirements.txt
-.venv/bin/python -m compileall -q python-forensics
-```
+. .venv/bin/activate
+python -m pip install -r backend/requirements.txt -r backend/requirements-dev.txt
+python -m uvicorn worker.app:app --app-dir backend --host 127.0.0.1 --port 8000
+~~~
 
-Example ELA CLI: `.venv/bin/python python-forensics/ela_analysis.py path/to/image.jpg`. This is a heuristic signal, not proof of Photoshop edits or a successful UPI credit.
+Set PGHOST, PGPORT, PGUSER, PGPASSWORD, PGDATABASE, WORKER_API_KEY, and
+CLIENT_ATTESTATION_MAX_SKEW_SECONDS in the worker's secure environment.
 
-These are **libraries, not n8n Code-node modules**: run forensic scripts as isolated worker processes and call them through authenticated APIs rather than assuming n8n can import Python modules.
+Run the unit and static checks with:
 
-## Step D — Verification checklist
+~~~bash
+python -m pytest backend/tests -q
+python scripts/validate_structure.py
+python scripts/validate_phase1.py
+python scripts/validate_phase2.py
+~~~
 
-- [ ] PostgreSQL service is active and `forensic_user` can connect to `forensic_db`.
-- [ ] `SELECT to_regclass('public.upi_vpa_pool'), to_regclass('public.payment_sessions'), to_regclass('public.financial_ledger');` returns three tables.
-- [ ] The count of **genuine verified merchant-owned** VPAs is 1,000 (currently zero until supplied).
-- [ ] `systemctl is-active forensic-n8n` reports `active`; port 5678 is reachable through your intended access controls.
-- [ ] The Python virtualenv compiles/imports the ELA/OCR modules and Tesseract is installed.
-- [ ] Worker/database schema and all n8n endpoint URLs are separately configured and integration-tested before activating workflows.
+## n8n
 
-**No claim of completed host installation, real VPA import, bank reconciliation, or production readiness is made by committing these files.**
+Import n8n-workflows/04_attestation_notifications.json, configure the internal
+worker HTTP Header Auth credential and CLIENT_ATTESTATION_NOTIFY_URL, then
+activate only after the target endpoint is reachable. On the Docker private
+network the worker hostname is worker; use the correct reachable HTTPS
+address when running n8n on a different host.
+
+Private signing keys must remain on the enrolled user devices.

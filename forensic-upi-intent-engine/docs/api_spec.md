@@ -1,35 +1,48 @@
-# Server-side API and n8n payloads
+# Signed Client Attestation API
 
-All `/v1/*` worker routes require `Authorization: Bearer <WORKER_API_KEY>` unless expressly documented otherwise. Worker credentials must only exist in **merchant servers or n8n**, never public browsers or React Native bundles. This is a shared internal key scaffold, not tenant-grade access control.
+## Device enrollment
+
+Table client_device_keys stores user_id, device_id, public_key_b64, hardware_attested and is_active. A privileged enrollment process must independently validate key provenance before setting hardware_attested=TRUE. There is no open device registration endpoint.
 
 ## POST /v1/sessions
+
+Internal endpoint requiring Authorization: Bearer WORKER_API_KEY. Supply client_user_id and client_device_id in addition to merchant_id, merchant_reference, amount_paise, currency and note. Both identities must bind to the enrolled device before attestation.
+
+## POST /v1/client/attest-payment
+
 ```json
-{"merchant_id":"demo","merchant_reference":"order-42","amount_paise":50000,"currency":"INR","note":"Order 42"}
+{
+  "session_id": "c3fb2561-32dc-4e87-8910-983e80bcd376",
+  "user_id": "user1",
+  "device_id": "device1",
+  "utr": "123456789012",
+  "amount": "500.00",
+  "timestamp": "2026-11-14T13:00:00Z",
+  "integrity": {"elapsed_ms": 9000, "retry_count": 0, "image_ela_score": 12.0},
+  "client_signature": "<base64 Ed25519 signature>"
+}
 ```
-Returns `id, vpa, status:PENDING, expires_at`. `409` when no merchant-approved VPA is available. Duplicate merchant/reference returns the same session only if amount and note match.
 
-## POST /v1/forensics/score
+Sign the UTF-8 JSON of all fields **except client_signature**, with recursively sorted keys and compact separators. The timestamp must use a normalized RFC 3339 representation. Amount uses exactly two decimal digits. Sign the precise bytes reconstructed by canonical_attestation_bytes in the backend.
+
+Accepted response:
+
 ```json
-{"elapsed_ms":800,"retry_count":4,"utr":"123456789012","image_ela_score":18.2}
+{"status":"CLIENT_ATTESTED","client_finalized":true,"attestation_hash":"<sha256 hex>","duplicate":false}
 ```
-Returns advisory risk flags, `risk_score` and `can_confirm_payment:false`.
 
-## GET /v1/vpas/canary?merchant_id=demo
-Reports enabled/healthy/leased VPA counts and stale checks only. **Does not transmit money**, probe bank apps, or validate account ownership.
+Exact retries return duplicate:true. Different claims for an already-attested session are rejected. The ledger is append-only.
 
-## POST /v1/statements/preview
-```json
-{"csv_text":"date,description,reference,credit,amount,currency\n2026-11-14,Example,123456789012,500.00,,INR"}
-```
-Returns normalized candidate credit rows. Input is untrusted until imported from an authenticated bank source; **never** settles automatically.
+## Device Integrity Checks
 
-## POST /v1/provider-events
-Mock adapter: raw JSON event; headers `X-Provider-Timestamp` (Unix seconds), `X-Provider-Signature`: `sha256=<hex HMAC-SHA256(secret, timestamp + '.' + raw body)>`. Replay protection and exact amount, VPA, reference checks are enabled. A SUCCESS claim produces `awaiting_bank_reconciliation`, **not PAID**. Actual PSP-specific signature scheme and credit verification must replace this adapter for live use.
+Signed elapsed_ms, retry_count, UTR formatting and optional image_ela_score are evaluated. Any flagged integrity threshold violation gives DEVICE_INTEGRITY_REJECT and blocks recording. These metrics define rejection policy, not independent cryptographic evidence of runtime behavior.
 
-## n8n workflows
-- `01_link_generator.json`: POST `forensic-upi/create-session`
-- `02_intent_verifier.json`: POST `forensic-upi/score`
-- `03_canary_tester.json`: authenticated POST `forensic-upi/vpa-health` for passive VPA counts
-- `04_statement_parser.json`: authenticated POST `forensic-upi/statement-preview` for review-only CSV parsing
+## Outbound notifications
 
-The webhooks need configured Header Auth credentials. HTTP Request nodes need server-side `Worker API Key` (header-auth credentials). Workflow JSON is deliberately inactive by default.
+GET /v1/client/attestations/recent?after_id=0 requires internal WORKER_API_KEY and returns an ordered event feed. Import n8n-workflows/04_attestation_notifications.json, configure its Header Auth credential and CLIENT_ATTESTATION_NOTIFY_URL, then activate it. Delivery is at least once; deduplicate by attestation_hash.
+
+## Installation
+
+Fresh worker deployments use infra/postgres/init.sql. Existing database installs need database/migrations/003_client_device_attestation.sql after backup. Native database/schema.sql is a separate schema and not interchangeable with the worker schema.
+
+Native device signing, hardware key provenance validation and verified device registration remain integration tasks. Never embed private signing keys or internal API credentials in mobile JavaScript.

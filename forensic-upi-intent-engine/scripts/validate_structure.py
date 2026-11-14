@@ -1,50 +1,31 @@
-"""Validate the intended project shape and critical no-false-settlement invariants."""
+"""Structural validation for the device-attestation worker."""
 from pathlib import Path
 import json
 
 root = Path(__file__).resolve().parents[1]
-needed = [
-    "docs/architecture.md", "docs/fraud_matrix.md", "docs/api_spec.md",
-    "infra/docker-compose.yml", "infra/postgres/init.sql",
-    "infra/postgres/seed_vpas.sql", "infra/n8n/Dockerfile",
-    "backend/workflows/01_link_generator.json",
-    "backend/workflows/02_intent_verifier.json",
-    "backend/workflows/03_canary_tester.json",
-    "backend/workflows/04_statement_parser.json",
-    "backend/python_nodes/ela_analysis.py",
-    "backend/python_nodes/ocr_extractor.py",
-    "backend/python_nodes/package_validator.py",
-    "backend/python_nodes/behavior_scorer.py",
-    "backend/python_nodes/statement_parser.py",
-    "backend/requirements.txt", "backend/worker/app.py",
-    "mobile-app/android/app/src/main/java/com/forensicupi/UPIIntentBridge.java",
-    "mobile-app/android/app/src/main/java/com/forensicupi/SecureSnapshot.java",
-    "mobile-app/src/sensors/AppStateTracker.js",
-    "mobile-app/src/sensors/TelemetrySDK.js",
-    "mobile-app/src/services/N8NClient.js",
-    "mobile-app/src/services/VPARotator.js",
-    "mobile-app/src/App.js", "mobile-app/package.json",
-    "web-fallback/index.html", "web-fallback/script.js", "web-fallback/style.css",
-    ".gitignore", ".env.example", "README.md", "LICENSE"
-]
-for name in needed:
-    assert (root / name).is_file(), f"Missing: {name}"
+for path in [
+    "README.md", ".env.example", "backend/worker/app.py",
+    "backend/worker/client_attestation.py", "backend/python_nodes/behavior_scorer.py",
+    "backend/tests/test_client_attestation.py", "infra/postgres/init.sql",
+    "database/schema.sql", "database/migrations/003_client_device_attestation.sql",
+]:
+    assert (root / path).is_file(), path
 
-for fname in ["01_link_generator.json", "02_intent_verifier.json", "03_canary_tester.json", "04_statement_parser.json"]:
-    flow = json.loads((root / "backend/workflows" / fname).read_text())
-    assert flow["active"] is False, "Never activate workflows before auth configuration"
-    assert flow["nodes"] and flow["connections"]
-    assert any(n["type"] == "n8n-nodes-base.webhook" and
-               n["parameters"]["authentication"] == "headerAuth" for n in flow["nodes"])
-
+app = (root / "backend/worker/app.py").read_text()
+attestation = (root / "backend/worker/client_attestation.py").read_text()
 schema = (root / "infra/postgres/init.sql").read_text()
-worker = (root / "backend/worker/app.py").read_text()
-seed = (root / "infra/postgres/seed_vpas.sql").read_text()
-assert "CREATE TABLE financial_ledger" in schema
-assert "forbid_financial_ledger_update_delete" in schema
-assert "enabled,status,health_status" in seed and "FALSE" in seed
-assert "awaiting_bank_reconciliation" in worker
-assert "SET status = 'PAID'" not in worker, "No mock callback may settle a payment"
-assert "redis_rate_limit" in worker
+env = (root / ".env.example").read_text()
+
+assert "client_attestation_router" in app
+assert "/v1/client/attest-payment" in attestation
+assert "verify_client_signature(body, key" in attestation
+assert "FOR UPDATE" in attestation
+assert "client_attestation_ledger" in attestation
+assert "CREATE TABLE client_device_keys" in schema
+assert "prevent_client_attestation_update_delete" in schema
+assert "provider_events" not in schema
+assert "PROVIDER_WEBHOOK_SECRET" not in env
+assert "/v1/provider-events" not in app
+assert "redis_rate_limit" in app
 assert json.loads((root / "mobile-app/package.json").read_text())["name"]
-print("New intent engine structure and safety invariants validated")
+print("Client device-attestation structural checks passed")

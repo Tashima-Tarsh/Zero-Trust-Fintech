@@ -1,35 +1,26 @@
-# Architecture
+# Device-attestation architecture
 
-```mermaid
+~~~mermaid
 flowchart LR
-M[Merchant server] -->|authenticated request| N[n8n Workflow 01]
-N --> W[FastAPI worker]
-W --> D[(Postgres: VPAs / sessions)]
-W --> R[(Redis: rate limits)]
-C[Mobile / PWA] -->|UPI intent| A[User's UPI app]
-A --> B[Authorized bank / PSP]
-C -->|consented advisory signals| T[Workflow 02: triage]
-T --> W
-B -->|future verified bank integration| X[Independent reconciliation]
-X --> D
-X --> L[(Immutable financial ledger)]
-W --> H[Workflow 03: passive pool report]
-W --> S[Workflow 04: statement preview]
-T -.->|NEVER settles| L
-```
+  U[Enrolled user device] -->|Ed25519 signed action claim| A[FastAPI /v1/client/attest-payment]
+  A --> K[(Enrolled public-key registry)]
+  A --> I[Device Integrity Checks]
+  A -->|transactional append| L[(Immutable client-attestation ledger)]
+  A --> S[(Session: CLIENT_ATTESTED)]
+  N[n8n scheduled reader] -->|cursor-based read| L
+  N -->|outbound notification| O[Configured notification target]
+~~~
 
-## Core invariants
-1. Merchant-scoped VPA leasing is atomic; default 10-minute lease.
-2. New sessions are pending, never paid by client return.
-3. Forensic results do not authorize transfer, fulfillment or a ledger posting.
-4. The mock provider-event adapter verifies HMAC transport but marks success as `awaiting_bank_reconciliation`, never PAID.
-5. A durable financial ledger supports append-only debit/credit entries; no postings occur without independently verified credited funds. PostgreSQL triggers reject update/delete.
-6. Rate limiting defaults to deny on Redis errors.
-7. 1,000 seeded sandbox VPAs are **disabled**, **fictional**, and may not receive money.
-8. Mobile identifiers are ephemeral; no device fingerprinting, silent screenshot harvesting, SMS reading or package spoofing.
+## Trust and state boundaries
 
-## Production architecture still required
-Integrate verified bank/PSP account credentials, bank-side credit verification, chargebacks/reversals, account ownership checks, approved VPA onboarding, transport mTLS, strict tenant auth/permissions and HTTPS termination. n8n orchestration and its credential store should remain inaccessible to payment clients.
+1. The user and device identifiers are bound to the session before attestation.
+2. The worker checks a previously enrolled, active Ed25519 public key.
+3. The signed claim covers session, identity, exact amount, reference, timestamp and integrity metrics.
+4. The worker rejects altered signatures, stale claims, expired sessions, duplicate conflicts and failed integrity policy.
+5. A record is appended once for each bound session under a database transaction; UPDATE, DELETE and TRUNCATE of the event ledger are rejected.
+6. An accepted claim is terminal **only as CLIENT_ATTESTED**, the application's signed-device-action state.
+7. Notification delivery occurs after the event has been recorded; consumers deduplicate by attestation_hash.
 
-## Native constraints
-Android may expose the selected handler, not a guaranteed receiving PSP package. Android 14+ MediaProjection requires user consent per session, and protected windows can block capture. PixelCopy only copies **this application's own** window; it cannot verify what a separate UPI app showed. Package certificate hashes need independently sourced, current, signed allowlists; client reports are untrusted.
+## Platform integration boundaries
+
+Device key generation, hardware provenance evidence and enrollment are not completed by the transport-only React Native helper. Production installations must integrate an audited native signing module, enrollment validation, secure key lifecycle, database permissions, and end-to-end tests.
