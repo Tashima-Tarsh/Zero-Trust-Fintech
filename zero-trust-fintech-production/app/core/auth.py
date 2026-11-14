@@ -55,6 +55,12 @@ def _jwt_decode(token: str, secret: str, algorithms: list = None) -> dict:
             raise AuthError("Invalid JWT token format")
         
         h_b64, p_b64, s_b64 = parts
+        try:
+            header = json.loads(_b64url_decode(h_b64).decode("utf-8"))
+        except (ValueError, UnicodeError) as e:
+            raise AuthError("Malformed JWT header") from e
+        if header.get("alg") != "HS256" or header.get("typ") != "JWT":
+            raise AuthError("Unsupported JWT header")
         msg = f"{h_b64}.{p_b64}"
         expected_sig = hmac.new(secret.encode('utf-8'), msg.encode('utf-8'), hashlib.sha256).digest()
         if not hmac.compare_digest(_b64url_encode(expected_sig), s_b64):
@@ -66,10 +72,10 @@ def _jwt_decode(token: str, secret: str, algorithms: list = None) -> dict:
             raise AuthError(f"Malformed JWT payload: {e}")
         
         exp = payload.get("exp")
-        if exp is not None:
-            now_ts = datetime.now(timezone.utc).timestamp()
-            if isinstance(exp, (int, float)) and exp < now_ts:
-                raise AuthError("JWT token has expired")
+        if isinstance(exp, bool) or not isinstance(exp, (int, float)):
+            raise AuthError("JWT expiration missing or invalid")
+        if exp <= datetime.now(timezone.utc).timestamp():
+            raise AuthError("JWT token has expired")
         return payload
     except Exception as e:
         raise AuthError(f"Invalid token: {str(e)}")
@@ -80,7 +86,10 @@ def create_access_token(data: dict, expires_delta: Optional[timedelta] = None) -
     to_encode = data.copy()
     now = datetime.now(timezone.utc)
     expire = now + (expires_delta or timedelta(minutes=getattr(settings, "JWT_ACCESS_TOKEN_EXPIRE_MINUTES", 60)))
-    to_encode.update({"exp": int(expire.timestamp()), "iat": int(now.timestamp()), "type": "access"})
+    token_type = to_encode.get("type", "access")
+    if token_type not in ("access", "websocket"):
+        raise ValueError("Unsupported access token purpose")
+    to_encode.update({"exp": int(expire.timestamp()), "iat": int(now.timestamp()), "type": token_type})
     secret = _get_jwt_secret()
     return _jwt_encode(to_encode, secret, algorithm=getattr(settings, "JWT_ALGORITHM", "HS256"))
 
@@ -118,8 +127,8 @@ async def get_current_merchant_user(
         user_id = payload.get("sub")
         merchant_id = payload.get("merchant_id")
         
-        if not user_id or not merchant_id:
-            raise AuthError("Invalid token payload")
+        if not user_id or not merchant_id or payload.get("type") != "access":
+            raise AuthError("Invalid access token scope or purpose")
         
         # Verify user exists and is active
         user = db.query(MerchantUser).filter(
@@ -166,12 +175,12 @@ def verify_websocket_token(token: str, merchant_id: str) -> dict:
         token_user = payload.get("sub")
         
         # Check merchant scope
-        if token_merchant != merchant_id and token_user != "admin":
+        if token_merchant != merchant_id or not token_user:
             raise AuthError("Token not authorized for this merchant")
         
-        # Check token type (allow 'websocket' or 'access' tokens)
+        # WebSocket tokens cannot be exchanged for ordinary API access.
         token_type = payload.get("type")
-        if token_type not in ("websocket", "access", None):
+        if token_type != "websocket":
             raise AuthError(f"Invalid token type for WebSocket: {token_type}")
         
         return payload
