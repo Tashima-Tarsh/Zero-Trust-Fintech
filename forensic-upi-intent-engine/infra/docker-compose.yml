@@ -40,7 +40,7 @@ services:
       PGPASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD}
       REDIS_URL: redis://redis:6379/0
       WORKER_API_KEY: ${WORKER_API_KEY:?Set WORKER_API_KEY}
-      PROVIDER_WEBHOOK_SECRET: ${PROVIDER_WEBHOOK_SECRET:?Set PROVIDER_WEBHOOK_SECRET}
+      CLIENT_ATTESTATION_MAX_SKEW_SECONDS: ${CLIENT_ATTESTATION_MAX_SKEW_SECONDS:-300}
     depends_on:
       postgres: {condition: service_healthy}
       redis: {condition: service_healthy}

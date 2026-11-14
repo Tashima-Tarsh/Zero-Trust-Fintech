@@ -1,7 +1,4 @@
-"""Server-only UPI session allocator and mock provider-event adapter.
-
-All payment completion must ultimately be checked against a contracted bank/PSP.
-"""
+"""UPI session orchestration, device checks and enrolled-device attestations."""
 from __future__ import annotations
 
 import hashlib
@@ -36,6 +33,8 @@ class SessionRequest(BaseModel):
     amount_paise: int = Field(gt=0, le=100_000_000)
     note: str = Field(default="", max_length=100)
     currency: Literal["INR"] = "INR"
+    client_user_id: str | None = Field(default=None, min_length=1, max_length=128, pattern=r"^[A-Za-z0-9_-]+$")
+    client_device_id: str | None = Field(default=None, min_length=1, max_length=128, pattern=r"^[A-Za-z0-9_-]+$")
 
 
 class ForensicRequest(BaseModel):
@@ -43,17 +42,6 @@ class ForensicRequest(BaseModel):
     retry_count: int = Field(default=0, ge=0, le=100)
     utr: str | None = Field(default=None, max_length=64)
     image_ela_score: float | None = Field(default=None, ge=0, le=100)
-
-
-class ProviderEvent(BaseModel):
-    event_id: str = Field(min_length=1, max_length=128)
-    session_id: UUID
-    merchant_id: str = Field(min_length=1, max_length=80)
-    merchant_reference: str = Field(min_length=1, max_length=128)
-    amount_paise: int = Field(gt=0)
-    currency: Literal["INR"] = "INR"
-    vpa: str = Field(min_length=3, max_length=255)
-    status: Literal["SUCCESS", "FAILED", "PENDING"]
 
 
 def check_api_key(authorization: str | None) -> None:
@@ -147,7 +135,9 @@ def create_session(body: SessionRequest, authorization: str | None = Header(defa
         )
         previous = cur.fetchone()
         if previous:
-            if previous["amount_paise"] != body.amount_paise or previous["note"] != body.note:
+            if (previous["amount_paise"] != body.amount_paise or previous["note"] != body.note
+                or previous["client_user_id"] != body.client_user_id
+                or previous["client_device_id"] != body.client_device_id):
                 raise HTTPException(409, "Idempotency key reused with different payment details")
             return previous
 
@@ -171,11 +161,11 @@ def create_session(body: SessionRequest, authorization: str | None = Header(defa
         )
         cur.execute(
             """INSERT INTO payment_sessions
-               (id, merchant_id, merchant_reference, amount_paise, currency, vpa, note, expires_at)
-               VALUES (%s,%s,%s,%s,%s,%s,%s,%s) RETURNING *""",
+               (id, merchant_id, merchant_reference, amount_paise, currency, vpa, note, expires_at, client_user_id, client_device_id)
+               VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s) RETURNING *""",
             (
                 session_id, body.merchant_id, body.merchant_reference, body.amount_paise,
-                body.currency, candidate["vpa"], body.note, expiry,
+                body.currency, candidate["vpa"], body.note, expiry, body.client_user_id, body.client_device_id,
             ),
         )
         return cur.fetchone()
@@ -214,7 +204,7 @@ def forensic_score(body: ForensicRequest, authorization: str | None = Header(def
 
 @app.post("/v1/intent/evaluate")
 def evaluate_intent(body: IntentEvidence, authorization: str | None = Header(default=None)):
-    """Authenticated evidence intake. Never credit an account from client signals."""
+    """Authenticated device-integrity evidence intake."""
     check_api_key(authorization)
     try:
         image = decode_consent_image(body)
@@ -247,7 +237,7 @@ def evaluate_intent(body: IntentEvidence, authorization: str | None = Header(def
         if session["status"] not in ("PENDING", "REVIEW"):
             raise HTTPException(409, "Session not open for evidence")
         if session["expires_at"] <= datetime.now(timezone.utc):
-            raise HTTPException(409, "Session expired; bank reconciliation required")
+            raise HTTPException(409, "Session expired")
 
         reused = False
         if image_hash:
@@ -276,15 +266,6 @@ def evaluate_intent(body: IntentEvidence, authorization: str | None = Header(def
             ),
         )
         cur.execute(
-            """INSERT INTO phase2_reconciliation_queue
-                 (session_id,merchant_id,reason_codes)
-               VALUES (%s,%s,%s)
-               ON CONFLICT (session_id) DO UPDATE
-               SET updated_at = now(), reason_codes = EXCLUDED.reason_codes,
-                   queue_status = 'OPEN'""",
-            (body.session_id, body.merchant_id, Jsonb(result["risk_flags"])),
-        )
-        cur.execute(
             """UPDATE payment_sessions
                SET forensic_score = GREATEST(forensic_score, %s),
                    fraud_flags = CASE WHEN %s >= forensic_score
@@ -302,118 +283,6 @@ def evaluate_intent(body: IntentEvidence, authorization: str | None = Header(def
         return result
 
 
-@app.get("/v1/reconciliation/queue/summary")
-def reconciliation_queue_summary(authorization: str | None = Header(default=None)):
-    """Read-only scheduled count; does not reconcile or release any payment."""
-    check_api_key(authorization)
-    with database() as conn, conn.cursor() as cur:
-        cur.execute(
-            "SELECT queue_status, count(*) AS total FROM phase2_reconciliation_queue "
-            "GROUP BY queue_status ORDER BY queue_status"
-        )
-        records = cur.fetchall()
-    return {
-        "queue_counts": {r["queue_status"]: r["total"] for r in records},
-        "bank_feed_connected": False,
-        "ledger_entries_posted": 0,
-        "note": "Independent authenticated bank reconciliation not implemented.",
-    }
 
-
-@app.get("/v1/reconciliation/queue")
-def reconciliation_queue(
-    merchant_id: str,
-    authorization: str | None = Header(default=None),
-):
-    check_api_key(authorization)
-    if not merchant_id or len(merchant_id) > 80 or not all(
-        c.isascii() and (c.isalnum() or c in "_-") for c in merchant_id
-    ):
-        raise HTTPException(422, "Invalid merchant identifier")
-    with database() as conn, conn.cursor() as cur:
-        cur.execute(
-            """SELECT session_id, queue_status, reason_codes, first_seen_at, updated_at
-               FROM phase2_reconciliation_queue
-               WHERE merchant_id = %s AND queue_status IN ('OPEN','INVESTIGATING')
-               ORDER BY first_seen_at ASC LIMIT 100""",
-            (merchant_id,),
-        )
-        records = cur.fetchall()
-    return {
-        "merchant_id": merchant_id,
-        "items": records,
-        "bank_feed_connected": False,
-        "can_confirm_payment": False,
-    }
-
-
-@app.post("/v1/provider-events")
-async def provider_event(
-    request: Request,
-    x_provider_timestamp: str | None = Header(default=None),
-    x_provider_signature: str | None = Header(default=None),
-):
-    # This is a *mock adapter contract*, not a live bank authorization.
-    secret = os.getenv("PROVIDER_WEBHOOK_SECRET", "")
-    if not secret:
-        raise HTTPException(503, "Provider integration unconfigured")
-    raw = await request.body()
-    if len(raw) > 16_384:
-        raise HTTPException(413, "Event body too large")
-    try:
-        timestamp = int(x_provider_timestamp or "")
-    except (TypeError, ValueError):
-        raise HTTPException(401, "Invalid provider timestamp") from None
-    if abs(time.time() - timestamp) > 300:
-        raise HTTPException(401, "Stale provider message")
-    digest = hmac.new(secret.encode(), (str(timestamp) + ".").encode() + raw, hashlib.sha256).hexdigest()
-    if not x_provider_signature or not hmac.compare_digest(x_provider_signature, "sha256=" + digest):
-        raise HTTPException(401, "Invalid provider signature")
-
-    # JSON validation occurs only after the raw-byte signature check.
-    try:
-        event = ProviderEvent.model_validate_json(raw)
-    except ValueError:
-        raise HTTPException(422, "Malformed provider event") from None
-
-    event_hash = hashlib.sha256(raw).hexdigest()
-    with database() as conn, conn.cursor() as cur:
-        cur.execute("SELECT * FROM provider_events WHERE event_id = %s FOR UPDATE", (event.event_id,))
-        old = cur.fetchone()
-        if old:
-            if old["event_hash"] != event_hash:
-                raise HTTPException(409, "Event ID reused with different payload")
-            return {"decision": old["decision"], "duplicate": True}
-
-        cur.execute("SELECT * FROM payment_sessions WHERE id = %s FOR UPDATE", (event.session_id,))
-        session = cur.fetchone()
-        if not session:
-            raise HTTPException(404, "Unknown session")
-
-        match = (
-            session["merchant_id"] == event.merchant_id
-            and session["merchant_reference"] == event.merchant_reference
-            and session["amount_paise"] == event.amount_paise
-            and session["currency"] == event.currency
-            and session["vpa"] == event.vpa
-        )
-        if not match:
-            raise HTTPException(409, "Provider event does not match original payment")
-
-        if event.status != "SUCCESS":
-            decision = "ignored_non_success"
-        elif session["status"] != "PENDING":
-            decision = "ignored_terminal"
-        elif session["expires_at"] <= datetime.now(timezone.utc):
-            decision = "late_credit_review"
-        else:
-            # HMAC of a mock event proves only its sender possessed a shared secret.
-            # A bank-authorized credit lookup is REQUIRED before posting to ledger.
-            # This prototype intentionally does not mark PAID or perform fulfillment.
-            decision = "awaiting_bank_reconciliation"
-
-        cur.execute(
-            "INSERT INTO provider_events (event_id,session_id,event_hash,decision) VALUES (%s,%s,%s,%s)",
-            (event.event_id, event.session_id, event_hash, decision),
-        )
-        return {"decision": decision, "duplicate": False, "live_bank_verified": False}
+from worker.client_attestation import router as client_attestation_router
+app.include_router(client_attestation_router)
