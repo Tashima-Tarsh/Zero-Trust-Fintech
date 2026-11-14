@@ -61,6 +61,7 @@ class Settings(BaseSettings):
     APP_ENV: str = "development"
     APP_HOST: str = "0.0.0.0"
     APP_PORT: int = 8000
+    CORS_ALLOWED_ORIGINS: str = ""  # Comma-separated trusted frontend origins
     CLOUD_PROVIDER: Optional[str] = None
     
     class Config:
@@ -91,7 +92,15 @@ class Settings(BaseSettings):
 @lru_cache()
 def get_settings() -> Settings:
     try:
-        return Settings()
+        configured = Settings()
+        if configured.JWT_ALGORITHM != "HS256":
+            raise ValueError("Only HS256 is supported by the current token implementation")
+        if configured.APP_ENV.lower() == "production":
+            example_secret = "zerotrust-fintech-jwt-secret-key-32bytes-minimum!"
+            if (configured.JWT_SECRET_KEY == example_secret
+                    or configured.SECRET_KEY == example_secret):
+                raise ValueError("Production JWT and legacy signing secrets must be configured")
+        return configured
     except Exception as e:
         logger.error(f"❌ Configuration error: {e}")
         raise
