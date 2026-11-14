@@ -6,6 +6,15 @@ const db = require('./db');
 
 const PORT = process.env.PORT || 5000;
 const PUBLIC_DIR = path.join(__dirname, 'public');
+const CORS_ALLOWED_ORIGINS = new Set(
+  (process.env.CORS_ALLOWED_ORIGINS || '').split(',').map(value => value.trim()).filter(Boolean)
+);
+
+function escapeCsvCell(value) {
+  const raw = String(value ?? '');
+  const safe = /^\s*[=+\-@]/.test(raw) ? "'" + raw : raw;
+  return '"' + safe.replace(/"/g, '""') + '"';
+}
 
 const MIME_TYPES = {
   '.html': 'text/html; charset=utf-8',
@@ -39,7 +48,6 @@ function sendJson(res, statusCode, data) {
   res.writeHead(statusCode, {
     'Content-Type': 'application/json; charset=utf-8',
     'Cache-Control': 'no-store, no-cache, must-revalidate',
-    'Access-Control-Allow-Origin': '*',
     'Access-Control-Allow-Headers': 'Content-Type, Authorization',
     'Access-Control-Allow-Methods': 'GET, POST, PUT, PATCH, DELETE, OPTIONS'
   });
@@ -89,11 +97,20 @@ const server = http.createServer(async (req, res) => {
   const parsedUrl = new URL(req.url, `http://${req.headers.host || 'localhost'}`);
   const pathname = decodeURIComponent(parsedUrl.pathname);
   const method = req.method.toUpperCase();
+  const requestOrigin = req.headers.origin;
+  if (requestOrigin && CORS_ALLOWED_ORIGINS.has(requestOrigin)) {
+    res.setHeader('Access-Control-Allow-Origin', requestOrigin);
+    res.setHeader('Vary', 'Origin');
+  }
 
   // CORS preflight
   if (method === 'OPTIONS') {
+    if (requestOrigin && !CORS_ALLOWED_ORIGINS.has(requestOrigin)) {
+      res.writeHead(403);
+      res.end();
+      return;
+    }
     res.writeHead(204, {
-      'Access-Control-Allow-Origin': '*',
       'Access-Control-Allow-Headers': 'Content-Type, Authorization',
       'Access-Control-Allow-Methods': 'GET, POST, PUT, PATCH, DELETE, OPTIONS',
       'Access-Control-Max-Age': '86400'
@@ -129,7 +146,8 @@ const server = http.createServer(async (req, res) => {
         const session = db.createSession(merchant.id);
         const safeMerchant = db.findMerchantById(merchant.id);
 
-        res.setHeader('Set-Cookie', `disha_session=${session.token}; Path=/; HttpOnly; SameSite=Lax; Max-Age=86400`);
+        const secureCookie = process.env.NODE_ENV === 'production' ? '; Secure' : '';
+        res.setHeader('Set-Cookie', `disha_session=${session.token}; Path=/; HttpOnly; SameSite=Lax; Max-Age=86400${secureCookie}`);
         return sendJson(res, 200, {
           success: true,
           token: session.token,
@@ -241,6 +259,9 @@ const server = http.createServer(async (req, res) => {
       // Payments: Test Simulator (Mark payment completed in test mode)
       const simulateMatch = pathname.match(/^\/api\/merchant\/payments\/([^/]+)\/simulate$/);
       if (simulateMatch && method === 'POST') {
+        if (process.env.NODE_ENV === 'production' || process.env.ENABLE_PAYMENT_SIMULATION !== 'true') {
+          return sendError(res, 404, 'Not found');
+        }
         const orderId = simulateMatch[1];
         const body = await readBody(req);
         const completedOrder = db.simulateOrderPayment(currentMerchant.id, orderId, body.utr);
@@ -346,8 +367,8 @@ const server = http.createServer(async (req, res) => {
           let csv = 'Order ID,Date,Amount (INR),UPI ID,UTR,Status,Description\n';
           for (const o of orders) {
             const dateStr = new Date(o.created_at).toISOString();
-            const desc = (o.description || '').replace(/"/g, '""');
-            csv += `"${o.id}","${dateStr}",${o.amount.toFixed(2)},"${o.vpa_address}","${o.utr || ''}","${o.status}","${desc}"\n`;
+            csv += [o.id, dateStr, o.amount.toFixed(2), o.vpa_address,
+              o.utr || '', o.status, o.description || ''].map(escapeCsvCell).join(',') + '\n';
           }
 
           res.writeHead(200, {
