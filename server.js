@@ -170,7 +170,6 @@ function generateUPILink(session) {
   return buildNPCIIntentUri({
     pa: session.vpaAddress || MERCHANT_UPI_ID,
     pn: MERCHANT_NAME,
-    am: session.challengeAmount,
     description: session.description || '',
     cu: 'INR'
   });

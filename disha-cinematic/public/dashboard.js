@@ -504,6 +504,68 @@ document.getElementById('createPaymentForm').addEventListener('submit', async (e
   }
 });
 
+window.currentQrDisplayMode = 'p2p';
+
+window.switchQrDisplayMode = function(mode) {
+  window.currentQrDisplayMode = mode;
+  const btnP2p = document.getElementById('btnModeP2P');
+  const btnDyn = document.getElementById('btnModeDynamic');
+  const inst = document.getElementById('qrModeInstruction');
+
+  if (mode === 'p2p') {
+    if (btnP2p) {
+      btnP2p.style.background = '#FFFFFF';
+      btnP2p.style.color = '#0F172A';
+      btnP2p.style.fontWeight = '700';
+      btnP2p.style.boxShadow = '0 1px 3px rgba(0,0,0,0.1)';
+    }
+    if (btnDyn) {
+      btnDyn.style.background = 'transparent';
+      btnDyn.style.color = '#64748B';
+      btnDyn.style.fontWeight = '500';
+      btnDyn.style.boxShadow = 'none';
+    }
+    if (inst) inst.textContent = '👆 Scan/Tap & Enter Amount to Pay (P2P Safe)';
+  } else {
+    if (btnDyn) {
+      btnDyn.style.background = '#FFFFFF';
+      btnDyn.style.color = '#0F172A';
+      btnDyn.style.fontWeight = '700';
+      btnDyn.style.boxShadow = '0 1px 3px rgba(0,0,0,0.1)';
+    }
+    if (btnP2p) {
+      btnP2p.style.background = 'transparent';
+      btnP2p.style.color = '#64748B';
+      btnP2p.style.fontWeight = '500';
+      btnP2p.style.boxShadow = 'none';
+    }
+    if (inst) inst.textContent = '👆 Pre-filled Locked Amount (Merchant Terminal)';
+  }
+
+  if (activeCreatedOrder) {
+    const targetUri = (mode === 'p2p') 
+      ? (activeCreatedOrder.upi_uri_p2p || activeCreatedOrder.upi_uri)
+      : (activeCreatedOrder.upi_uri_dynamic || activeCreatedOrder.upi_uri);
+    
+    document.getElementById('generatedLinkInput').value = targetUri;
+    const appBtn = document.getElementById('btnOpenUpiApp');
+    if (appBtn) appBtn.href = targetUri;
+
+    const qrContainer = document.getElementById('qrcode');
+    qrContainer.innerHTML = '';
+    if (typeof QRCode !== 'undefined') {
+      new QRCode(qrContainer, {
+        text: targetUri,
+        width: 170,
+        height: 170,
+        colorDark: '#000000',
+        colorLight: '#ffffff',
+        correctLevel: QRCode.CorrectLevel.M
+      });
+    }
+  }
+};
+
 function renderGeneratedQr(order) {
   document.getElementById('qrIdleState').style.display = 'none';
   const activeState = document.getElementById('qrActiveState');
@@ -511,11 +573,17 @@ function renderGeneratedQr(order) {
 
   document.getElementById('qrShopTitle').textContent = currentMerchant.business_name || 'Merchant Pay';
   document.getElementById('qrAmountTag').textContent = '₹' + order.amount.toFixed(2);
-  document.getElementById('generatedLinkInput').value = order.upi_uri;
+  
+  // Use mode-selected URI (defaults to pure P2P without am)
+  const targetUri = (window.currentQrDisplayMode === 'dynamic')
+    ? (order.upi_uri_dynamic || order.upi_uri)
+    : (order.upi_uri_p2p || order.upi_uri);
+
+  document.getElementById('generatedLinkInput').value = targetUri;
 
   // Direct Pay with App Button & clickable QR
   const appBtn = document.getElementById('btnOpenUpiApp');
-  if (appBtn) appBtn.href = order.upi_uri;
+  if (appBtn) appBtn.href = targetUri;
 
   const qrBadge = document.getElementById('qrStatusBadge');
   qrBadge.className = 'status-pill-pending';
@@ -530,7 +598,7 @@ function renderGeneratedQr(order) {
   qrContainer.innerHTML = '';
   if (typeof QRCode !== 'undefined') {
     new QRCode(qrContainer, {
-      text: order.upi_uri,
+      text: targetUri,
       width: 170,
       height: 170,
       colorDark: '#000000',

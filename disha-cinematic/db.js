@@ -530,25 +530,37 @@ function createMerchantOrder(merchantId, { amount, description = '', vpaAddress 
     : ('ORD_' + Date.now().toString(36).toUpperCase() + '_' + crypto.randomBytes(3).toString('hex').toUpperCase());
   const businessName = merchant.business_name || 'Merchant';
   // P2P NPCI Specification for personal savings VPAs:
-  // mc and tr must NOT be sent for personal VPAs.
-  // GPay, PhonePe and Slice validate mc/tr against their merchant acquiring registry;
-  // a personal VPA with mc or tr is rejected before PIN by all three apps as an unregistered merchant.
-  // Also do NOT pass 'orderId' with underscores into 'tn', as bank switches (SBI) reject notes with '_' before PIN.
-  const upiUri = buildNPCIIntentUri({
+  // Under NPCI rules, personal savings accounts (@oksbi) cannot have locked amounts (am=)
+  // in web QRs without bank switch decline before PIN.
+  // The primary upi_uri is pure P2P (customer types amount, 100% accepted across all banks).
+  const upiUriP2p = buildNPCIIntentUri({
+    pa: chosenVpa,
+    pn: businessName,
+    description: description || '',
+    cu: 'INR'
+  });
+
+  const upiUriDynamic = buildNPCIIntentUri({
     pa: chosenVpa,
     pn: businessName,
     am: parsedAmount,
     description: description || '',
     cu: 'INR'
   });
+
   const now = Date.now();
 
   db.prepare(`
     INSERT INTO merchant_orders (id, merchant_id, amount, description, vpa_address, upi_uri, status, created_at)
     VALUES (?, ?, ?, ?, ?, ?, 'PENDING', ?)
-  `).run(finalOrderId, merchantId, parsedAmount, description, chosenVpa, upiUri, now);
+  `).run(finalOrderId, merchantId, parsedAmount, description, chosenVpa, upiUriP2p, now);
 
-  return db.prepare('SELECT * FROM merchant_orders WHERE id = ?').get(finalOrderId);
+  const order = db.prepare('SELECT * FROM merchant_orders WHERE id = ?').get(finalOrderId);
+  if (order) {
+    order.upi_uri_p2p = upiUriP2p;
+    order.upi_uri_dynamic = upiUriDynamic;
+  }
+  return order;
 }
 
 function simulateOrderPayment(merchantId, orderId, customUtr = null) {

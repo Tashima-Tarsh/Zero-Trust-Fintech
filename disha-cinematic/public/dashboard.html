@@ -411,11 +411,21 @@
               </div>
 
               <div id="qrActiveState" class="qr-active-state" style="display: none;">
+                <!-- QR Protocol Mode Switcher -->
+                <div style="display: flex; gap: 8px; margin-bottom: 12px; background: rgba(0,0,0,0.04); padding: 4px; border-radius: 8px;">
+                  <button type="button" id="btnModeP2P" onclick="switchQrDisplayMode('p2p')" style="flex: 1; padding: 7px 10px; font-size: 0.78rem; font-weight: 700; border: none; border-radius: 6px; cursor: pointer; background: #FFFFFF; color: #0F172A; box-shadow: 0 1px 3px rgba(0,0,0,0.1); transition: all 0.2s;">
+                    🟢 P2P Mode (Customer Types Amount)
+                  </button>
+                  <button type="button" id="btnModeDynamic" onclick="switchQrDisplayMode('dynamic')" style="flex: 1; padding: 7px 10px; font-size: 0.78rem; font-weight: 500; border: none; border-radius: 6px; cursor: pointer; background: transparent; color: #64748B; transition: all 0.2s;">
+                    Locked Amount (am=...)
+                  </button>
+                </div>
+
                 <div class="qr-container-card" id="qrCardBox" title="Tap QR to pay directly with your UPI app" onclick="openUpiAppDirectly()" style="cursor: pointer; transition: transform 0.18s ease;">
                   <div class="qr-merchant-tag" id="qrShopTitle">Shop Name</div>
                   <div id="qrcode" class="qrcode-wrapper"></div>
                   <div class="qr-amount-tag" id="qrAmountTag">₹0.00</div>
-                  <div style="font-size: 0.78rem; font-weight: 600; color: var(--indigo-600); margin-top: 6px;">👆 Tap QR to Pay Directly with UPI App</div>
+                  <div id="qrModeInstruction" style="font-size: 0.78rem; font-weight: 600; color: #059669; margin-top: 6px;">👆 Scan/Tap & Enter Amount to Pay</div>
                   <div class="qr-apps-tag" style="margin-top: 4px;">Supports GPay · PhonePe · Paytm · BHIM · Any Bank UPI</div>
                 </div>
 
