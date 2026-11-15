@@ -2,34 +2,28 @@ name: SharePay PWA CI
 
 on:
   push:
-    branches: [main, develop]
-    paths:
-      - 'sharepay-mvp/**'
-      - 'merchant-pwa/**'
-      - '.github/workflows/sharepay-ci.yml'
+    branches: [ main ]
   pull_request:
-    branches: [main]
-    paths:
-      - 'sharepay-mvp/**'
-      - 'merchant-pwa/**'
+    branches: [ main ]
 
 jobs:
-  test:
-    name: Test SharePay MVP & Merchant PWA
+  lint-and-test:
+    name: Lint and Test
     runs-on: ubuntu-latest
-    
     steps:
       - uses: actions/checkout@v4
-      
-      - name: Set up Node.js 22
+
+      - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
           node-version: '22'
-      
-      - name: Run SharePay Attack Matrix Tests (8/8 Tests)
-        run: |
-          npm test --prefix sharepay-mvp
-      
-      - name: Run Merchant PWA Test Suite (7/7 Tests)
-        run: |
-          node merchant-pwa/test.js
+          cache: 'npm'
+
+      - name: Install root dependencies
+        run: npm ci
+
+      - name: Run lint
+        run: npm run lint
+
+      - name: Run test suite
+        run: npm test

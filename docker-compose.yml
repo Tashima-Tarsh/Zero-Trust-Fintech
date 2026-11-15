@@ -53,38 +53,6 @@ services:
       redis:
         condition: service_healthy
 
-  sharepay-pwa:
-    image: node:22-alpine
-    container_name: sharepay_customer_pwa
-    restart: unless-stopped
-    working_dir: /app
-    volumes:
-      - ./sharepay-mvp:/app
-    ports:
-      - "3000:3000"
-    command: sh -c "npm install && node server.js"
-    environment:
-      PORT: 3000
-      MERCHANT_UPI_ID: ${MERCHANT_UPI_ID:-yourmerchant@ybl}
-      MERCHANT_NAME: ${MERCHANT_NAME:-SharePay Store}
-    depends_on:
-      - backend
-
-  merchant-pwa:
-    image: node:22-alpine
-    container_name: sharepay_merchant_pwa
-    restart: unless-stopped
-    working_dir: /app
-    volumes:
-      - ./merchant-pwa:/app
-    ports:
-      - "8080:8080"
-    command: sh -c "node server.js"
-    environment:
-      PORT: 8080
-    depends_on:
-      - sharepay-pwa
-
 volumes:
   postgres_data:
   redis_data:
