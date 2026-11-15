@@ -125,15 +125,17 @@ function buildNPCIIntentUri({
     parts.push('am=' + numAmt.toFixed(2));
   }
 
-  // 4. tn (Transaction Note): clean alphanumeric text (NPCI rule: only letters, numbers, spaces; no underscores or query chars)
-  // Strict compliance for SBI/HDFC/ICICI switches which reject notes containing '_' or commercial order tags on personal VPAs
-  const rawNote = tn || description || '';
+  // 4. tn (Transaction Note): clean text adhering to NPCI rules
+  // If merchant VPA (mc present), allows standard separators (- _) up to 80 chars.
+  // If personal VPA (no mc), enforces strict alphanumeric without _ for SBI/HDFC switch compatibility.
+  let rawNote = tn;
+  if (!rawNote && (orderId || description)) {
+    rawNote = sanitizeTransactionNote(orderId, description);
+  }
   if (rawNote) {
-    const cleanNote = String(rawNote)
-      .replace(/[^A-Za-z0-9 ]/g, ' ')
-      .replace(/\s+/g, ' ')
-      .trim()
-      .substring(0, 30);
+    const cleanNote = mc
+      ? String(rawNote).replace(/[&?=%#\r\n\t]/g, ' ').replace(/\s+/g, ' ').trim().substring(0, 80)
+      : String(rawNote).replace(/[^A-Za-z0-9 ]/g, ' ').replace(/\s+/g, ' ').trim().substring(0, 30);
     if (cleanNote) {
       parts.push('tn=' + encodeURIComponent(cleanNote));
     }
@@ -142,9 +144,10 @@ function buildNPCIIntentUri({
   // 5. cu (Currency): always INR
   parts.push('cu=' + (cu || 'INR').toUpperCase());
 
-  // 6. tr (Transaction Reference): ONLY included if explicitly provided (must be omitted for personal VPAs!)
-  if (tr && String(tr).trim()) {
-    parts.push('tr=' + encodeURIComponent(String(tr).trim()));
+  // 6. tr (Transaction Reference): ONLY included if explicitly provided or for merchant VPAs with orderId (must be omitted for personal VPAs!)
+  const ref = tr ? sanitizeTxnRef(tr) : (mc && orderId ? sanitizeTxnRef(orderId) : '');
+  if (ref) {
+    parts.push('tr=' + encodeURIComponent(ref));
   }
 
   // 7. mc (Merchant Category Code): ONLY included if explicitly provided (must be omitted for personal VPAs!)

@@ -11,6 +11,8 @@ const assert = require('assert');
 
   const BASE_URL = 'http://localhost:3000';
   const SEED_API_KEY = 'gz_live_key_a1b2c3d4e5f60718293a4b5c6d7e8f90';
+  const ADMIN_KEY = 'disha_dev_admin_key';
+  const adminHeaders = { 'Content-Type': 'application/json', 'X-Admin-Key': ADMIN_KEY };
 
   // ─────────────────────────────────────────────────────────────
   // 1. MISSING & INVALID API KEY
@@ -76,7 +78,7 @@ const assert = require('assert');
   });
 
   // Verify blocked attempt was logged
-  const blockedRes = await fetch(`${BASE_URL}/api/admin/blocked-attempts`);
+  const blockedRes = await fetch(`${BASE_URL}/api/admin/blocked-attempts`, { headers: adminHeaders });
   const blockedJson = await blockedRes.json();
   const hackerAttempt = blockedJson.blocked_attempts.find(b => b.ip_address === hackerIP);
   assert(hackerAttempt, 'Hacker attempt must be recorded in blocked_ip_attempts');
@@ -136,7 +138,7 @@ const assert = require('assert');
   // 5. AUDIT TRAIL & LOGGING VERIFICATION
   // ─────────────────────────────────────────────────────────────
   console.log('\n--- 5. Testing API Audit Trail Logging ---');
-  const logRes = await fetch(`${BASE_URL}/api/admin/access-logs`);
+  const logRes = await fetch(`${BASE_URL}/api/admin/access-logs`, { headers: adminHeaders });
   const logJson = await logRes.json();
   assert(logJson.success && logJson.logs.length >= 2, 'API access log must capture successful calls');
   const recentLog = logJson.logs[0];
@@ -150,7 +152,7 @@ const assert = require('assert');
   // 6a: Create new gaming enterprise tenant
   const compRes = await fetch(`${BASE_URL}/api/admin/companies`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: adminHeaders,
     body: JSON.stringify({
       company_name: 'Epic Battle Royale Studios',
       contact_email: 'infrastructure@epicbattles.in'
@@ -166,7 +168,7 @@ const assert = require('assert');
   // 6b: Add IP to new company whitelist
   const addIpRes = await fetch(`${BASE_URL}/api/admin/companies/${newCompanyId}/ips`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: adminHeaders,
     body: JSON.stringify({
       ip_address: '13.126.44.10',
       description: 'Primary Matchmaking Node'
@@ -180,7 +182,7 @@ const assert = require('assert');
   // 6c: Add CIDR range
   const addCidrRes = await fetch(`${BASE_URL}/api/admin/companies/${newCompanyId}/ips`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: adminHeaders,
     body: JSON.stringify({
       ip_range: '13.235.0.0/16',
       description: 'AWS Asia-Pacific (Mumbai) Fleet'
@@ -190,7 +192,7 @@ const assert = require('assert');
   console.log('✅ Whitelisted CIDR range 13.235.0.0/16');
 
   // 6d: List company IPs
-  const listIpsRes = await fetch(`${BASE_URL}/api/admin/companies/${newCompanyId}/ips`);
+  const listIpsRes = await fetch(`${BASE_URL}/api/admin/companies/${newCompanyId}/ips`, { headers: adminHeaders });
   const listIpsJson = await listIpsRes.json();
   assert.strictEqual(listIpsJson.total, 2);
   console.log(`✅ Listed ${listIpsJson.total} whitelisted entries for new tenant`);
@@ -211,7 +213,8 @@ const assert = require('assert');
 
   // 6f: Delete IP from whitelist
   const delRes = await fetch(`${BASE_URL}/api/admin/companies/${newCompanyId}/ips/${addedIpId}`, {
-    method: 'DELETE'
+    method: 'DELETE',
+    headers: adminHeaders
   });
   assert.strictEqual(delRes.status, 200);
   console.log('✅ Successfully revoked IP from whitelist');
