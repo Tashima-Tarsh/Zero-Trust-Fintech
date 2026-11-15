@@ -636,5 +636,86 @@
     updateVideoUI();
   }
 
+  // --- 10. Directional Scroll Reveal Engine (Phase 9) ---
+  const reveals = document.querySelectorAll('.reveal-on-scroll');
+  if ('IntersectionObserver' in window && !prefersReducedMotion) {
+    const revealObserver = new IntersectionObserver((entries, observer) => {
+      entries.forEach((entry) => {
+        if (entry.isIntersecting) {
+          entry.target.classList.add('is-revealed');
+          observer.unobserve(entry.target);
+        }
+      });
+    }, { rootMargin: '0px 0px -60px 0px', threshold: 0.1 });
+
+    reveals.forEach((el) => revealObserver.observe(el));
+  } else {
+    // Fallback: immediately show elements
+    reveals.forEach((el) => el.classList.add('is-revealed'));
+  }
+
+  // --- 11. Browser-Based Voice Alert Simulator (Phase 10) ---
+  const testVoiceAlertBtn = document.getElementById('testVoiceAlertBtn');
+  const voiceSimulator = document.querySelector('.voice-simulator');
+
+  if (testVoiceAlertBtn && voiceSimulator) {
+    testVoiceAlertBtn.addEventListener('click', () => {
+      voiceSimulator.classList.add('is-speaking');
+
+      const message = 'Payment of one thousand two hundred forty-nine rupees and thirty-seven paise verified on DISHA.';
+      showToast('🔊 Speaking: "Payment of ₹1,249.37 verified on DISHA"');
+
+      if ('speechSynthesis' in window) {
+        window.speechSynthesis.cancel();
+        const utterance = new SpeechSynthesisUtterance(message);
+        utterance.rate = 1.0;
+        utterance.pitch = 1.05;
+        utterance.onend = () => {
+          voiceSimulator.classList.remove('is-speaking');
+        };
+        utterance.onerror = () => {
+          voiceSimulator.classList.remove('is-speaking');
+        };
+        window.speechSynthesis.speak(utterance);
+      } else {
+        // Fallback tone
+        setTimeout(() => {
+          voiceSimulator.classList.remove('is-speaking');
+        }, 2200);
+      }
+    });
+  }
+
+  // --- 12. Interactive Demo Link & Ledger Export Triggers (Phase 10) ---
+  const copyDemoLinkBtn = document.getElementById('copyDemoLinkBtn');
+  if (copyDemoLinkBtn) {
+    copyDemoLinkBtn.addEventListener('click', () => {
+      const demoUrl = 'https://pay.disha.live/l/inv_9421';
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(demoUrl).then(() => {
+          showToast('Payment link copied: ' + demoUrl);
+        }).catch(() => {
+          showToast('Payment link ready: ' + demoUrl);
+        });
+      } else {
+        showToast('Payment link: ' + demoUrl);
+      }
+    });
+  }
+
+  const exportLedgerCsv = document.getElementById('exportLedgerCsv');
+  if (exportLedgerCsv) {
+    exportLedgerCsv.addEventListener('click', () => {
+      showToast('Exporting balanced ledger statement (CSV)...');
+    });
+  }
+
+  const exportLedgerPdf = document.getElementById('exportLedgerPdf');
+  if (exportLedgerPdf) {
+    exportLedgerPdf.addEventListener('click', () => {
+      showToast('Generating audit-ready tax summary (PDF)...');
+    });
+  }
+
   console.log('DISHA 8.2 PhonePe navigation & interaction system initialized.');
 })();

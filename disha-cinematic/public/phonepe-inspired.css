@@ -191,8 +191,176 @@
 @keyframes float{0%,100%{transform:translateY(0)}50%{transform:translateY(-10px)}}
 .solution-jump{border-bottom:1px solid #f1eff5;background:#fff}.jump-grid{display:grid;grid-template-columns:repeat(4,1fr);padding-block:25px}.jump-item{display:flex;align-items:center;gap:12px;padding:8px 18px;border-right:1px solid #e8e4ef;transition:transform .2s}.jump-item:first-child{padding-left:0}.jump-item:last-child{border:0}.jump-item:hover{transform:translateY(-3px)}.jump-item strong,.jump-item small{display:block}.jump-item strong{font-size:13px;white-space:nowrap}.jump-item small{font-size:11px;color:#868198;line-height:1.3}.jump-item>i{margin-left:auto;font-size:15px;color:#8c84ab;font-style:normal}
 .section{padding:110px 0}.section-heading{max-width:720px;margin-bottom:44px}.section-heading.centered{text-align:center;margin-inline:auto}.section h2,.final-cta h2{font:800 clamp(33px,3.6vw,51px)/1.18 "Manrope",sans-serif;letter-spacing:-2px;margin:13px 0 17px}.section h2 span{color:#7464b3}.section-heading p,.merchant-heading>p,.trust-head>p{color:var(--muted);font-size:15px;line-height:1.75;max-width:565px;margin:0}.section-heading.centered p{margin-inline:auto}
-.section-solutions{background:#fbfaf9}.feature-split{display:grid;grid-template-columns:1fr 1fr;gap:70px;align-items:center}.feature-lines{display:grid;gap:0}.feature-line{display:grid;grid-template-columns:45px 1fr;gap:20px;padding:27px 0;border-bottom:1px solid #e9e5ec}.feature-line:first-child{border-top:1px solid #e9e5ec}.feature-number{color:#927fca;font:800 14px "Manrope"}.feature-line h3{font:800 20px/1.4 "Manrope";margin:0 0 7px;letter-spacing:-.5px}.feature-line p{color:#76718a;font-size:14px;margin:0;max-width:400px}
-.feature-art{height:470px;display:grid;place-items:center;position:relative;border-radius:33px;background:linear-gradient(145deg,#e2d8fa 10%,#d4f4ef 88%);overflow:hidden}.art-halo{position:absolute;width:380px;height:380px;border-radius:50%;background:#fff9;filter:blur(30px)}.pay-phone{position:relative;z-index:2;width:230px;height:416px;border:8px solid #242043;border-radius:38px;background:#fff;box-shadow:0 25px 44px #382c8277;transform:rotate(-7deg);overflow:hidden}.phone-top{display:flex;justify-content:space-between;padding:13px 17px 6px;font-size:10px;font-weight:800}.phone-title{display:flex;align-items:center;gap:8px;padding:14px 15px;font-size:12px;font-weight:800}.phone-brand{background:#37257b;color:#fff;width:22px;height:22px;border-radius:7px;display:grid;place-items:center}.phone-center{text-align:center;padding:12px 15px 4px}.phone-center>span{display:block;font-size:9px;color:#948aab;letter-spacing:1.2px;font-weight:800}.phone-center strong{font:800 28px "Manrope";letter-spacing:-1px}.phone-center strong span{font-size:16px;color:#847e9d}.phone-qr{height:125px;width:125px;margin:12px auto 6px;display:grid;place-items:center;color:#342472}.phone-center>small{font-size:7px;font-weight:800;color:#a9a3b8;letter-spacing:.3px}.phone-bottom{position:absolute;bottom:8px;left:10px;right:10px;background:#342279;border-radius:12px;padding:12px;color:#fff;font-size:10px;font-weight:800;display:flex;justify-content:space-between}.art-pop{position:absolute;z-index:3;padding:10px 15px;border-radius:14px;background:#fff;box-shadow:0 14px 34px #251d6038;font-size:11px;font-weight:800}.art-pop span{color:#0aa787}.pop-left{left:12px;top:88px}.pop-right{right:9px;bottom:72px}
+/* Phase 9: Mesh Gradients, Aurora Lighting & Directional Reveals */
+.reveal-on-scroll{opacity:0;transform:translateY(28px);transition:opacity .65s cubic-bezier(.16,1,.3,1),transform .65s cubic-bezier(.16,1,.3,1)}
+.reveal-on-scroll.is-revealed{opacity:1;transform:translateY(0)}
+
+/* Tactile Button Feedback & Shimmer Gleam */
+.btn{position:relative;overflow:hidden}
+.btn::after{content:"";position:absolute;top:-50%;left:-60%;width:40%;height:200%;background:linear-gradient(90deg,transparent,rgba(255,255,255,.35),transparent);transform:rotate(25deg);transition:left .65s ease}
+.btn:hover::after{left:120%}
+
+/* Aurora Shimmer Background on Solutions */
+.section-solutions{background:radial-gradient(circle at 10% 20%,rgba(237,231,255,.7) 0,transparent 40%),radial-gradient(circle at 90% 70%,rgba(225,251,242,.65) 0,transparent 45%),#faf9fd;position:relative}
+.solutions-showcase{display:grid;gap:35px;margin-top:40px}
+.sol-card{background:#ffffff;border:1px solid #eeebf6;border-radius:26px;box-shadow:0 12px 35px rgba(45,30,95,.05);transition:transform .25s ease,box-shadow .25s ease}
+.sol-card:hover{box-shadow:0 20px 48px rgba(45,30,95,.1)}
+.sol-num{font:800 11px/1.4 "DM Sans",sans-serif;letter-spacing:1.8px;color:#6850b8;display:block;margin-bottom:12px;text-transform:uppercase}
+
+/* 01: DIRECT UPI (Asymmetric Split) */
+.sol-direct-upi{display:grid;grid-template-columns:1.15fr .85fr;gap:45px;align-items:center;padding:48px 45px;background:linear-gradient(135deg,#ffffff 0%,#f8f6fe 100%)}
+.sol-copy h3{font:800 clamp(26px,2.6vw,36px)/1.2 "Manrope",sans-serif;letter-spacing:-1px;margin:0 0 14px;color:#241b44}
+.sol-copy h3 span{color:#6850b8}
+.sol-copy p{font-size:15px;line-height:1.7;color:#6b6680;max-width:480px;margin:0 0 20px}
+.sol-checklist{list-style:none;padding:0;margin:0 0 26px;display:grid;gap:10px}
+.sol-checklist li{display:flex;align-items:center;gap:10px;font-size:14px;font-weight:700;color:#352c52}
+.check-icon{width:22px;height:22px;border-radius:50%;background:#e1fbf2;color:#0e9d7c;display:grid;place-items:center;font-size:12px;font-weight:800}
+
+/* Realistic Phone UPI Intent Chooser */
+.sol-visual-upi{display:grid;place-items:center}
+.upi-phone-mockup{width:270px;background:#ffffff;border:8px solid #281d4a;border-radius:36px;box-shadow:0 25px 50px rgba(35,20,80,.25);overflow:hidden}
+.upi-phone-header{display:flex;justify-content:space-between;padding:12px 18px 6px;font-size:10px;font-weight:800;color:#655e78;background:#f8f7fc}
+.upi-phone-body{padding:18px 16px;text-align:center}
+.upi-payee-badge{display:flex;align-items:center;gap:10px;text-align:left;background:#f3effe;padding:8px 12px;border-radius:12px;margin-bottom:14px}
+.payee-avatar{width:32px;height:32px;border-radius:10px;background:#382477;color:#fff;display:grid;place-items:center;font:800 14px "Manrope"}
+.upi-payee-badge strong{font-size:12px;display:block;color:#241d44}
+.upi-payee-badge small{font-size:10px;color:#78728d;display:block}
+.upi-amount-block{margin:12px 0 16px}
+.upi-amount-label{font-size:9px;letter-spacing:1px;font-weight:800;color:#8f88a4;display:block}
+.upi-amount-val{font:800 32px/1.2 "Manrope",sans-serif;color:#241b44;display:block}
+.upi-amount-val span{font-size:18px;color:#857e9c}
+.upi-fingerprint-pill{display:inline-block;font-size:9px;font-weight:800;color:#089975;background:#d5fbef;padding:3px 8px;border-radius:10px;margin-top:4px}
+.upi-apps-row{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin:16px 0}
+.upi-app-icon{height:42px;border-radius:10px;background:#f6f4fc;border:1px solid #e7e2f4;display:grid;place-items:center;font:800 9px "Manrope";color:#3b2d69;transition:transform .2s}
+.upi-app-icon:hover{transform:scale(1.06)}
+.upi-app-icon.gpay{color:#2a75d3;background:#eef5ff}
+.upi-app-icon.phonepe{color:#5f259f;background:#f5efff}
+.upi-app-icon.paytm{color:#00b9f5;background:#e6f8ff}
+.upi-app-icon.bhim{color:#f26522;background:#fff2ea}
+.upi-direct-badge{background:#e7fbf5;color:#0d7a64;font-size:10px;font-weight:800;padding:8px;border-radius:10px;margin-top:6px}
+
+/* 02: MERCHANT DASHBOARD (Panoramic Command Center) */
+.sol-dashboard{padding:45px;background:linear-gradient(145deg,#ffffff,#f9f8fe)}
+.sol-dash-head{display:flex;justify-content:space-between;align-items:flex-end;gap:40px;margin-bottom:28px}
+.sol-dash-head h3{font:800 clamp(24px,2.4vw,32px)/1.2 "Manrope",sans-serif;letter-spacing:-.8px;margin:0;color:#241b44}
+.sol-dash-head h3 span{color:#6850b8}
+.sol-dash-head p{max-width:440px;font-size:14px;color:#6b6680;margin:0}
+.panoramic-dash-window{border:1px solid #e5dff0;border-radius:20px;overflow:hidden;background:#ffffff;box-shadow:0 18px 45px rgba(35,20,80,.07)}
+.pan-bar{display:flex;align-items:center;gap:12px;padding:12px 20px;background:#f8f7fd;border-bottom:1px solid #ede8f5}
+.pan-logo{width:26px;height:26px;border-radius:8px;background:#382477;color:#fff;display:grid;place-items:center;font:800 12px "Manrope"}
+.pan-title strong{font-size:12px;color:#281e4b;display:block}
+.pan-title small{font-size:9px;color:#109e7c;font-weight:800;letter-spacing:.6px}
+.pan-controls{margin-left:auto;font-size:9px;letter-spacing:3px;color:#aba6c2}
+.pan-content{display:grid;grid-template-columns:1fr 1.2fr 1fr;gap:20px;padding:24px}
+.pan-metric-card,.pan-chart-card,.pan-rails-card{padding:16px;border-radius:14px;background:#faf9fe;border:1px solid #edeaf5}
+.pan-metric-card small,.pan-chart-card small,.pan-rails-card small{font-size:9px;letter-spacing:1px;font-weight:800;color:#857e9c;display:block;margin-bottom:8px}
+.pan-stat{font:800 24px/1 "Manrope",sans-serif;color:#241b44}
+.pan-trend{color:#109e7c;font-size:12px;margin-left:4px}
+.pan-subtext{font-size:11px;color:#78728d;margin-top:6px}
+.pan-wave-svg{height:55px;margin-top:4px}
+.pan-wave-svg svg{width:100%;height:100%}
+.pan-line-pulse{animation:dashPulse 2.8s ease-in-out infinite}
+@keyframes dashPulse{0%,100%{stroke-width:3}50%{stroke-width:4.2;stroke:#19c99e}}
+.rail-status-list{display:grid;gap:6px}
+.rail-status-list>div{display:flex;justify-content:space-between;align-items:center;font-size:11px;font-weight:700}
+.status-online{color:#0ea082;font-size:10px}
+.status-standby{color:#4a69bd;font-size:10px}
+
+/* 03: QR AND PAYMENT LINKS (Split Interactive Card) */
+.sol-qr-links{padding:42px 40px;background:linear-gradient(135deg,#ffffff 0%,#fdf9f7 100%)}
+.sol-split-2col{display:grid;grid-template-columns:1.1fr .9fr;gap:45px;align-items:center}
+.qr-col h3{font:800 28px/1.2 "Manrope",sans-serif;margin:0 0 12px;color:#241b44}
+.qr-col h3 span{color:#d35400}
+.qr-col p{font-size:14px;color:#6b6680;margin:0 0 20px}
+.qr-link-badge{background:#fff;border:1px solid #ebdcd5;border-radius:14px;padding:14px;display:flex;flex-direction:column;gap:8px}
+.qr-link-badge .link-label{font-size:10px;font-weight:800;color:#c0392b;letter-spacing:.8px}
+.qr-link-badge code{font-size:13px;color:#392d69;font-weight:700;word-break:break-all}
+.dynamic-qr-card{background:#ffffff;border:1px solid #ebdcd5;border-radius:20px;padding:22px;text-align:center;box-shadow:0 14px 34px rgba(60,30,10,.06)}
+.qr-timer-pill{display:inline-flex;align-items:center;gap:6px;font-size:10px;font-weight:800;color:#d35400;background:#ffede2;padding:4px 10px;border-radius:12px;margin-bottom:12px}
+.timer-dot{animation:dotPulse 1.2s infinite;color:#e74c3c}
+.qr-code-box{width:110px;height:110px;margin:0 auto 12px}
+.qr-code-box svg{width:100%;height:100%}
+.qr-amount-callout small{font-size:9px;color:#857e9c;font-weight:800;display:block}
+.qr-amount-callout strong{font:800 22px/1 "Manrope",sans-serif;color:#241b44;display:block;margin:2px 0}
+.qr-amount-callout span{font-size:10px;color:#0e9d7c;font-weight:700}
+
+/* 04: UPI ID MANAGEMENT (Bank Rails Grid) */
+.sol-upi-management{padding:42px 40px}
+.sol-head-inline h3{font:800 28px/1.2 "Manrope",sans-serif;margin:0 0 10px;color:#241b44}
+.sol-head-inline h3 span{color:#1976d2}
+.sol-head-inline p{font-size:14px;color:#6b6680;max-width:580px;margin:0 0 26px}
+.bank-rails-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:18px}
+.bank-card{padding:22px 20px;border-radius:18px;background:#fbfaff;border:1.5px solid #ece8f5;transition:transform .2s,border-color .2s}
+.bank-card:hover{transform:translateY(-3px);border-color:#6850b8}
+.bank-card.active-rail{border-color:#19c99e;background:#f4fbf8}
+.bank-card-top{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px}
+.bank-avatar{font:800 10px "Manrope";padding:4px 8px;border-radius:6px;color:#fff}
+.bank-avatar.hdfc{background:#004c8f}
+.bank-avatar.icici{background:#b82619}
+.bank-avatar.axis{background:#97144d}
+.rail-badge{font-size:9px;font-weight:800;padding:3px 7px;border-radius:8px}
+.rail-badge.primary{background:#d5fbef;color:#0b8767}
+.rail-badge.standby{background:#e8f0fe;color:#1a73e8}
+.rail-badge.balance{background:#fce8e6;color:#c5221f}
+.bank-card strong{font:800 14px "Manrope",sans-serif;color:#281f4a;display:block;margin-bottom:14px}
+.bank-stats{display:grid;gap:6px;border-top:1px solid rgba(0,0,0,.06);padding-top:10px}
+.bank-stats>div{display:flex;justify-content:space-between;font-size:11px;color:#6f6885}
+.bank-stats b{color:#241b44}
+
+/* 05: REPORTS AND BALANCED LEDGER (Tabular Accounting) */
+.sol-reports-ledger{padding:42px 40px}
+.ledger-header-row{display:flex;justify-content:space-between;align-items:flex-end;gap:30px;margin-bottom:24px}
+.ledger-header-row h3{font:800 28px/1.2 "Manrope",sans-serif;margin:0 0 8px;color:#241b44}
+.ledger-header-row h3 span{color:#8e24aa}
+.ledger-header-row p{font-size:14px;color:#6b6680;max-width:540px;margin:0}
+.ledger-actions{display:flex;gap:10px;white-space:nowrap}
+.ledger-table-wrap{border:1px solid #ede8f5;border-radius:16px;overflow:hidden;background:#ffffff}
+.ledger-table{width:100%;border-collapse:collapse;font-size:12px}
+.ledger-table th{background:#f8f7fd;padding:12px 16px;text-align:left;font-weight:800;color:#5a5173;border-bottom:1px solid #ece7f4}
+.ledger-table td{padding:12px 16px;border-bottom:1px solid #f2edf7;color:#453d5c}
+.ledger-table code{background:#f3effe;padding:2px 6px;border-radius:5px;font-size:11px;color:#45287e}
+.paise-tag{background:#e1fbf2;color:#0b8767;font-weight:800;padding:2px 6px;border-radius:5px;font-size:11px}
+.ledger-badge.settled{background:#e7fbf5;color:#0c8c6f;font-weight:800;padding:3px 7px;border-radius:8px;font-size:10px}
+.ledger-footer-summary{display:flex;justify-content:space-between;padding:12px 16px;background:#fcfbff;font-size:11px;color:#645c7a}
+.reconciled-indicator{color:#0e9d7c;font-weight:800}
+
+/* 06: BROWSER VOICE ALERTS (Interactive Audio Simulator) */
+.sol-voice-alerts{padding:42px 40px;background:linear-gradient(135deg,#ffffff 0%,#f8f4fe 100%)}
+.voice-card-grid{display:grid;grid-template-columns:1.15fr .85fr;gap:45px;align-items:center}
+.voice-copy h3{font:800 28px/1.2 "Manrope",sans-serif;margin:0 0 10px;color:#241b44}
+.voice-copy h3 span{color:#6850b8}
+.voice-copy p{font-size:14px;line-height:1.7;color:#6b6680;margin:0 0 18px}
+.soundbox-saving-pill{background:#edf9f4;border:1px solid #c9f0e2;border-radius:12px;padding:12px 16px;display:flex;flex-direction:column;gap:3px}
+.soundbox-saving-pill .save-tag{font-size:9px;font-weight:800;color:#0b8767;letter-spacing:.8px}
+.soundbox-saving-pill strong{font-size:13px;color:#07684f}
+.speaker-unit{background:#ffffff;border:1px solid #ebdff5;border-radius:22px;padding:26px 22px;text-align:center;box-shadow:0 15px 36px rgba(50,20,80,.07)}
+.speaker-grill{display:flex;justify-content:center;align-items:center;gap:6px;height:45px;margin-bottom:14px}
+.sound-wave{width:5px;border-radius:4px;background:linear-gradient(180deg,#6850b8,#29cee9);animation:waveBob 1.2s ease-in-out infinite}
+.sound-wave.wave-1{height:16px;animation-delay:.1s}
+.sound-wave.wave-2{height:32px;animation-delay:.25s}
+.sound-wave.wave-3{height:45px;animation-delay:.4s}
+.sound-wave.wave-4{height:28px;animation-delay:.15s}
+.sound-wave.wave-5{height:18px;animation-delay:.3s}
+@keyframes waveBob{0%,100%{transform:scaleY(.4)}50%{transform:scaleY(1)}}
+.voice-simulator.is-speaking .sound-wave{animation-duration:.45s}
+.voice-announcement-box{background:#f7f4fc;border-radius:12px;padding:10px 14px;margin-bottom:16px}
+.voice-announcement-box small{font-size:9px;letter-spacing:.8px;font-weight:800;color:#857c9e;display:block}
+.voice-announcement-box strong{font-size:12px;color:#2e2254;display:block;margin-top:2px}
+.btn-voice-trigger{width:100%;font-size:13px}
+
+/* 07: OPERATIONAL CONTROLS (Deterministic Security Shield) */
+.sol-controls{padding:42px 40px;background:#fbfaff}
+.controls-top h3{font:800 28px/1.2 "Manrope",sans-serif;margin:0 0 10px;color:#241b44}
+.controls-top h3 span{color:#0c9e8a}
+.controls-top p{font-size:14px;color:#6b6680;max-width:580px;margin:0 0 24px}
+.controls-pillars-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:18px}
+.pillar-card{background:#ffffff;border:1px solid #eeeaf6;border-radius:18px;padding:22px;position:relative}
+.pillar-icon{font-size:26px;display:block;margin-bottom:10px}
+.pillar-card h4{font:800 16px/1.3 "Manrope",sans-serif;margin:0 0 8px;color:#241b44}
+.pillar-card p{font-size:12px;color:#6b6680;line-height:1.6;margin:0 0 14px}
+.pillar-check{font-size:10px;font-weight:800;color:#0e9d7c;background:#e1fbf2;padding:3px 8px;border-radius:6px;display:inline-block}
+.controls-shield-footer{margin-top:20px;padding:12px 18px;border-radius:12px;background:#e7fbf5;color:#077e64;font-size:12px;display:flex;align-items:center;gap:8px}
+.shield-dot{color:#19c99e;font-size:10px;animation:dotPulse 1.4s infinite}
 .section-benefits{background:#fff}.benefit-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:22px}.benefit-card{min-height:315px;border-radius:24px;padding:33px 30px;position:relative;transition:transform .2s}.benefit-card:hover{transform:translateY(-5px)}.benefit-purple{background:#eae5fa}.benefit-peach{background:#ffede2}.benefit-mint{background:#e3f8f2}.benefit-icon{width:57px;height:57px;border-radius:17px;display:grid;place-items:center;background:#fff9;font-size:34px;font-weight:700;color:#5b469d}.benefit-card h3{font:800 23px/1.25 "Manrope";letter-spacing:-.7px;margin:25px 0 11px}.benefit-card p{font-size:14px;color:#646078;max-width:285px;margin:0}.card-arrow{position:absolute;bottom:25px;right:30px;font-size:20px}
 /* Eligible Business Sectors */
 .section-sectors{background:#faf9fd;border-top:1px solid #eeebf6;border-bottom:1px solid #eeebf6}
@@ -252,7 +420,7 @@
 .final-cta{position:relative;overflow:hidden;padding:95px 0 100px;background:radial-gradient(ellipse at 85% 100%,#5f46ba 0,transparent 42%),linear-gradient(115deg,#281959,#3b267d);text-align:center;color:#fff}.final-cta .content-width{position:relative;z-index:2}.final-cta h2{font-size:clamp(37px,4.4vw,62px);letter-spacing:-2.8px;margin:18px auto;max-width:810px}.final-cta p{color:#e1d8f3;max-width:640px;margin:0 auto}.final-actions{display:flex;justify-content:center;gap:14px;flex-wrap:wrap;margin-top:30px}.final-glow{position:absolute;right:12%;top:-40px;height:240px;width:240px;border-radius:50%;background:#62f4cb55;filter:blur(70px);pointer-events:none}
 .site-footer{padding:68px 0 20px;background:#fff}.footer-grid{display:grid;grid-template-columns:2.5fr 1fr 1fr 1fr;gap:50px}.footer-brand p{font-size:13px;color:#746d83;max-width:290px}.footer-col{display:grid;align-content:start;gap:12px}.footer-col h3{font-size:13px;margin:2px 0 6px}.footer-col a{font-size:12px;color:#797384}.footer-col a:hover{color:#5135b0}.footer-bottom{border-top:1px solid #eeeaf4;padding-top:23px;margin-top:60px;display:flex;justify-content:space-between;color:#837e90;font-size:11px;gap:12px}.toast{position:fixed;z-index:125;bottom:23px;left:50%;transform:translateX(-50%);background:#2f2377;color:#fff;padding:12px 20px;border-radius:11px;box-shadow:var(--shadow);font-size:13px;font-weight:700}
 @media(max-width:1130px){.desktop-nav{gap:14px}.desktop-nav a,.nav-menu-trigger{font-size:12px}.header-actions{gap:10px}.content-width,.header-inner,.hero-container,.hero-controls-inner{padding-inline:24px}.jump-item{padding-inline:11px}.jump-item>i{display:none}.hero-container{gap:16px}.hero h1{font-size:49px}}
-@media(max-width:960px){.desktop-nav,.header-actions .text-action,.header-actions>.btn{display:none}.mobile-menu-button{display:flex}.header-actions{margin-left:auto}.site-header{height:73px}.mega-menu,.mobile-drawer{top:73px}.hero-slide{min-height:auto}.hero-container{min-height:550px}.hero h1{font-size:clamp(34px,5vw,49px)}.hero-visual{height:400px}.note-top{right:-4px}.note-bottom{left:-8px}.floating-note{padding:9px}.jump-grid{grid-template-columns:repeat(2,1fr);gap:12px}.jump-item:nth-child(2){border-right:0}.jump-item:nth-child(3){padding-left:0}.feature-split,.pricing-layout{gap:35px}.merchant-heading,.trust-head{gap:20px}.trust-grid{grid-template-columns:repeat(2,1fr)}.faq-layout{gap:40px}.footer-grid{gap:25px}.sectors-grid{grid-template-columns:repeat(2,1fr);gap:16px}.story-wrap{grid-template-columns:1fr;gap:35px}}
-@media(max-width:700px){.content-width,.header-inner,.hero-container,.hero-controls-inner{padding-inline:21px}.brand-mark{height:40px;width:40px}.brand-word{font-size:21px}.hero-container{display:flex;flex-direction:column;align-items:stretch;gap:0;min-height:auto}.hero-text{padding:54px 0 16px}.hero h1{font-size:clamp(35px,7.8vw,49px);letter-spacing:-1.7px;margin:18px 0}.hero-text>p{font-size:14px}.hero-cta{gap:13px;margin-top:23px}.hero-cta .btn{white-space:normal}.hero-micro{margin-top:22px;gap:12px}.hero-micro span{font-size:10px;padding-right:10px}.hero-micro b{font-size:14px}.hero-visual{height:340px;width:100%}.scene-25d-wrap{width:100%;justify-content:center;gap:12px;transform:scale(.88)}.char-phone{width:92px;padding:5px}.phone-amount{font-size:11px}.payment-beam-bridge{width:85px}.beam-fingerprint-badge{padding:4px 8px}.beam-fingerprint-badge strong{font-size:11px}.beam-fingerprint-badge small{font-size:7px}.visual-ring{width:290px;height:290px}.ring-two{width:335px;height:225px}.floating-note{padding:8px 9px;border-radius:10px}.floating-note strong{font-size:9px}.floating-note small{font-size:8px}.note-symbol{height:26px;width:26px;font-size:15px}.note-top{top:12px;right:0}.note-bottom{bottom:14px;left:0}.hero-coin{display:none}.savings-visual .savings-orb{width:290px;height:290px}.savings-card{max-width:320px;padding:22px;transform:none}.savings-hero-multiplier{font-size:52px}.savings-formula-pill{font-size:9px}.mock-dashboard{max-width:330px;transform:none}.mock-dashboard-body{padding:15px}.mock-dashboard-stat{font-size:27px}.mock-wave{height:75px}.hero-dot{width:18px;height:6px}.hero-dot.active{width:38px}.hero-pause-btn,.slide-arrows button{width:32px;height:32px;font-size:13px}.hero-controls-inner{padding-bottom:12px}.jump-grid{grid-template-columns:repeat(2,1fr);padding-block:13px}.jump-item{gap:8px;padding:8px 4px}.jump-item strong{font-size:11px}.jump-item small{font-size:9px}.jump-symbol{width:36px;height:36px;font-size:18px}.section{padding:70px 0}.section h2{font-size:clamp(31px,7vw,43px);letter-spacing:-1.5px}.section-heading{margin-bottom:29px}.section-heading p{font-size:14px}.sectors-grid{grid-template-columns:1fr;gap:14px}.feature-split,.merchant-grid,.pricing-layout,.faq-layout,.story-wrap{grid-template-columns:1fr}.feature-split{gap:25px}.feature-art{height:365px}.pay-phone{transform:rotate(-4deg) scale(.82)}.art-pop{font-size:9px}.pop-left{top:50px}.pop-right{bottom:35px}.benefit-grid,.steps{grid-template-columns:1fr;gap:13px}.benefit-card{min-height:260px;padding:24px}.benefit-card h3{font-size:21px}.story-wrap{gap:24px}.story-copy{padding:30px 0 0}.video-caption-overlay{font-size:11px;bottom:46px;padding:6px 10px}.video-scene-indicator{font-size:9px;padding:4px 8px;top:10px;left:10px}.merchant-heading,.trust-head{display:block}.merchant-heading>p,.trust-head>p{margin-top:18px}.merchant-card-main{min-height:430px}.merchant-main-copy{padding:30px 27px 0}.merchant-side-grid{gap:12px}.merchant-card-small{padding:19px;min-height:205px}.merchant-card-small h3{font-size:15px}.pricing-layout{gap:15px}.price-orbit{height:290px}.orbit-circle{width:270px;height:270px}.orbit-small{width:200px;height:200px}.orbit-message{width:193px;height:193px}.pricing-calculator{padding:23px}.calculator-two{grid-template-columns:1fr;gap:0}.calculator-two label{min-height:0}.calculator-results .result-primary strong{font-size:22px}.trust-grid{gap:13px}.trust-card{min-height:220px;padding:22px}.faq-layout{gap:30px}.final-cta{padding:75px 0}.final-cta h2{font-size:39px;letter-spacing:-1.8px}.footer-grid{grid-template-columns:repeat(2,1fr);gap:34px 22px}.footer-brand{grid-column:1/-1}.footer-bottom{display:grid;margin-top:35px;gap:6px}.mobile-drawer{max-height:calc(100vh - 73px);overflow:auto}}
+@media(max-width:960px){.desktop-nav,.header-actions .text-action,.header-actions>.btn{display:none}.mobile-menu-button{display:flex}.header-actions{margin-left:auto}.site-header{height:73px}.mega-menu,.mobile-drawer{top:73px}.hero-slide{min-height:auto}.hero-container{min-height:550px}.hero h1{font-size:clamp(34px,5vw,49px)}.hero-visual{height:400px}.note-top{right:-4px}.note-bottom{left:-8px}.floating-note{padding:9px}.jump-grid{grid-template-columns:repeat(2,1fr);gap:12px}.jump-item:nth-child(2){border-right:0}.jump-item:nth-child(3){padding-left:0}.pricing-layout{gap:35px}.merchant-heading,.trust-head{gap:20px}.trust-grid{grid-template-columns:repeat(2,1fr)}.faq-layout{gap:40px}.footer-grid{gap:25px}.sectors-grid{grid-template-columns:repeat(2,1fr);gap:16px}.story-wrap{grid-template-columns:1fr;gap:35px}.sol-direct-upi,.sol-split-2col,.voice-card-grid{grid-template-columns:1fr;gap:30px}.sol-dash-head,.ledger-header-row{flex-direction:column;align-items:flex-start;gap:16px}.pan-content{grid-template-columns:1fr 1fr;gap:15px}.bank-rails-grid{grid-template-columns:repeat(2,1fr)}.controls-pillars-grid{grid-template-columns:repeat(2,1fr)}}
+@media(max-width:700px){.content-width,.header-inner,.hero-container,.hero-controls-inner{padding-inline:21px}.brand-mark{height:40px;width:40px}.brand-word{font-size:21px}.hero-container{display:flex;flex-direction:column;align-items:stretch;gap:0;min-height:auto}.hero-text{padding:54px 0 16px}.hero h1{font-size:clamp(35px,7.8vw,49px);letter-spacing:-1.7px;margin:18px 0}.hero-text>p{font-size:14px}.hero-cta{gap:13px;margin-top:23px}.hero-cta .btn{white-space:normal}.hero-micro{margin-top:22px;gap:12px}.hero-micro span{font-size:10px;padding-right:10px}.hero-micro b{font-size:14px}.hero-visual{height:340px;width:100%}.scene-25d-wrap{width:100%;justify-content:center;gap:12px;transform:scale(.88)}.char-phone{width:92px;padding:5px}.phone-amount{font-size:11px}.payment-beam-bridge{width:85px}.beam-fingerprint-badge{padding:4px 8px}.beam-fingerprint-badge strong{font-size:11px}.beam-fingerprint-badge small{font-size:7px}.visual-ring{width:290px;height:290px}.ring-two{width:335px;height:225px}.floating-note{padding:8px 9px;border-radius:10px}.floating-note strong{font-size:9px}.floating-note small{font-size:8px}.note-symbol{height:26px;width:26px;font-size:15px}.note-top{top:12px;right:0}.note-bottom{bottom:14px;left:0}.hero-coin{display:none}.savings-visual .savings-orb{width:290px;height:290px}.savings-card{max-width:320px;padding:22px;transform:none}.savings-hero-multiplier{font-size:52px}.savings-formula-pill{font-size:9px}.mock-dashboard{max-width:330px;transform:none}.mock-dashboard-body{padding:15px}.mock-dashboard-stat{font-size:27px}.mock-wave{height:75px}.hero-dot{width:18px;height:6px}.hero-dot.active{width:38px}.hero-pause-btn,.slide-arrows button{width:32px;height:32px;font-size:13px}.hero-controls-inner{padding-bottom:12px}.jump-grid{grid-template-columns:repeat(2,1fr);padding-block:13px}.jump-item{gap:8px;padding:8px 4px}.jump-item strong{font-size:11px}.jump-item small{font-size:9px}.jump-symbol{width:36px;height:36px;font-size:18px}.section{padding:70px 0}.section h2{font-size:clamp(31px,7vw,43px);letter-spacing:-1.5px}.section-heading{margin-bottom:29px}.section-heading p{font-size:14px}.sectors-grid{grid-template-columns:1fr;gap:14px}.merchant-grid,.pricing-layout,.faq-layout,.story-wrap{grid-template-columns:1fr}.sol-card{padding:28px 20px}.sol-direct-upi{padding:28px 20px}.pan-content{grid-template-columns:1fr}.bank-rails-grid{grid-template-columns:1fr}.ledger-table-wrap{overflow-x:auto}.ledger-table{min-width:540px}.controls-pillars-grid{grid-template-columns:1fr}.story-wrap{gap:24px}.story-copy{padding:30px 0 0}.video-caption-overlay{font-size:11px;bottom:46px;padding:6px 10px}.video-scene-indicator{font-size:9px;padding:4px 8px;top:10px;left:10px}.merchant-heading,.trust-head{display:block}.merchant-heading>p,.trust-head>p{margin-top:18px}.merchant-card-main{min-height:430px}.merchant-main-copy{padding:30px 27px 0}.merchant-side-grid{gap:12px}.merchant-card-small{padding:19px;min-height:205px}.merchant-card-small h3{font-size:15px}.pricing-layout{gap:15px}.price-orbit{height:290px}.orbit-circle{width:270px;height:270px}.orbit-small{width:200px;height:200px}.orbit-message{width:193px;height:193px}.pricing-calculator{padding:23px}.calculator-two{grid-template-columns:1fr;gap:0}.calculator-two label{min-height:0}.calculator-results .result-primary strong{font-size:22px}.trust-grid{gap:13px}.trust-card{min-height:220px;padding:22px}.faq-layout{gap:30px}.final-cta{padding:75px 0}.final-cta h2{font-size:39px;letter-spacing:-1.8px}.footer-grid{grid-template-columns:repeat(2,1fr);gap:34px 22px}.footer-brand{grid-column:1/-1}.footer-bottom{display:grid;margin-top:35px;gap:6px}.mobile-drawer{max-height:calc(100vh - 73px);overflow:auto}}
 @media(max-width:380px){.hero h1{font-size:34px}.hero-micro span{font-size:9px}.jump-symbol{width:30px;height:30px}.jump-item strong{font-size:10px}.merchant-side-grid{grid-template-columns:1fr}.merchant-card-small{min-height:160px}.story-graphic{transform:scale(.74);margin-inline:-34px}.calculator-results strong{font-size:15px}.calculator-results .result-primary strong{font-size:20px}}
 @media(prefers-reduced-motion:reduce){html{scroll-behavior:auto}*,*::before,*::after{animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important}.hero-dot{transition:none}.dot-progress{animation:none!important}}
