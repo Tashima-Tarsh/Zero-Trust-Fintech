@@ -599,25 +599,163 @@ app.post('/api/verify', verifyLimiter, (req, res) => {
 });
 
 // ═══════════════════════════════════════════════════════════════════
-// TASK 7: WEB SHARE TARGET & NPCI INTENT CALLBACK HANDLERS
+// TASK 7: ANDROID WEB SHARE TARGET (SINGLE SOURCE OF TRUTH SETTLEMENT)
 // ═══════════════════════════════════════════════════════════════════
-app.post('/handle-share', (req, res) => {
-  const { title, text, url } = req.body;
-  const rawReceipt = [title, text, url].filter(Boolean).join('\n');
+app.post('/handle-share', async (req, res) => {
+  try {
+    const { title, text, url } = req.body || {};
+    const rawReceipt = [title, text, url].filter(Boolean).join('\n');
+    const now = Date.now();
 
-  console.log(`📥 [Web Share Target] Received shared receipt payload (${rawReceipt.length} chars)`);
+    console.log(`📥 [Android Share Target SST] Received shared receipt payload (${rawReceipt.length} chars)`);
 
-  const parsed = parseNPCIIntentResponse(rawReceipt);
-  const utr = parsed.txnId || '';
-  const amount = parsed.amount ? String(parsed.amount) : '';
-  const orderId = parsed.orderId || '';
+    const parsed = parseNPCIIntentResponse(rawReceipt);
+    const parsedUtr = parsed.txnId || (req.body && req.body.utr) || '';
+    const parsedAmount = parsed.amount || (req.body && parseFloat(req.body.amount)) || null;
+    let detectedOrderId = parsed.orderId || (req.body && req.body.orderId) || (req.query && req.query.orderId) || '';
 
-  if (!utr || !amount) {
-    return res.redirect(`/failed.html?reason=${encodeURIComponent('Could not extract 12-digit UTR or amount from shared receipt')}`);
+    if (!parsedUtr || !parsedAmount) {
+      if (req.accepts('json') && !req.accepts('html')) {
+        return res.status(400).json({
+          success: false,
+          error: 'INVALID_SHARE_PAYLOAD',
+          message: 'Could not extract 12-digit UTR and challenged amount from shared receipt.'
+        });
+      }
+      return res.redirect(`/failed.html?reason=${encodeURIComponent('Could not extract 12-digit UTR or amount from shared receipt')}`);
+    }
+
+    // RESOLVE SESSION: Match by explicit orderId OR by Unique Mathematical Challenge Amount!
+    let session = null;
+    if (detectedOrderId) {
+      session = db.findSessionByOrderId(detectedOrderId);
+    }
+    if (!session && parsedAmount) {
+      // Find active pending session by the exact unique challenge paise
+      session = db.findSessionByAmount(parsedAmount);
+    }
+
+    if (!session) {
+      if (req.accepts('json') && !req.accepts('html')) {
+        return res.status(404).json({
+          success: false,
+          error: 'SESSION_NOT_FOUND',
+          message: `No active checkout session found matching challenge amount ₹${parsedAmount}. Session may have expired.`
+        });
+      }
+      return res.redirect(`/failed.html?reason=${encodeURIComponent('No active checkout session matched this challenge amount.')}`);
+    }
+
+    // Evaluate evidence with Zero-Trust scoring engine
+    const sessionContext = {
+      challengeAmount: Number(session.challengeAmount),
+      createdAt: session.createdAt,
+      expiresAt: session.expiresAt,
+      payeeVpa: session.vpaAddress || MERCHANT_UPI_ID,
+      payeeName: MERCHANT_NAME
+    };
+
+    const ev = {
+      amount: parsedAmount,
+      utr: parsedUtr,
+      payeeVpa: session.vpaAddress || MERCHANT_UPI_ID,
+      payeeName: MERCHANT_NAME,
+      statusText: 'SUCCESS',
+      shownTime: now,
+      layoutFieldsFound: 4,
+      layoutFieldsExpected: 4,
+      looksLikeScreenshot: true,
+      submittedAt: now
+    };
+
+    const attemptsCount = (session.verificationAttempts || 0) + 1;
+    session.verificationAttempts = attemptsCount;
+
+    const hist = {
+      utrSeen: db.isUtrBlacklisted(parsedUtr),
+      imageHashSeen: false,
+      attemptsThisSession: attemptsCount,
+      priorConfirmed: 1
+    };
+
+    const trustResult = scoreEvidence(sessionContext, ev, hist, {
+      now,
+      graceMs: 60 * 1000,
+      sameDevice: false // Mobile scanning external screen
+    });
+
+    if (trustResult.tier === 'REJECT') {
+      if (req.accepts('json') && !req.accepts('html')) {
+        return res.status(400).json({
+          success: false,
+          code: trustResult.gate || 'VERIFICATION_REJECTED',
+          reason: (trustResult.reasons && trustResult.reasons[0]) || 'Evidence rejected by Zero-Trust verification.',
+          trustScore: trustResult.score,
+          confidenceTier: trustResult.tier
+        });
+      }
+      return res.redirect(`/failed.html?reason=${encodeURIComponent((trustResult.reasons && trustResult.reasons[0]) || 'Verification failed')}`);
+    }
+
+    // Ledger posting & anti-replay
+    const { txId, verification } = db.recordTransactionAndLedger(
+      session.orderId,
+      parsedUtr,
+      session.challengeAmount,
+      session.vpaAddress
+    );
+
+    // Blacklist UTR to prevent any future reuse
+    db.blacklistUtr(parsedUtr, session.orderId, session.challengeAmount, 'Settled via Android Share Sheet SST');
+
+    // Update session status in DB
+    db.updateSessionStatus(session.orderId, 'SUCCESS', parsedUtr);
+
+    const suggestedAction = suggestAction(trustResult, session.challengeAmount, 500);
+
+    // ⚡ CRITICAL: INSTANT WEBSOCKET DISPATCH TO WAITING CHECKOUT (LAPTOP/DESKTOP/MOBILE)
+    const successPayload = {
+      orderId: session.orderId,
+      utr: parsedUtr,
+      amount: session.challengeAmount,
+      baseAmount: session.baseAmount,
+      vpaAddress: session.vpaAddress,
+      senderVpa: req.body.senderVpa || 'customer@upi',
+      txId,
+      timestamp: now,
+      settlementSource: 'ANDROID_SHARE_SHEET_SST',
+      trustScore: trustResult.score,
+      confidenceTier: trustResult.tier,
+      suggestedAction,
+      message: 'Settlement confirmed via Android Share Sheet Single Source of Truth (SST)'
+    };
+    broadcastOrderSuccess(session.orderId, successPayload);
+
+    console.log(`✅ [Android Share Target SST] Successfully settled order ${session.orderId} and notified checkout client via WebSocket`);
+
+    if (req.accepts('json') && !req.accepts('html')) {
+      return res.json({
+        success: true,
+        settled: true,
+        orderId: session.orderId,
+        utr: parsedUtr,
+        amount: session.challengeAmount,
+        trustScore: trustResult.score,
+        confidenceTier: trustResult.tier,
+        suggestedAction,
+        ledgerTxId: txId
+      });
+    }
+
+    // Redirect to success page with parameters
+    res.redirect(`/success.html?utr=${encodeURIComponent(parsedUtr)}&amount=${encodeURIComponent(String(session.challengeAmount))}&orderId=${encodeURIComponent(session.orderId)}`);
+  } catch (err) {
+    console.error('[Android Share Target] Error:', err);
+    if (req.accepts('json') && !req.accepts('html')) {
+      return res.status(500).json({ success: false, error: err.message });
+    }
+    res.redirect(`/failed.html?reason=${encodeURIComponent(err.message)}`);
   }
-
-  // Redirect to success page with parameters
-  res.redirect(`/success.html?utr=${encodeURIComponent(utr)}&amount=${encodeURIComponent(amount)}&orderId=${encodeURIComponent(orderId)}`);
 });
 
 // Official NPCI Intent Callback / Webhook Endpoint

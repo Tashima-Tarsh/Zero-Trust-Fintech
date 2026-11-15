@@ -436,6 +436,38 @@ function findSessionByTxnRef(txnRef) {
   return null;
 }
 
+function findSessionByAmount(amount) {
+  if (sqliteDb) {
+    const numAmt = parseFloat(amount);
+    if (isNaN(numAmt)) return null;
+    const now = Date.now();
+    // Match active or recent PENDING session with exact challenge paise offset
+    const row = sqliteDb.prepare(`
+      SELECT * FROM sessions 
+      WHERE ABS(challenge_amount - ?) < 0.004 
+        AND status = 'PENDING' 
+        AND expires_at >= (? - 60000)
+      ORDER BY created_at DESC 
+      LIMIT 1
+    `).get(numAmt, now);
+    if (!row) return null;
+    return {
+      sessionId: row.session_id,
+      orderId: row.order_id,
+      challengeAmount: row.challenge_amount,
+      baseAmount: row.base_amount,
+      txnRef: row.txn_ref,
+      vpaAddress: row.vpa_address,
+      status: row.status,
+      utr: row.utr,
+      createdAt: row.created_at,
+      expiresAt: row.expires_at,
+      qrRefreshAt: row.qr_refresh_at
+    };
+  }
+  return null;
+}
+
 function updateSessionStatus(orderId, status, utr = null) {
   if (sqliteDb) {
     sqliteDb.prepare(`UPDATE sessions SET status = ?, utr = ? WHERE order_id = ?`).run(status, utr, orderId);
@@ -535,6 +567,7 @@ module.exports = {
   saveSession,
   findSessionByOrderId,
   findSessionByTxnRef,
+  findSessionByAmount,
   updateSessionStatus,
   isUtrBlacklisted,
   blacklistUtr,
