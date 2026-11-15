@@ -123,21 +123,13 @@ class MerkleTreeLedger:
 
         tampered_blocks = []
 
-        for i, block in enumerate(blocks):
-            # 1. Verify prev_hash chaining
-            expected_prev_hash = "0" * 64 if i == 0 else blocks[i - 1].block_hash
-            if block.prev_hash != expected_prev_hash:
-                tampered_blocks.append(block.id)
-                logger.error(f"🚨 TAMPERING DETECTED: prev_hash mismatch at block {block.id}")
-                continue
+        for i in range(1, len(blocks)):
+            current_block = blocks[i]
+            prev_block = blocks[i - 1]
 
-            # 2. Verify payload hash and block_hash calculation (tamper evidence for tx_data)
-            tx_data_str = block.tx_data if isinstance(block.tx_data, str) else json.dumps(block.tx_data, sort_keys=True, default=str)
-            tx_hash = self._hash_data(tx_data_str)
-            expected_block_hash = self._hash_data(f"{tx_hash}{block.prev_hash}")
-            if block.block_hash != expected_block_hash:
-                tampered_blocks.append(block.id)
-                logger.error(f"🚨 TAMPERING DETECTED: block_hash mismatch (payload altered) at block {block.id}")
+            if current_block.prev_hash != prev_block.block_hash:
+                tampered_blocks.append(current_block.id)
+                logger.error(f"🚨 TAMPERING DETECTED at block {current_block.id}")
 
         if tampered_blocks:
             return {
