@@ -125,12 +125,17 @@ function buildNPCIIntentUri({
     parts.push('am=' + numAmt.toFixed(2));
   }
 
-  // 4. tn (Transaction Note): clean alphanumeric order ID (avoids banking switch parser errors)
-  const rawNote = tn || orderId || description || '';
+  // 4. tn (Transaction Note): clean alphanumeric text (NPCI rule: only letters, numbers, spaces; no underscores or query chars)
+  // Strict compliance for SBI/HDFC/ICICI switches which reject notes containing '_' or commercial order tags on personal VPAs
+  const rawNote = tn || description || '';
   if (rawNote) {
-    const safeNote = String(rawNote).replace(/[^A-Za-z0-9_-]/g, '').substring(0, 50);
-    if (safeNote) {
-      parts.push('tn=' + safeNote);
+    const cleanNote = String(rawNote)
+      .replace(/[^A-Za-z0-9 ]/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim()
+      .substring(0, 30);
+    if (cleanNote) {
+      parts.push('tn=' + encodeURIComponent(cleanNote));
     }
   }
 

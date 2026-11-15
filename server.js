@@ -171,8 +171,7 @@ function generateUPILink(session) {
     pa: session.vpaAddress || MERCHANT_UPI_ID,
     pn: MERCHANT_NAME,
     am: session.challengeAmount,
-    orderId: session.orderId,
-    description: session.description || 'Kirana Order',
+    description: session.description || 'Payment',
     cu: 'INR'
   });
 }

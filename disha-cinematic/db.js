@@ -529,15 +529,16 @@ function createMerchantOrder(merchantId, { amount, description = '', vpaAddress 
     ? String(orderId).trim() 
     : ('ORD_' + Date.now().toString(36).toUpperCase() + '_' + crypto.randomBytes(3).toString('hex').toUpperCase());
   const businessName = merchant.business_name || 'Merchant';
+  // P2P NPCI Specification for personal savings VPAs:
   // mc and tr must NOT be sent for personal VPAs.
   // GPay, PhonePe and Slice validate mc/tr against their merchant acquiring registry;
   // a personal VPA with mc or tr is rejected before PIN by all three apps as an unregistered merchant.
+  // Also do NOT pass 'orderId' with underscores into 'tn', as bank switches (SBI) reject notes with '_' before PIN.
   const upiUri = buildNPCIIntentUri({
     pa: chosenVpa,
     pn: businessName,
     am: parsedAmount,
-    orderId: finalOrderId,
-    description: description || 'Retail Payment',
+    description: description || 'Payment',
     cu: 'INR'
   });
   const now = Date.now();
