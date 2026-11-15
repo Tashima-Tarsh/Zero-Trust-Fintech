@@ -668,32 +668,179 @@
       </div>
     </section>
 
-    <!-- WHY DISHA: HUMAN-CENTERED VALUE -->
+    <!-- 11. WHY DISHA: EDITORIAL VALUE & ARTWORK -->
     <section class="section section-benefits" id="why-disha">
       <div class="content-width">
-        <div class="section-heading centered">
+        <div class="section-heading centered reveal-on-scroll">
           <span class="section-tag">WHY DISHA</span>
-          <h2>More independence.<br><span>Fewer daily headaches.</span></h2>
-          <p>You already have enough to manage in your business. Your payment software shouldn't become another daily problem. Here is why merchants choose to run their own payment stack.</p>
+          <h2>More Independence.<br><span>Less Getting in Your Way.</span></h2>
+          <p class="benefits-intro-lead">Your business is yours. The software behind it should give you more control, too.</p>
+          <p class="benefits-intro-sub">DISHA is built around merchant-controlled deployment, a clear operational workspace, and a pricing model that doesn't depend on collecting a DISHA commission every time you sell.</p>
         </div>
-        <div class="benefit-grid">
-          <article class="benefit-card benefit-purple">
-            <span class="benefit-icon">▣</span>
-            <h3>No perpetual monthly tolls.</h3>
-            <p>Stop paying an ongoing 1.5% to 2% slice of every sale to a gateway middleman. Keep every single rupee your business works hard to earn.</p>
-            <span class="card-arrow">↗</span>
+
+        <div class="editorial-benefits-list">
+          <!-- BENEFIT 01: OWNERSHIP -->
+          <article class="editorial-card card-ownership reveal-on-scroll">
+            <div class="editorial-card-content">
+              <span class="benefit-badge">BENEFIT 01 · OWNERSHIP</span>
+              <h3>Run DISHA in your chosen hosting environment.</h3>
+              <p>Your customer data, bank API credentials, and transaction logs remain strictly inside your own infrastructure perimeter. Whether deployed on AWS, Google Cloud, DigitalOcean, or private bare metal, you hold the root keys with zero third-party platform lock-in.</p>
+              <ul class="benefit-check-list">
+                <li><span class="check-icon">✓</span> <span><strong>Merchant-Controlled Perimeter:</strong> Deployed in your private VPC or on-premise server.</span></li>
+                <li><span class="check-icon">✓</span> <span><strong>Zero Telemetry Detours:</strong> Payment receipts are verified directly against your bank records.</span></li>
+                <li><span class="check-icon">✓</span> <span><strong>Full Database Sovereignty:</strong> PostgreSQL or SQLite storage you control and back up yourself.</span></li>
+              </ul>
+            </div>
+            <div class="editorial-art art-ownership" aria-hidden="true">
+              <div class="art-ownership-frame">
+                <div class="art-cloud-tags">
+                  <span class="cloud-tag">AWS EC2</span>
+                  <span class="cloud-tag">Google Cloud</span>
+                  <span class="cloud-tag">DigitalOcean</span>
+                  <span class="cloud-tag">Bare Metal</span>
+                </div>
+                <div class="art-server-vpc">
+                  <div class="vpc-header">
+                    <span class="vpc-dot"></span>
+                    <span class="vpc-title">Merchant Virtual Private Cloud (VPC)</span>
+                    <span class="vpc-badge">Private Subnet</span>
+                  </div>
+                  <div class="vpc-nodes">
+                    <div class="vpc-node primary">
+                      <div class="node-icon">⚡</div>
+                      <div class="node-info">
+                        <strong>DISHA 8.2 Engine</strong>
+                        <small>Direct UPI &amp; L7 Verification</small>
+                      </div>
+                      <span class="node-status">Active</span>
+                    </div>
+                    <div class="vpc-node">
+                      <div class="node-icon">🔐</div>
+                      <div class="node-info">
+                        <strong>HMAC Key Vault</strong>
+                        <small>AES-256 Encrypted Secrets</small>
+                      </div>
+                    </div>
+                    <div class="vpc-node">
+                      <div class="node-icon">💾</div>
+                      <div class="node-info">
+                        <strong>Transaction Store</strong>
+                        <small>Local PostgreSQL / SQLite</small>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                <div class="art-ownership-footer">
+                  <span class="art-shield-icon">🛡</span>
+                  <span>Root Access: 100% Merchant Owned · Zero Vendor Lock-in</span>
+                </div>
+              </div>
+            </div>
           </article>
-          <article class="benefit-card benefit-peach">
-            <span class="benefit-icon">◎</span>
-            <h3>Costs you can explain.</h3>
-            <p>One fair, agreed software price based on four months of real verified net savings. No surprise rate hikes as your transaction volume grows.</p>
-            <span class="card-arrow">↗</span>
+
+          <!-- BENEFIT 02: SIMPLICITY -->
+          <article class="editorial-card card-simplicity reveal-on-scroll">
+            <div class="editorial-card-content">
+              <span class="benefit-badge">BENEFIT 02 · SIMPLICITY</span>
+              <h3>Manage supported payment functions and business records together.</h3>
+              <p>Stop switching between disjointed bank portals, payment gateway dashboards, hardware soundbox subscription bills, and separate spreadsheet trackers. DISHA unites UPI collection, real-time voice verification, dynamic QR codes, and a balanced double-entry ledger into one calm, readable workspace.</p>
+              <ul class="benefit-check-list">
+                <li><span class="check-icon">✓</span> <span><strong>Unified Checkout Operations:</strong> Handle UPI intents, dynamic links, and counter QR codes in one flow.</span></li>
+                <li><span class="check-icon">✓</span> <span><strong>Browser-Based Voice Alerts:</strong> Audible payment confirmations on phone or desktop without hardware rental fees.</span></li>
+                <li><span class="check-icon">✓</span> <span><strong>Reconciled General Ledger:</strong> Every transaction mapped with 12-digit UTR, micro-paise tag, and instant CSV/PDF export.</span></li>
+              </ul>
+            </div>
+            <div class="editorial-art art-simplicity" aria-hidden="true">
+              <div class="art-simplicity-frame">
+                <div class="art-unified-workspace">
+                  <div class="workspace-bar">
+                    <span class="ws-tab active">DISHA Workspace</span>
+                    <span class="ws-pill">Calm Single Screen</span>
+                  </div>
+                  <div class="workspace-layers">
+                    <div class="ws-layer layer-intake">
+                      <div class="layer-badge">01. INTAKE</div>
+                      <div class="layer-content">
+                        <strong>Dynamic UPI Intent &amp; QR</strong>
+                        <span>Auto-challenge: ₹1,249.37 (TTL: 15s)</span>
+                      </div>
+                      <span class="layer-check">✓</span>
+                    </div>
+                    <div class="ws-layer-connector"></div>
+                    <div class="ws-layer layer-voice">
+                      <div class="layer-badge">02. AUDIBLE NOTIFICATION</div>
+                      <div class="layer-content">
+                        <strong>Browser Voice Verification</strong>
+                        <span>"Payment of ₹1,249.37 verified on DISHA"</span>
+                      </div>
+                      <span class="sound-wave-mini"><span></span><span></span><span></span></span>
+                    </div>
+                    <div class="ws-layer-connector"></div>
+                    <div class="ws-layer layer-ledger">
+                      <div class="layer-badge">03. BALANCED RECORD</div>
+                      <div class="layer-content">
+                        <strong>Reconciled Bank Ledger</strong>
+                        <span>UTR #332198421098 · Gateway Fee: ₹0.00</span>
+                      </div>
+                      <span class="layer-settled">Settled</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
           </article>
-          <article class="benefit-card benefit-mint">
-            <span class="benefit-icon">≋</span>
-            <h3>Everything in one place.</h3>
-            <p>Payment requests, real-time verification, browser voice alerts, and organized ledger records all working smoothly together.</p>
-            <span class="card-arrow">↗</span>
+
+          <!-- BENEFIT 03: FAIR PRICING -->
+          <article class="editorial-card card-pricing reveal-on-scroll">
+            <div class="editorial-card-content">
+              <span class="benefit-badge">BENEFIT 03 · FAIR PRICING</span>
+              <h3>Pay once using the four-month verified savings formula.</h3>
+              <p>Software should empower your enterprise, not tax its growth forever. Instead of siphoning a permanent 1.5% to 2.0% cut from every customer transaction, DISHA's one-time perpetual license is strictly calculated from four months of your verified monthly net savings. Every rupee saved thereafter stays in your business.</p>
+              <ul class="benefit-check-list">
+                <li><span class="check-icon">✓</span> <span><strong>Objective Formula:</strong> One-Time Price = 4 × (Avoidable Monthly Costs − Hosting Expenses).</span></li>
+                <li><span class="check-icon">✓</span> <span><strong>0% Commission to DISHA:</strong> No transaction tolls or recurring percentage deductions.</span></li>
+                <li><span class="check-icon">✓</span> <span><strong>Compounding Advantage:</strong> As your sales volume grows, your savings grow while your software cost stays zero.</span></li>
+              </ul>
+              <div class="benefit-cta-wrap">
+                <a href="#pricing" class="btn btn-dark btn-sm">Calculate Your One-Time Price <span aria-hidden="true">↗</span></a>
+              </div>
+            </div>
+            <div class="editorial-art art-pricing" aria-hidden="true">
+              <div class="art-pricing-frame">
+                <div class="pricing-formula-card">
+                  <span class="formula-title">THE 4-MONTH NET SAVINGS FORMULA</span>
+                  <div class="formula-equation">
+                    <span class="eq-term">One-Time License</span>
+                    <span class="eq-op">=</span>
+                    <span class="eq-val">4 × Monthly Net Savings</span>
+                  </div>
+                </div>
+                <div class="savings-bars-comparison">
+                  <div class="compare-row row-traditional">
+                    <div class="compare-info">
+                      <strong>Traditional Aggregators</strong>
+                      <span>1.5% – 2.0% Perpetual Toll</span>
+                    </div>
+                    <div class="compare-bar-track">
+                      <div class="compare-bar-fill fill-drain"><span>Endless Monthly Tolls</span></div>
+                    </div>
+                  </div>
+                  <div class="compare-row row-disha">
+                    <div class="compare-info">
+                      <strong>DISHA 8.2 Model</strong>
+                      <span>Pay Once · Keep All Future Savings</span>
+                    </div>
+                    <div class="compare-bar-track">
+                      <div class="compare-bar-fill fill-disha"><span>4 Months Net Savings Capped</span></div>
+                    </div>
+                  </div>
+                </div>
+                <div class="art-pricing-callout">
+                  <span class="callout-badge">YEARS 2, 3 &amp; BEYOND</span>
+                  <strong>100% of Net Savings Retained by Your Business</strong>
+                </div>
+              </div>
+            </div>
           </article>
         </div>
       </div>
@@ -906,6 +1053,155 @@
       </div>
     </section>
 
+    <!-- 12. TRUST AND FRAUD-AWARE CONTROLS -->
+    <section class="section section-trust" id="trust">
+      <div class="content-width">
+        <div class="trust-head reveal-on-scroll">
+          <div>
+            <span class="section-tag">TRUST AND FRAUD-AWARE CONTROLS</span>
+            <h2>Know More.<br><span>Guess Less.</span></h2>
+          </div>
+          <p>Payments deserve care. DISHA helps businesses organize transaction information and identify signals that may need a closer look.</p>
+        </div>
+
+        <!-- RESTRAINED SECURITY CONSOLE / ILLUSTRATION -->
+        <div class="trust-console reveal-on-scroll">
+          <div class="trust-console-intro">
+            <div class="shield-badge-wrap">
+              <div class="restrained-shield-icon" aria-hidden="true">
+                <svg width="48" height="48" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <path d="M24 4L7 11V22C7 32.5 14.3 42.2 24 45C33.7 42.2 41 32.5 41 22V11L24 4Z" fill="#EAE5FA" stroke="#5B3EA8" stroke-width="2.5" stroke-linejoin="round"/>
+                  <path d="M16 24L22 30L32 18" stroke="#0F9976" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
+              </div>
+              <div>
+                <span class="console-mini-label">DETERMINISTIC VERIFICATION</span>
+                <h3>Evidence Evaluation Console</h3>
+                <p>DISHA inspects technical signals across 7 layers to help you verify payment legitimacy before release.</p>
+              </div>
+            </div>
+            <div class="console-status-pill">
+              <span class="status-pulse-dot"></span>
+              <span>7 Active Control Signals Monitored</span>
+            </div>
+          </div>
+
+          <div class="trust-console-telemetry">
+            <div class="telemetry-header">
+              <span>Live Verification Telemetry</span>
+              <span class="telemetry-session">Sample Session #D82_94A2</span>
+            </div>
+            <div class="telemetry-grid">
+              <div class="telemetry-item passed">
+                <div class="telemetry-icon">⏱</div>
+                <div class="telemetry-details">
+                  <strong>Time-Bound Session (15s TTL)</strong>
+                  <span>Active challenge window [14.2s remaining]</span>
+                </div>
+                <span class="telemetry-tag">Passed</span>
+              </div>
+              <div class="telemetry-item passed">
+                <div class="telemetry-icon">⛨</div>
+                <div class="telemetry-details">
+                  <strong>Duplicate Reference Check</strong>
+                  <span>UTR #332198421098 [Unique · 0 Replays]</span>
+                </div>
+                <span class="telemetry-tag">Passed</span>
+              </div>
+              <div class="telemetry-item passed">
+                <div class="telemetry-icon">◈</div>
+                <div class="telemetry-details">
+                  <strong>Transaction-Specific Amount</strong>
+                  <span>Order ₹1,249.00 + ₹0.37 paise fingerprint</span>
+                </div>
+                <span class="telemetry-tag">Passed</span>
+              </div>
+              <div class="telemetry-item passed">
+                <div class="telemetry-icon">📋</div>
+                <div class="telemetry-details">
+                  <strong>Operational Activity Review</strong>
+                  <span>Logged in merchant audit trail (20:25:12 IST)</span>
+                </div>
+                <span class="telemetry-tag">Passed</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 7 SUPPORTED FEATURE CARDS -->
+        <div class="trust-features-grid">
+          <article class="trust-feature-card reveal-on-scroll">
+            <div class="feature-card-top">
+              <span class="feature-num">01</span>
+              <span class="feature-icon purple-tint">⏱</span>
+            </div>
+            <h3>Time-bound sessions</h3>
+            <p>Connect payment activity to a strictly defined session and ephemeral time window (15-second TTL) that expires automatically to prevent stale checkouts.</p>
+          </article>
+
+          <article class="trust-feature-card reveal-on-scroll">
+            <div class="feature-card-top">
+              <span class="feature-num">02</span>
+              <span class="feature-icon mint-tint">⛨</span>
+            </div>
+            <h3>Duplicate reference checks</h3>
+            <p>Cross-reference the 12-digit bank UTR against your indexed transaction database in real time to catch and flag repeated reference submissions.</p>
+          </article>
+
+          <article class="trust-feature-card reveal-on-scroll">
+            <div class="feature-card-top">
+              <span class="feature-num">03</span>
+              <span class="feature-icon peach-tint">◈</span>
+            </div>
+            <h3>Transaction-specific amounts</h3>
+            <p>Micro-paise fingerprint injection (e.g. ₹0.37) creates mathematically unique checkout amounts, eliminating collisions between simultaneous buyers.</p>
+          </article>
+
+          <article class="trust-feature-card reveal-on-scroll">
+            <div class="feature-card-top">
+              <span class="feature-num">04</span>
+              <span class="feature-icon blue-tint">📋</span>
+            </div>
+            <h3>Operational activity review</h3>
+            <p>Comprehensive chronological audit trails log every receipt intake, manual inspection, status update, and operator action with timestamps.</p>
+          </article>
+
+          <article class="trust-feature-card reveal-on-scroll">
+            <div class="feature-card-top">
+              <span class="feature-num">05</span>
+              <span class="feature-icon purple-tint">🔍</span>
+            </div>
+            <h3>Available evidence analysis</h3>
+            <p>Multi-factor verification inspecting receipt structure, payer VPA syntax, transaction amounts, and reference formatting against bank standards.</p>
+          </article>
+
+          <article class="trust-feature-card reveal-on-scroll">
+            <div class="feature-card-top">
+              <span class="feature-num">06</span>
+              <span class="feature-icon mint-tint">📊</span>
+            </div>
+            <h3>Transaction records</h3>
+            <p>Structured double-entry accounting records with exportable CSV and PDF reports, giving you clean reconciled books for audits and tax filing.</p>
+          </article>
+
+          <article class="trust-feature-card reveal-on-scroll feature-span-all">
+            <div class="feature-card-top">
+              <span class="feature-num">07</span>
+              <span class="feature-icon peach-tint">🔐</span>
+            </div>
+            <h3>Merchant access and configuration controls</h3>
+            <p>Granular role-based team permissions, rotated HMAC webhook keys, and configurable alert thresholds managed entirely within your workspace perimeter.</p>
+          </article>
+        </div>
+
+        <!-- HONEST TRUST DISCLOSURE (NO FALSE CLAIMS) -->
+        <div class="trust-disclosure-card reveal-on-scroll">
+          <div class="disclosure-badge">NOTICE</div>
+          <p>No software can guarantee the elimination of fraud. Controls and status indicators must be assessed against the actual payment evidence available. DISHA provides transparent technical checks to assist merchant operational review without making unrealistic safety guarantees.</p>
+        </div>
+      </div>
+    </section>
+
     <!-- FAIR BY DESIGN PRICING -->
     <section class="section section-pricing" id="pricing">
       <div class="content-width">
@@ -980,7 +1276,8 @@
         </div>
       </div>
     </section>
-    <section class="section section-trust" id="trust"><div class="content-width"><div class="trust-head"><div><span class="section-tag">TRUST IS BUILT ON CLARITY</span><h2>Know more.<br><span>Guess less.</span></h2></div><p>Payments deserve care. DISHA provides tools to organize activity and identify specific risks, without pretending uncertainty doesn't exist.</p></div><div class="trust-grid"><div class="trust-card"><span>01</span><div class="trust-symbol">⌛</div><h3>Time-bound sessions</h3><p>Connect payment activity to a defined session and its relevant time window.</p></div><div class="trust-card"><span>02</span><div class="trust-symbol">♻</div><h3>Reference reuse checks</h3><p>Help flag repeated references that need a closer look.</p></div><div class="trust-card"><span>03</span><div class="trust-symbol">◈</div><h3>Evidence-aware review</h3><p>Use available signals to add context when a payment needs attention.</p></div><div class="trust-card"><span>04</span><div class="trust-symbol">▤</div><h3>Organized records</h3><p>Keep transaction information and reports easier to follow.</p></div></div><p class="trust-disclosure">No software can guarantee the elimination of fraud. Controls and status indicators must be assessed against the actual payment evidence available.</p></div></section>
+
+    <!-- FAQ SECTION -->
     <section class="section section-faq" id="questions"><div class="content-width faq-layout"><div><span class="section-tag">GOOD QUESTIONS, CLEAR ANSWERS</span><h2>A few things<br><span>worth knowing.</span></h2><p>Because choosing your payment software is a business decision, not just a design preference.</p></div><div class="faq-list"><details><summary>What exactly am I buying?<span>+</span></summary><p>A perpetual license for the agreed DISHA software version, plus the installation and handover services in your quotation. The intellectual property stays with DISHA unless separately agreed.</p></details><details><summary>Do I pay DISHA every month?<span>+</span></summary><p>No recurring DISHA software subscription under this model. Your own hosting, third-party network or banking charges, taxes, and optional services remain separate.</p></details><details><summary>How is my price calculated?<span>+</span></summary><p>Four months of verified monthly net savings: genuinely removable costs, less new ongoing expenses introduced by your deployment.</p></details><details><summary>What if I already pay zero UPI fees?<span>+</span></summary><p>We'll review other genuinely removable software and operating costs. If positive savings cannot be established, we won't invent a savings-based quotation.</p></details><details><summary>Does DISHA guarantee a payment is safe?<span>+</span></summary><p>No. The platform includes available transaction and evidence controls to improve visibility and reduce specific operational risks, not a guarantee that fraud cannot occur.</p></details><details><summary>Can I sign up immediately?<span>+</span></summary><p>Existing merchants can log in now. New merchant access requires authorized provisioning; use the estimate to understand the commercial model while onboarding is arranged.</p></details></div></div></section>
     <section class="final-cta"><div class="content-width"><span class="section-tag inverse">MORE BUSINESS. LESS DEPENDENCE.</span><h2>You built it.<br>Now make the software yours.</h2><p>Direct UPI tools, a clearer merchant workspace, and a one-time license designed around the savings you can actually demonstrate.</p><div class="final-actions"><a class="btn btn-white" href="#pricing">Calculate Your Price <span aria-hidden="true">↗</span></a><a class="btn btn-outline-light" href="/login">Merchant Login <span aria-hidden="true">→</span></a></div><div class="final-glow" aria-hidden="true"></div></div></section>
   </main>
