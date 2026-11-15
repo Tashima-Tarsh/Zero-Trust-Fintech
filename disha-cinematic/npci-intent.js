@@ -145,7 +145,13 @@ function buildNPCIIntentUri({
     params.set('sign', String(sign));
   }
 
-  return 'upi://pay?' + params.toString();
+  // UPI apps expect raw @ in the pa= parameter (not %40).
+  // URLSearchParams auto-encodes @ → %40 which many UPI apps (BHIM, bank apps) reject.
+  // Fix: build the URI manually so pa= keeps the raw @ character.
+  const paRaw = 'pa=' + pa; // raw, unencoded
+  params.delete('pa');
+  const rest = params.toString(); // rest of params (pn, am, tn, tr, cu, mc ...)
+  return 'upi://pay?' + paRaw + (rest ? '&' + rest : '');
 }
 
 /**
