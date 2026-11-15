@@ -3,7 +3,7 @@
 # 🏦 DISHA 8.2 — The Sovereign Zero-Fee, Fraud-Proof UPI Payment Rail
 ### *Enterprise-Grade, Non-Custodial UPI Infrastructure for Indian Commerce & High-Volume Platforms*
 
-[![License: Apache 2.0](https://img.shields.io/badge/License-Apache%202.0-blue.svg?style=for-the-badge&logo=apache)](https://opensource.org/licenses/Apache-2.0)
+[![License: BSL 1.1](https://img.shields.io/badge/License-BSL%201.1%20Commercial%20Protected-crimson.svg?style=for-the-badge&logo=shield)](LICENSE)
 [![NPCI UPI Spec](https://img.shields.io/badge/NPCI%20UPI-v3.2%20Compliant-orange.svg?style=for-the-badge&logo=google-pay)](https://www.npci.org.in/)
 [![Engine Status](https://img.shields.io/badge/All%20Test%20Suites-100%25%20Passing-brightgreen.svg?style=for-the-badge&logo=githubactions)](tests/)
 [![Settlement Speed](https://img.shields.io/badge/Settlement-T%2B0%20Instant-purple.svg?style=for-the-badge&logo=fastapi)](/)
@@ -555,8 +555,12 @@ If you discover a vulnerability within DISHA's verification engine, double-entry
 - Provide a patch in a security release within **24 hours**.
 - Public recognition in the DISHA Hall of Fame and commercial bug bounty rewards.
 
-### License
-DISHA 8.2 is open-source software licensed under the **Apache License, Version 2.0**. Commercial merchants, gaming studios, and developers may use, modify, and self-host the software with complete sovereign freedom.
+### License & Commercial Protection (BSL 1.1)
+DISHA 8.2 is licensed under the **Business Source License 1.1 (BSL 1.1)**. 
+
+* **Evaluation & Personal Use**: You are free to view, test, and run the software locally for development, security auditing, and internal testing free of charge.
+* **Commercial Restriction**: You may **NOT** copy, resell, sublicense, or operate DISHA 8.2 (or any derivative work) as a commercial service, hosted payment gateway, or SaaS aggregator to third parties. Any unauthorized commercial exploitation constitutes willful copyright infringement subject to preliminary injunctions, statutory damages, and legal action.
+* **Commercial Enterprise Licenses**: To run DISHA 8.2 for your enterprise or production platform, contact: `nitish@thenitishkr.in`.
 
 ---
 
