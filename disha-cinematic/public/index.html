@@ -1,826 +1,142 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>DISHA 8.2 — Sovereign Direct UPI Payments & Double-Entry Ledger</title>
-  <meta name="description" content="DISHA 8.2 gives Indian merchants direct control over UPI payments: Zero commission (0% MDR), Smart VPA ban prevention, automated GST invoices, and browser voice soundbox.">
-
-  <!-- Production Typography: Space Grotesk + Inter + JetBrains Mono -->
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#f9f8ff">
+  <meta name="description" content="DISHA 8.2 is self-hosted merchant payment software for direct UPI experiences. Explore merchant tools and a one-time price based on four months of verified savings.">
+  <title>DISHA 8.2 | Your Business. Your Payment Software.</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;600;700&family=Space+Grotesk:wght@600;700;800&display=swap" rel="stylesheet">
-
-  <link rel="stylesheet" href="/styles.css">
-  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><polygon points='50,5 90,25 90,75 50,95 10,75 10,25' fill='none' stroke='%2310b981' stroke-width='8'/><circle cx='50' cy='50' r='14' fill='%2310b981'/></svg>">
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/phonepe-inspired.css">
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='19' fill='%23292272'/%3E%3Cpath d='M15 32h34M32 15v34' stroke='%235ff2c9' stroke-width='6' stroke-linecap='round'/%3E%3C/svg%3E">
 </head>
-<body class="cinematic-body">
-
-  <!-- Ambient Dynamic Canvas Particles -->
-  <canvas id="ambientCanvas" class="ambient-canvas" aria-hidden="true"></canvas>
-
-  <!-- Realtime Scroll Progress Line -->
-  <div class="scroll-progress-line" id="scrollProgressLine"></div>
-
-  <!-- Realtime Interactive Toast HUD -->
-  <div class="disha-toast" id="dishaToast">
-    <span class="toast-dot"></span>
-    <span class="toast-msg">DISHA 8.2 Sovereign Gateway Live</span>
-  </div>
-
-  <!-- ========================================================
-       TOP FULL-BLEED NAVIGATION (Simplified, Accessible, Clean)
-  ======================================================== -->
-  <header class="disha-bleed-nav" id="bleedNav">
-    <div class="nav-container">
-      
-      <!-- Brand Logo -->
-      <div class="nav-brand">
-        <a href="#scene-hero" class="brand-link" title="DISHA 8.2 Sovereign Payment Rail">
-          <div class="brand-hexagon">
-            <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2.2">
-              <polygon points="12 2 22 8.5 22 15.5 12 22 2 15.5 2 8.5 12 2"></polygon>
-              <circle cx="12" cy="12" r="3" fill="#10B981"></circle>
-            </svg>
-          </div>
-          <span class="brand-title">DISHA</span>
-          <span class="brand-tag">8.2 PRO</span>
-        </a>
-      </div>
-
-      <!-- Clean Anchor Links -->
-      <nav class="nav-center-links" id="navMenuLinks">
-        <a href="#scene-hero" class="nav-anchor active">Overview</a>
-        <a href="#scene-crisis" class="nav-anchor">Failure Modes</a>
-        <a href="#scene-architecture" class="nav-anchor">Architecture</a>
-        <a href="#scene-vpa-routing" class="nav-anchor">Smart VPA</a>
-        <a href="#scene-ledger" class="nav-anchor">Double Ledger</a>
-        <a href="#scene-calculator" class="nav-anchor">Savings</a>
-        <a href="#scene-soundbox" class="nav-anchor">Soundbox</a>
+<body>
+  <a class="skip-link" href="#main">Skip to content</a>
+  <header class="site-header" id="siteHeader">
+    <div class="header-inner">
+      <a class="brand" href="#home" aria-label="DISHA 8.2 homepage">
+        <span class="brand-mark" aria-hidden="true"><svg viewBox="0 0 44 44" fill="none"><path d="m22 3 18 10.5v17L22 41 4 30.5v-17L22 3Z" stroke="currentColor" stroke-width="2.6"/><path d="M13 22h18m-9-9v18" stroke="currentColor" stroke-width="2.9" stroke-linecap="round"/><circle cx="22" cy="22" r="4.2" fill="#69F5C5"/></svg></span>
+        <span class="brand-word">DISHA<span>8.2</span><small>MERCHANT PAYMENTS</small></span>
+      </a>
+      <nav class="desktop-nav" aria-label="Primary navigation">
+        <button class="nav-menu-trigger" type="button" data-menu="solutions" aria-expanded="false" aria-controls="megaMenu">Solutions <span class="chevron"></span></button>
+        <a href="#why-disha">Why DISHA</a>
+        <a href="#story">Our Story</a>
+        <a href="#trust">Trust &amp; Controls</a>
+        <a href="#pricing">Pricing</a>
+        <button class="nav-menu-trigger" type="button" data-menu="explore" aria-expanded="false" aria-controls="megaMenu">Explore <span class="chevron"></span></button>
       </nav>
-
-      <!-- Actions -->
-      <div class="nav-actions">
-        <!-- Audio Synthesizer Toggle -->
-        <button class="audio-toggle-btn active" id="audioSynthBtn" title="Toggle Synthesized Sound FX">
-          <span class="audio-waves">
-            <span class="wave-bar"></span>
-            <span class="wave-bar"></span>
-            <span class="wave-bar"></span>
-          </span>
-          <span class="audio-btn-text">Audio FX</span>
-        </button>
-
-        <a href="/login" class="btn-primary-login">
-          <span>Merchant Login</span>
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
-        </a>
-
-        <!-- Mobile Menu Toggle Button -->
-        <button class="mobile-toggle-btn" id="mobileNavToggle" aria-label="Toggle Navigation Menu">
-          <span></span>
-          <span></span>
-          <span></span>
-        </button>
+      <div class="header-actions">
+        <a class="text-action" href="/login">Merchant Login</a>
+        <a class="btn btn-dark btn-sm" href="#pricing">Get Started <span aria-hidden="true">↗</span></a>
+        <button class="mobile-menu-button" id="mobileMenuButton" type="button" aria-controls="mobileDrawer" aria-expanded="false" aria-label="Open menu"><span></span><span></span><span></span></button>
       </div>
-
+    </div>
+    <div id="megaMenu" class="mega-menu" hidden>
+      <div class="mega-inner" data-mega-content="solutions">
+        <div class="mega-intro"><span class="mini-label">THE DISHA PLATFORM</span><h3>Everything your shop needs. Nothing it doesn't.</h3><p>A more independent way to run your payment experience.</p></div>
+        <div class="mega-links">
+          <a href="#solutions"><span class="mega-icon purple">↗</span><span><strong>Direct UPI</strong><small>Payment links and QR experiences</small></span></a>
+          <a href="#merchant"><span class="mega-icon aqua">▦</span><span><strong>Merchant Workspace</strong><small>All your activity in one view</small></span></a>
+          <a href="#trust"><span class="mega-icon pink">◇</span><span><strong>Trust &amp; Controls</strong><small>Better signals, clearer records</small></span></a>
+          <a href="#pricing"><span class="mega-icon gold">₹</span><span><strong>One-Time Pricing</strong><small>Four months of verified savings</small></span></a>
+        </div>
+      </div>
+      <div class="mega-inner" data-mega-content="explore" hidden>
+        <div class="mega-intro"><span class="mini-label">GET TO KNOW DISHA</span><h3>Built around a simpler idea.</h3><p>Own your payment software, and make it work for your business.</p></div>
+        <div class="mega-links">
+          <a href="#story"><span class="mega-icon purple">▶</span><span><strong>Our Story</strong><small>Why we built DISHA</small></span></a>
+          <a href="#how-it-works"><span class="mega-icon aqua">↳</span><span><strong>How It Works</strong><small>The merchant journey</small></span></a>
+          <a href="#questions"><span class="mega-icon pink">?</span><span><strong>Frequently Asked Questions</strong><small>Clear answers, no jargon</small></span></a>
+          <a href="/login"><span class="mega-icon gold">→</span><span><strong>Merchant Login</strong><small>Enter your workspace</small></span></a>
+        </div>
+      </div>
+    </div>
+    <div class="mobile-drawer" id="mobileDrawer" hidden>
+      <nav aria-label="Mobile navigation">
+        <a href="#home">Home</a><a href="#solutions">Solutions</a><a href="#why-disha">Why DISHA</a><a href="#story">Our Story</a><a href="#how-it-works">How It Works</a><a href="#trust">Trust &amp; Controls</a><a href="#pricing">Pricing</a><a href="#questions">FAQ</a><a href="/login">Merchant Login</a><a class="drawer-cta" href="#pricing">Get Started ↗</a>
+      </nav>
     </div>
   </header>
-
-  <!-- Mobile Dropdown Navigation -->
-  <div class="mobile-menu-drawer" id="mobileDrawer">
-    <div class="mobile-menu-inner">
-      <a href="#scene-hero" class="mobile-link active">01. Overview</a>
-      <a href="#scene-crisis" class="mobile-link">02. Failure Modes of Aggregators</a>
-      <a href="#scene-architecture" class="mobile-link">03. Production Architecture</a>
-      <a href="#scene-vpa-routing" class="mobile-link">04. Smart VPA Rotation</a>
-      <a href="#scene-ledger" class="mobile-link">05. Double-Entry Accounting</a>
-      <a href="#scene-calculator" class="mobile-link">06. P&amp;L Savings Calculator</a>
-      <a href="#scene-soundbox" class="mobile-link">07. Browser Voice Soundbox</a>
-      <a href="/login" class="mobile-link highlight">Open Merchant Workspace →</a>
-    </div>
-  </div>
-
-  <!-- ========================================================
-       MAIN ENTERPRISE CANVAS
-  ======================================================== -->
-  <main class="story-canvas">
-
-    <!-- ========================================================
-         ACT 1: BALANCED INTEGRATED HERO (Headline + Merchant Story)
-    ======================================================== -->
-    <section class="story-scene scene-hero-balanced" id="scene-hero">
-      <div class="scene-inner-bounds">
-        <div class="hero-split-grid">
-          
-          <!-- LEFT: Clear Product Introduction & Call to Action -->
-          <div class="hero-content-col">
-            <div class="enterprise-eyebrow eyebrow-teal">
-              <span class="pulse-live-dot"></span>
-              <span>SOVEREIGN DIRECT UPI INFRASTRUCTURE</span>
-            </div>
-
-            <h1 class="hero-master-title">
-              Accept Payments Directly to Your Bank. <span class="text-teal">Zero Commission. Zero Fraud.</span>
-            </h1>
-
-            <p class="hero-master-sub">
-              DISHA gives Indian kiranas and retailers sovereign control over UPI collections. Dynamic decimal challenges, intelligent VPA rotation, and instant voice soundbox verification without giving away 2.36% to aggregators.
-            </p>
-
-            <div class="hero-action-group">
-              <a href="/login" class="btn-primary-hero magnetic-btn">
-                <span>Open Merchant Workspace</span>
-                <span class="btn-arrow">➔</span>
-              </a>
-              <button class="btn-secondary-hero magnetic-btn" onclick="document.getElementById('demoQrBox').click()">
-                <span>Simulate Customer Scan</span>
-              </button>
-            </div>
-
-            <!-- Balanced Key Metrics Strip -->
-            <div class="hero-metrics-pill-strip">
-              <div class="h-metric-item">
-                <span class="h-val">0.00%</span>
-                <span class="h-lbl">MDR Commission</span>
-              </div>
-              <div class="h-metric-sep"></div>
-              <div class="h-metric-item">
-                <span class="h-val">&lt; 15ms</span>
-                <span class="h-lbl">Voice Finality</span>
-              </div>
-              <div class="h-metric-sep"></div>
-              <div class="h-metric-item">
-                <span class="h-val">T+0</span>
-                <span class="h-lbl">Direct Bank Credit</span>
-              </div>
-              <div class="h-metric-sep"></div>
-              <div class="h-metric-item">
-                <span class="h-val">100%</span>
-                <span class="h-lbl">RBI &amp; GST Compliant</span>
-              </div>
-            </div>
+  <main id="main">
+    <section class="hero" id="home" aria-label="DISHA introduction">
+      <div class="hero-slide slide-first active" data-hero-slide="0">
+        <div class="hero-dust dust-one"></div>
+        <div class="hero-container">
+          <div class="hero-text">
+            <span class="eyebrow eyebrow-light"><span class="eyebrow-dot"></span> THE FUTURE OF MERCHANT-OWNED PAYMENTS</span>
+            <h1>You built the business.<br><em>Own the payment experience.</em></h1>
+            <p>Meet DISHA 8.2. Direct UPI tools, your own merchant workspace, and payment software you can run on your infrastructure.</p>
+            <div class="hero-cta"><a class="btn btn-white" href="#pricing">See What You Could Save <span aria-hidden="true">↗</span></a><a class="hero-text-link" href="#story">Discover our story <span aria-hidden="true">→</span></a></div>
+            <div class="hero-micro"><span><b>One-Time</b> Software Price</span><span><b>0%</b> DISHA Commission</span><span><b>Your</b> Deployment</span></div>
           </div>
-
-          <!-- RIGHT: Integrated Merchant Story & Interactive Terminal HUD -->
-          <div class="hero-visual-col">
-            <div class="cinematic-overlay-stage morning-stage tilt-card" data-tilt>
-              <img src="/assets/ramesh-kirana-morning.jpg" alt="Ramesh Kirana Store in Narayan Peth, Pune" class="stage-bg-image">
-              <div class="stage-scim-gradient"></div>
-
-              <div class="stage-overlay-content">
-                <!-- Location & Shop Badge -->
-                <div class="stage-header-row">
-                  <div class="location-badge">
-                    <span class="hud-dot-live"></span>
-                    <span>NARAYAN PETH, PUNE · 06:42 AM</span>
-                  </div>
-                  <div class="hud-live-tag">
-                    <span class="pulse-live-dot"></span>
-                    <span>REGISTER ACTIVE</span>
-                  </div>
-                </div>
-
-                <!-- Story Snippet -->
-                <div class="stage-story-snippet">
-                  <h3 class="stage-story-headline">Ramesh Provision Stores</h3>
-                  <p class="stage-story-text">
-                    Ramesh Kaka opens his shutter at dawn. Flour on his hands, tea on the stove. A customer selects groceries:
-                    <em>"Kaka, QR code scan karto."</em>
-                  </p>
-                </div>
-
-                <!-- Live Interactive Cash Register Terminal -->
-                <div class="stage-terminal-hud">
-                  <div class="hud-due-box">
-                    <div class="hud-due-col">
-                      <span class="hud-due-lbl">Amount Payable</span>
-                      <div class="hud-due-amt">₹1,000.00</div>
-                    </div>
-                    <div class="hud-due-col text-right">
-                      <span class="hud-due-lbl">Settlement VPA</span>
-                      <div class="hud-due-vpa">ramesh.store@okaxis</div>
-                    </div>
-                  </div>
-
-                  <!-- Live Interactive QR Code -->
-                  <div class="hud-qr-wrapper" id="demoQrBox" title="Click to simulate customer scan">
-                    <div class="hud-qr-frame">
-                      <svg class="qr-svg" viewBox="0 0 100 100" fill="none">
-                        <rect x="6" y="6" width="24" height="24" rx="4" stroke="#05070B" stroke-width="4"/>
-                        <rect x="11" y="11" width="14" height="14" fill="#05070B"/>
-                        <rect x="70" y="6" width="24" height="24" rx="4" stroke="#05070B" stroke-width="4"/>
-                        <rect x="75" y="11" width="14" height="14" fill="#05070B"/>
-                        <rect x="6" y="70" width="24" height="24" rx="4" stroke="#05070B" stroke-width="4"/>
-                        <rect x="11" y="75" width="14" height="14" fill="#05070B"/>
-                        <rect x="38" y="8" width="6" height="6" fill="#05070B"/>
-                        <rect x="50" y="8" width="8" height="6" fill="#05070B"/>
-                        <rect x="38" y="22" width="14" height="6" fill="#05070B"/>
-                        <rect x="8" y="38" width="20" height="6" fill="#05070B"/>
-                        <rect x="36" y="36" width="26" height="26" rx="4" fill="#10B981" id="qrCenterLogo"/>
-                        <rect x="68" y="44" width="8" height="14" fill="#05070B"/>
-                        <rect x="82" y="38" width="10" height="16" fill="#05070B"/>
-                        <rect x="38" y="68" width="8" height="18" fill="#05070B"/>
-                        <rect x="52" y="76" width="18" height="12" fill="#05070B"/>
-                        <rect x="78" y="72" width="14" height="18" fill="#05070B"/>
-                      </svg>
-                      <div class="scanner-laser" id="scannerLaser"></div>
-                    </div>
-
-                    <div class="hud-qr-actions">
-                      <div class="hud-prompt-text" id="scanPromptText">
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align: -2px; margin-right: 4px;"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon></svg>Click QR code to simulate customer scan
-                      </div>
-                      <div class="hud-sub-text">
-                        Supports PhonePe · Google Pay · Paytm · BHIM
-                      </div>
-                      <button class="hud-btn-tap magnetic-btn" onclick="document.getElementById('demoQrBox').click()">
-                        Simulate Customer UPI Tap
-                      </button>
-                    </div>
-                  </div>
-
-                </div>
-
-              </div>
-            </div>
+          <div class="hero-visual hero-visual-market" aria-hidden="true">
+            <div class="visual-ring ring-one"></div><div class="visual-ring ring-two"></div>
+            <div class="market-image"><img src="/assets/ramesh-kirana-morning.jpg" alt="" loading="eager"></div>
+            <div class="floating-note note-top"><span class="note-symbol mint">✓</span><div><strong>One clear workspace</strong><small>Your payments, your view</small></div></div>
+            <div class="floating-note note-bottom"><span class="note-symbol peach">₹</span><div><strong>Merchant-first software</strong><small>Built for the way you work</small></div></div>
+            <div class="hero-coin coin-a">₹</div><div class="hero-coin coin-b">₹</div>
           </div>
-
+        </div>
+      </div>
+      <div class="hero-slide slide-second" data-hero-slide="1" aria-hidden="true">
+        <div class="hero-container">
+          <div class="hero-text">
+            <span class="eyebrow eyebrow-light"><span class="eyebrow-dot"></span> A DIFFERENT WAY TO PAY FOR SOFTWARE</span>
+            <h1>Four months of savings.<br><em>One-time price.</em></h1>
+            <p>We look at the costs DISHA can genuinely remove from your business. You pay once, based on four months of verified net savings.</p>
+            <div class="hero-cta"><a class="btn btn-white" href="#pricing">Calculate My Price <span aria-hidden="true">↗</span></a><a class="hero-text-link" href="#how-it-works">How it works <span aria-hidden="true">→</span></a></div>
+          </div>
+          <div class="hero-visual savings-visual" aria-hidden="true"><div class="savings-orb"></div><div class="savings-card"><small>ONE-TIME DISHA LICENSE</small><strong>4× <span>monthly net savings</span></strong><div class="savings-divider"></div><div class="savings-row"><span>Monthly subscription</span><b>₹0</b></div><div class="savings-row"><span>DISHA transaction commission</span><b>0%</b></div><div class="savings-row"><span>Forced plan upgrades</span><b>None</b></div></div></div>
+        </div>
+      </div>
+      <div class="hero-slide slide-third" data-hero-slide="2" aria-hidden="true">
+        <div class="hero-container">
+          <div class="hero-text">
+            <span class="eyebrow eyebrow-light"><span class="eyebrow-dot"></span> ALL THE CLARITY, LESS OF THE CLUTTER</span>
+            <h1>A clearer view of<br><em>every business day.</em></h1>
+            <p>Create payment requests, view transactions, manage UPI IDs and keep your business records together—without juggling a maze of tools.</p>
+            <div class="hero-cta"><a class="btn btn-white" href="#merchant">Explore Merchant Tools <span aria-hidden="true">↗</span></a><a class="hero-text-link" href="/login">Merchant login <span aria-hidden="true">→</span></a></div>
+          </div>
+          <div class="hero-visual dashboard-visual" aria-hidden="true"><div class="mock-dashboard"><div class="mock-bar"><span class="mock-logo">D</span><span>Merchant overview</span><i>● ● ●</i></div><div class="mock-dashboard-body"><small>SALES ACTIVITY · ILLUSTRATIVE PREVIEW</small><div class="mock-dashboard-stat">₹42,850 <span>↗</span></div><div class="mock-wave"><svg viewBox="0 0 420 160" preserveAspectRatio="none"><defs><linearGradient id="dashboardWave" x1="0" y1="0" x2="0" y2="1"><stop stop-color="#53e4c5" stop-opacity=".45"/><stop offset="1" stop-color="#53e4c5" stop-opacity="0"/></linearGradient></defs><path d="M0 118 C55 110 62 40 120 72 S210 145 261 63 S353 44 420 10 L420 160 L0 160Z" fill="url(#dashboardWave)"/><path d="M0 118 C55 110 62 40 120 72 S210 145 261 63 S353 44 420 10" fill="none" stroke="#45d5b5" stroke-width="5"/></svg></div><div class="mock-row"><span>Transaction records</span><span>View all →</span></div><div class="mock-transactions"><div><span class="tiny-avatar">₹</span> Payment activity <b>●</b></div><div><span class="tiny-avatar t-purple">↗</span> Payment link <b>●</b></div></div></div></div></div>
+        </div>
+      </div>
+      <div class="hero-controls"><div class="hero-controls-inner"><div class="slide-dots" role="group" aria-label="Choose a featured message"><button class="hero-dot active" type="button" data-slide-go="0" aria-label="Show slide 1" aria-current="true"></button><button class="hero-dot" type="button" data-slide-go="1" aria-label="Show slide 2"></button><button class="hero-dot" type="button" data-slide-go="2" aria-label="Show slide 3"></button></div><div class="slide-arrows"><button id="previousSlide" type="button" aria-label="Previous slide">←</button><button id="nextSlide" type="button" aria-label="Next slide">→</button></div></div></div>
+    </section>
+    <section class="solution-jump" aria-label="Explore DISHA solutions">
+      <div class="content-width jump-grid">
+        <a href="#solutions" class="jump-item"><span class="jump-symbol lilac">↗</span><span><strong>Direct UPI</strong><small>Payment links &amp; QR</small></span><i aria-hidden="true">↗</i></a>
+        <a href="#merchant" class="jump-item"><span class="jump-symbol mint">▦</span><span><strong>Merchant Workspace</strong><small>Everything in one view</small></span><i aria-hidden="true">↗</i></a>
+        <a href="#trust" class="jump-item"><span class="jump-symbol coral">◇</span><span><strong>Trust &amp; Controls</strong><small>Clearer payment records</small></span><i aria-hidden="true">↗</i></a>
+        <a href="#pricing" class="jump-item"><span class="jump-symbol amber">₹</span><span><strong>One-Time Pricing</strong><small>Based on verified savings</small></span><i aria-hidden="true">↗</i></a>
+      </div>
+    </section>
+    <section class="section section-solutions" id="solutions">
+      <div class="content-width">
+        <div class="section-heading"><span class="section-tag">THE SIMPLE WAY FORWARD</span><h2>Business payments,<br><span>made more yours.</span></h2><p>The tools you reach for every day should feel like they belong to your business. That's the whole idea.</p></div>
+        <div class="feature-split">
+          <div class="feature-lines">
+            <article class="feature-line"><span class="feature-number">01</span><div><h3>Create a payment in moments</h3><p>Share a payment link or QR, and let customers use a compatible UPI app they already know.</p></div></article>
+            <article class="feature-line"><span class="feature-number">02</span><div><h3>See the work, not the clutter</h3><p>Payment activity, UPI IDs, and merchant operations live in one thoughtfully organized workspace.</p></div></article>
+            <article class="feature-line"><span class="feature-number">03</span><div><h3>Keep your own setup</h3><p>Run DISHA on your chosen infrastructure, with configuration and operational data under your control.</p></div></article>
+          </div>
+          <div class="feature-art" aria-label="Illustrative view of a DISHA payment request"><div class="art-halo"></div><div class="pay-phone"><div class="phone-top"><span>9:41</span><span>●●●</span></div><div class="phone-title"><span class="phone-brand">D</span> DISHA 8.2</div><div class="phone-center"><span>PAYMENT REQUEST</span><strong>₹1,249<span>.00</span></strong><div class="phone-qr"><svg viewBox="0 0 100 100" aria-hidden="true"><rect x="4" y="4" width="28" height="28" fill="none" stroke="currentColor" stroke-width="6"/><rect x="12" y="12" width="12" height="12" fill="currentColor"/><rect x="68" y="4" width="28" height="28" fill="none" stroke="currentColor" stroke-width="6"/><rect x="76" y="12" width="12" height="12" fill="currentColor"/><rect x="4" y="68" width="28" height="28" fill="none" stroke="currentColor" stroke-width="6"/><rect x="12" y="76" width="12" height="12" fill="currentColor"/><path d="M42 8h9v9h-9zm13 13h8v8h-8zM39 40h11v10H39zm18 0h6v18h-6zm11 7h20v8H68zm-27 13h10v15H41zm16 9h12v9H57zm19-8h14v11H76zm-3 24h8v9h-8zM43 86h10v10H43z" fill="currentColor"/></svg></div><small>ILLUSTRATIVE DEMO • NOT A LIVE QR</small></div><div class="phone-bottom">Send payment request <span>→</span></div></div><div class="art-pop pop-left"><span>✓</span> One merchant workspace</div><div class="art-pop pop-right"><span>↗</span> Direct UPI experience</div></div>
         </div>
       </div>
     </section>
-
-    <!-- ========================================================
-         ACT 2: THE 3 FAILURE MODES OF LEGACY AGGREGATORS
-    ======================================================== -->
-    <section class="story-scene scene-crisis" id="scene-crisis">
-      <div class="scene-inner-bounds">
-        
-        <div class="scene-lead-header">
-          <div class="enterprise-eyebrow eyebrow-red">
-            <span>THE CORE PROBLEM MERCHANTS FACE</span>
-          </div>
-          <h2 class="scene-master-title">The Three Failure Modes of Legacy Aggregators.</h2>
-          <p class="scene-master-sub">
-            Legacy payment gateways siphon hard-earned retail margins, leave static paper stickers open to spoofing, and trap customer funds in multi-day interbank escrow.
-          </p>
-        </div>
-
-        <!-- 3-Column Comparative Cards -->
-        <div class="crisis-trio-grid">
-          
-          <!-- Failure Mode 1: The Economic Bleed -->
-          <div class="trio-cinematic-card bleed-card tilt-card" data-tilt>
-            <div class="trio-media-wrapper">
-              <img src="/assets/currency-bleed.jpg" alt="Currency disintegrating under fees" class="trio-bg-img">
-              <div class="trio-gradient-scim"></div>
-
-              <div class="trio-overlay-content">
-                <div class="trio-top-bar">
-                  <span class="trio-number">01</span>
-                  <span class="trio-badge badge-red">THE ECONOMIC BLEED</span>
-                </div>
-
-                <div class="trio-main-info">
-                  <h3 class="trio-title">₹23.60 Siphoned on Every ₹1,000 Sale</h3>
-                  <p class="trio-desc">
-                    Aggregators quietly extract 1.8% MDR + 18% GST + monthly soundbox rental fees. A store doing ₹6L monthly turnover loses <strong>₹1,69,920 annually</strong> — equal to 7 months of shop rent.
-                  </p>
-
-                  <div class="trio-breakdown-table">
-                    <div class="t-row">
-                      <span>Aggregator Base MDR (1.80%)</span>
-                      <strong class="text-loss">-₹18.00</strong>
-                    </div>
-                    <div class="t-row">
-                      <span>GST on Fee (18%)</span>
-                      <strong class="text-loss">-₹3.24</strong>
-                    </div>
-                    <div class="t-row">
-                      <span>Hardware Soundbox SIM Rental</span>
-                      <strong class="text-loss">-₹125/mo</strong>
-                    </div>
-                    <div class="t-row highlight-row">
-                      <span>DISHA Direct Settlement</span>
-                      <strong class="text-teal">₹0.00 (Zero MDR)</strong>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <!-- Failure Mode 2: The Attack Surface -->
-          <div class="trio-cinematic-card hacker-card tilt-card" data-tilt>
-            <div class="trio-media-wrapper">
-              <img src="/assets/hacker-shadows.jpg" alt="Cyber attacks on static QR codes" class="trio-bg-img">
-              <div class="trio-gradient-scim"></div>
-
-              <div class="trio-overlay-content">
-                <div class="trio-top-bar">
-                  <span class="trio-number">02</span>
-                  <span class="trio-badge badge-purple">THE ATTACK SURFACE</span>
-                </div>
-
-                <div class="trio-main-info">
-                  <h3 class="trio-title">Static QR Stickers &amp; Fake Soundboxes</h3>
-                  <p class="trio-desc">
-                    Paper QR stickers can be pasted over with malicious UPI IDs. Telegram channels sell fake payment soundbox APKs that play simulated voice confirmations on customer phones.
-                  </p>
-
-                  <div class="trio-breakdown-table">
-                    <div class="t-row">
-                      <span>Paper QR Sticker Risk</span>
-                      <strong class="text-loss">Vulnerable to swap</strong>
-                    </div>
-                    <div class="t-row">
-                      <span>Fake Soundbox Audio APKs</span>
-                      <strong class="text-loss">Undetected fraud</strong>
-                    </div>
-                    <div class="t-row highlight-row">
-                      <span>DISHA Dynamic Decimal</span>
-                      <strong class="text-teal">Unique Cents per Txn</strong>
-                    </div>
-                    <div class="t-row highlight-row">
-                      <span>Untouchable Canvas QR</span>
-                      <strong class="text-teal">Anti-OCR 15s Refresh</strong>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <!-- Failure Mode 3: The 7-Day Limbo -->
-          <div class="trio-cinematic-card limbo-card tilt-card" data-tilt>
-            <div class="trio-media-wrapper">
-              <img src="/assets/priya-panic.jpg" alt="Customer payment gateway timeout distress" class="trio-bg-img">
-              <div class="trio-gradient-scim"></div>
-
-              <div class="trio-overlay-content">
-                <div class="trio-top-bar">
-                  <span class="trio-number">03</span>
-                  <span class="trio-badge badge-amber">THE 7-DAY LIMBO</span>
-                </div>
-
-                <div class="trio-main-info">
-                  <h3 class="trio-title">₹5,000 Debited. Zero Seat. Pure Panic.</h3>
-                  <p class="trio-desc">
-                    A customer pays ₹5,000 for a certification exam. Her bank debits immediately, but the aggregator times out. The payment is trapped in interbank escrow for 7 days.
-                  </p>
-
-                  <div class="trio-breakdown-table">
-                    <div class="t-row">
-                      <span>Aggregator Settlement</span>
-                      <strong class="text-loss">T+2 to T+7 Days</strong>
-                    </div>
-                    <div class="t-row">
-                      <span>Support Resolution</span>
-                      <strong class="text-loss">Automated Bots</strong>
-                    </div>
-                    <div class="t-row highlight-row">
-                      <span>DISHA Bank Settlement</span>
-                      <strong class="text-teal">T+0 Instant Credit</strong>
-                    </div>
-                    <div class="t-row highlight-row">
-                      <span>Voice Finality Speed</span>
-                      <strong class="text-teal">&lt; 15ms at counter</strong>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-
-        </div>
-      </div>
-    </section>
-
-    <!-- ========================================================
-         ACT 3: PRODUCTION ARCHITECTURE STACK
-    ======================================================== -->
-    <section class="story-scene scene-architecture" id="scene-architecture">
-      <div class="scene-inner-bounds">
-        <div class="scene-lead-header">
-          <div class="enterprise-eyebrow eyebrow-teal">
-            <span>FULL PRODUCTION INFRASTRUCTURE</span>
-          </div>
-          <h2 class="scene-master-title">Four Sovereign Layers. Zero Gateway Escrow.</h2>
-          <p class="scene-master-sub">
-            From the customer's phone to the merchant's current account, transactions settle instantly with complete cryptographic attestation.
-          </p>
-        </div>
-
-        <div class="pipeline-flow-grid">
-          
-          <div class="pipeline-step-card">
-            <div class="step-num-badge">01</div>
-            <div class="step-icon">
-              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="5" y="2" width="14" height="20" rx="2" ry="2"></rect><line x1="12" y1="18" x2="12.01" y2="18"></line></svg>
-            </div>
-            <h4 class="step-title">Customer Device</h4>
-            <p class="step-desc">
-              Customer triggers payment using their existing UPI app (GPay, PhonePe, Paytm) via standard NPCI deep links.
-            </p>
-            <div class="step-badge">NPCI Intent Spec</div>
-          </div>
-
-          <div class="pipeline-step-card">
-            <div class="step-num-badge">02</div>
-            <div class="step-icon">
-              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="16 3 21 3 21 8"></polyline><line x1="4" y1="20" x2="21" y2="3"></line><polyline points="21 16 21 21 16 21"></polyline><line x1="15" y1="15" x2="21" y2="21"></line><line x1="4" y1="4" x2="9" y2="9"></line></svg>
-            </div>
-            <h4 class="step-title">Smart VPA Routing</h4>
-            <p class="step-desc">
-              Incoming payments are dynamically assigned across merchant bank VPAs to prevent banking velocity bans.
-            </p>
-            <div class="step-badge">Velocity Protection</div>
-          </div>
-
-          <div class="pipeline-step-card">
-            <div class="step-num-badge">03</div>
-            <div class="step-icon">
-              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path><path d="M9 12l2 2 4-4"></path></svg>
-            </div>
-            <h4 class="step-title">7-Layer Fraud Engine</h4>
-            <p class="step-desc">
-              Verifies session TTL, exact challenge cents, 12-digit UTR freshness, and blacklist replay detection.
-            </p>
-            <div class="step-badge">Mathematical Proof</div>
-          </div>
-
-          <div class="pipeline-step-card">
-            <div class="step-num-badge">04</div>
-            <div class="step-icon">
-              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 21h18M3 10h18M5 6l7-3 7 3M4 10v11M20 10v11M8 14v4M12 14v4M16 14v4"></path></svg>
-            </div>
-            <h4 class="step-title">Bank Ledger &amp; Voice</h4>
-            <p class="step-desc">
-              Direct credit into merchant bank account, atomic double-entry ledger posting, and counter voice announcement.
-            </p>
-            <div class="step-badge">T+0 Bank Finality</div>
-          </div>
-
-        </div>
-      </div>
-    </section>
-
-    <!-- ========================================================
-         ACT 4: SMART VPA ROTATION ENGINE
-    ======================================================== -->
-    <section class="story-scene scene-vpa" id="scene-vpa-routing">
-      <div class="scene-inner-bounds">
-        <div class="scene-lead-header">
-          <div class="enterprise-eyebrow eyebrow-teal">
-            <span>BAN PREVENTION ENGINE</span>
-          </div>
-          <h2 class="scene-master-title">Smart VPA Rotation. Never Get Frozen.</h2>
-          <p class="scene-master-sub">
-            Banks automatically freeze retail UPI accounts receiving more than 30 to 50 daily transactions. DISHA rotates across multiple VPAs to keep every account healthy and active.
-          </p>
-        </div>
-
-        <div class="vpa-showcase-grid">
-          
-          <!-- VPA Card 1 -->
-          <div class="vpa-card active-vpa" id="vpa-axis">
-            <div class="vpa-bank-header">
-              <span class="vpa-bank-name">Axis Bank</span>
-              <span class="vpa-health-pill health-green">● 98% Health</span>
-            </div>
-            <div class="vpa-address font-mono">ramesh.store@okaxis</div>
-            <div class="vpa-limits-bar">
-              <div class="vpa-limit-fill" style="width: 60%;"></div>
-            </div>
-            <div class="vpa-meta-row">
-              <span>Daily Volume: 18 / 30 Txns</span>
-              <span class="text-teal">ACTIVE ROUTE</span>
-            </div>
-          </div>
-
-          <!-- VPA Card 2 -->
-          <div class="vpa-card" id="vpa-icici">
-            <div class="vpa-bank-header">
-              <span class="vpa-bank-name">ICICI Bank</span>
-              <span class="vpa-health-pill health-green">● 96% Health</span>
-            </div>
-            <div class="vpa-address font-mono">ramesh.pune@icici</div>
-            <div class="vpa-limits-bar">
-              <div class="vpa-limit-fill" style="width: 40%;"></div>
-            </div>
-            <div class="vpa-meta-row">
-              <span>Daily Volume: 12 / 30 Txns</span>
-              <span class="text-muted">STANDBY</span>
-            </div>
-          </div>
-
-          <!-- VPA Card 3 -->
-          <div class="vpa-card" id="vpa-yes">
-            <div class="vpa-bank-header">
-              <span class="vpa-bank-name">YES Bank</span>
-              <span class="vpa-health-pill health-green">● 94% Health</span>
-            </div>
-            <div class="vpa-address font-mono">ramesh.retail@ybl</div>
-            <div class="vpa-limits-bar">
-              <div class="vpa-limit-fill" style="width: 25%;"></div>
-            </div>
-            <div class="vpa-meta-row">
-              <span>Daily Volume: 7 / 30 Txns</span>
-              <span class="text-muted">STANDBY</span>
-            </div>
-          </div>
-
-        </div>
-
-        <!-- Interactive Simulation Control -->
-        <div class="vpa-sim-terminal">
-          <div class="vpa-sim-header">
-            <span>ALGORITHM TELEMETRY: WEIGHTED VPA SCORING &amp; PATTERN MASKING</span>
-            <button class="btn-terminal-action" id="btnSimulateOrder">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align: -2px; margin-right: 4px;"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon></svg>
-              <span>Simulate Incoming ₹500 Transaction</span>
-            </button>
-          </div>
-          <div class="vpa-sim-body font-mono" id="algoLogBody">
-            [02:24:10] VPA Engine Initialized: 3 Active Channels in Pool.<br>
-            [02:24:12] Candidate scored: ramesh.store@okaxis (Score: 89.2) -> Selected for active routing.<br>
-            [02:24:12] Cooldown factor applied (45s). Next routing will mask previous handle pattern.
-          </div>
-        </div>
-
-      </div>
-    </section>
-
-    <!-- ========================================================
-         ACT 5: DOUBLE-ENTRY ACCOUNTING LEDGER
-    ======================================================== -->
-    <section class="story-scene scene-ledger" id="scene-ledger">
-      <div class="scene-inner-bounds">
-        <div class="scene-lead-header">
-          <div class="enterprise-eyebrow eyebrow-teal">
-            <span>AUTOMATED AUDIT TRAIL</span>
-          </div>
-          <h2 class="scene-master-title">Double-Entry Ledger. GST-Ready Books.</h2>
-          <p class="scene-master-sub">
-            Every transaction creates mathematically balanced journal entries: Debit Bank Account (Asset) and Credit Sales Revenue, ensuring one-click GST compliance.
-          </p>
-        </div>
-
-        <div class="ledger-journal-card">
-          <div class="ledger-header-row">
-            <div>
-              <h4 style="font-family: var(--font-display); font-size: 1.15rem; color: #FFFFFF;">Real-Time General Journal</h4>
-              <span style="font-size: 0.8rem; color: var(--text-muted);">Atomic double-entry postings with 12-digit NPCI Bank UTR</span>
-            </div>
-            <div class="ledger-status-pill">
-              <span class="pulse-live-dot"></span>
-              <span>INVARIANT VERIFIED: ₹0.00 IMBALANCE</span>
-            </div>
-          </div>
-
-          <div class="ledger-table-wrapper">
-            <table class="ledger-table font-mono">
-              <thead>
-                <tr>
-                  <th>Timestamp</th>
-                  <th>Order Reference</th>
-                  <th>Account Code</th>
-                  <th>Account Name</th>
-                  <th>Debit (Dr)</th>
-                  <th>Credit (Cr)</th>
-                </tr>
-              </thead>
-              <tbody id="ledgerTableBody">
-                <tr>
-                  <td>15/11 06:42:12</td>
-                  <td><code>Order_831C904E</code></td>
-                  <td>1010-BANK</td>
-                  <td>Direct Bank Settlement (Asset)</td>
-                  <td class="text-teal font-bold">₹1,000.37</td>
-                  <td class="text-muted">—</td>
-                </tr>
-                <tr>
-                  <td>15/11 06:42:12</td>
-                  <td><code>Order_831C904E</code></td>
-                  <td>4010-REVENUE</td>
-                  <td>Kirana Sales Revenue</td>
-                  <td class="text-muted">—</td>
-                  <td class="text-teal font-bold">₹1,000.37</td>
-                </tr>
-              </tbody>
-              <tfoot>
-                <tr class="ledger-footer-row">
-                  <td colspan="4" class="text-right font-bold">JOURNAL TOTALS (BALANCED):</td>
-                  <td class="text-teal font-bold" id="totalDebitsVal">₹1,000.37</td>
-                  <td class="text-teal font-bold" id="totalCreditsVal">₹1,000.37</td>
-                </tr>
-              </tfoot>
-            </table>
-          </div>
-        </div>
-
-      </div>
-    </section>
-
-    <!-- ========================================================
-         ACT 6: P&L ROI CALCULATOR
-    ======================================================== -->
-    <section class="story-scene scene-calculator" id="scene-calculator">
-      <div class="scene-inner-bounds">
-        <div class="scene-lead-header">
-          <div class="enterprise-eyebrow eyebrow-teal">
-            <span>PROFIT &amp; LOSS IMPACT</span>
-          </div>
-          <h2 class="scene-master-title">Calculate Your Gateway Commission Loss.</h2>
-          <p class="scene-master-sub">
-            Move the slider to see how much money your store loses each year to 1.8% MDR + 18% GST + soundbox hardware rental.
-          </p>
-        </div>
-
-        <div class="calc-widget-card">
-          <div class="calc-slider-header">
-            <span>Monthly Store Turnover:</span>
-            <strong class="font-mono text-teal" id="turnoverDisplay" style="font-size: 1.5rem;">₹6,00,000/mo</strong>
-          </div>
-
-          <input type="range" id="monthlyTurnover" class="styled-range-slider" min="50000" max="5000000" step="25000" value="600000">
-
-          <div class="calc-results-duo">
-            <div class="calc-card legacy-loss">
-              <span class="calc-card-eyebrow text-loss">LEGACY GATEWAY COMMISSION SIPHON</span>
-              <div class="calc-big-num text-loss" id="annualLossDisplay">₹1,69,920</div>
-              <div class="calc-sub-text">Lost each year to 1.8% MDR + 18% GST + hardware rent</div>
-            </div>
-
-            <div class="calc-card disha-savings">
-              <span class="calc-card-eyebrow text-teal">DISHA ANNUAL SAVINGS RETAINED</span>
-              <div class="calc-big-num text-teal" id="annualSavingsDisplay">₹1,69,920</div>
-              <div class="calc-sub-text">100% kept in merchant bank account (Equals 7 months of shop rent)</div>
-            </div>
-          </div>
-        </div>
-
-      </div>
-    </section>
-
-    <!-- ========================================================
-         ACT 7: BROWSER-NATIVE COUNTER SOUNDBOX
-    ======================================================== -->
-    <section class="story-scene scene-soundbox" id="scene-soundbox">
-      <div class="scene-inner-bounds">
-        <div class="scene-lead-header">
-          <div class="enterprise-eyebrow eyebrow-teal">
-            <span>HARDWARE-FREE COUNTER AUDIO</span>
-          </div>
-          <h2 class="scene-master-title">Browser Voice Soundbox. Zero Monthly Rent.</h2>
-          <p class="scene-master-sub">
-            No proprietary SIM boxes. No ₹125/month battery replacement fees. Any smartphone, tablet, or PC browser becomes an instant loud payment soundbox.
-          </p>
-        </div>
-
-        <div class="soundbox-hardware-stage">
-          <div class="soundbox-device-box">
-            <div class="soundbox-speaker-grille">
-              <span></span><span></span><span></span><span></span>
-              <span></span><span></span><span></span><span></span>
-            </div>
-
-            <div class="soundbox-led-display font-mono" id="soundboxLedText">
-              DISHA · READY ₹
-            </div>
-
-            <div class="soundbox-lang-select-box">
-              <label for="soundboxLangSelect" style="font-size: 0.8rem; color: var(--text-muted); display: block; margin-bottom: 6px;">
-                Announcement Language:
-              </label>
-              <select id="soundboxLangSelect" class="soundbox-select">
-                <option value="en-IN">English ("Payment of ₹1,000 received")</option>
-                <option value="hi-IN">Hindi ("DISHA par 1,000 rupaye prapt hue")</option>
-                <option value="mr-IN">Marathi ("DISHA var 1,000 rupaye prapt jhale")</option>
-              </select>
-            </div>
-
-            <div class="soundbox-controls-row">
-              <button class="btn-soundbox-play" id="testSoundboxEnBtn" onclick="window.dishaAudio && window.dishaAudio.speakPayment(1000)">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align: -3px; margin-right: 6px;"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon><path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"></path></svg>
-                <span>Test Audio Voice Announcement</span>
-              </button>
-            </div>
-          </div>
-        </div>
-
-      </div>
-    </section>
-
-    <!-- ========================================================
-         ACT 8: MERCHANT CONSOLE PREVIEW & LAUNCH
-    ======================================================== -->
-    <section class="story-scene scene-dashboard-preview" id="scene-dashboard">
-      <div class="scene-inner-bounds">
-        <div class="scene-lead-header">
-          <div class="enterprise-eyebrow eyebrow-teal">
-            <span>SOVEREIGN MERCHANT WORKSPACE</span>
-          </div>
-          <h2 class="scene-master-title">Complete Merchant Control Center.</h2>
-          <p class="scene-master-sub">
-            Sign in to track real-time collections, generate dynamic payment links, rotate UPI settlement handles, and export tax reports.
-          </p>
-        </div>
-
-        <div class="console-hero-card">
-          <div class="console-top-strip">
-            <div class="console-traffic-lights">
-              <span></span><span></span><span></span>
-            </div>
-            <span class="console-url font-mono">https://disha.merchant.in/dashboard</span>
-          </div>
-
-          <div class="console-preview-body">
-            <div class="console-kpi-row">
-              <div class="kpi-mini-card">
-                <span class="kpi-lbl">Total Volume</span>
-                <span class="kpi-val text-teal">₹8,409.50</span>
-              </div>
-              <div class="kpi-mini-card">
-                <span class="kpi-lbl">Orders Cleared</span>
-                <span class="kpi-val">8 Txns</span>
-              </div>
-              <div class="kpi-mini-card">
-                <span class="kpi-lbl">Gateway Fees Saved</span>
-                <span class="kpi-val text-teal">₹198.46</span>
-              </div>
-              <div class="kpi-mini-card">
-                <span class="kpi-lbl">Active Handles</span>
-                <span class="kpi-val">2 VPAs</span>
-              </div>
-            </div>
-
-            <div class="console-cta-strip">
-              <a href="/login" class="btn-primary-hero">
-                <span>Sign In to Merchant Workspace</span>
-                <span class="btn-arrow">➔</span>
-              </a>
-              <a href="/setup" class="btn-secondary-hero">
-                <span>First-Time Merchant Onboarding</span>
-              </a>
-            </div>
-          </div>
-        </div>
-
-      </div>
-    </section>
-
+    <section class="section section-benefits" id="why-disha"><div class="content-width"><div class="section-heading centered"><span class="section-tag">WHY DISHA</span><h2>More independence.<br><span>Less getting in your way.</span></h2><p>Technology is meant to simplify your business—not become another thing you have to chase.</p></div><div class="benefit-grid"><article class="benefit-card benefit-purple"><span class="benefit-icon">▣</span><h3>Your software. Your space.</h3><p>Choose where your payment software runs. Keep the experience close to the way your business operates.</p><span class="card-arrow">↗</span></article><article class="benefit-card benefit-peach"><span class="benefit-icon">◎</span><h3>Costs you can explain.</h3><p>One agreed software price based on actual savings, not a new DISHA commission each time you make a sale.</p><span class="card-arrow">↗</span></article><article class="benefit-card benefit-mint"><span class="benefit-icon">≋</span><h3>Everything, together.</h3><p>Bring payment requests, transaction activity, merchant records and reporting into a single workflow.</p><span class="card-arrow">↗</span></article></div></div></section>
+    <section class="section section-story" id="story"><div class="content-width"><div class="story-wrap"><div class="story-copy"><span class="section-tag inverse">OUR STORY, IN 15 SECONDS</span><h2>A customer pays.<br>Why should your software stand in the way?</h2><p>Picture a busy shop. A customer reaches for their phone. The shopkeeper waits. Then comes the maze of extra fees, delayed information and tools neither person controls.</p><p>DISHA is built around a simpler idea: let merchants operate the software behind their own payment experience.</p><a class="btn btn-white" href="#how-it-works">See the DISHA approach <span aria-hidden="true">↗</span></a></div><div class="story-graphic" aria-label="Illustration of a customer and merchant connecting around a payment barrier"><div class="story-backlight"></div><div class="story-customer character"><div class="character-head">●</div><div class="character-body">Customer</div><div class="character-hand hand-right"></div></div><div class="story-gateway"><span>PAYMENT<br>FRICTION</span><strong>⇢</strong></div><div class="story-merchant character"><div class="character-head">●</div><div class="character-body">Merchant</div><div class="character-hand hand-left"></div></div><div class="story-disha">DISHA 8.2 <span>✦</span></div><div class="story-caption">Illustrated concept — direct software connection</div></div></div></div></section>
+    <section class="section section-how" id="how-it-works"><div class="content-width"><div class="section-heading centered"><span class="section-tag">BUILT FOR EVERYDAY BUSINESS</span><h2>From your counter<br><span>to your control.</span></h2><p>A familiar customer experience, with more of the software in your hands.</p></div><div class="steps"><div class="step"><span>01</span><div class="step-mark">▣</div><h3>Set up your workspace</h3><p>Configure your merchant profile and supported UPI payment details.</p></div><div class="step"><span>02</span><div class="step-mark">↗</div><h3>Share a payment request</h3><p>Create a link or QR for customers to use with a compatible UPI app.</p></div><div class="step"><span>03</span><div class="step-mark">✓</div><h3>Stay on top of activity</h3><p>Review transaction information, account tools and reports from one place.</p></div></div></div></section>
+    <section class="section section-merchant" id="merchant"><div class="content-width"><div class="merchant-heading"><div><span class="section-tag">BUSINESS SOLUTIONS</span><h2>One workspace.<br><span>Many little wins.</span></h2></div><p>Tools that meet you where you're working—at a shop counter, from your laptop or while checking in on the business.</p></div><div class="merchant-grid"><a class="merchant-card merchant-card-main" href="/login"><div class="merchant-main-copy"><span class="white-tag">MERCHANT CONTROL CENTER</span><h3>Your business in one clear view.</h3><p>Open your payment activity, links, records and settings without switching between scattered tools.</p><span class="card-button">Open merchant login ↗</span></div><div class="merchant-card-visual"><img src="/assets/disha-hero-orb.jpg" alt="" loading="lazy"></div></a><div class="merchant-side-grid"><a class="merchant-card merchant-card-small lilac-card" href="#solutions"><span class="card-emoji">▦</span><h3>Payment links &amp; QR</h3><p>Let customers pay in a familiar way.</p><span class="merchant-arrow">↗</span></a><a class="merchant-card merchant-card-small mint-card" href="#trust"><span class="card-emoji">◇</span><h3>Fraud-aware controls</h3><p>More context for uncertain payment activity.</p><span class="merchant-arrow">↗</span></a><a class="merchant-card merchant-card-small peach-card" href="/login"><span class="card-emoji">≋</span><h3>Reports &amp; ledger</h3><p>Understand and organize your records.</p><span class="merchant-arrow">↗</span></a><a class="merchant-card merchant-card-small cream-card" href="/login"><span class="card-emoji">♪</span><h3>Browser voice alerts</h3><p>An alternative to a dedicated soundbox.</p><span class="merchant-arrow">↗</span></a></div></div></div></section>
+    <section class="section section-pricing" id="pricing"><div class="content-width"><div class="section-heading centered"><span class="section-tag">FAIR BY DESIGN</span><h2>Pay once.<br><span>Keep the savings for years.</span></h2><p>We calculate the payment-software costs DISHA can actually help your business remove. Your price is four months of those verified net savings—one time.</p></div><div class="pricing-layout"><div class="pricing-story"><div class="price-orbit"><div class="orbit-circle orbit-large"></div><div class="orbit-circle orbit-small"></div><div class="orbit-message"><small>YOUR DISHA LICENSE</small><strong>4×</strong><span>verified monthly net savings</span></div></div><h3>One complete product.<br>One agreed price.</h3><p>No monthly DISHA software subscription. No commission charged by DISHA on each transaction. No compulsory plan upgrades as your business grows.</p><div class="price-highlights"><span>✓ Perpetual license for the purchased version</span><span>✓ Self-hosted deployment</span><span>✓ No volume-based license repricing</span></div></div><form class="pricing-calculator" id="pricingCalculator"><div class="calculator-head"><div><span class="mini-label">YOUR BUSINESS, YOUR NUMBERS</span><h3>Estimate your one-time price</h3></div><span class="calculator-emoji">₹</span></div><p class="calculator-help">Use real expenses from your statements. Estimates are not a guaranteed saving.</p><div class="calculator-field"><label for="feeVolume">Monthly volume currently charged avoidable fees <output id="feeVolumeOut">₹10,00,000</output></label><input id="feeVolume" type="range" min="0" max="5000000" step="50000" value="1000000"><div class="range-ends"><span>₹0</span><span>₹50 lakh</span></div></div><div class="calculator-field"><label for="avoidableRate">Verified avoidable charge rate <output id="avoidableRateOut">1.0%</output></label><input id="avoidableRate" type="range" min="0" max="3" step=".1" value="1"><div class="range-ends"><span>0%</span><span>3%</span></div></div><div class="calculator-two"><div class="calculator-field"><label for="removedFixed">Removable monthly software costs</label><div class="amount-input"><span>₹</span><input id="removedFixed" type="number" min="0" max="10000000" step="100" value="1000" inputmode="decimal"></div></div><div class="calculator-field"><label for="newOperating">New monthly hosting and running costs</label><div class="amount-input"><span>₹</span><input id="newOperating" type="number" min="0" max="10000000" step="100" value="1000" inputmode="decimal"></div></div></div><div class="calculator-results"><div><span>Estimated monthly net savings</span><strong id="monthlySavings">₹10,000</strong></div><div class="result-primary"><span>Your one-time DISHA price</span><strong id="oneTimePrice">₹40,000</strong></div><div><span>Estimated first-year net benefit</span><strong id="firstYearBenefit">₹80,000</strong></div></div><p class="calculator-warning" id="calculatorWarning" hidden>We can't establish a positive savings-based quote from these figures. Review your actual removable costs.</p><button type="button" class="btn btn-dark calc-copy" id="copyQuote">Copy My Estimate <span aria-hidden="true">↗</span></button><small class="calculator-footnote">Only use fees DISHA can genuinely replace. Bank/network charges, taxes and hosting may still apply.</small></form></div></div></section>
+    <section class="section section-trust" id="trust"><div class="content-width"><div class="trust-head"><div><span class="section-tag">TRUST IS BUILT ON CLARITY</span><h2>Know more.<br><span>Guess less.</span></h2></div><p>Payments deserve care. DISHA provides tools to organize activity and identify specific risks, without pretending uncertainty doesn't exist.</p></div><div class="trust-grid"><div class="trust-card"><span>01</span><div class="trust-symbol">⌛</div><h3>Time-bound sessions</h3><p>Connect payment activity to a defined session and its relevant time window.</p></div><div class="trust-card"><span>02</span><div class="trust-symbol">♻</div><h3>Reference reuse checks</h3><p>Help flag repeated references that need a closer look.</p></div><div class="trust-card"><span>03</span><div class="trust-symbol">◈</div><h3>Evidence-aware review</h3><p>Use available signals to add context when a payment needs attention.</p></div><div class="trust-card"><span>04</span><div class="trust-symbol">▤</div><h3>Organized records</h3><p>Keep transaction information and reports easier to follow.</p></div></div><p class="trust-disclosure">No software can guarantee the elimination of fraud. Controls and status indicators must be assessed against the actual payment evidence available.</p></div></section>
+    <section class="section section-faq" id="questions"><div class="content-width faq-layout"><div><span class="section-tag">GOOD QUESTIONS, CLEAR ANSWERS</span><h2>A few things<br><span>worth knowing.</span></h2><p>Because choosing your payment software is a business decision, not just a design preference.</p></div><div class="faq-list"><details><summary>What exactly am I buying?<span>+</span></summary><p>A perpetual license for the agreed DISHA software version, plus the installation and handover services in your quotation. The intellectual property stays with DISHA unless separately agreed.</p></details><details><summary>Do I pay DISHA every month?<span>+</span></summary><p>No recurring DISHA software subscription under this model. Your own hosting, third-party network or banking charges, taxes, and optional services remain separate.</p></details><details><summary>How is my price calculated?<span>+</span></summary><p>Four months of verified monthly net savings: genuinely removable costs, less new ongoing expenses introduced by your deployment.</p></details><details><summary>What if I already pay zero UPI fees?<span>+</span></summary><p>We'll review other genuinely removable software and operating costs. If positive savings cannot be established, we won't invent a savings-based quotation.</p></details><details><summary>Does DISHA guarantee a payment is safe?<span>+</span></summary><p>No. The platform includes available transaction and evidence controls to improve visibility and reduce specific operational risks, not a guarantee that fraud cannot occur.</p></details><details><summary>Can I sign up immediately?<span>+</span></summary><p>Existing merchants can log in now. New merchant access requires authorized provisioning; use the estimate to understand the commercial model while onboarding is arranged.</p></details></div></div></section>
+    <section class="final-cta"><div class="content-width"><span class="section-tag inverse">MORE BUSINESS. LESS DEPENDENCE.</span><h2>You built it.<br>Now make the software yours.</h2><p>Direct UPI tools, a clearer merchant workspace, and a one-time license designed around the savings you can actually demonstrate.</p><div class="final-actions"><a class="btn btn-white" href="#pricing">Calculate Your Price <span aria-hidden="true">↗</span></a><a class="btn btn-outline-light" href="/login">Merchant Login <span aria-hidden="true">→</span></a></div><div class="final-glow" aria-hidden="true"></div></div></section>
   </main>
-
-  <!-- ========================================================
-       FOOTER
-  ======================================================== -->
-  <footer class="public-footer">
-    <div class="footer-container">
-      <div class="footer-brand">
-        <div class="brand-link">
-          <div class="brand-hexagon">
-            <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2">
-              <polygon points="12 2 22 8.5 22 15.5 12 22 2 15.5 2 8.5 12 2"></polygon>
-              <circle cx="12" cy="12" r="3" fill="#10B981"></circle>
-            </svg>
-          </div>
-          <span class="brand-title">DISHA</span>
-          <span class="brand-tag">MERCHANT PAY</span>
-        </div>
-        <p style="font-size: 0.85rem; color: var(--text-muted); margin-top: 10px; max-width: 320px;">
-          Sovereign Direct UPI Settlement &amp; Double-Entry Accounting Architecture. Built for Indian Kiranas and Retailers.
-        </p>
-      </div>
-
-      <div class="footer-links-group">
-        <div class="footer-col">
-          <span class="footer-heading">Architecture</span>
-          <a href="#scene-hero">Overview</a>
-          <a href="#scene-crisis">Failure Modes</a>
-          <a href="#scene-architecture">Pipeline Stack</a>
-          <a href="#scene-vpa-routing">Smart VPA</a>
-        </div>
-
-        <div class="footer-col">
-          <span class="footer-heading">Features</span>
-          <a href="#scene-ledger">Double Ledger</a>
-          <a href="#scene-calculator">Savings ROI</a>
-          <a href="#scene-soundbox">Voice Soundbox</a>
-          <a href="/login">Merchant Portal</a>
-        </div>
-      </div>
-    </div>
-
-    <div class="footer-bottom-bar">
-      <span>© 2026 DISHA Sovereign Fintech Architecture. Compliant with NPCI UPI 2.0 Specifications.</span>
-      <span>T+0 Direct Bank Settlement · 0% MDR</span>
-    </div>
-  </footer>
-
-  <!-- Scripts: Vendor GSAP + App Engine -->
-  <script src="/vendor/gsap.min.js"></script>
-  <script src="/vendor/ScrollTrigger.min.js"></script>
-  <script src="/app.js"></script>
+  <footer class="site-footer"><div class="content-width"><div class="footer-grid"><div class="footer-brand"><a class="brand" href="#home"><span class="brand-mark" aria-hidden="true"><svg viewBox="0 0 44 44" fill="none"><path d="m22 3 18 10.5v17L22 41 4 30.5v-17L22 3Z" stroke="currentColor" stroke-width="2.6"/><path d="M13 22h18m-9-9v18" stroke="currentColor" stroke-width="2.9" stroke-linecap="round"/><circle cx="22" cy="22" r="4.2" fill="#69F5C5"/></svg></span><span class="brand-word">DISHA<span>8.2</span><small>MERCHANT PAYMENTS</small></span></a><p>Self-hosted merchant payment software, built to give businesses greater control of their daily operations.</p></div><div class="footer-col"><h3>Explore</h3><a href="#solutions">Direct UPI</a><a href="#merchant">Merchant Workspace</a><a href="#how-it-works">How It Works</a></div><div class="footer-col"><h3>Discover</h3><a href="#story">Our Story</a><a href="#why-disha">Why DISHA</a><a href="#trust">Trust &amp; Controls</a></div><div class="footer-col"><h3>Get started</h3><a href="#pricing">One-Time Pricing</a><a href="#questions">FAQs</a><a href="/login">Merchant Login</a></div></div><div class="footer-bottom"><span>© <span id="copyrightYear">2026</span> DISHA 8.2. All rights reserved.</span><span>Direct payment software. Not a bank or payment network.</span></div></div></footer>
+  <div class="toast" id="siteToast" role="status" aria-live="polite" hidden></div>
+  <script src="/phonepe-inspired.js" defer></script>
 </body>
 </html>
