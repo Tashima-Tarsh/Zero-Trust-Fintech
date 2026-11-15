@@ -51,6 +51,9 @@ function sendError(res, statusCode, message, details = null) {
 }
 
 function readBody(req) {
+  if (req.body && typeof req.body === 'object' && Object.keys(req.body).length > 0) {
+    return Promise.resolve(req.body);
+  }
   return new Promise((resolve, reject) => {
     let body = '';
     req.on('data', chunk => {
@@ -85,7 +88,7 @@ function authenticateRequest(req) {
   return db.validateSession(token);
 }
 
-const server = http.createServer(async (req, res) => {
+async function handleCinematicRequest(req, res) {
   const parsedUrl = new URL(req.url, `http://${req.headers.host || 'localhost'}`);
   const pathname = decodeURIComponent(parsedUrl.pathname);
   const method = req.method.toUpperCase();
@@ -648,14 +651,23 @@ const server = http.createServer(async (req, res) => {
       res.end(content);
     });
   });
-});
+}
 
-server.listen(PORT, '0.0.0.0', () => {
-  console.log(`============================================================`);
-  console.log(`🚀 DISHA Merchant SaaS Platform running on:`);
-  console.log(`   > Public Website:     http://localhost:${PORT}/`);
-  console.log(`   > Merchant Login:     http://localhost:${PORT}/login`);
-  console.log(`   > First-Time Setup:   http://localhost:${PORT}/setup`);
-  console.log(`   > Merchant Dashboard: http://localhost:${PORT}/dashboard`);
-  console.log(`============================================================`);
-});
+if (require.main === module) {
+  const server = http.createServer(handleCinematicRequest);
+  server.listen(PORT, '0.0.0.0', () => {
+    console.log(`============================================================`);
+    console.log(`🚀 DISHA Merchant SaaS Platform running on:`);
+    console.log(`   > Public Website:     http://localhost:${PORT}/`);
+    console.log(`   > Merchant Login:     http://localhost:${PORT}/login`);
+    console.log(`   > First-Time Setup:   http://localhost:${PORT}/setup`);
+    console.log(`   > Merchant Dashboard: http://localhost:${PORT}/dashboard`);
+    console.log(`============================================================`);
+  });
+}
+
+module.exports = {
+  handleCinematicRequest,
+  sendJson,
+  sendError
+};

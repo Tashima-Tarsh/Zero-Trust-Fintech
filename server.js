@@ -24,6 +24,7 @@ const { scoreEvidence, suggestAction, WEIGHTS, TIERS } = require('./utils/trust-
 const { buildUpiUri, appLinks, generateChallengeAmount: generateUniqueChallenge } = require('./utils/upi-intent');
 const { IPWhitelistMiddleware } = require('./middleware/ip-whitelist');
 const adminRoutes = require('./routes/admin/ip-whitelist');
+const { handleCinematicRequest } = require('./disha-cinematic/server');
 
 const app = express();
 app.set('trust proxy', 1);
@@ -96,16 +97,50 @@ const verifyLimiter = createRateLimiter(60000, 60, 'Rate limit exceeded on payme
 
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+
+// 1. Static Assets: Serve PhonePe marketing styles, console styles, scripts, videos, and icons
+app.use(express.static(path.join(__dirname, 'disha-cinematic', 'public')));
 app.use(express.static(path.join(__dirname, 'public')));
 
-// Health Check Endpoint (Render & Uptime Monitoring)
+// 2. Health Check Endpoint (Render & Uptime Monitoring)
 app.get(['/health', '/api/health'], (req, res) => {
   res.json({
     status: 'healthy',
-    service: 'disha-checkout-gateway',
+    service: 'disha-unified-platform',
+    version: '8.2.0',
     uptime: process.uptime(),
     timestamp: new Date().toISOString()
   });
+});
+
+// 3. Flagship PhonePe-Inspired Website & Merchant SaaS Routes
+app.get(['/', '/home'], (req, res) => {
+  res.sendFile(path.join(__dirname, 'disha-cinematic', 'public', 'index.html'));
+});
+
+app.get('/login', (req, res) => {
+  res.sendFile(path.join(__dirname, 'disha-cinematic', 'public', 'login.html'));
+});
+
+app.get('/setup', (req, res) => {
+  res.sendFile(path.join(__dirname, 'disha-cinematic', 'public', 'setup.html'));
+});
+
+app.get('/dashboard', (req, res) => {
+  res.sendFile(path.join(__dirname, 'disha-cinematic', 'public', 'dashboard.html'));
+});
+
+// 4. Dedicated Sovereign Customer Checkout Gateway Route
+app.get(['/checkout', '/pay'], (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'index.html'));
+});
+
+// 5. Merchant Auth & Dashboard API Delegation
+app.use((req, res, next) => {
+  if (req.path.startsWith('/api/auth') || req.path.startsWith('/api/merchant')) {
+    return handleCinematicRequest(req, res);
+  }
+  next();
 });
 
 // Administrative Authentication & Security Helpers

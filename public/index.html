@@ -28,25 +28,29 @@
     <!-- Top Navigation Bar -->
     <header class="top-navbar">
       <div class="brand-group">
-        <div class="brand-logo-icon">
-          <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.2">
-            <polygon points="12 2 22 8.5 22 15.5 12 22 2 15.5 2 8.5 12 2"></polygon>
-            <circle cx="12" cy="12" r="3" fill="#0D9488"></circle>
-          </svg>
-        </div>
-        <div class="brand-titles">
-          <span class="brand-text">DISHA</span>
-          <span class="brand-sub">Sovereign Payments</span>
-        </div>
+        <a href="/" style="text-decoration:none; display:flex; align-items:center; gap:8px; color:inherit;">
+          <div class="brand-logo-icon">
+            <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.2">
+              <polygon points="12 2 22 8.5 22 15.5 12 22 2 15.5 2 8.5 12 2"></polygon>
+              <circle cx="12" cy="12" r="3" fill="#0D9488"></circle>
+            </svg>
+          </div>
+          <div class="brand-titles">
+            <span class="brand-text">DISHA</span>
+            <span class="brand-sub">Sovereign Payments</span>
+          </div>
+        </a>
       </div>
 
-      <div class="security-badge">
+      <div class="security-badge" style="margin-left: auto;">
         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#0D9488" stroke-width="2.2">
           <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path>
           <polyline points="9 12 11 14 15 10"></polyline>
         </svg>
         <span>Direct Bank Settlement · 0% Fee</span>
       </div>
+
+      <a href="/login" class="merchant-link-btn" style="text-decoration:none; font-size:12px; font-weight:700; color:#5F259F; background:#FAF5FF; padding:6px 14px; border-radius:999px; border:1px solid #E9D5FF; letter-spacing:0.02em; white-space:nowrap;">Merchant Workspace ↗</a>
     </header>
 
     <!-- Main Focused Checkout Card -->

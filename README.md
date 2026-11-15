@@ -12,6 +12,15 @@
 
 <br/>
 
+<p align="center">
+  <a href="https://disha-merchant-saas.onrender.com"><b>🌐 Live Product Website</b></a> &nbsp;•&nbsp;
+  <a href="https://disha-merchant-saas.onrender.com/login"><b>🔐 Merchant Login</b></a> &nbsp;•&nbsp;
+  <a href="https://disha-merchant-saas.onrender.com/dashboard"><b>📊 Sovereign Workspace</b></a> &nbsp;•&nbsp;
+  <a href="https://disha-merchant-saas.onrender.com/checkout"><b>🛒 Customer Checkout</b></a>
+</p>
+
+<br/>
+
 **DISHA 8.2** (*Digital Infrastructure for Sovereign Handshakes & Autonomous Settlement*) is an institutional-grade, open-source payment rail designed for Indian merchants, D2C brands, quick-commerce operators, and high-volume gaming studios. 
 
 By bypassing proprietary payment aggregator gateways (Razorpay, Cashfree, Paytm, PayU), DISHA establishes **direct-to-bank UPI settlements with 0% gateway MDR**, eliminates third-party escrow freeze vulnerabilities, and guarantees transaction integrity using a **7-layer zero-trust fraud engine**, **autonomous 1,000-VPA multi-bank anti-ban routing**, and **cryptographic double-entry ledger balance**.
