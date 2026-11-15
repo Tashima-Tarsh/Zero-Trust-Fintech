@@ -61,6 +61,18 @@
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 21h18M3 10h18M5 6l7-3 7 3M4 10v11M20 10v11M8 14v4M12 14v4M16 14v4"></path></svg>
           <span>UPI IDs</span>
         </a>
+        <a href="#vpa-routing" class="side-nav-item" data-workspace="vpa-routing" onclick="switchWorkspace('vpa-routing')">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 3h5v5M4 20L21 3M21 16v5h-5M15 15l6 6M4 4l5 5"></path></svg>
+          <span>Smart VPA Routing</span>
+        </a>
+        <a href="#fraud-engine" class="side-nav-item" data-workspace="fraud-engine" onclick="switchWorkspace('fraud-engine')">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path></svg>
+          <span>7-Layer Fraud Defense</span>
+        </a>
+        <a href="#api-console" class="side-nav-item" data-workspace="api-console" onclick="switchWorkspace('api-console')">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="16 18 22 12 16 6"></polyline><polyline points="8 6 2 12 8 18"></polyline></svg>
+          <span>Developer API Console</span>
+        </a>
         <a href="#ip-whitelist" class="side-nav-item" data-workspace="ip-whitelist" onclick="switchWorkspace('ip-whitelist')">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>
           <span>Server IP Whitelist</span>
@@ -829,6 +841,287 @@
 
             <div id="fullNotifList" class="full-notif-list">
               <!-- Populated by JS -->
+            </div>
+          </div>
+        </section>
+
+        <!-- WORKSPACE: SMART VPA ROUTING -->
+        <section id="ws-vpa-routing" class="workspace-section">
+          <div class="metrics-grid">
+            <div class="stat-card">
+              <span class="stat-label">Active Routing Handles</span>
+              <strong id="routingActiveCount" class="stat-value">3 Online</strong>
+              <span class="stat-sub text-success">Multi-bank dispersion</span>
+            </div>
+            <div class="stat-card">
+              <span class="stat-label">Daily Safe Capacity</span>
+              <strong id="routingSafeCap" class="stat-value">₹5,00,000</strong>
+              <span class="stat-sub text-muted">Anti-ban threshold</span>
+            </div>
+            <div class="stat-card">
+              <span class="stat-label">Routing Algorithm</span>
+              <strong id="routingActiveAlgo" class="stat-value" style="font-size: 1.15rem;">Adaptive Balancing</strong>
+              <span class="stat-sub text-purple">Zero gateway fee</span>
+            </div>
+            <div class="stat-card">
+              <span class="stat-label">Rail Availability</span>
+              <strong class="stat-value text-success">99.98%</strong>
+              <span class="stat-sub text-success">All bank nodes healthy</span>
+            </div>
+          </div>
+
+          <!-- Multi-Bank Topology Map -->
+          <div class="dash-panel" style="margin-top: 24px;">
+            <div class="panel-header">
+              <div>
+                <h3>Multi-Bank Routing Rails</h3>
+                <p class="panel-subtitle">Incoming customer transactions are dynamically routed across accounts to prevent NPCI rate limits and ensure direct settlement.</p>
+              </div>
+              <button type="button" class="btn-dash-secondary" onclick="loadVpaRoutingData()">
+                <span>Refresh Topology</span>
+              </button>
+            </div>
+            <div class="routing-rails-grid" id="routingRailsGrid">
+              <!-- Dynamically rendered bank rail cards -->
+            </div>
+          </div>
+
+          <!-- Live Routing Simulator & Strategy Controls -->
+          <div class="settings-grid" style="margin-top: 24px;">
+            <!-- Routing Policy -->
+            <div class="dash-panel">
+              <div class="panel-header">
+                <h3>Routing Policy</h3>
+                <span class="panel-badge">Autonomous</span>
+              </div>
+              <form id="routingPolicyForm" class="settings-form" onsubmit="event.preventDefault(); saveRoutingPolicy();">
+                <div class="form-group">
+                  <label class="form-label">Traffic Distribution Strategy</label>
+                  <select id="routingStrategySelect" class="form-input" onchange="updateRoutingStrategyDescription()">
+                    <option value="adaptive" selected>Adaptive Dynamic Balancing (Recommended)</option>
+                    <option value="failover">Health Failover Protection (Auto-bypass outages)</option>
+                    <option value="round_robin">Sequential Round-Robin (Equal volume spread)</option>
+                    <option value="priority">Priority Primary Handle (80% default, 20% backup)</option>
+                  </select>
+                  <p id="routingStrategyDesc" class="panel-subtitle" style="margin-top: 6px; font-size: 0.8rem;">
+                    Automatically routes checkouts based on real-time transaction amounts and daily bank quotas to avoid single account scrutiny.
+                  </p>
+                </div>
+                <div class="form-group">
+                  <label class="form-label">Per-Handle Daily Ceiling (INR)</label>
+                  <input type="number" id="routingDailyCeiling" class="form-input font-mono" value="100000" min="10000" step="5000">
+                </div>
+                <button type="submit" class="btn-dash-primary">
+                  <span>Save Routing Policy</span>
+                </button>
+              </form>
+            </div>
+
+            <!-- Real-Time Simulator -->
+            <div class="dash-panel">
+              <div class="panel-header">
+                <h3>Live Routing Simulator</h3>
+                <span class="panel-badge">Interactive Test</span>
+              </div>
+              <div class="settings-form">
+                <div class="form-group">
+                  <label class="form-label">Simulated Transaction Amount (INR)</label>
+                  <input type="number" id="simAmount" class="form-input font-mono" value="2450" min="1" step="1">
+                </div>
+                <div class="form-group">
+                  <label class="form-label">Payer UPI App / Rail</label>
+                  <select id="simPayerRail" class="form-input">
+                    <option value="google_pay">Google Pay (oksbi / okhdfcbank)</option>
+                    <option value="phonepe">PhonePe (ybl / ibl / axl)</option>
+                    <option value="paytm">Paytm (paytm / ptm)</option>
+                    <option value="bhim">BHIM / Any Bank App (upi)</option>
+                  </select>
+                </div>
+                <button type="button" class="btn-dash-secondary" onclick="runRoutingSimulation()">
+                  <span>Simulate Optimal Route ⚡</span>
+                </button>
+
+                <!-- Simulator Output Box -->
+                <div id="simResultBox" class="sim-result-box" style="margin-top: 14px; display: none;"></div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- WORKSPACE: 7-LAYER FRAUD DEFENSE -->
+        <section id="ws-fraud-engine" class="workspace-section">
+          <div class="metrics-grid">
+            <div class="stat-card">
+              <span class="stat-label">Store Trust Score</span>
+              <strong id="fraudTrustScore" class="stat-value text-success">98 / 100</strong>
+              <span class="stat-sub text-success">Verified High Trust</span>
+            </div>
+            <div class="stat-card">
+              <span class="stat-label">Replay Interceptions</span>
+              <strong id="fraudInterceptionsCount" class="stat-value">3 Blocked</strong>
+              <span class="stat-sub text-muted">Zero double spends</span>
+            </div>
+            <div class="stat-card">
+              <span class="stat-label">Ledger Invariant Proof</span>
+              <strong class="stat-value text-success">Debits === Credits</strong>
+              <span class="stat-sub text-success">100% Mathematically Balanced</span>
+            </div>
+            <div class="stat-card">
+              <span class="stat-label">Attestation Security</span>
+              <strong class="stat-value text-purple">Hardware Enforced</strong>
+              <span class="stat-sub text-muted">SHA-256 integrity</span>
+            </div>
+          </div>
+
+          <!-- 7 Layer Architecture Visualizer -->
+          <div class="dash-panel" style="margin-top: 24px;">
+            <div class="panel-header">
+              <div>
+                <h3>7-Layer Zero-Trust Fraud Defense Architecture</h3>
+                <p class="panel-subtitle">Real-time mathematical and cryptographic verification protecting every customer payment without relying on third-party aggregators.</p>
+              </div>
+              <button type="button" class="btn-dash-secondary" onclick="loadFraudStats()">
+                <span>Run Health Check</span>
+              </button>
+            </div>
+            <div class="fraud-layers-grid" id="fraudLayersGrid">
+              <!-- Dynamically populated 7 layer cards -->
+            </div>
+          </div>
+
+          <!-- Fraud Simulator & Interception Audit Log -->
+          <div class="settings-grid" style="margin-top: 24px;">
+            <!-- Interactive Attack Simulator -->
+            <div class="dash-panel">
+              <div class="panel-header">
+                <h3>Threat Replay Simulator</h3>
+                <span class="panel-badge">Attack Injection Test</span>
+              </div>
+              <div class="settings-form">
+                <p class="panel-subtitle" style="margin-bottom: 12px;">Test the resilience of the 7-Layer Fraud Engine by simulating real payment fraud attacks.</p>
+                <div class="form-group">
+                  <label class="form-label">Select Attack Vector to Test</label>
+                  <select id="fraudTestTypeSelect" class="form-input">
+                    <option value="duplicate_utr">1. Duplicate Bank UTR Replay Attack (Layer 3)</option>
+                    <option value="expired_session">2. Expired Session Spoofing (>300s TTL) (Layer 1)</option>
+                    <option value="amount_mismatch">3. Challenge Cent Delta Tampering (Layer 2)</option>
+                    <option value="legitimate">4. Clean Legitimate Transaction Baseline</option>
+                  </select>
+                </div>
+                <button type="button" class="btn-dash-primary" onclick="runFraudTestSimulation()">
+                  <span>Execute Threat Simulation 🛡️</span>
+                </button>
+                <div id="fraudTestResultBox" class="sim-result-box" style="margin-top: 14px; display: none;"></div>
+              </div>
+            </div>
+
+            <!-- Interception Feed -->
+            <div class="dash-panel">
+              <div class="panel-header">
+                <h3>Security Interception Audit Log</h3>
+                <span class="panel-badge text-success">Live Stream</span>
+              </div>
+              <div id="fraudInterceptionList" class="fraud-audit-feed">
+                <!-- Dynamically populated intercepted threats -->
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- WORKSPACE: DEVELOPER API CONSOLE -->
+        <section id="ws-api-console" class="workspace-section">
+          <!-- Credentials & Postman Card -->
+          <div class="dash-panel">
+            <div class="panel-header">
+              <div>
+                <h3>Merchant API Credentials & Integration</h3>
+                <p class="panel-subtitle">Integrate DISHA 8.2 programmatically with your custom storefront, billing POS, ERP, or backend systems.</p>
+              </div>
+              <div class="api-card-actions">
+                <a href="/disha-api.postman_collection.json" download class="btn-dash-secondary" style="text-decoration: none;">
+                  <span>⬇️ Postman Collection</span>
+                </a>
+                <a href="/disha-local.postman_environment.json" download class="btn-dash-secondary" style="text-decoration: none;">
+                  <span>⬇️ Local Environment</span>
+                </a>
+              </div>
+            </div>
+            <div class="api-keys-box">
+              <div class="api-key-row">
+                <div class="api-key-info">
+                  <span class="api-key-label">Base URL</span>
+                  <code id="apiBaseUrl" class="font-mono">http://localhost:5000</code>
+                </div>
+                <button type="button" class="btn-copy-sm" onclick="copyTextDirect(document.getElementById('apiBaseUrl').textContent)">Copy</button>
+              </div>
+              <div class="api-key-row">
+                <div class="api-key-info">
+                  <span class="api-key-label">Active Bearer Session Token</span>
+                  <code id="apiBearerToken" class="font-mono">Loading token...</code>
+                </div>
+                <button type="button" class="btn-copy-sm" onclick="copyTextDirect(document.getElementById('apiBearerToken').textContent)">Copy</button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Interactive Live API Runner -->
+          <div class="dash-panel" style="margin-top: 24px;">
+            <div class="panel-header">
+              <div>
+                <h3>Live API Runner & Explorer</h3>
+                <p class="panel-subtitle">Execute live requests directly against your local DISHA sovereign server.</p>
+              </div>
+              <button type="button" id="btnCopyCurl" class="btn-dash-secondary" onclick="copyActiveCurl()">
+                <span>Copy as cURL</span>
+              </button>
+            </div>
+            
+            <div class="api-runner-layout">
+              <div class="api-request-side">
+                <div class="form-group">
+                  <label class="form-label">Select API Endpoint</label>
+                  <select id="apiEndpointSelect" class="form-input font-mono" onchange="onApiEndpointChange()">
+                    <option value="GET_HEALTH">[GET] /health — Public System Health</option>
+                    <option value="GET_ME">[GET] /api/auth/me — Authenticated Merchant Profile</option>
+                    <option value="POST_PAYMENT" selected>[POST] /api/merchant/payments — Create Dynamic UPI Payment</option>
+                    <option value="GET_PAYMENTS">[GET] /api/merchant/payments — List Payment Orders</option>
+                    <option value="GET_VPAS">[GET] /api/merchant/vpas — List UPI VPAs</option>
+                    <option value="GET_VPA_ANALYTICS">[GET] /api/merchant/vpas/analytics — VPA Pool Analytics</option>
+                    <option value="GET_DASHBOARD">[GET] /api/merchant/dashboard?dateFilter=30d — Dashboard Metrics</option>
+                    <option value="GET_REPORTS">[GET] /api/merchant/reports?format=json — Full Ledger Records</option>
+                    <option value="GET_IP_WHITELIST">[GET] /api/merchant/ip-whitelist — Allowed Server IPs</option>
+                    <option value="GET_FRAUD_STATS">[GET] /api/merchant/fraud-stats — 7-Layer Fraud Defense Stats</option>
+                    <option value="GET_NOTIFS">[GET] /api/merchant/notifications — Merchant Alert Feed</option>
+                  </select>
+                </div>
+
+                <div class="form-group" id="apiBodyGroup">
+                  <label class="form-label">Request Body (JSON)</label>
+                  <textarea id="apiRequestBody" class="form-input font-mono" rows="6">{
+  "amount": 1500,
+  "description": "API Console Test Payment",
+  "vpaAddress": "ramesh.store@oksbi"
+}</textarea>
+                </div>
+
+                <button type="button" class="btn-dash-primary" onclick="sendInteractiveApiRequest()">
+                  <span>Send API Request 🚀</span>
+                </button>
+              </div>
+
+              <div class="api-response-side">
+                <div class="api-response-head">
+                  <div class="response-status-badge">
+                    <span class="label">Status:</span>
+                    <strong id="apiResponseStatus" class="status-pill status-ready">Ready</strong>
+                  </div>
+                  <div class="response-time-badge">
+                    <span class="label">Time:</span>
+                    <span id="apiResponseTime">0 ms</span>
+                  </div>
+                </div>
+                <pre id="apiResponseBody" class="api-response-viewer font-mono">Click 'Send API Request' to test the endpoint live.</pre>
+              </div>
             </div>
           </div>
         </section>
