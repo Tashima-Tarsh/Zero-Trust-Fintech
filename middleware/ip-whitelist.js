@@ -71,8 +71,9 @@ class IPWhitelistMiddleware {
   check() {
     return async (req, res, next) => {
       try {
-        // Step 1: Extract API key from header or query
-        const apiKey = req.headers['x-api-key'] || (req.query && req.query.api_key);
+        // Step 1: Extract API key strictly from secure headers (never from query string)
+        const apiKey = req.headers['x-api-key'] || 
+                       (req.headers.authorization && req.headers.authorization.replace(/^Bearer\s+/i, '').trim());
         if (!apiKey) {
           return res.status(401).json({
             error: 'MISSING_API_KEY',
