@@ -249,6 +249,17 @@ const server = http.createServer(async (req, res) => {
         return sendJson(res, 201, { success: true, order });
       }
 
+      // Payments: Single Order Status (for real-time dashboard verification)
+      const singleOrderMatch = pathname.match(/^\/api\/merchant\/payments\/([^/]+)$/);
+      if (singleOrderMatch && method === 'GET') {
+        const orderId = singleOrderMatch[1];
+        const order = db.getMerchantOrderById(currentMerchant.id, orderId);
+        if (!order) {
+          return sendError(res, 404, `Order '${orderId}' not found`);
+        }
+        return sendJson(res, 200, { success: true, order });
+      }
+
       // Payments: Test Simulator (Mark payment completed in test mode)
       const simulateMatch = pathname.match(/^\/api\/merchant\/payments\/([^/]+)\/simulate$/);
       if (simulateMatch && method === 'POST') {

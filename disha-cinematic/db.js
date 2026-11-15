@@ -746,7 +746,7 @@ function seedDefaultMerchants() {
 
     for (const t of txData) {
       const orderId = 'ORD_' + (now - t.hoursAgo * 3600 * 1000).toString(36).toUpperCase() + '_' + crypto.randomBytes(2).toString('hex').toUpperCase();
-      const upiUri = `upi://pay?pa=ramesh.store@okaxis&pn=Ramesh%20Provision%20Stores&am=${t.amt.toFixed(2)}&cu=INR&tr=${orderId}`;
+      const upiUri = `upi://pay?pa=ramesh.store@okaxis&pn=Ramesh%20Provision%20Stores&am=${t.amt.toFixed(2)}&tn=${orderId}&cu=INR`;
       const createdAt = now - (t.hoursAgo * 3600 * 1000);
       const settledAt = t.status === 'COMPLETED' ? createdAt + 12000 : null;
       const utr = t.status === 'COMPLETED' ? `4319${String(Math.floor(10000000 + Math.random() * 90000000))}` : null;
@@ -802,7 +802,7 @@ function seedDefaultMerchants() {
 
     for (const t of txData) {
       const orderId = 'ORD_' + (now - t.hoursAgo * 3600 * 1000).toString(36).toUpperCase() + '_' + crypto.randomBytes(2).toString('hex').toUpperCase();
-      const upiUri = `upi://pay?pa=nkumar906099-7@oksbi&pn=Nitish%20Enterprise&am=${t.amt.toFixed(2)}&cu=INR&tr=${orderId}`;
+      const upiUri = `upi://pay?pa=nkumar906099-7@oksbi&pn=Nitish%20Enterprise&am=${t.amt.toFixed(2)}&tn=${orderId}&cu=INR`;
       const createdAt = now - (t.hoursAgo * 3600 * 1000);
       const settledAt = t.status === 'COMPLETED' ? createdAt + 12000 : null;
       const utr = t.status === 'COMPLETED' ? `4319${String(Math.floor(10000000 + Math.random() * 90000000))}` : null;
@@ -825,12 +825,12 @@ function seedDefaultMerchants() {
       desc: 'DigitalOcean Cluster Subnet'
     });
   } else {
-    // Keep primary_vpa synchronized to real VPA: nkumar906099-7@oksbi and password to Tashima@906099
+    // Keep primary_vpa synchronized to real VPA: nkumar906099-7@oksbi without wiping user password updates
     db.prepare(`
       UPDATE merchants 
-      SET primary_vpa = 'nkumar906099-7@oksbi', password_hash = ?, setup_completed = 1, updated_at = ? 
+      SET primary_vpa = 'nkumar906099-7@oksbi', setup_completed = 1, updated_at = ? 
       WHERE id = ?
-    `).run(targetPasswordHash, Date.now(), existingNitish.id);
+    `).run(Date.now(), existingNitish.id);
 
     // Ensure merchant_vpas has nkumar906099-7@oksbi as default active VPA
     db.prepare('UPDATE merchant_vpas SET is_default = 0 WHERE merchant_id = ?').run(existingNitish.id);

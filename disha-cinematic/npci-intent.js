@@ -216,8 +216,10 @@ function parseNPCIIntentResponse(rawPayload) {
   }
 
   if (!result.amount) {
-    // Matches amounts with optional Indian comma separators (e.g. ₹1,000.37, Rs. 50,000.00)
-    const amtMatch = trimmed.match(/[₹RsINR\.]?\s*([\d,]+(?:\.\d{2})?)/i);
+    // Matches amounts with explicit currency symbol or prefix (e.g. ₹1,000.37, Rs. 50,000.00, INR 99.37)
+    // Explicit currency prefix prevents matching order IDs or timestamps
+    const amtMatch = trimmed.match(/(?:₹|Rs\.?|INR)\s*([\d,]+(?:\.\d{2})?)/i) ||
+                     trimmed.match(/\b(?:amount|amt|paid)\s*(?:is|:)?\s*(?:₹|Rs\.?|INR)?\s*([\d,]+(?:\.\d{2})?)/i);
     if (amtMatch) {
       const cleanAmtStr = amtMatch[1].replace(/,/g, '');
       const parsed = parseFloat(cleanAmtStr);
@@ -270,14 +272,20 @@ function parseUTRTimestamp(utr) {
       if (!isNaN(d.getTime())) return d.getTime();
     }
 
-    // Format B: NPCI Standard RRN (YDDD... where Y is year, DDD is day of year)
+    // Format B: NPCI Standard RRN (YDDDHH... where Y is year, DDD is day of year, HH is IST hour)
     const currentYear = new Date().getFullYear();
     const yearDigit = parseInt(utr.charAt(0), 10);
     const dayOfYear = parseInt(utr.substring(1, 4), 10);
+    const hour = parseInt(utr.substring(4, 6), 10);
 
     if (dayOfYear >= 1 && dayOfYear <= 366 && (currentYear % 10) === yearDigit) {
-      const yearStart = new Date(currentYear, 0, 1).getTime();
-      return yearStart + (dayOfYear - 1) * 86400000;
+      const yearStart = new Date(Date.UTC(currentYear, 0, 1)).getTime();
+      let ts = yearStart + (dayOfYear - 1) * 86400000;
+      if (!isNaN(hour) && hour >= 0 && hour < 24) {
+        // Convert IST hour to UTC (-5.5h)
+        ts += (hour * 3600000) - (5.5 * 3600000);
+      }
+      return ts;
     }
   } catch (_) {
     return null;

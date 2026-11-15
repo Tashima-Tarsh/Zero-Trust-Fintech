@@ -549,6 +549,87 @@ function renderGeneratedQr(order) {
   const simBtn = document.getElementById('btnSimulatePayment');
   simBtn.disabled = false;
   simBtn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align: -2px; margin-right: 6px;"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon></svg><span>Simulate Customer Payment (Tests Soundbox)</span>';
+
+  // Start live polling for payment settlement (auto-detects real UPI transfers)
+  startOrderStatusPoll(order.id);
+}
+
+let activePollTimer = null;
+
+function startOrderStatusPoll(orderId) {
+  if (activePollTimer) clearInterval(activePollTimer);
+
+  const startTime = Date.now();
+  const maxPollDuration = 3 * 60 * 1000; // 3 minutes
+
+  activePollTimer = setInterval(async () => {
+    if (!activeCreatedOrder || activeCreatedOrder.id !== orderId || (Date.now() - startTime) > maxPollDuration) {
+      clearInterval(activePollTimer);
+      return;
+    }
+    if (activeCreatedOrder.status === 'COMPLETED') {
+      clearInterval(activePollTimer);
+      return;
+    }
+
+    try {
+      const res = await fetch(`/api/merchant/payments/${orderId}`, {
+        headers: { 'Authorization': 'Bearer ' + authToken }
+      });
+      if (!res.ok) return;
+      const data = await res.json();
+      if (data.order && data.order.status === 'COMPLETED') {
+        clearInterval(activePollTimer);
+        markOrderAsCompletedOnUi(data.order);
+      }
+    } catch (_) {}
+  }, 2000);
+}
+
+function markOrderAsCompletedOnUi(completed) {
+  activeCreatedOrder = completed;
+
+  const qrBadge = document.getElementById('qrStatusBadge');
+  if (qrBadge) {
+    qrBadge.className = 'status-pill-active';
+    qrBadge.textContent = '● COMPLETED';
+  }
+
+  const simBtn = document.getElementById('btnSimulatePayment');
+  if (simBtn) {
+    simBtn.textContent = `Verified! Bank UTR: ${completed.utr || 'CONFIRMED'}`;
+    simBtn.disabled = true;
+  }
+
+  const confirmCard = document.getElementById('paymentConfirmationCard');
+  if (confirmCard) {
+    confirmCard.style.display = 'block';
+    const now = new Date();
+    const istTime = new Intl.DateTimeFormat('en-IN', {
+      dateStyle: 'medium',
+      timeStyle: 'medium',
+      timeZone: 'Asia/Kolkata'
+    }).format(now);
+
+    const confirmTimeEl = document.getElementById('confirmTimestamp');
+    if (confirmTimeEl) confirmTimeEl.textContent = istTime + ' IST';
+
+    const confirmSenderEl = document.getElementById('confirmSenderVpa');
+    if (confirmSenderEl) confirmSenderEl.textContent = 'verified-payer@upi';
+
+    const confirmMerchantEl = document.getElementById('confirmMerchantVpa');
+    if (confirmMerchantEl) confirmMerchantEl.textContent = completed.vpa_address || (currentMerchant ? currentMerchant.primary_vpa : 'merchant@upi');
+
+    const confirmUtrEl = document.getElementById('confirmUtr');
+    if (confirmUtrEl) confirmUtrEl.textContent = completed.utr || 'VERIFIED';
+
+    const confirmOrderEl = document.getElementById('confirmOrderId');
+    if (confirmOrderEl) confirmOrderEl.textContent = completed.id;
+  }
+
+  playMerchantAnnouncement(completed.amount);
+  loadDashboardOverview();
+  loadNotifications();
 }
 
 function isMobileDevice() {
@@ -594,6 +675,13 @@ function getAppSpecificUri(app, baseUpi) {
   if (app === 'bhim') {
     if (isAndroid) {
       return `intent://pay?${query}#Intent;scheme=upi;package=in.org.npci.upiapp;end`;
+    }
+    return `upi://pay?${query}`;
+  }
+
+  if (app === 'slice') {
+    if (isAndroid) {
+      return `intent://pay?${query}#Intent;scheme=upi;package=org.slice.app;end`;
     }
     return `upi://pay?${query}`;
   }
@@ -703,49 +791,7 @@ window.simulatePaymentForActiveOrder = async function() {
       return;
     }
 
-    const completed = data.order;
-    activeCreatedOrder = completed;
-
-    // Update UI status
-    const qrBadge = document.getElementById('qrStatusBadge');
-    qrBadge.className = 'status-pill-active';
-    qrBadge.textContent = '● COMPLETED';
-
-    simBtn.textContent = `Verified! Bank UTR: ${completed.utr}`;
-
-    // Reveal Full User Confirmation & Security Card
-    const confirmCard = document.getElementById('paymentConfirmationCard');
-    if (confirmCard) {
-      confirmCard.style.display = 'block';
-      const now = new Date();
-      const istTime = new Intl.DateTimeFormat('en-IN', {
-        dateStyle: 'medium',
-        timeStyle: 'medium',
-        timeZone: 'Asia/Kolkata'
-      }).format(now);
-
-      const confirmTimeEl = document.getElementById('confirmTimestamp');
-      if (confirmTimeEl) confirmTimeEl.textContent = istTime + ' IST';
-
-      const confirmSenderEl = document.getElementById('confirmSenderVpa');
-      if (confirmSenderEl) confirmSenderEl.textContent = 'customer@okhdfcbank';
-
-      const confirmMerchantEl = document.getElementById('confirmMerchantVpa');
-      if (confirmMerchantEl) confirmMerchantEl.textContent = completed.vpa_address || (currentMerchant ? currentMerchant.primary_vpa : 'merchant@upi');
-
-      const confirmUtrEl = document.getElementById('confirmUtr');
-      if (confirmUtrEl) confirmUtrEl.textContent = completed.utr;
-
-      const confirmOrderEl = document.getElementById('confirmOrderId');
-      if (confirmOrderEl) confirmOrderEl.textContent = completed.id;
-    }
-
-    // Play Voice Soundbox Announcement
-    playMerchantAnnouncement(completed.amount);
-
-    // Refresh overview and notifications
-    loadDashboardOverview();
-    loadNotifications();
+    markOrderAsCompletedOnUi(data.order);
   } catch (err) {
     alert('Simulation error');
     simBtn.disabled = false;

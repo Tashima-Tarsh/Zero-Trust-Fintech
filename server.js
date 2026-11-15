@@ -333,14 +333,14 @@ app.post('/api/verify', (req, res) => {
       });
     }
 
-    // NPCI UTR Julian Day / Timestamp check
+    // NPCI UTR Julian Day / Timestamp check (allowing 2-hour window for hourly RRN)
     const utrTimestamp = parseUTRTimestamp(parsedUtr);
-    if (utrTimestamp && (now - utrTimestamp) > (10 * 60 * 1000)) {
+    if (utrTimestamp && (now - utrTimestamp) > (2 * 60 * 60 * 1000)) {
       return res.status(400).json({
         success: false,
         layer: 4,
         code: 'UTR_TIMESTAMP_EXPIRED',
-        reason: 'Bank UTR internal timestamp indicates receipt is > 10 minutes old.'
+        reason: 'Bank UTR internal timestamp indicates receipt is from an expired time window.'
       });
     }
 
@@ -509,12 +509,26 @@ app.post('/api/npci-callback', (req, res) => {
 // ═══════════════════════════════════════════════════════════════════
 const ADMIN_API_KEY = process.env.ADMIN_API_KEY || 'disha_live_admin_secret_key_2026';
 
+function safeCompareKeys(a, b) {
+  if (!a || !b) return false;
+  try {
+    const bufA = Buffer.from(String(a));
+    const bufB = Buffer.from(String(b));
+    return bufA.length === bufB.length && crypto.timingSafeEqual(bufA, bufB);
+  } catch (_) {
+    return false;
+  }
+}
+
 function requireAdminAuth(req, res, next) {
   const headerKey = req.headers['x-admin-key'] ||
                     req.headers['x-api-key'] ||
                     (req.headers.authorization && req.headers.authorization.replace(/^Bearer\s+/i, ''));
 
-  if (!headerKey || (headerKey !== ADMIN_API_KEY && headerKey !== 'gz_live_key_a1b2c3d4e5f60718293a4b5c6d7e8f90')) {
+  const isValid = safeCompareKeys(headerKey, ADMIN_API_KEY) ||
+                  (process.env.EXTRA_ADMIN_KEY && safeCompareKeys(headerKey, process.env.EXTRA_ADMIN_KEY));
+
+  if (!isValid) {
     return res.status(401).json({
       success: false,
       error: 'UNAUTHORIZED_ADMIN_ACCESS',
@@ -531,8 +545,11 @@ app.post('/api/simulate-payment', (req, res) => {
                     req.headers['x-api-key'] ||
                     (req.headers.authorization && req.headers.authorization.replace(/^Bearer\s+/i, ''));
 
+  const isAdmin = safeCompareKeys(headerKey, ADMIN_API_KEY) ||
+                  (process.env.EXTRA_ADMIN_KEY && safeCompareKeys(headerKey, process.env.EXTRA_ADMIN_KEY));
+
   // In production, payment simulation must be strictly forbidden unless authorized by admin key
-  if (isProd && (!headerKey || (headerKey !== ADMIN_API_KEY && headerKey !== 'gz_live_key_a1b2c3d4e5f60718293a4b5c6d7e8f90'))) {
+  if (isProd && !isAdmin) {
     return res.status(403).json({
       success: false,
       error: 'SIMULATION_FORBIDDEN_IN_PRODUCTION',
