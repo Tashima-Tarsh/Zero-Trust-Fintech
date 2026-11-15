@@ -374,8 +374,7 @@ window.simulateTestPayment = async function() {
     const res = await fetch('/api/simulate-payment', {
       method: 'POST',
       headers: {
-        'Content-Type': 'application/json',
-        'X-Admin-Key': 'disha_live_admin_secret_key_2026'
+        'Content-Type': 'application/json'
       },
       body: JSON.stringify({ orderId: activeSession.orderId })
     });

@@ -187,7 +187,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"orderId\": \"{{ORDER_ID}}\",\n  \"amount\": {{CHALLENGE_AMOUNT}},\n  \"utr\": \"{{DYNAMIC_UTR}}\",\n  \"senderVpa\": \"customer@okhdfcbank\",\n  \"timestamp\": {{TIMESTAMP}}\n}"
+              "raw": "{\n  \"orderId\": \"{{ORDER_ID}}\",\n  \"amount\": {{CHALLENGE_AMOUNT}},\n  \"utr\": \"{{DYNAMIC_UTR}}\",\n  \"senderVpa\": \"customer@okhdfcbank\",\n  \"timestamp\": {{TIMESTAMP}},\n  \"receipt\": \"Paid to Nitish Enterprise (nkumar906099-7@oksbi) ₹{{CHALLENGE_AMOUNT}} on Google Pay. UPI transaction ID: {{DYNAMIC_UTR}}. Status: Completed successfully. Order: {{ORDER_ID}}\"\n}"
             },
             "url": {
               "raw": "{{CHECKOUT_URL}}/api/verify",

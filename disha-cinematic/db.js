@@ -727,7 +727,11 @@ function markNotificationsRead(merchantId) {
 }
 
 // Initial Seed: Pre-provisions Ramesh Kirana & a brand new fresh merchant for onboarding testing
+// Strictly disabled in production to eliminate static demo credentials
 function seedDefaultMerchants() {
+  if (process.env.NODE_ENV === 'production') {
+    return;
+  }
   const existingRamesh = findMerchantByEmail('ramesh@kirana.in');
   if (!existingRamesh) {
     console.log('Seeding pre-configured merchant: ramesh@kirana.in / Ramesh@123');

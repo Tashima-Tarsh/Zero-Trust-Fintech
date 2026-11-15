@@ -42,6 +42,10 @@ app.use((req, res, next) => {
   res.setHeader('X-Frame-Options', 'SAMEORIGIN');
   res.setHeader('X-XSS-Protection', '1; mode=block');
   res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
+  res.setHeader(
+    'Content-Security-Policy',
+    "default-src 'self'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: blob:; connect-src 'self' ws: wss:;"
+  );
   if (process.env.NODE_ENV === 'production') {
     res.setHeader('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
   }
@@ -166,17 +170,33 @@ wss.on('connection', (ws, req) => {
   const url = new URL(req.url, `http://${req.headers.host || 'localhost'}`);
   const orderId = url.searchParams.get('orderId');
 
-  if (orderId) {
-    if (!orderWsClients.has(orderId)) {
-      orderWsClients.set(orderId, new Set());
-    }
-    orderWsClients.get(orderId).add(ws);
-    // Send acknowledgement
-    ws.send(JSON.stringify({ type: 'CONNECTED', orderId, timestamp: Date.now() }));
+  // Verify orderId parameter and assert session exists in database
+  if (!orderId) {
+    ws.close(4400, 'Missing orderId parameter');
+    return;
   }
 
+  const session = db.findSessionByOrderId(orderId);
+  if (!session) {
+    ws.close(4404, 'Session not found for orderId');
+    return;
+  }
+
+  if (!orderWsClients.has(orderId)) {
+    orderWsClients.set(orderId, new Set());
+  }
+  orderWsClients.get(orderId).add(ws);
+
+  // Send acknowledgement
+  ws.send(JSON.stringify({
+    type: 'CONNECTED',
+    orderId,
+    status: session.status,
+    timestamp: Date.now()
+  }));
+
   ws.on('close', () => {
-    if (orderId && orderWsClients.has(orderId)) {
+    if (orderWsClients.has(orderId)) {
       orderWsClients.get(orderId).delete(ws);
       if (orderWsClients.get(orderId).size === 0) {
         orderWsClients.delete(orderId);
@@ -213,6 +233,7 @@ function broadcastOrderSuccess(orderId, payload) {
       vpaAddress: maskVpa(payload.vpaAddress),
       senderVpa: maskVpa(payload.senderVpa),
       maskedUtr: maskUtr(payload.utr),
+      utr: payload.utr,
       txId: payload.txId,
       timestamp: payload.timestamp,
       message: 'Settlement confirmed'
@@ -223,6 +244,29 @@ function broadcastOrderSuccess(orderId, payload) {
       }
     }
     console.log(`📡 [WebSocket] Broadcasted SUCCESS to ${clients.size} client(s) for order ${orderId}`);
+  }
+}
+
+function broadcastOrderPendingConfirmation(orderId, payload) {
+  const clients = orderWsClients.get(orderId);
+  if (clients && clients.size > 0) {
+    const message = JSON.stringify({
+      type: 'AWAITING_SHOP_CONFIRMATION',
+      orderId,
+      amount: payload.amount,
+      maskedUtr: payload.utr ? maskUtr(payload.utr) : null,
+      status: 'AWAITING_SHOP_CONFIRMATION',
+      trustScore: payload.trustScore,
+      confidenceTier: payload.confidenceTier,
+      suggestedAction: payload.suggestedAction,
+      message: 'Payment received. Awaiting shop confirmation.'
+    });
+    for (const client of clients) {
+      if (client.readyState === 1) { // OPEN
+        client.send(message);
+      }
+    }
+    console.log(`📡 [WebSocket] Broadcasted AWAITING_SHOP_CONFIRMATION to ${clients.size} client(s) for order ${orderId}`);
   }
 }
 
@@ -387,6 +431,100 @@ app.get('/api/session/:orderId', (req, res) => {
 });
 
 // ═══════════════════════════════════════════════════════════════════
+// ZERO-TRUST SERVER-SIDE RECEIPT EVIDENCE EXTRACTION
+// ═══════════════════════════════════════════════════════════════════
+function extractReceiptEvidence(receiptText, sessionContext, clientReported = {}) {
+  const now = Date.now();
+
+  // If no receipt text or image is provided, fail-closed with zero evidence
+  if (!receiptText || typeof receiptText !== 'string' || receiptText.trim().length < 8) {
+    return {
+      payeeVpa: null,
+      payeeName: null,
+      statusText: null,
+      shownTime: null,
+      layoutFieldsFound: 0,
+      layoutFieldsExpected: 4,
+      looksLikeScreenshot: false,
+      exifSoftware: null,
+      editArtifacts: false,
+      submittedAt: now,
+      rawReceipt: ''
+    };
+  }
+
+  const text = receiptText.trim();
+  const lower = text.toLowerCase();
+
+  // 1. Payee extraction from receipt text
+  let foundPayeeVpa = null;
+  let foundPayeeName = null;
+  const vpaMatch = text.match(/[\w.-]+@[\w.-]+/);
+  if (vpaMatch) {
+    foundPayeeVpa = vpaMatch[0];
+  }
+  if (sessionContext && sessionContext.payeeName && lower.includes(sessionContext.payeeName.toLowerCase())) {
+    foundPayeeName = sessionContext.payeeName;
+  }
+
+  // 2. Status text extraction
+  let foundStatusText = null;
+  if (/\b(successful|success|completed|paid|debited)\b/i.test(text)) {
+    foundStatusText = 'SUCCESS';
+  } else if (/\b(failed|declined|reversed|rejected|cancelled|canceled|expired)\b/i.test(text)) {
+    foundStatusText = 'FAILED';
+  } else if (/\b(pending|processing|in progress|awaiting)\b/i.test(text)) {
+    foundStatusText = 'PENDING';
+  }
+
+  // 3. Shown time extraction from receipt or client session context
+  let foundShownTime = null;
+  if (clientReported.shownTime || clientReported.timestamp) {
+    const st = Number(clientReported.shownTime || clientReported.timestamp);
+    if (!isNaN(st) && sessionContext && st >= sessionContext.createdAt - 60000 && st <= now + 60000) {
+      foundShownTime = st;
+    }
+  }
+  if (!foundShownTime && sessionContext) {
+    // If authentic receipt was submitted during active session window
+    foundShownTime = now;
+  }
+
+  // 4. Layout fields presence check (4 standard UPI layout fields)
+  let layoutFieldsFound = 0;
+  if (foundPayeeVpa || foundPayeeName || (sessionContext && lower.includes((sessionContext.payeeVpa || '').toLowerCase()))) {
+    layoutFieldsFound++;
+  }
+  if (/(?:₹|Rs\.?|INR)\s*[\d,]+(?:\.\d{2})?/i.test(text) || /\b(?:amount|paid|amt)\b/i.test(text)) {
+    layoutFieldsFound++;
+  }
+  if (/\b(?:utr|upi\s*(?:ref|transaction|txn)\s*(?:id|no|ref)?|rrn)\b/i.test(text) || /\b\d{12}\b/.test(text)) {
+    layoutFieldsFound++;
+  }
+  if (foundStatusText) {
+    layoutFieldsFound++;
+  }
+
+  // 5. Authentic UPI App signatures check
+  const hasAppSignature = /\b(google\s*pay|gpay|phonepe|paytm|bhim|cred|amazon\s*pay|axis\s*pay|i-mobile|upi)\b/i.test(text);
+  const looksLikeScreenshot = hasAppSignature || layoutFieldsFound >= 3;
+
+  return {
+    payeeVpa: foundPayeeVpa,
+    payeeName: foundPayeeName,
+    statusText: foundStatusText,
+    shownTime: foundShownTime,
+    layoutFieldsFound,
+    layoutFieldsExpected: 4,
+    looksLikeScreenshot,
+    exifSoftware: clientReported.exifSoftware || null,
+    editArtifacts: clientReported.editArtifacts === true,
+    submittedAt: now,
+    rawReceipt: text
+  };
+}
+
+// ═══════════════════════════════════════════════════════════════════
 // TASK 8: 7-LAYER FRAUD VERIFICATION & TRUST-SCORING ENGINE
 // ═══════════════════════════════════════════════════════════════════
 app.post('/api/verify', verifyLimiter, (req, res) => {
@@ -431,20 +569,10 @@ app.post('/api/verify', verifyLimiter, (req, res) => {
       payeeName: MERCHANT_NAME
     };
 
-    const ev = {
-      amount: parsedAmount !== null ? Number(parsedAmount) : null,
-      utr: parsedUtr,
-      payeeVpa: req.body.payeeVpa || session.vpaAddress,
-      payeeName: req.body.payeeName || MERCHANT_NAME,
-      statusText: req.body.statusText || 'SUCCESS',
-      shownTime: req.body.shownTime ? Number(req.body.shownTime) : now,
-      layoutFieldsFound: req.body.layoutFieldsFound || 4,
-      layoutFieldsExpected: req.body.layoutFieldsExpected || 4,
-      looksLikeScreenshot: req.body.looksLikeScreenshot !== false,
-      exifSoftware: req.body.exifSoftware || null,
-      editArtifacts: req.body.editArtifacts === true,
-      submittedAt: now
-    };
+    // Extract server-side verified evidence (NO lenient client defaults)
+    const ev = extractReceiptEvidence(receipt, sessionContext, req.body);
+    ev.amount = parsedAmount !== null ? Number(parsedAmount) : null;
+    ev.utr = parsedUtr;
 
     const attemptsCount = (session.verificationAttempts || 0) + 1;
     session.verificationAttempts = attemptsCount;
@@ -453,7 +581,7 @@ app.post('/api/verify', verifyLimiter, (req, res) => {
       utrSeen: db.isUtrBlacklisted(parsedUtr),
       imageHashSeen: req.body.imageHash ? (typeof db.isImageHashSeen === 'function' ? db.isImageHashSeen(req.body.imageHash) : false) : false,
       attemptsThisSession: attemptsCount,
-      priorConfirmed: 1
+      priorConfirmed: 0
     };
 
     // Evaluate evidence through trust-score pure scoring engine
@@ -463,7 +591,10 @@ app.post('/api/verify', verifyLimiter, (req, res) => {
       sameDevice: req.body.sameDevice !== false
     });
 
-    // Check hard gates
+    // ─────────────────────────────────────────────────────────────
+    // TIER-DRIVEN PAYMENT STATE MACHINE (RBI / Sovereign Zero-Trust)
+    // ─────────────────────────────────────────────────────────────
+    // Check hard gates or REJECT tier
     if (trustResult.tier === 'REJECT') {
       let mappedLayer = 2;
       if (trustResult.gate === 'SESSION_EXPIRED') {
@@ -484,6 +615,32 @@ app.post('/api/verify', verifyLimiter, (req, res) => {
         reason: (trustResult.reasons && trustResult.reasons[0]) || 'Evidence rejected by Zero-Trust verification.',
         trustScore: trustResult.score,
         confidenceTier: trustResult.tier
+      });
+    }
+
+    // LOW tier: Insufficient evidence
+    if (trustResult.tier === 'LOW') {
+      return res.status(400).json({
+        success: false,
+        layer: 2,
+        code: 'EVIDENCE_INSUFFICIENT',
+        reason: `Evidence confidence score too low (${trustResult.score}/100, Tier: LOW). Valid receipt proof required.`,
+        trustScore: trustResult.score,
+        confidenceTier: trustResult.tier,
+        reasons: trustResult.reasons
+      });
+    }
+
+    // PENDING tier: Bank switch interbank pending
+    if (trustResult.tier === 'PENDING') {
+      db.updateSessionStatus(session.orderId, 'PENDING');
+      return res.status(202).json({
+        success: false,
+        status: 'PENDING',
+        code: 'PAYMENT_PENDING_BANK',
+        reason: 'Payment is marked as pending by customer bank. Awaiting clearing.',
+        trustScore: trustResult.score,
+        confidenceTier: 'PENDING'
       });
     }
 
@@ -527,8 +684,42 @@ app.post('/api/verify', verifyLimiter, (req, res) => {
       });
     }
 
+    // Compute suggested shop action based on confidence tier and instant limit (₹500)
+    const suggestedAction = suggestAction(trustResult, session.challengeAmount, 500);
+
+    // MEDIUM tier OR HIGH tier exceeding instant limit (> ₹500):
+    // Requires merchant bank app confirmation before irreversible ledger settlement
+    if (trustResult.tier === 'MEDIUM' || (trustResult.tier === 'HIGH' && session.challengeAmount > 500)) {
+      db.updateSessionStatus(session.orderId, 'AWAITING_SHOP_CONFIRMATION', parsedUtr);
+
+      broadcastOrderPendingConfirmation(session.orderId, {
+        orderId: session.orderId,
+        utr: parsedUtr,
+        amount: session.challengeAmount,
+        trustScore: trustResult.score,
+        confidenceTier: trustResult.tier,
+        suggestedAction
+      });
+
+      return res.status(200).json({
+        success: true,
+        status: 'AWAITING_SHOP_CONFIRMATION',
+        layer: 6,
+        confidenceTier: trustResult.tier,
+        trustScore: trustResult.score,
+        suggestedAction,
+        message: 'Payment evidence requires merchant bank app confirmation before ledger settlement.',
+        orderId: session.orderId,
+        utr: parsedUtr,
+        amount: session.challengeAmount,
+        bankCorroborated: false,
+        reconciliationState: 'AWAITING_SHOP_CONFIRMATION'
+      });
+    }
+
     // ─────────────────────────────────────────────────────────────
     // LAYER 7: DOUBLE-ENTRY LEDGER POSTING & BALANCE ASSERTION
+    // HIGH tier <= ₹500: Instant settlement & double-entry ledger posting
     // ─────────────────────────────────────────────────────────────
     const { txId, verification } = db.recordTransactionAndLedger(
       session.orderId,
@@ -551,9 +742,6 @@ app.post('/api/verify', verifyLimiter, (req, res) => {
 
     // Update session status
     db.updateSessionStatus(session.orderId, 'SUCCESS', parsedUtr);
-
-    // Compute suggested shop action based on confidence tier and instant limit (₹500)
-    const suggestedAction = suggestAction(trustResult, session.challengeAmount, 500);
 
     // Notify connected browser via WebSocket (TASK 11)
     const successPayload = {
@@ -655,18 +843,10 @@ app.post('/handle-share', async (req, res) => {
       payeeName: MERCHANT_NAME
     };
 
-    const ev = {
-      amount: parsedAmount,
-      utr: parsedUtr,
-      payeeVpa: session.vpaAddress || MERCHANT_UPI_ID,
-      payeeName: MERCHANT_NAME,
-      statusText: 'SUCCESS',
-      shownTime: now,
-      layoutFieldsFound: 4,
-      layoutFieldsExpected: 4,
-      looksLikeScreenshot: true,
-      submittedAt: now
-    };
+    // Extract server-side verified evidence (NO lenient client defaults)
+    const ev = extractReceiptEvidence(rawReceipt, sessionContext, req.body);
+    ev.amount = parsedAmount;
+    ev.utr = parsedUtr;
 
     const attemptsCount = (session.verificationAttempts || 0) + 1;
     session.verificationAttempts = attemptsCount;
@@ -675,13 +855,13 @@ app.post('/handle-share', async (req, res) => {
       utrSeen: db.isUtrBlacklisted(parsedUtr),
       imageHashSeen: false,
       attemptsThisSession: attemptsCount,
-      priorConfirmed: 1
+      priorConfirmed: 0
     };
 
     const trustResult = scoreEvidence(sessionContext, ev, hist, {
       now,
       graceMs: 60 * 1000,
-      sameDevice: false // Mobile scanning external screen
+      sameDevice: false // Mobile scanning external screen or intent
     });
 
     if (trustResult.tier === 'REJECT') {
@@ -697,7 +877,54 @@ app.post('/handle-share', async (req, res) => {
       return res.redirect(`/failed.html?reason=${encodeURIComponent((trustResult.reasons && trustResult.reasons[0]) || 'Verification failed')}`);
     }
 
-    // Ledger posting & anti-replay
+    if (trustResult.tier === 'LOW') {
+      if (req.accepts('json') && !req.accepts('html')) {
+        return res.status(400).json({
+          success: false,
+          code: 'EVIDENCE_INSUFFICIENT',
+          reason: `Evidence confidence score too low (${trustResult.score}/100, Tier: LOW). Valid receipt proof required.`,
+          trustScore: trustResult.score,
+          confidenceTier: trustResult.tier,
+          reasons: trustResult.reasons
+        });
+      }
+      return res.redirect(`/failed.html?reason=${encodeURIComponent('Evidence confidence score too low. Authentic receipt required.')}`);
+    }
+
+    const suggestedAction = suggestAction(trustResult, session.challengeAmount, 500);
+
+    // MEDIUM tier OR HIGH tier exceeding instant limit (> ₹500):
+    // Requires merchant bank app confirmation before ledger release
+    if (trustResult.tier === 'MEDIUM' || (trustResult.tier === 'HIGH' && session.challengeAmount > 500)) {
+      db.updateSessionStatus(session.orderId, 'AWAITING_SHOP_CONFIRMATION', parsedUtr);
+
+      broadcastOrderPendingConfirmation(session.orderId, {
+        orderId: session.orderId,
+        utr: parsedUtr,
+        amount: session.challengeAmount,
+        trustScore: trustResult.score,
+        confidenceTier: trustResult.tier,
+        suggestedAction
+      });
+
+      if (req.accepts('json') && !req.accepts('html')) {
+        return res.json({
+          success: true,
+          settled: false,
+          status: 'AWAITING_SHOP_CONFIRMATION',
+          orderId: session.orderId,
+          utr: parsedUtr,
+          amount: session.challengeAmount,
+          trustScore: trustResult.score,
+          confidenceTier: trustResult.tier,
+          suggestedAction,
+          reasons: trustResult.reasons
+        });
+      }
+      return res.redirect(`/success.html?orderId=${encodeURIComponent(session.orderId)}&status=AWAITING_CONFIRMATION`);
+    }
+
+    // Ledger posting & anti-replay for HIGH <= ₹500
     const { txId, verification } = db.recordTransactionAndLedger(
       session.orderId,
       parsedUtr,
@@ -710,8 +937,6 @@ app.post('/handle-share', async (req, res) => {
 
     // Update session status in DB
     db.updateSessionStatus(session.orderId, 'SUCCESS', parsedUtr);
-
-    const suggestedAction = suggestAction(trustResult, session.challengeAmount, 500);
 
     // ⚡ CRITICAL: INSTANT WEBSOCKET DISPATCH TO WAITING CHECKOUT (LAPTOP/DESKTOP/MOBILE)
     const successPayload = {
@@ -806,10 +1031,10 @@ app.post('/api/npci-callback', (req, res) => {
   }
 });
 
-// Simulation helper for one-click developer testing (guarded against production abuse)
+// Simulation helper for one-click developer testing (guarded against production abuse - OFF by default)
 app.post('/api/simulate-payment', (req, res) => {
   const isProd = process.env.NODE_ENV === 'production';
-  const simulationEnabled = process.env.ENABLE_PAYMENT_SIMULATION !== 'false';
+  const simulationEnabled = process.env.ENABLE_PAYMENT_SIMULATION === 'true'; // OFF by default
   const headerKey = req.headers['x-admin-key'] ||
                     req.headers['x-api-key'] ||
                     (req.headers.authorization && req.headers.authorization.replace(/^Bearer\s+/i, ''));
@@ -817,12 +1042,20 @@ app.post('/api/simulate-payment', (req, res) => {
   const isAdmin = safeCompareKeys(headerKey, ADMIN_API_KEY) ||
                   (process.env.EXTRA_ADMIN_KEY && safeCompareKeys(headerKey, process.env.EXTRA_ADMIN_KEY));
 
-  // In production or when disabled, payment simulation is strictly forbidden without admin credentials
-  if ((isProd || !simulationEnabled) && !isAdmin) {
+  // In production or when not explicitly enabled, simulation is strictly forbidden without admin credentials
+  if (!simulationEnabled && !isAdmin) {
+    return res.status(403).json({
+      success: false,
+      error: 'SIMULATION_DISABLED_BY_DEFAULT',
+      message: 'Payment simulation is disabled by default. Enable via ENABLE_PAYMENT_SIMULATION=true or provide administrative credentials.'
+    });
+  }
+
+  if (isProd && !isAdmin) {
     return res.status(403).json({
       success: false,
       error: 'SIMULATION_FORBIDDEN_IN_PRODUCTION',
-      message: 'Payment simulation is disabled without administrative credentials'
+      message: 'Payment simulation is strictly forbidden in production without administrative credentials.'
     });
   }
 
@@ -962,11 +1195,11 @@ app.post('/api/gaming/verify-payment', async (req, res) => {
     const company = req.company;
     const clientIP = req.clientIP;
 
-    if (!utr) {
+    if (!utr || !/^\d{12}$/.test(String(utr).trim())) {
       return res.status(400).json({
         success: false,
-        error: 'MISSING_UTR',
-        message: 'Transaction UTR is required'
+        error: 'INVALID_UTR_FORMAT',
+        message: 'Valid 12-digit transaction UTR is required'
       });
     }
 
