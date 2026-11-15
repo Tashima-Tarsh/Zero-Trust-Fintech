@@ -529,18 +529,16 @@ function createMerchantOrder(merchantId, { amount, description = '', vpaAddress 
     ? String(orderId).trim() 
     : ('ORD_' + Date.now().toString(36).toUpperCase() + '_' + crypto.randomBytes(3).toString('hex').toUpperCase());
   const businessName = merchant.business_name || 'Merchant';
-  // mc (Merchant Category Code) must NOT be sent for personal VPAs.
-  // GPay, PhonePe and Slice validate mc against their merchant registry;
-  // a personal VPA with mc=5411 is rejected before PIN by all three apps.
+  // mc and tr must NOT be sent for personal VPAs.
+  // GPay, PhonePe and Slice validate mc/tr against their merchant acquiring registry;
+  // a personal VPA with mc or tr is rejected before PIN by all three apps as an unregistered merchant.
   const upiUri = buildNPCIIntentUri({
     pa: chosenVpa,
     pn: businessName,
     am: parsedAmount,
     orderId: finalOrderId,
     description: description || 'Retail Payment',
-    tr: finalOrderId,
     cu: 'INR'
-    // mc omitted intentionally — personal VPA, not a registered merchant PSP
   });
   const now = Date.now();
 
