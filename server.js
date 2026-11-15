@@ -165,16 +165,15 @@ function generateSession(baseAmount = 100, description = '', customVpa = null) {
 // TASK 4: NPCI-COMPLIANT UPI DEEP LINK GENERATOR (v3.2 Spec)
 // ═══════════════════════════════════════════════════════════════════
 function generateUPILink(session) {
-  // NPCI Specification v3.2: upi://pay?pa=&pn=&am=&tn=&tr=&cu=INR&mc=5411
+  // P2P NPCI Specification: upi://pay?pa=&pn=&am=&tn=&cu=INR
+  // mc and tr are omitted intentionally for personal VPAs to avoid bank decline before PIN
   return buildNPCIIntentUri({
     pa: session.vpaAddress || MERCHANT_UPI_ID,
     pn: MERCHANT_NAME,
     am: session.challengeAmount,
     orderId: session.orderId,
     description: session.description || 'Kirana Order',
-    tr: session.txnRef,
-    cu: 'INR',
-    mc: '5411'
+    cu: 'INR'
   });
 }
 

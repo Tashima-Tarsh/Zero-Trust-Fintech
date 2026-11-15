@@ -76,7 +76,13 @@ function sanitizeTxnRef(txnRef = '') {
 
 /**
  * Build NPCI-Compliant UPI Intent URI:
- * upi://pay?pa=<vpa>&pn=<name>&am=<amt>&tn=<note>&tr=<ref>&cu=INR&mc=<mcc>
+ * upi://pay?pa=<vpa>&pn=<name>&am=<amt>&tn=<note>&cu=INR
+ * 
+ * Note on P2P vs P2M:
+ * Personal VPAs (like @oksbi, @okhdfcbank, @ybl) must NEVER include 'mc' or 'tr'.
+ * If 'mc' or 'tr' is present, banking switches (like SBI/HDFC) treat the transaction as P2M
+ * and decline it immediately ("Transaction declined by bank") before asking for UPI PIN
+ * because the payee is a personal savings account, not a registered merchant terminal.
  */
 function buildNPCIIntentUri({
   pa,
@@ -85,9 +91,9 @@ function buildNPCIIntentUri({
   orderId = '',
   description = '',
   tn,
-  tr,
+  tr = '',
   cu = 'INR',
-  mc = '', // Do NOT default mc — personal VPAs must omit it or GPay/PhonePe/Slice reject before PIN
+  mc = '',
   url = '',
   sign = '',
   mam = ''
@@ -99,59 +105,64 @@ function buildNPCIIntentUri({
     throw new Error('NPCI Compliance Error: Payee Address (pa) exceeds maximum 50 characters');
   }
 
+  const parts = [];
+
+  // 1. pa (Payee Address): keep raw @ (never %40) for universal UPI app compatibility
+  parts.push('pa=' + pa.trim());
+
+  // 2. pn (Payee Name): standard percent-encoding (%20 for spaces, never '+')
   const cleanPn = (pn || 'Merchant').substring(0, 80).trim();
-  const note = tn ? sanitizeTransactionNote('', tn) : sanitizeTransactionNote(orderId, description);
-  const ref = sanitizeTxnRef(tr || orderId);
+  if (cleanPn) {
+    parts.push('pn=' + encodeURIComponent(cleanPn));
+  }
 
-  const params = new URLSearchParams();
-  params.set('pa', pa);
-  params.set('pn', cleanPn);
-
+  // 3. am (Amount): formatted to exactly 2 decimal places
   if (am !== undefined && am !== null && am !== '') {
     const numAmt = Number(am);
     if (isNaN(numAmt) || numAmt <= 0) {
       throw new Error('NPCI Compliance Error: Amount (am) must be a positive number');
     }
-    // NPCI requires exactly 2 decimal places
-    params.set('am', numAmt.toFixed(2));
+    parts.push('am=' + numAmt.toFixed(2));
   }
 
-  if (note) {
-    params.set('tn', note);
+  // 4. tn (Transaction Note): clean alphanumeric order ID (avoids banking switch parser errors)
+  const rawNote = tn || orderId || description || '';
+  if (rawNote) {
+    const safeNote = String(rawNote).replace(/[^A-Za-z0-9_-]/g, '').substring(0, 50);
+    if (safeNote) {
+      parts.push('tn=' + safeNote);
+    }
   }
 
-  if (ref) {
-    params.set('tr', ref);
+  // 5. cu (Currency): always INR
+  parts.push('cu=' + (cu || 'INR').toUpperCase());
+
+  // 6. tr (Transaction Reference): ONLY included if explicitly provided (must be omitted for personal VPAs!)
+  if (tr && String(tr).trim()) {
+    parts.push('tr=' + encodeURIComponent(String(tr).trim()));
   }
 
-  params.set('cu', (cu || 'INR').toUpperCase());
-
+  // 7. mc (Merchant Category Code): ONLY included if explicitly provided (must be omitted for personal VPAs!)
   if (mc && /^\d{4}$/.test(String(mc))) {
-    params.set('mc', String(mc));
+    parts.push('mc=' + mc);
   }
 
   if (mam) {
     const numMam = Number(mam);
     if (!isNaN(numMam) && numMam > 0) {
-      params.set('mam', numMam.toFixed(2));
+      parts.push('mam=' + numMam.toFixed(2));
     }
   }
 
   if (url) {
-    params.set('url', String(url).substring(0, 256));
+    parts.push('url=' + encodeURIComponent(String(url).substring(0, 256)));
   }
 
   if (sign) {
-    params.set('sign', String(sign));
+    parts.push('sign=' + encodeURIComponent(String(sign)));
   }
 
-  // UPI apps expect raw @ in the pa= parameter (not %40).
-  // URLSearchParams auto-encodes @ → %40 which many UPI apps (BHIM, bank apps) reject.
-  // Fix: build the URI manually so pa= keeps the raw @ character.
-  const paRaw = 'pa=' + pa; // raw, unencoded
-  params.delete('pa');
-  const rest = params.toString(); // rest of params (pn, am, tn, tr, cu, mc ...)
-  return 'upi://pay?' + paRaw + (rest ? '&' + rest : '');
+  return 'upi://pay?' + parts.join('&');
 }
 
 /**
