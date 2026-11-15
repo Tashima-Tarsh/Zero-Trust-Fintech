@@ -303,8 +303,14 @@ async def verify_payment(
 
 
 @router.get("/vpa/health/{merchant_id}")
-async def check_merchant_vpa(merchant_id: str, db: Session = Depends(get_db)):
+async def check_merchant_vpa(
+    merchant_id: str,
+    current_merchant: Merchant = Depends(get_current_merchant),
+    db: Session = Depends(get_db),
+):
     """Check VPA health and 90-day rotation status (P2-1)"""
+    if current_merchant.id != merchant_id:
+        raise HTTPException(status_code=403, detail="Merchant ID mismatch")
     return await vpa_health_monitor.check_vpa_health(merchant_id, db)
 
 

@@ -108,7 +108,18 @@ class MerkleTreeLedger:
         blocks = self.db.query(TransactionBlock).order_by(TransactionBlock.id).all()
 
         if not blocks:
-            return {"status": "empty", "message": "No blocks in ledger"}
+            try:
+                genesis_tx = {
+                    "event": "GENESIS_INITIALIZATION",
+                    "system": "DISHA 8.2 Sovereign Fintech",
+                    "timestamp": datetime.now(timezone.utc).isoformat(),
+                    "status": "INITIALIZED",
+                }
+                genesis_block = self.commit_transaction(genesis_tx)
+                blocks = [genesis_block]
+            except Exception as e:
+                logger.warning(f"Genesis block initialization notice: {e}")
+                return {"status": "empty", "message": "No blocks in ledger"}
 
         tampered_blocks = []
 

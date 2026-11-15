@@ -253,9 +253,30 @@ const server = http.createServer(async (req, res) => {
       const simulateMatch = pathname.match(/^\/api\/merchant\/payments\/([^/]+)\/simulate$/);
       if (simulateMatch && method === 'POST') {
         const orderId = simulateMatch[1];
-        const body = await readBody(req);
-        const completedOrder = db.simulateOrderPayment(currentMerchant.id, orderId, body.utr);
-        return sendJson(res, 200, { success: true, order: completedOrder });
+
+        // Production Guard: Strict production disables arbitrary payment simulation
+        const isStrictProd = process.env.NODE_ENV === 'production' && process.env.ALLOW_SIMULATION === 'false';
+        if (isStrictProd) {
+          return sendError(res, 403, 'Payment simulation is disabled in production environment');
+        }
+
+        // Validate order existence (handled 404 rejection instead of 500 error)
+        const order = db.getMerchantOrderById(currentMerchant.id, orderId);
+        if (!order) {
+          return sendError(res, 404, `Order '${orderId}' not found`);
+        }
+
+        if (order.status === 'COMPLETED') {
+          return sendError(res, 400, `Order '${orderId}' is already settled`);
+        }
+
+        try {
+          const body = await readBody(req);
+          const completedOrder = db.simulateOrderPayment(currentMerchant.id, orderId, body.utr);
+          return sendJson(res, 200, { success: true, order: completedOrder });
+        } catch (simErr) {
+          return sendError(res, 400, simErr.message);
+        }
       }
 
       // UPI IDs: List
@@ -326,30 +347,52 @@ const server = http.createServer(async (req, res) => {
       const vpaMatch = pathname.match(/^\/api\/merchant\/vpas\/([^/]+)$/);
       if (vpaMatch && method === 'PATCH') {
         const vpaId = vpaMatch[1];
+
+        // Validate VPA existence (handled 404 rejection instead of 500 error)
+        const targetVpa = db.getMerchantVPAById(currentMerchant.id, vpaId);
+        if (!targetVpa) {
+          return sendError(res, 404, `UPI ID '${vpaId}' not found`);
+        }
+
         const body = await readBody(req);
         const { action } = body;
 
-        if (action === 'set_default') {
-          const vpas = db.setDefaultVPA(currentMerchant.id, vpaId);
-          return sendJson(res, 200, { success: true, vpas });
-        } else if (action === 'pause') {
-          const vpa = db.updateVPAStatus(currentMerchant.id, vpaId, 'PAUSED');
-          return sendJson(res, 200, { success: true, vpa });
-        } else if (action === 'resume') {
-          const vpa = db.updateVPAStatus(currentMerchant.id, vpaId, 'ACTIVE');
-          return sendJson(res, 200, { success: true, vpa });
-        } else if (action === 'quarantine') {
-          const vpa = db.updateVPAStatus(currentMerchant.id, vpaId, 'COOLDOWN');
-          return sendJson(res, 200, { success: true, vpa, message: 'VPA placed into 7-day quarantine cooldown.' });
-        } else {
-          return sendError(res, 400, 'Invalid action. Supported: set_default, pause, resume, quarantine');
+        try {
+          if (action === 'set_default') {
+            const vpas = db.setDefaultVPA(currentMerchant.id, vpaId);
+            return sendJson(res, 200, { success: true, vpas });
+          } else if (action === 'pause') {
+            const vpa = db.updateVPAStatus(currentMerchant.id, vpaId, 'PAUSED');
+            return sendJson(res, 200, { success: true, vpa });
+          } else if (action === 'resume') {
+            const vpa = db.updateVPAStatus(currentMerchant.id, vpaId, 'ACTIVE');
+            return sendJson(res, 200, { success: true, vpa });
+          } else if (action === 'quarantine') {
+            const vpa = db.updateVPAStatus(currentMerchant.id, vpaId, 'COOLDOWN');
+            return sendJson(res, 200, { success: true, vpa, message: 'VPA placed into 7-day quarantine cooldown.' });
+          } else {
+            return sendError(res, 400, 'Invalid action. Supported: set_default, pause, resume, quarantine');
+          }
+        } catch (actionErr) {
+          return sendError(res, 400, actionErr.message);
         }
       }
 
       if (vpaMatch && method === 'DELETE') {
         const vpaId = vpaMatch[1];
-        db.deleteVPA(currentMerchant.id, vpaId);
-        return sendJson(res, 200, { success: true, message: 'UPI ID removed' });
+
+        // Validate VPA existence (handled 404 rejection instead of 500 error)
+        const targetVpa = db.getMerchantVPAById(currentMerchant.id, vpaId);
+        if (!targetVpa) {
+          return sendError(res, 404, `UPI ID '${vpaId}' not found`);
+        }
+
+        try {
+          db.deleteVPA(currentMerchant.id, vpaId);
+          return sendJson(res, 200, { success: true, message: 'UPI ID removed' });
+        } catch (delErr) {
+          return sendError(res, 400, delErr.message);
+        }
       }
 
       // Reports: Summary & CSV Export

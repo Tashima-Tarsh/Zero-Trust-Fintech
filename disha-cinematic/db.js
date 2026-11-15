@@ -369,9 +369,16 @@ function addMerchantVPA(merchantId, vpaAddress, bankName = '') {
   return db.prepare('SELECT id, vpa_address, bank_name, is_default, status, created_at FROM merchant_vpas WHERE id = ?').get(vpaId);
 }
 
+function getMerchantVPAById(merchantId, vpaId) {
+  if (!merchantId || !vpaId) return null;
+  return db.prepare('SELECT id, vpa_address, bank_name, is_default, status, created_at FROM merchant_vpas WHERE id = ? AND merchant_id = ?').get(vpaId, merchantId) || null;
+}
+
 function updateVPAStatus(merchantId, vpaId, status) {
+  const existing = getMerchantVPAById(merchantId, vpaId);
+  if (!existing) throw new Error('VPA not found');
   db.prepare('UPDATE merchant_vpas SET status = ? WHERE id = ? AND merchant_id = ?').run(status, vpaId, merchantId);
-  return db.prepare('SELECT id, vpa_address, bank_name, is_default, status, created_at FROM merchant_vpas WHERE id = ?').get(vpaId);
+  return getMerchantVPAById(merchantId, vpaId);
 }
 
 function setDefaultVPA(merchantId, vpaId) {
@@ -577,6 +584,11 @@ function simulateOrderPayment(merchantId, orderId, customUtr = null) {
   );
 
   return db.prepare('SELECT * FROM merchant_orders WHERE id = ?').get(orderId);
+}
+
+function getMerchantOrderById(merchantId, orderId) {
+  if (!merchantId || !orderId) return null;
+  return db.prepare('SELECT * FROM merchant_orders WHERE id = ? AND merchant_id = ?').get(orderId, merchantId) || null;
 }
 
 function getMerchantOrders(merchantId, { status, search, limit = 50, fromTimestamp, toTimestamp }) {
@@ -918,6 +930,7 @@ module.exports = {
   updateMerchantProfile,
   updateMerchantPassword,
   getMerchantVPAs,
+  getMerchantVPAById,
   addMerchantVPA,
   updateVPAStatus,
   setDefaultVPA,
@@ -931,6 +944,7 @@ module.exports = {
   createMerchantOrder,
   simulateOrderPayment,
   getMerchantOrders,
+  getMerchantOrderById,
   getMerchantDashboardData,
   getMerchantNotifications,
   markNotificationsRead
