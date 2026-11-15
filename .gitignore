@@ -17,8 +17,8 @@ build/
 .env
 .env.local
 .env.*.local
-screenshots/
-**/screenshots/
+test-artifacts/
+**/test-artifacts/
 *.db
 *.db-shm
 *.db-wal

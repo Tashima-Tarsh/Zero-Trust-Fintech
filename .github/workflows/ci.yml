@@ -1,0 +1,70 @@
+name: DISHA 8.2 CI
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  lint-and-test:
+    runs-on: windows-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+
+      - name: Install root dependencies
+        run: npm ci
+
+      - name: Install disha-cinematic dependencies (puppeteer-core)
+        run: npm ci
+        working-directory: disha-cinematic
+
+      - name: Run lint (syntax check)
+        run: npm run lint
+
+      - name: Start checkout server (port 3000)
+        run: Start-Process -FilePath "node" -ArgumentList "server.js" -WindowStyle Hidden -PassThru | Select-Object -First 1
+        env:
+          PORT: 3000
+          NODE_ENV: test
+
+      - name: Start merchant SaaS server (port 5000)
+        run: Start-Process -FilePath "node" -ArgumentList "server.js" -WindowStyle Hidden -PassThru | Select-Object -First 1
+        working-directory: disha-cinematic
+        env:
+          PORT: 5000
+          NODE_ENV: test
+          DATA_DIR: ./data
+
+      - name: Wait for servers to be healthy
+        run: |
+          $timeout = 60; $start = Get-Date;
+          do {
+            $r3000 = Invoke-RestMethod -Uri "http://localhost:3000/health" -ErrorAction SilentlyContinue;
+            $r5000 = Invoke-RestMethod -Uri "http://localhost:5000/health" -ErrorAction SilentlyContinue;
+            if ($r3000 -and $r5000) { Write-Host "Both servers healthy"; break }
+            Start-Sleep -Seconds 2;
+          } while ((Get-Date) - $start -lt $timeout);
+          if (-not ($r3000 -and $r5000)) { Write-Host "Servers not healthy in time"; exit 1 }
+
+      - name: Run test suite
+        run: npm test
+
+      - name: Upload test artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: disha-test-screenshots
+          path: |
+            test-artifacts/verify-touch-*.png
+            test-artifacts/verify-*.png
+          retention-days: 7
