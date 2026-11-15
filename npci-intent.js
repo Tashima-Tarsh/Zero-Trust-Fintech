@@ -299,11 +299,17 @@ function parseUTRTimestamp(utr) {
   return null;
 }
 
+const { buildUpiUri, appLinks, generateChallengeAmount, VPA_RE } = require('./utils/upi-intent');
+
 module.exports = {
   NPCI_RESPONSE_CODES,
   sanitizeTransactionNote,
   sanitizeTxnRef,
   buildNPCIIntentUri,
+  buildUpiUri,
+  appLinks,
+  generateChallengeAmount,
+  VPA_RE,
   parseNPCIIntentResponse,
   parseUTRTimestamp
 };

@@ -20,6 +20,8 @@ const {
   parseUTRTimestamp,
   NPCI_RESPONSE_CODES
 } = require('./npci-intent');
+const { scoreEvidence, suggestAction, WEIGHTS, TIERS } = require('./utils/trust-score');
+const { buildUpiUri, appLinks, generateChallengeAmount: generateUniqueChallenge } = require('./utils/upi-intent');
 const { IPWhitelistMiddleware } = require('./middleware/ip-whitelist');
 const adminRoutes = require('./routes/admin/ip-whitelist');
 
@@ -291,17 +293,31 @@ function generateSession(baseAmount = 100, description = '', customVpa = null) {
 }
 
 // ═══════════════════════════════════════════════════════════════════
-// TASK 4: NPCI-COMPLIANT UPI DEEP LINK GENERATOR (v3.2 Spec)
+// TASK 4: NPCI-COMPLIANT UPI DEEP LINK GENERATOR (v3.2 Spec & upi-intent)
 // ═══════════════════════════════════════════════════════════════════
 function generateUPILink(session) {
   // P2P NPCI Specification: upi://pay?pa=&pn=&am=&tn=&cu=INR
-  // mc and tr are omitted intentionally for personal VPAs to avoid bank decline before PIN
-  return buildNPCIIntentUri({
-    pa: session.vpaAddress || MERCHANT_UPI_ID,
-    pn: MERCHANT_NAME,
-    description: session.description || '',
-    cu: 'INR'
-  });
+  // mc and tr are strictly forbidden for personal VPAs to avoid bank decline before PIN
+  const isMerchantP2M = session.mc && /^\d{4}$/.test(session.mc) && session.tr;
+  if (isMerchantP2M) {
+    return buildUpiUri({
+      kind: 'P2M',
+      pa: session.vpaAddress || MERCHANT_UPI_ID,
+      pn: MERCHANT_NAME,
+      am: session.challengeAmount,
+      tn: session.orderId || session.description || 'Payment',
+      mc: session.mc,
+      tr: session.tr
+    });
+  } else {
+    return buildUpiUri({
+      kind: 'P2P',
+      pa: session.vpaAddress || MERCHANT_UPI_ID,
+      pn: MERCHANT_NAME,
+      am: session.challengeAmount,
+      tn: session.orderId || session.description || 'Payment'
+    });
+  }
 }
 
 // ═══════════════════════════════════════════════════════════════════
@@ -330,6 +346,7 @@ app.get('/api/session/new', checkoutLimiter, async (req, res) => {
     }
     const session = generateSession(baseAmount, description, validatedVpa);
     const upiLink = generateUPILink(session);
+    const links = appLinks(upiLink);
 
     // Generate base64 QR as helper, though frontend renders direct to canvas
     const qrDataUrl = await QRCode.toDataURL(upiLink, {
@@ -351,6 +368,7 @@ app.get('/api/session/new', checkoutLimiter, async (req, res) => {
       expiresAt: session.expiresAt,
       qrRefreshAt: session.qrRefreshAt,
       upiLink,
+      appLinks: links,
       qrDataUrl
     });
   } catch (err) {
@@ -369,7 +387,7 @@ app.get('/api/session/:orderId', (req, res) => {
 });
 
 // ═══════════════════════════════════════════════════════════════════
-// TASK 8: 7-LAYER FRAUD VERIFICATION ENGINE
+// TASK 8: 7-LAYER FRAUD VERIFICATION & TRUST-SCORING ENGINE
 // ═══════════════════════════════════════════════════════════════════
 app.post('/api/verify', verifyLimiter, (req, res) => {
   try {
@@ -404,66 +422,74 @@ app.post('/api/verify', verifyLimiter, (req, res) => {
       });
     }
 
-    if (now > session.expiresAt) {
-      db.updateSessionStatus(session.orderId, 'EXPIRED');
+    // Prepare evidence & session context for Zero-Trust scoring engine
+    const sessionContext = {
+      challengeAmount: Number(session.challengeAmount),
+      createdAt: session.createdAt,
+      expiresAt: session.expiresAt,
+      payeeVpa: session.vpaAddress || MERCHANT_UPI_ID,
+      payeeName: MERCHANT_NAME
+    };
+
+    const ev = {
+      amount: parsedAmount !== null ? Number(parsedAmount) : null,
+      utr: parsedUtr,
+      payeeVpa: req.body.payeeVpa || session.vpaAddress,
+      payeeName: req.body.payeeName || MERCHANT_NAME,
+      statusText: req.body.statusText || 'SUCCESS',
+      shownTime: req.body.shownTime ? Number(req.body.shownTime) : now,
+      layoutFieldsFound: req.body.layoutFieldsFound || 4,
+      layoutFieldsExpected: req.body.layoutFieldsExpected || 4,
+      looksLikeScreenshot: req.body.looksLikeScreenshot !== false,
+      exifSoftware: req.body.exifSoftware || null,
+      editArtifacts: req.body.editArtifacts === true,
+      submittedAt: now
+    };
+
+    const attemptsCount = (session.verificationAttempts || 0) + 1;
+    session.verificationAttempts = attemptsCount;
+
+    const hist = {
+      utrSeen: db.isUtrBlacklisted(parsedUtr),
+      imageHashSeen: req.body.imageHash ? (typeof db.isImageHashSeen === 'function' ? db.isImageHashSeen(req.body.imageHash) : false) : false,
+      attemptsThisSession: attemptsCount,
+      priorConfirmed: 1
+    };
+
+    // Evaluate evidence through trust-score pure scoring engine
+    const trustResult = scoreEvidence(sessionContext, ev, hist, {
+      now,
+      graceMs: 60 * 1000,
+      sameDevice: req.body.sameDevice !== false
+    });
+
+    // Check hard gates
+    if (trustResult.tier === 'REJECT') {
+      let mappedLayer = 2;
+      if (trustResult.gate === 'SESSION_EXPIRED') {
+        db.updateSessionStatus(session.orderId, 'EXPIRED');
+        mappedLayer = 1;
+      } else if (trustResult.gate === 'AMOUNT_MISMATCH') {
+        mappedLayer = 2;
+      } else if (trustResult.gate === 'UTR_FORMAT' || trustResult.gate === 'UTR_REUSED') {
+        mappedLayer = 3;
+      } else if (trustResult.gate === 'TOO_MANY_ATTEMPTS') {
+        mappedLayer = 6;
+      }
+
       return res.status(400).json({
         success: false,
-        layer: 1,
-        code: 'SESSION_EXPIRED',
-        reason: 'Transaction session expired (3-minute TTL exceeded). Please generate a fresh QR.'
-      });
-    }
-
-    // ─────────────────────────────────────────────────────────────
-    // LAYER 2: AMOUNT MATCH (The Mathematical Challenge Proof)
-    // ─────────────────────────────────────────────────────────────
-    if (!parsedAmount || isNaN(parsedAmount)) {
-      return res.status(400).json({
-        success: false,
-        layer: 2,
-        code: 'INVALID_AMOUNT',
-        reason: 'Payment amount could not be extracted from receipt.'
-      });
-    }
-
-    // Must match challengeAmount with exact decimal cents
-    const expected = Number(session.challengeAmount.toFixed(2));
-    const actual = Number(parsedAmount.toFixed(2));
-
-    if (Math.abs(expected - actual) > 0.001) {
-      return res.status(400).json({
-        success: false,
-        layer: 2,
-        code: 'AMOUNT_MISMATCH',
-        reason: `Amount tampering detected! Expected challenge amount ₹${expected.toFixed(2)}, received ₹${actual.toFixed(2)}. Old receipt replay rejected.`
-      });
-    }
-
-    // ─────────────────────────────────────────────────────────────
-    // LAYER 3: UTR BLACKLIST (Anti-Replay)
-    // ─────────────────────────────────────────────────────────────
-    if (!parsedUtr || !/^\d{12}$/.test(parsedUtr)) {
-      return res.status(400).json({
-        success: false,
-        layer: 3,
-        code: 'INVALID_UTR_FORMAT',
-        reason: 'NPCI 12-digit Bank UTR is required.'
-      });
-    }
-
-    if (db.isUtrBlacklisted(parsedUtr)) {
-      return res.status(400).json({
-        success: false,
-        layer: 3,
-        code: 'UTR_ALREADY_USED',
-        reason: `Replay attack blocked! Bank UTR ${parsedUtr} has already been verified and settled.`
+        layer: mappedLayer,
+        code: trustResult.gate || 'VERIFICATION_REJECTED',
+        reason: (trustResult.reasons && trustResult.reasons[0]) || 'Evidence rejected by Zero-Trust verification.',
+        trustScore: trustResult.score,
+        confidenceTier: trustResult.tier
       });
     }
 
     // ─────────────────────────────────────────────────────────────
     // LAYER 4: UTR FRESHNESS (10-Minute Maximum Latency & Timestamp Audit)
     // ─────────────────────────────────────────────────────────────
-    // Ensure the order was initiated recently (< 10 minutes)
     const orderAgeMs = now - session.createdAt;
     if (orderAgeMs > (10 * 60 * 1000)) {
       return res.status(400).json({
@@ -474,22 +500,10 @@ app.post('/api/verify', verifyLimiter, (req, res) => {
       });
     }
 
-    // NPCI UTR Julian Day / Timestamp check (allowing 2-hour window for hourly RRN)
-    const utrTimestamp = parseUTRTimestamp(parsedUtr);
-    if (utrTimestamp && (now - utrTimestamp) > (2 * 60 * 60 * 1000)) {
-      return res.status(400).json({
-        success: false,
-        layer: 4,
-        code: 'UTR_TIMESTAMP_EXPIRED',
-        reason: 'Bank UTR internal timestamp indicates receipt is from an expired time window.'
-      });
-    }
-
     // ─────────────────────────────────────────────────────────────
     // LAYER 5: TRANSACTION NOTE MATCH (Order Reference Cross-Verification)
     // ─────────────────────────────────────────────────────────────
     if (receipt) {
-      // If receipt explicitly contains a transaction note or order ID, verify it matches
       const noteMatches = receipt.match(/Order_[A-Z0-9]+/i) || receipt.match(/ORD_[A-Z0-9_]+/i);
       if (noteMatches && noteMatches[0].toUpperCase() !== session.orderId.toUpperCase()) {
         return res.status(400).json({
@@ -516,10 +530,6 @@ app.post('/api/verify', verifyLimiter, (req, res) => {
     // ─────────────────────────────────────────────────────────────
     // LAYER 7: DOUBLE-ENTRY LEDGER POSTING & BALANCE ASSERTION
     // ─────────────────────────────────────────────────────────────
-    // Post to accounting ledger:
-    // DEBIT: Bank Account (Asset)
-    // CREDIT: Revenue Account (Revenue)
-    // Verify: SUM(Debits) === SUM(Credits)
     const { txId, verification } = db.recordTransactionAndLedger(
       session.orderId,
       parsedUtr,
@@ -542,6 +552,9 @@ app.post('/api/verify', verifyLimiter, (req, res) => {
     // Update session status
     db.updateSessionStatus(session.orderId, 'SUCCESS', parsedUtr);
 
+    // Compute suggested shop action based on confidence tier and instant limit (₹500)
+    const suggestedAction = suggestAction(trustResult, session.challengeAmount, 500);
+
     // Notify connected browser via WebSocket (TASK 11)
     const successPayload = {
       orderId: session.orderId,
@@ -552,7 +565,10 @@ app.post('/api/verify', verifyLimiter, (req, res) => {
       senderVpa: req.body.senderVpa || 'customer@okhdfcbank',
       txId,
       timestamp: now,
-      message: 'Settlement confirmed via DISHA 8.2 7-Layer Zero-Trust Engine'
+      trustScore: trustResult.score,
+      confidenceTier: trustResult.tier,
+      suggestedAction,
+      message: 'Settlement confirmed via DISHA 8.2 Zero-Trust Trust-Scoring Engine'
     };
     broadcastOrderSuccess(session.orderId, successPayload);
 
@@ -570,7 +586,11 @@ app.post('/api/verify', verifyLimiter, (req, res) => {
       ledgerVerification: verification,
       reconciliationState: 'CLAIM_VERIFIED_PENDING_BANK_RECONCILIATION',
       trustFactor: 'PROBABILISTIC_CHALLENGE_MATCH',
-      bankCorroborated: false
+      bankCorroborated: false,
+      trustScore: trustResult.score,
+      confidenceTier: trustResult.tier,
+      suggestedAction,
+      trustReasons: trustResult.reasons
     });
   } catch (err) {
     console.error('Verification error:', err);
