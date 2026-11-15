@@ -87,7 +87,7 @@ function buildNPCIIntentUri({
   tn,
   tr,
   cu = 'INR',
-  mc = '5411', // default retail/grocery MCC (5816 for digital goods)
+  mc = '', // Do NOT default mc — personal VPAs must omit it or GPay/PhonePe/Slice reject before PIN
   url = '',
   sign = '',
   mam = ''
