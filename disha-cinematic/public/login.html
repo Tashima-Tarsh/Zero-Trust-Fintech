@@ -3,12 +3,12 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Merchant Login — DISHA Sovereign Merchant Console</title>
+  <title>Merchant Console — DISHA 8.2</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/styles.css">
-  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><polygon points='50,5 90,25 90,75 50,95 10,75 10,25' fill='none' stroke='%2310b981' stroke-width='8'/><circle cx='50' cy='50' r='14' fill='%2310b981'/></svg>">
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400..700;1,9..40,400..700&family=JetBrains+Mono:wght@400;500;600&family=Manrope:wght@500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/disha-console.css">
+  <link rel="icon" type="image/png" href="/assets/disha-symbol-transparent.png">
 </head>
 <body class="auth-body">
 
@@ -16,86 +16,193 @@
     <!-- Back to public home -->
     <div class="auth-top-nav">
       <a href="/" class="back-link">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
         <span>Back to Public Website</span>
       </a>
     </div>
 
     <div class="auth-card">
+      <!-- Brand Logo -->
       <div class="auth-header">
         <div class="auth-brand-logo">
-          <svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" stroke-width="2">
-            <polygon points="12 2 22 8.5 22 15.5 12 22 2 15.5 2 8.5 12 2"></polygon>
-            <circle cx="12" cy="12" r="3" fill="#10b981"></circle>
-          </svg>
+          <img src="/assets/disha-symbol-transparent.png" alt="DISHA 8.2 Logo">
         </div>
-        <h1 class="auth-title">Merchant Login</h1>
-        <p class="auth-subtitle">Sign in to your sovereign business payment workspace</p>
+        
+        <!-- Segment Control: Sign In vs Request Access -->
+        <div class="auth-mode-switch" role="tablist">
+          <button type="button" class="auth-mode-btn active" id="tabSignIn" role="tab" aria-selected="true" onclick="switchAuthMode('signin')">Sign In</button>
+          <button type="button" class="auth-mode-btn" id="tabRequestAccess" role="tab" aria-selected="false" onclick="switchAuthMode('request')">Request Access</button>
+        </div>
       </div>
 
-      <!-- Error Alert Banner -->
-      <div id="errorAlert" class="auth-alert-danger" style="display: none;" role="alert">
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
-        <span id="errorMessage">Invalid email or password</span>
-      </div>
-
-      <form id="loginForm" class="auth-form" novalidate>
-        <div class="form-group">
-          <label for="email" class="form-label">Merchant Login ID or Email</label>
-          <div class="input-wrapper">
-            <input 
-              type="text" 
-              id="email" 
-              name="email" 
-              class="form-input" 
-              placeholder="e.g. nkumar906099-7@oksbi or Nitish@oksbi" 
-              required 
-              autocomplete="username"
-              autofocus
-            >
-          </div>
-          <span class="field-error" id="emailError"></span>
+      <!-- VIEW 1: SIGN IN -->
+      <div id="signInView">
+        <div style="text-align: center; margin-bottom: 22px;">
+          <h1 class="auth-title">Welcome Back.</h1>
+          <p class="auth-subtitle">Your business workspace is ready.</p>
         </div>
 
-        <div class="form-group">
-          <div class="label-row">
-            <label for="password" class="form-label">Password</label>
+        <!-- Error Alert Banner -->
+        <div id="errorAlert" class="auth-alert-danger" style="display: none;" role="alert">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+          <span id="errorMessage">Invalid email or password</span>
+        </div>
+
+        <form id="loginForm" class="auth-form" novalidate>
+          <div class="form-group">
+            <label for="email" class="form-label">Merchant login ID / email</label>
+            <div class="input-wrapper">
+              <input 
+                type="text" 
+                id="email" 
+                name="email" 
+                class="form-input" 
+                placeholder="e.g. ramesh@kirana.in or Nitish@oksbi" 
+                required 
+                autocomplete="username"
+                autofocus
+              >
+            </div>
+            <span class="field-error" id="emailError"></span>
           </div>
-          <div class="input-wrapper password-input-wrapper">
-            <input 
-              type="password" 
-              id="password" 
-              name="password" 
-              class="form-input" 
-              placeholder="Enter your password" 
-              required 
-              autocomplete="current-password"
-            >
-            <button 
-              type="button" 
-              id="togglePassword" 
-              class="btn-toggle-password" 
-              aria-label="Show password"
-              tabindex="-1"
-            >
-              <svg id="eyeIcon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
-              <svg id="eyeOffIcon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="display: none;"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
+
+          <div class="form-group">
+            <div class="label-row">
+              <label for="password" class="form-label">Password</label>
+            </div>
+            <div class="input-wrapper password-input-wrapper">
+              <input 
+                type="password" 
+                id="password" 
+                name="password" 
+                class="form-input" 
+                placeholder="Enter your password" 
+                required 
+                autocomplete="current-password"
+              >
+              <button 
+                type="button" 
+                id="togglePassword" 
+                class="btn-toggle-password" 
+                aria-label="Show password"
+                title="Show password"
+                tabindex="-1"
+              >
+                <svg id="eyeIcon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+                <svg id="eyeOffIcon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="display: none;"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
+              </button>
+            </div>
+            <span class="field-error" id="passwordError"></span>
+          </div>
+
+          <div class="form-actions">
+            <button type="submit" id="submitBtn" class="btn-auth-submit">
+              <span id="btnText">Sign In</span>
             </button>
           </div>
-          <span class="field-error" id="passwordError"></span>
+        </form>
+
+        <!-- Quick Fill Helper for Local Testing -->
+        <div class="quick-creds-container">
+          <span class="quick-creds-title">LOCAL DEMO ACCOUNTS</span>
+          <div class="quick-creds-buttons">
+            <button type="button" class="btn-cred-chip" onclick="fillCredentials('ramesh@kirana.in', 'Ramesh@123')">
+              <span>🏪 Ramesh Kirana</span>
+            </button>
+            <button type="button" class="btn-cred-chip" onclick="fillCredentials('new@merchant.in', 'Merchant@123')">
+              <span>✨ Fresh Setup</span>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- VIEW 2: GET STARTED / REQUEST ACCESS -->
+      <div id="accessRequestView" style="display: none;">
+        <div style="text-align: center; margin-bottom: 20px;">
+          <h1 class="auth-title">Get Started.</h1>
+          <p class="auth-subtitle">Request access to your merchant instance.</p>
         </div>
 
-        <div class="form-actions">
-          <button type="submit" id="submitBtn" class="btn-auth-submit">
-            <span id="btnText">Sign In to Dashboard</span>
-            <div id="btnSpinner" class="spinner" style="display: none;"></div>
-          </button>
+        <div class="auth-alert-info">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+          <span><strong>Authorized Provisioning:</strong> New DISHA merchant instances are provisioned by your system administrator. Fill in your details below to generate an authorized access request.</span>
         </div>
-      </form>
+
+        <div id="requestSuccessAlert" class="auth-alert-success" style="display: none;" role="status">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+          <div>
+            <strong>Access Request Submitted!</strong><br>
+            <span id="requestSuccessMsg">Your profile and net savings calculation have been recorded. Your instance credentials will be authorized shortly.</span>
+          </div>
+        </div>
+
+        <form id="accessRequestForm" novalidate>
+          <div class="form-group">
+            <label for="reqBizName" class="form-label">Business name <span style="color:#ef4444">*</span></label>
+            <input type="text" id="reqBizName" class="form-input" placeholder="e.g. Zenith Electronics or Apex Retail" required>
+          </div>
+
+          <div class="form-row-2">
+            <div class="form-group">
+              <label for="reqEmail" class="form-label">Contact email <span style="color:#ef4444">*</span></label>
+              <input type="email" id="reqEmail" class="form-input" placeholder="owner@store.in" required>
+            </div>
+            <div class="form-group">
+              <label for="reqPhone" class="form-label">Contact phone <span style="color:#ef4444">*</span></label>
+              <input type="tel" id="reqPhone" class="form-input" placeholder="10-digit mobile" maxlength="10" required>
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label for="reqCategory" class="form-label">Business category</label>
+            <select id="reqCategory" class="form-select">
+              <option value="retail">Retail &amp; Counter Stores</option>
+              <option value="ecommerce">E-Commerce &amp; Online Stores</option>
+              <option value="digital">Digital Service Providers</option>
+              <option value="education">Education &amp; Training</option>
+              <option value="services">Professional Services</option>
+              <option value="other">Other Commercial Operations</option>
+            </select>
+          </div>
+
+          <div class="form-row-2">
+            <div class="form-group">
+              <label for="reqVolume" class="form-label">Approx. monthly volume (₹)</label>
+              <input type="number" id="reqVolume" class="form-input" value="500000" min="10000" step="10000" oninput="updateAccessSavings()">
+            </div>
+            <div class="form-group">
+              <label for="reqCurrentCost" class="form-label">Current software / gateway fee (₹/mo)</label>
+              <input type="number" id="reqCurrentCost" class="form-input" value="8500" min="0" step="500" oninput="updateAccessSavings()">
+            </div>
+          </div>
+
+          <!-- Savings Estimate Widget -->
+          <div style="background:#f4f1fa; border:1px solid #e2d9f3; border-radius:14px; padding:14px 16px; margin:16px 0 20px;">
+            <div style="display:flex; justify-content:space-between; font-size:11px; font-weight:800; color:#5b459c; margin-bottom:8px;">
+              <span>SAVINGS ESTIMATE (DISHA FORMULA)</span>
+              <span id="calcFormulaTag">4 × Net Savings</span>
+            </div>
+            <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px; font-size:12px;">
+              <div>
+                <span style="color:#78718a; display:block;">Est. Monthly Net Savings:</span>
+                <strong id="estMonthlySavings" style="font-size:15px; color:#0f9976;">₹8,500</strong>
+              </div>
+              <div>
+                <span style="color:#78718a; display:block;">One-Time Software License:</span>
+                <strong id="estOneTimePrice" style="font-size:15px; color:#382477;">₹34,000</strong>
+              </div>
+            </div>
+          </div>
+
+          <button type="submit" id="reqSubmitBtn" class="btn-auth-submit">
+            <span>Submit Access Request ↗</span>
+          </button>
+        </form>
+      </div>
 
       <div class="auth-card-footer">
         <p>
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align: -2px; margin-right: 4px;"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align: -2px; margin-right: 6px;"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>
           256-bit encrypted session · Direct bank-to-bank settlement
         </p>
       </div>
@@ -103,6 +210,11 @@
   </div>
 
   <script>
+    const signInView = document.getElementById('signInView');
+    const accessRequestView = document.getElementById('accessRequestView');
+    const tabSignIn = document.getElementById('tabSignIn');
+    const tabRequestAccess = document.getElementById('tabRequestAccess');
+
     const loginForm = document.getElementById('loginForm');
     const emailInput = document.getElementById('email');
     const passwordInput = document.getElementById('password');
@@ -111,9 +223,28 @@
     const eyeOffIcon = document.getElementById('eyeOffIcon');
     const submitBtn = document.getElementById('submitBtn');
     const btnText = document.getElementById('btnText');
-    const btnSpinner = document.getElementById('btnSpinner');
     const errorAlert = document.getElementById('errorAlert');
     const errorMessage = document.getElementById('errorMessage');
+
+    // Switch between Sign In and Request Access tabs
+    function switchAuthMode(mode) {
+      if (mode === 'signin') {
+        signInView.style.display = 'block';
+        accessRequestView.style.display = 'none';
+        tabSignIn.classList.add('active');
+        tabSignIn.setAttribute('aria-selected', 'true');
+        tabRequestAccess.classList.remove('active');
+        tabRequestAccess.setAttribute('aria-selected', 'false');
+      } else {
+        signInView.style.display = 'none';
+        accessRequestView.style.display = 'block';
+        tabSignIn.classList.remove('active');
+        tabSignIn.setAttribute('aria-selected', 'false');
+        tabRequestAccess.classList.add('active');
+        tabRequestAccess.setAttribute('aria-selected', 'true');
+        updateAccessSavings();
+      }
+    }
 
     // Quick fill helper
     window.fillCredentials = function(email, pass) {
@@ -130,6 +261,7 @@
       eyeIcon.style.display = isPassword ? 'none' : 'block';
       eyeOffIcon.style.display = isPassword ? 'block' : 'none';
       togglePasswordBtn.setAttribute('aria-label', isPassword ? 'Hide password' : 'Show password');
+      togglePasswordBtn.setAttribute('title', isPassword ? 'Hide password' : 'Show password');
     });
 
     // Check if already authenticated
@@ -154,7 +286,7 @@
       }
     })();
 
-    // Form submission
+    // Sign in form submission
     loginForm.addEventListener('submit', async (e) => {
       e.preventDefault();
       errorAlert.style.display = 'none';
@@ -163,7 +295,7 @@
       const password = passwordInput.value;
 
       if (!email) {
-        showError('Please enter your email or login ID.');
+        showError('Please enter your merchant login ID or email.');
         emailInput.focus();
         return;
       }
@@ -174,10 +306,8 @@
         return;
       }
 
-      // Set loading state
       submitBtn.disabled = true;
       btnText.textContent = 'Verifying credentials...';
-      btnSpinner.style.display = 'inline-block';
 
       try {
         const response = await fetch('/api/auth/login', {
@@ -189,10 +319,9 @@
         const result = await response.json();
 
         if (!response.ok) {
-          showError(result.error || 'Login failed. Please check your credentials.');
+          showError(result.error || 'Invalid merchant credentials. Please verify your login details.');
           submitBtn.disabled = false;
-          btnText.textContent = 'Sign In to Dashboard';
-          btnSpinner.style.display = 'none';
+          btnText.textContent = 'Sign In';
           return;
         }
 
@@ -202,17 +331,15 @@
 
         btnText.textContent = 'Success! Opening workspace...';
 
-        // Check if first-time setup is completed
         if (result.merchant && result.merchant.setup_completed) {
           window.location.href = '/dashboard';
         } else {
           window.location.href = '/setup';
         }
       } catch (err) {
-        showError('Unable to connect to server. Please check your network connection.');
+        showError('Unable to connect to authentication server. Please check your network connection.');
         submitBtn.disabled = false;
-        btnText.textContent = 'Sign In to Dashboard';
-        btnSpinner.style.display = 'none';
+        btnText.textContent = 'Sign In';
       }
     });
 
@@ -220,6 +347,58 @@
       errorMessage.textContent = msg;
       errorAlert.style.display = 'flex';
     }
+
+    // Access Request Savings Calculator
+    function updateAccessSavings() {
+      const volume = parseFloat(document.getElementById('reqVolume').value) || 0;
+      const currentCost = parseFloat(document.getElementById('reqCurrentCost').value) || 0;
+      
+      // Estimated avoidable monthly cost: 1.2% typical gateway toll + monthly recurring fee
+      const gatewayAvoidable = volume * 0.012;
+      const totalAvoidable = gatewayAvoidable + currentCost;
+      const newHosting = 1200; // estimated self-hosting cost
+      const netSavings = Math.max(0, totalAvoidable - newHosting);
+      const oneTimePrice = netSavings * 4;
+
+      document.getElementById('estMonthlySavings').textContent = '₹' + Math.round(netSavings).toLocaleString('en-IN');
+      document.getElementById('estOneTimePrice').textContent = '₹' + Math.round(oneTimePrice).toLocaleString('en-IN');
+    }
+
+    // Access Request Form Submission (Truthful Merchant Provisioning Journey)
+    const accessRequestForm = document.getElementById('accessRequestForm');
+    accessRequestForm.addEventListener('submit', (e) => {
+      e.preventDefault();
+      const bizName = document.getElementById('reqBizName').value.trim();
+      const email = document.getElementById('reqEmail').value.trim();
+      const phone = document.getElementById('reqPhone').value.trim();
+      const category = document.getElementById('reqCategory').value;
+      const volume = document.getElementById('reqVolume').value;
+      const currentCost = document.getElementById('reqCurrentCost').value;
+
+      if (!bizName || !email || !phone) {
+        alert('Please fill in your business name, contact email, and phone number.');
+        return;
+      }
+
+      // Record access request in sessionStorage / local queue
+      const requestPayload = {
+        business_name: bizName,
+        email: email,
+        phone: phone,
+        category: category,
+        approx_volume: volume,
+        current_cost: currentCost,
+        submitted_at: new Date().toISOString()
+      };
+
+      const existingRequests = JSON.parse(sessionStorage.getItem('disha_access_requests') || '[]');
+      existingRequests.push(requestPayload);
+      sessionStorage.setItem('disha_access_requests', JSON.stringify(existingRequests));
+
+      // Show success confirmation
+      document.getElementById('requestSuccessAlert').style.display = 'flex';
+      accessRequestForm.style.display = 'none';
+    });
   </script>
 </body>
 </html>
