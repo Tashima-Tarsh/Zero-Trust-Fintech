@@ -20,31 +20,26 @@ function cleanIP(raw) {
 function getClientIP(req) {
   if (!req) return '127.0.0.1';
 
-  // Check headers in order of enterprise proxy authority
-  const forwarded = req.headers ? req.headers['x-forwarded-for'] : null;
-  const realIP = req.headers ? req.headers['x-real-ip'] : null;
-  const cfConnectingIP = req.headers ? req.headers['cf-connecting-ip'] : null;
-  const customClientIP = req.headers ? req.headers['x-client-ip'] : null;
+  // If Express trust proxy is active, prefer Express validated req.ip
+  if (req.app && req.app.get && req.app.get('trust proxy') && req.ip) {
+    return cleanIP(req.ip) || '127.0.0.1';
+  }
 
-  if (forwarded) {
-    const parts = String(forwarded).split(',');
-    if (parts.length > 0 && parts[0].trim()) {
-      return cleanIP(parts[0].trim());
+  // Trusted enterprise reverse proxy headers (e.g. Cloudflare)
+  if (req.headers && req.headers['cf-connecting-ip']) {
+    return cleanIP(req.headers['cf-connecting-ip']);
+  }
+
+  // Only check x-forwarded-for if trust proxy is explicitly enabled
+  const isTrusted = req.app && req.app.get && req.app.get('trust proxy');
+  if (isTrusted && req.headers && req.headers['x-forwarded-for']) {
+    const parts = String(req.headers['x-forwarded-for']).split(',').map(p => p.trim()).filter(Boolean);
+    if (parts.length > 0) {
+      return cleanIP(parts[0]);
     }
   }
 
-  if (realIP) {
-    return cleanIP(realIP);
-  }
-
-  if (cfConnectingIP) {
-    return cleanIP(cfConnectingIP);
-  }
-
-  if (customClientIP) {
-    return cleanIP(customClientIP);
-  }
-
+  // Fallback to socket remoteAddress (cannot be spoofed via HTTP headers)
   const socketIP = (req.socket && req.socket.remoteAddress) ||
                    (req.connection && req.connection.remoteAddress) ||
                    req.ip;

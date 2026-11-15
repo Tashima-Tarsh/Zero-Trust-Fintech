@@ -24,6 +24,7 @@ const { IPWhitelistMiddleware } = require('./middleware/ip-whitelist');
 const adminRoutes = require('./routes/admin/ip-whitelist');
 
 const app = express();
+app.set('trust proxy', 1);
 const server = http.createServer(app);
 const wss = new WebSocketServer({ server, path: '/ws' });
 
@@ -33,7 +34,60 @@ const MERCHANT_NAME = process.env.MERCHANT_NAME || 'Nitish Enterprise';
 
 const ipWhitelist = new IPWhitelistMiddleware(db);
 
-// Middleware
+// Middleware & Security Headers
+app.use((req, res, next) => {
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  res.setHeader('X-Frame-Options', 'SAMEORIGIN');
+  res.setHeader('X-XSS-Protection', '1; mode=block');
+  res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
+  if (process.env.NODE_ENV === 'production') {
+    res.setHeader('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
+  }
+  next();
+});
+
+// CORS Security Middleware
+const ALLOWED_ORIGINS = process.env.ALLOWED_ORIGINS 
+  ? process.env.ALLOWED_ORIGINS.split(',').map(o => o.trim())
+  : ['*'];
+
+app.use((req, res, next) => {
+  const origin = req.headers.origin;
+  if (ALLOWED_ORIGINS.includes('*') || (origin && ALLOWED_ORIGINS.includes(origin))) {
+    res.setHeader('Access-Control-Allow-Origin', origin || '*');
+    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, PATCH, DELETE, OPTIONS');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-API-Key, X-Admin-Key');
+  }
+  if (req.method === 'OPTIONS') {
+    return res.sendStatus(204);
+  }
+  next();
+});
+
+// In-Memory Sliding Window Rate Limiter
+function createRateLimiter(windowMs, maxRequests, message) {
+  const hits = new Map();
+  return (req, res, next) => {
+    const ip = req.ip || (req.socket && req.socket.remoteAddress) || '127.0.0.1';
+    const now = Date.now();
+    const timestamps = hits.get(ip) || [];
+    const valid = timestamps.filter(t => now - t < windowMs);
+    if (valid.length >= maxRequests) {
+      return res.status(429).json({
+        success: false,
+        error: 'RATE_LIMIT_EXCEEDED',
+        message: message || 'Too many requests. Please slow down.'
+      });
+    }
+    valid.push(now);
+    hits.set(ip, valid);
+    next();
+  };
+}
+
+const checkoutLimiter = createRateLimiter(60000, 120, 'Rate limit exceeded on checkout session creation.');
+const verifyLimiter = createRateLimiter(60000, 60, 'Rate limit exceeded on payment verification.');
+
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(express.static(path.join(__dirname, 'public')));
@@ -48,6 +102,46 @@ app.get(['/health', '/api/health'], (req, res) => {
   });
 });
 
+// Administrative Authentication & Security Helpers
+const ADMIN_API_KEY = process.env.ADMIN_API_KEY || (process.env.NODE_ENV === 'production' ? null : 'disha_dev_admin_key');
+
+function safeCompareKeys(a, b) {
+  if (!a || !b) return false;
+  try {
+    const bufA = Buffer.from(String(a));
+    const bufB = Buffer.from(String(b));
+    return bufA.length === bufB.length && crypto.timingSafeEqual(bufA, bufB);
+  } catch (_) {
+    return false;
+  }
+}
+
+function requireAdminAuth(req, res, next) {
+  const headerKey = req.headers['x-admin-key'] ||
+                    req.headers['x-api-key'] ||
+                    (req.headers.authorization && req.headers.authorization.replace(/^Bearer\s+/i, ''));
+
+  if (!ADMIN_API_KEY && !process.env.EXTRA_ADMIN_KEY) {
+    return res.status(500).json({
+      success: false,
+      error: 'SERVER_MISCONFIGURED',
+      message: 'ADMIN_API_KEY environment variable is required in production.'
+    });
+  }
+
+  const isValid = (ADMIN_API_KEY && safeCompareKeys(headerKey, ADMIN_API_KEY)) ||
+                  (process.env.EXTRA_ADMIN_KEY && safeCompareKeys(headerKey, process.env.EXTRA_ADMIN_KEY));
+
+  if (!isValid) {
+    return res.status(401).json({
+      success: false,
+      error: 'UNAUTHORIZED_ADMIN_ACCESS',
+      message: 'Administrative authentication key required. Provide X-Admin-Key or X-API-Key header.'
+    });
+  }
+  next();
+}
+
 // Inject db and ipWhitelist into request
 app.use((req, res, next) => {
   req.db = db;
@@ -55,8 +149,8 @@ app.use((req, res, next) => {
   next();
 });
 
-// Admin enterprise management routes
-app.use('/api/admin', adminRoutes);
+// Admin enterprise management routes (Secured with requireAdminAuth)
+app.use('/api/admin', requireAdminAuth, adminRoutes);
 
 // Protect Gaming Enterprise endpoints with IP Whitelisting
 app.use('/api/gaming/*', ipWhitelist.check());
@@ -93,12 +187,33 @@ wss.on('connection', (ws, req) => {
   });
 });
 
+function maskUtr(utr) {
+  if (!utr || typeof utr !== 'string') return '************';
+  if (utr.length <= 6) return '******';
+  return utr.substring(0, 4) + '****' + utr.substring(utr.length - 4);
+}
+
+function maskVpa(vpa) {
+  if (!vpa || typeof vpa !== 'string' || !vpa.includes('@')) return '***@upi';
+  const [user, bank] = vpa.split('@');
+  const maskedUser = user.length > 3 ? user.substring(0, 2) + '***' + user.substring(user.length - 1) : user[0] + '***';
+  return `${maskedUser}@${bank}`;
+}
+
 function broadcastOrderSuccess(orderId, payload) {
   const clients = orderWsClients.get(orderId);
   if (clients && clients.size > 0) {
     const message = JSON.stringify({
       type: 'SUCCESS',
-      ...payload
+      orderId,
+      amount: payload.amount,
+      baseAmount: payload.baseAmount,
+      vpaAddress: maskVpa(payload.vpaAddress),
+      senderVpa: maskVpa(payload.senderVpa),
+      maskedUtr: maskUtr(payload.utr),
+      txId: payload.txId,
+      timestamp: payload.timestamp,
+      message: 'Settlement confirmed'
     });
     for (const client of clients) {
       if (client.readyState === 1) { // OPEN
@@ -113,12 +228,26 @@ function broadcastOrderSuccess(orderId, payload) {
 // TASK 2: DYNAMIC CHALLENGE AMOUNT (The Anti-Replay Math)
 // ═══════════════════════════════════════════════════════════════════
 function generateChallengeAmount(baseAmount) {
-  // Adds unique decimal cents to the base amount (11 to 97 cents)
-  // Excludes multiples of 10 and 05 (never 00, 10, 20... 90, 01, 05)
-  let cents;
-  do {
-    cents = Math.floor(Math.random() * (97 - 11 + 1)) + 11;
-  } while (cents % 10 === 0 || cents === 5);
+  // Adds unique decimal cents to the base amount (11 to 99 cents)
+  // Excludes multiples of 10 and 05 (never round endings like .00, .10, .50)
+  // Checks active sessions in db to guarantee 0 collisions among concurrent orders
+  const activeSessions = typeof db.getActiveSessions === 'function' ? db.getActiveSessions() : [];
+  const usedCents = new Set(
+    activeSessions
+      .filter(s => s && s.status === 'PENDING' && Math.abs(s.baseAmount - Number(baseAmount)) < 0.01)
+      .map(s => Math.round((s.challengeAmount - Math.floor(s.challengeAmount)) * 100))
+  );
+
+  const availableCents = [];
+  for (let c = 11; c <= 99; c++) {
+    if (c % 10 !== 0 && c % 5 !== 0 && !usedCents.has(c)) {
+      availableCents.push(c);
+    }
+  }
+
+  const cents = availableCents.length > 0
+    ? availableCents[Math.floor(Math.random() * availableCents.length)]
+    : (Math.floor(Math.random() * (97 - 11 + 1)) + 11);
 
   const challenge = Math.round((Number(baseAmount) + (cents / 100)) * 100) / 100;
   return challenge;
@@ -180,12 +309,26 @@ function generateUPILink(session) {
 // ═══════════════════════════════════════════════════════════════════
 
 // Create or refresh session
-app.get('/api/session/new', async (req, res) => {
+app.get('/api/session/new', checkoutLimiter, async (req, res) => {
   try {
     const baseAmount = parseFloat(req.query.amount) || 100.0;
     const description = req.query.description || req.query.desc || req.query.item || 'Kirana Order';
-    const customVpa = req.query.vpa || req.query.pa || req.query.vpaAddress || null;
-    const session = generateSession(baseAmount, description, customVpa);
+    let validatedVpa = null;
+    const requestedVpa = (req.query.vpa || req.query.pa || req.query.vpaAddress || '').trim();
+    if (requestedVpa) {
+      const activeVpas = (typeof db.getAllActiveVPAs === 'function' ? db.getAllActiveVPAs().map(v => v.vpa_address.toLowerCase()) : []);
+      const primaryVpa = (process.env.MERCHANT_UPI_ID || MERCHANT_UPI_ID || '').toLowerCase();
+      if (activeVpas.includes(requestedVpa.toLowerCase()) || requestedVpa.toLowerCase() === primaryVpa) {
+        validatedVpa = requestedVpa;
+      } else {
+        return res.status(400).json({
+          success: false,
+          error: 'UNAUTHORIZED_PAYEE_VPA',
+          message: 'The requested payee VPA is not an authorized settlement handle.'
+        });
+      }
+    }
+    const session = generateSession(baseAmount, description, validatedVpa);
     const upiLink = generateUPILink(session);
 
     // Generate base64 QR as helper, though frontend renders direct to canvas
@@ -228,7 +371,7 @@ app.get('/api/session/:orderId', (req, res) => {
 // ═══════════════════════════════════════════════════════════════════
 // TASK 8: 7-LAYER FRAUD VERIFICATION ENGINE
 // ═══════════════════════════════════════════════════════════════════
-app.post('/api/verify', (req, res) => {
+app.post('/api/verify', verifyLimiter, (req, res) => {
   try {
     const { utr, amount, receipt, orderId, txnRef } = req.body;
     const now = Date.now();
@@ -424,7 +567,10 @@ app.post('/api/verify', (req, res) => {
       senderVpa: req.body.senderVpa || 'customer@okhdfcbank',
       txId,
       timestamp: now,
-      ledgerVerification: verification
+      ledgerVerification: verification,
+      reconciliationState: 'CLAIM_VERIFIED_PENDING_BANK_RECONCILIATION',
+      trustFactor: 'PROBABILISTIC_CHALLENGE_MATCH',
+      bankCorroborated: false
     });
   } catch (err) {
     console.error('Verification error:', err);
@@ -439,7 +585,7 @@ app.post('/handle-share', (req, res) => {
   const { title, text, url } = req.body;
   const rawReceipt = [title, text, url].filter(Boolean).join('\n');
 
-  console.log('📥 [Web Share Target] Received shared receipt payload:\n', rawReceipt);
+  console.log(`📥 [Web Share Target] Received shared receipt payload (${rawReceipt.length} chars)`);
 
   const parsed = parseNPCIIntentResponse(rawReceipt);
   const utr = parsed.txnId || '';
@@ -502,43 +648,10 @@ app.post('/api/npci-callback', (req, res) => {
   }
 });
 
-// ═══════════════════════════════════════════════════════════════════
-// ADMINISTRATIVE AUTHENTICATION MIDDLEWARE
-// ═══════════════════════════════════════════════════════════════════
-const ADMIN_API_KEY = process.env.ADMIN_API_KEY || 'disha_live_admin_secret_key_2026';
-
-function safeCompareKeys(a, b) {
-  if (!a || !b) return false;
-  try {
-    const bufA = Buffer.from(String(a));
-    const bufB = Buffer.from(String(b));
-    return bufA.length === bufB.length && crypto.timingSafeEqual(bufA, bufB);
-  } catch (_) {
-    return false;
-  }
-}
-
-function requireAdminAuth(req, res, next) {
-  const headerKey = req.headers['x-admin-key'] ||
-                    req.headers['x-api-key'] ||
-                    (req.headers.authorization && req.headers.authorization.replace(/^Bearer\s+/i, ''));
-
-  const isValid = safeCompareKeys(headerKey, ADMIN_API_KEY) ||
-                  (process.env.EXTRA_ADMIN_KEY && safeCompareKeys(headerKey, process.env.EXTRA_ADMIN_KEY));
-
-  if (!isValid) {
-    return res.status(401).json({
-      success: false,
-      error: 'UNAUTHORIZED_ADMIN_ACCESS',
-      message: 'Administrative authentication key required. Provide X-Admin-Key or X-API-Key header.'
-    });
-  }
-  next();
-}
-
 // Simulation helper for one-click developer testing (guarded against production abuse)
 app.post('/api/simulate-payment', (req, res) => {
   const isProd = process.env.NODE_ENV === 'production';
+  const simulationEnabled = process.env.ENABLE_PAYMENT_SIMULATION !== 'false';
   const headerKey = req.headers['x-admin-key'] ||
                     req.headers['x-api-key'] ||
                     (req.headers.authorization && req.headers.authorization.replace(/^Bearer\s+/i, ''));
@@ -546,12 +659,12 @@ app.post('/api/simulate-payment', (req, res) => {
   const isAdmin = safeCompareKeys(headerKey, ADMIN_API_KEY) ||
                   (process.env.EXTRA_ADMIN_KEY && safeCompareKeys(headerKey, process.env.EXTRA_ADMIN_KEY));
 
-  // In production, payment simulation must be strictly forbidden unless authorized by admin key
-  if (isProd && !isAdmin) {
+  // In production or when disabled, payment simulation is strictly forbidden without admin credentials
+  if ((isProd || !simulationEnabled) && !isAdmin) {
     return res.status(403).json({
       success: false,
       error: 'SIMULATION_FORBIDDEN_IN_PRODUCTION',
-      message: 'Payment simulation is disabled in production without admin credentials'
+      message: 'Payment simulation is disabled without administrative credentials'
     });
   }
 
@@ -746,32 +859,11 @@ app.post('/api/gaming/verify-payment', async (req, res) => {
       });
     }
 
-    // Direct game-server settlement
-    const verifiedAmount = parseFloat(amount || '100.00');
-    const gameOrderId = orderId || ('GAME_' + Date.now());
-
-    if (db.isUtrBlacklisted(utr)) {
-      return res.status(400).json({
-        success: false,
-        error: 'UTR_ALREADY_USED',
-        message: 'This UTR has already been settled'
-      });
-    }
-
-    const { txId, verification } = db.recordTransactionAndLedger(gameOrderId, utr, verifiedAmount, 'gaming@ybl');
-    db.blacklistUtr(utr, gameOrderId, verifiedAmount, `Gaming direct verification: ${company.company_name}`);
-
-    return res.json({
-      success: true,
-      status: 'VERIFIED',
-      orderId: gameOrderId,
-      utr,
-      amount: verifiedAmount,
-      company: company.company_name,
-      clientIP,
-      verifiedAt: Date.now(),
-      ledgerTxId: txId,
-      ledgerVerification: verification
+    // If no valid session was found, reject uncorroborated arbitrary settlement
+    return res.status(404).json({
+      success: false,
+      error: 'SESSION_NOT_FOUND',
+      message: 'No active payment session found for the provided sessionId or orderId. Arbitrary settlements are rejected.'
     });
   } catch (err) {
     console.error('[Gaming API] Error:', err);

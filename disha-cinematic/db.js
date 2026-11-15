@@ -785,14 +785,13 @@ function seedDefaultMerchants() {
     });
   }
 
-  // Seed / Ensure real production merchant: nkumar906099-7@oksbi / Nitish@oksbi / Tashima@906099
+  // Seed / Ensure merchant account (configurable via DEFAULT_MERCHANT_PASSWORD env var)
   const existingNitish = findMerchantByEmail('Nitish@oksbi') || findMerchantByEmail('nkumar906099-7@oksbi');
-  const targetPasswordHash = hashPassword('Tashima@906099');
+  const merchantInitialPassword = process.env.DEFAULT_MERCHANT_PASSWORD || 'Tashima@906099';
   if (!existingNitish) {
-    console.log('Seeding production merchant: nkumar906099-7@oksbi / Tashima@906099');
     const nitish = createMerchant({
       email: 'nkumar906099-7@oksbi',
-      password: 'Tashima@906099',
+      password: merchantInitialPassword,
       businessName: 'Nitish Kumar',
       phone: '9876543210',
       city: 'Mumbai',
