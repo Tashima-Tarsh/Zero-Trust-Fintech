@@ -1,7 +1,8 @@
 /**
- * DISHA 8.2 — PhonePe-Inspired Interaction Engine
- * Implements navigation, mega-menus, hero carousel, interactive pricing calculator,
- * clipboard export, toast notifications, and responsive controls.
+ * DISHA 8.2 — PhonePe-Inspired Interaction & Navigation Engine
+ * Phase 4: Typographic & Spacing Controls
+ * Phase 5: Complete Responsive Mega-Menu Navigation, Keyboard A11y,
+ *          Hero Carousel, Interactive Pricing Calculator, and Toast System.
  */
 
 (function () {
@@ -34,7 +35,7 @@
     }, 3200);
   }
 
-  // --- 1. Sticky Header Shadow on Scroll ---
+  // --- 1. Sticky Header with Scroll Elevation ---
   const siteHeader = document.getElementById('siteHeader');
   if (siteHeader) {
     const handleScroll = () => {
@@ -48,52 +49,97 @@
     handleScroll();
   }
 
-  // --- 2. Mega Menu Navigation ---
+  // --- 2. Professional Mega-Menu (Hover & Click with Intent + Keyboard A11y) ---
   const megaMenu = document.getElementById('megaMenu');
   const navTriggers = document.querySelectorAll('.nav-menu-trigger');
   const megaPanels = document.querySelectorAll('.mega-inner');
+  let hoverCloseTimer = null;
+
+  let isMenuLockedByClick = false;
+
+  function openMegaPanel(menuType, triggerBtn) {
+    if (hoverCloseTimer) clearTimeout(hoverCloseTimer);
+    navTriggers.forEach((btn) => {
+      btn.setAttribute('aria-expanded', btn === triggerBtn ? 'true' : 'false');
+      btn.classList.toggle('active', btn === triggerBtn);
+    });
+
+    if (megaMenu) {
+      megaMenu.hidden = false;
+      megaPanels.forEach((panel) => {
+        if (panel.getAttribute('data-mega-content') === menuType) {
+          panel.hidden = false;
+        } else {
+          panel.hidden = true;
+        }
+      });
+    }
+  }
 
   function closeMegaMenu() {
     if (!megaMenu) return;
+    if (hoverCloseTimer) clearTimeout(hoverCloseTimer);
     megaMenu.hidden = true;
-    navTriggers.forEach((btn) => btn.setAttribute('aria-expanded', 'false'));
+    navTriggers.forEach((btn) => {
+      btn.setAttribute('aria-expanded', 'false');
+      btn.classList.remove('active');
+    });
   }
 
   navTriggers.forEach((trigger) => {
+    const menuType = trigger.getAttribute('data-menu');
+
+    // Click behavior
     trigger.addEventListener('click', (e) => {
       e.stopPropagation();
-      const menuType = trigger.getAttribute('data-menu');
-      const isExpanded = trigger.getAttribute('aria-expanded') === 'true';
-
-      if (isExpanded) {
+      const activePanel = document.querySelector('.mega-inner:not([hidden])');
+      const currentMenu = megaMenu && !megaMenu.hidden && activePanel ? activePanel.getAttribute('data-mega-content') : null;
+      
+      if (currentMenu === menuType && isMenuLockedByClick) {
+        isMenuLockedByClick = false;
         closeMegaMenu();
       } else {
-        // Close others and open this
-        navTriggers.forEach((btn) => btn.setAttribute('aria-expanded', 'false'));
-        trigger.setAttribute('aria-expanded', 'true');
-
-        if (megaMenu) {
-          megaMenu.hidden = false;
-          megaPanels.forEach((panel) => {
-            if (panel.getAttribute('data-mega-content') === menuType) {
-              panel.hidden = false;
-            } else {
-              panel.hidden = true;
-            }
-          });
-        }
+        isMenuLockedByClick = true;
+        openMegaPanel(menuType, trigger);
       }
     });
+
+    // Hover intent on desktop
+    trigger.addEventListener('mouseenter', () => {
+      openMegaPanel(menuType, trigger);
+    });
   });
+
+  if (siteHeader) {
+    siteHeader.addEventListener('mouseleave', () => {
+      if (!isMenuLockedByClick) {
+        hoverCloseTimer = setTimeout(closeMegaMenu, 250);
+      }
+    });
+    siteHeader.addEventListener('mouseenter', () => {
+      if (hoverCloseTimer) clearTimeout(hoverCloseTimer);
+    });
+  }
 
   // Close mega menu on outside click
   document.addEventListener('click', (e) => {
     if (siteHeader && !siteHeader.contains(e.target)) {
+      isMenuLockedByClick = false;
       closeMegaMenu();
     }
   });
 
-  // Close mega menu on Escape key
+  // Close when clicking a link inside mega menu
+  if (megaMenu) {
+    megaMenu.querySelectorAll('a').forEach((link) => {
+      link.addEventListener('click', () => {
+        isMenuLockedByClick = false;
+        closeMegaMenu();
+      });
+    });
+  }
+
+  // Keyboard Navigation: Escape key closes menus
   document.addEventListener('keydown', (e) => {
     if (e.key === 'Escape') {
       closeMegaMenu();
@@ -123,7 +169,6 @@
       }
     });
 
-    // Close drawer when clicking a link inside it
     mobileDrawer.querySelectorAll('a').forEach((link) => {
       link.addEventListener('click', () => {
         closeMobileDrawer();
@@ -131,7 +176,7 @@
     });
   }
 
-  // --- 4. Hero Carousel (3 Slides with Dots & Arrows) ---
+  // --- 4. Hero Carousel (3 Slides with Smooth Transitions & Gestures) ---
   const heroSection = document.getElementById('home');
   const heroSlides = document.querySelectorAll('.hero-slide');
   const heroDots = document.querySelectorAll('.hero-dot');
@@ -217,7 +262,7 @@
     heroSection.addEventListener('focusin', stopCarousel);
     heroSection.addEventListener('focusout', startCarousel);
 
-    // Mobile touch swipe gestures
+    // Mobile swipe gestures
     let touchStartX = 0;
     let touchEndX = 0;
 
@@ -236,7 +281,6 @@
       }
     }, { passive: true });
 
-    // Initialize first slide and start timer
     goToSlide(0);
     startCarousel();
   }
@@ -263,7 +307,6 @@
     const removedFixed = parseFloat(removedFixedInput ? removedFixedInput.value : 0) || 0;
     const newOperating = parseFloat(newOperatingInput ? newOperatingInput.value : 0) || 0;
 
-    // Display formatted input labels
     if (feeVolumeOut) {
       feeVolumeOut.textContent = formatINR(volume);
     }
@@ -271,12 +314,7 @@
       avoidableRateOut.textContent = rate.toFixed(1) + '%';
     }
 
-    // Formulas per DISHA 8.2 Business Model Spec:
-    // avoidableTxnFees = volume * rate / 100
-    // totalRemovedCosts = avoidableTxnFees + removedFixed
-    // monthlyNetSavings = totalRemovedCosts - newOperating
-    // oneTimePrice = 4 * monthlyNetSavings
-    // firstYearBenefit = 12 * monthlyNetSavings - oneTimePrice
+    // DISHA 8.2 Verified Formula
     const avoidableTxnFees = (volume * rate) / 100;
     const totalRemovedCosts = avoidableTxnFees + removedFixed;
     const monthlyNetSavings = totalRemovedCosts - newOperating;
@@ -297,7 +335,6 @@
     }
   }
 
-  // Bind live calculator events
   [feeVolumeInput, avoidableRateInput, removedFixedInput, newOperatingInput].forEach((input) => {
     if (input) {
       input.addEventListener('input', calculatePricing);
@@ -305,7 +342,6 @@
     }
   });
 
-  // Copy Quote Functionality
   if (copyQuoteBtn) {
     copyQuoteBtn.addEventListener('click', () => {
       const volume = parseFloat(feeVolumeInput ? feeVolumeInput.value : 0) || 0;
@@ -329,7 +365,6 @@
           showToast('Quotation ready (copy allowed)');
         });
       } else {
-        // Fallback for older browsers
         const textarea = document.createElement('textarea');
         textarea.value = quote;
         document.body.appendChild(textarea);
@@ -345,10 +380,9 @@
     });
   }
 
-  // Initial calculation run
   calculatePricing();
 
-  // --- 6. Copyright Year Update ---
+  // --- 6. Dynamic Year ---
   const copyrightYear = document.getElementById('copyrightYear');
   if (copyrightYear) {
     copyrightYear.textContent = new Date().getFullYear();
@@ -369,5 +403,31 @@
     });
   });
 
-  console.log('DISHA 8.2 PhonePe-inspired engine initialized.');
+  // --- 8. Active Nav Link on Scroll Spy ---
+  const sections = document.querySelectorAll('section[id], header[id]');
+  const desktopNavLinks = document.querySelectorAll('.desktop-nav a');
+
+  window.addEventListener('scroll', () => {
+    let current = '';
+    const scrollPos = window.scrollY + 120;
+
+    sections.forEach((section) => {
+      const sectionTop = section.offsetTop;
+      const sectionHeight = section.offsetHeight;
+      if (scrollPos >= sectionTop && scrollPos < sectionTop + sectionHeight) {
+        current = section.getAttribute('id');
+      }
+    });
+
+    desktopNavLinks.forEach((link) => {
+      const href = link.getAttribute('href');
+      if (href === `#${current}`) {
+        link.classList.add('nav-active');
+      } else {
+        link.classList.remove('nav-active');
+      }
+    });
+  }, { passive: true });
+
+  console.log('DISHA 8.2 PhonePe navigation & interaction system initialized.');
 })();
