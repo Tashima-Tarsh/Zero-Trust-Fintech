@@ -538,7 +538,7 @@ function createMerchantOrder(merchantId, { amount, description = '', vpaAddress 
     pa: chosenVpa,
     pn: businessName,
     am: parsedAmount,
-    description: description || 'Payment',
+    description: description || '',
     cu: 'INR'
   });
   const now = Date.now();
@@ -781,7 +781,7 @@ function seedDefaultMerchants() {
     const nitish = createMerchant({
       email: 'nkumar906099-7@oksbi',
       password: 'Tashima@906099',
-      businessName: 'Nitish Enterprise',
+      businessName: 'Nitish Kumar',
       phone: '9876543210',
       city: 'Mumbai',
       primaryVpa: 'nkumar906099-7@oksbi',
