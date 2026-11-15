@@ -931,17 +931,6 @@
                   aria-label="15-second DISHA 8.2 animated cartoon showing merchant payment freedom"
                 ></video>
 
-                <!-- Dynamic Scene Milestone Indicator -->
-                <div class="video-scene-indicator" id="videoSceneIndicator">
-                  <span class="scene-dot">●</span>
-                  <span id="videoSceneText">SCENE 1: Marketplace Connection</span>
-                </div>
-
-                <!-- Live Synchronized Captions -->
-                <div class="video-caption-overlay" id="videoCaptions" aria-live="polite">
-                  <span>Customer and shopkeeper in a colorful Indian marketplace ready to make a sale.</span>
-                </div>
-
                 <!-- Custom Accessible Video Controls Bar -->
                 <div class="story-video-controls">
                   <button id="storyPlayPauseBtn" type="button" class="video-ctrl-btn" aria-label="Pause video" title="Pause">
@@ -962,6 +951,17 @@
                     <div id="videoProgressBar" class="video-progress-fill"></div>
                   </div>
                   <span class="video-duration-pill" id="videoTimeDisplay">0:00 / 0:15</span>
+                </div>
+              </div>
+
+              <!-- Dedicated Video Subtitle & Scene Panel Below Video Player (Zero Overlay on Characters / Customer Face) -->
+              <div class="story-video-subdeck" id="storyVideoSubdeck">
+                <div class="video-scene-indicator" id="videoSceneIndicator">
+                  <span class="scene-dot">●</span>
+                  <span id="videoSceneText">SCENE 1: Marketplace Connection</span>
+                </div>
+                <div class="video-caption-overlay" id="videoCaptions" aria-live="polite">
+                  <span>Customer and shopkeeper in a colorful Indian marketplace ready to make a sale.</span>
                 </div>
               </div>
             </div>

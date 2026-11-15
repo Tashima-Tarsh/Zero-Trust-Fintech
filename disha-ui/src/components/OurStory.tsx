@@ -121,17 +121,6 @@ export const OurStory: React.FC = () => {
                   aria-label="15-second DISHA 8.2 animated cartoon showing merchant payment freedom"
                 />
 
-                <div className="video-scene-indicator">
-                  <span className="scene-dot">●</span>
-                  <span>{activeScene.title}</span>
-                </div>
-
-                {showCaptions && (
-                  <div className="video-caption-overlay" aria-live="polite">
-                    <span>{activeScene.caption}</span>
-                  </div>
-                )}
-
                 <div className="story-video-controls">
                   <button
                     type="button"
@@ -181,6 +170,20 @@ export const OurStory: React.FC = () => {
                     {formatTime(currentTime)} / {formatTime(duration)}
                   </span>
                 </div>
+              </div>
+
+              {/* Dedicated Live Scene Milestone & Subtitle Panel Below Video Player */}
+              <div className="story-video-subdeck">
+                <div className="video-scene-indicator">
+                  <span className="scene-dot">●</span>
+                  <span>{activeScene.title}</span>
+                </div>
+
+                {showCaptions && (
+                  <div className="video-caption-overlay" aria-live="polite">
+                    <span>{activeScene.caption}</span>
+                  </div>
+                )}
               </div>
             </div>
             <div className="story-video-caption">
