@@ -177,16 +177,40 @@
   }
 
   // --- 4. Hero Carousel (3 Slides with Smooth Transitions & Gestures) ---
+  // --- 4. Hero Carousel (3 Slides with Smooth Transitions, Pause Controls & Progress Bar) ---
   const heroSection = document.getElementById('home');
   const heroSlides = document.querySelectorAll('.hero-slide');
   const heroDots = document.querySelectorAll('.hero-dot');
   const prevBtn = document.getElementById('previousSlide');
   const nextBtn = document.getElementById('nextSlide');
+  const heroPauseBtn = document.getElementById('heroPauseBtn');
+  const pauseSymbol = heroPauseBtn ? heroPauseBtn.querySelector('.pause-symbol') : null;
+  const playSymbol = heroPauseBtn ? heroPauseBtn.querySelector('.play-symbol') : null;
 
   let currentSlide = 0;
   const totalSlides = heroSlides.length || 3;
   let carouselInterval = null;
   const AUTO_INTERVAL_MS = 6500;
+  let isManuallyPaused = false;
+  let isHoveredOrFocused = false;
+
+  const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  if (prefersReducedMotion) {
+    isManuallyPaused = true;
+  }
+
+  function resetDotProgress(activeDot) {
+    if (!activeDot) return;
+    const progressSpan = activeDot.querySelector('.dot-progress');
+    if (progressSpan) {
+      progressSpan.style.animation = 'none';
+      // Trigger reflow
+      void progressSpan.offsetWidth;
+      if (!prefersReducedMotion) {
+        progressSpan.style.animation = `dotProgress ${AUTO_INTERVAL_MS}ms linear forwards`;
+      }
+    }
+  }
 
   function goToSlide(index) {
     if (totalSlides === 0) return;
@@ -196,8 +220,10 @@
       if (idx === currentSlide) {
         slide.classList.add('active');
         slide.removeAttribute('hidden');
+        slide.setAttribute('aria-hidden', 'false');
       } else {
         slide.classList.remove('active');
+        slide.setAttribute('aria-hidden', 'true');
       }
     });
 
@@ -205,9 +231,12 @@
       if (idx === currentSlide) {
         dot.classList.add('active');
         dot.setAttribute('aria-current', 'true');
+        resetDotProgress(dot);
       } else {
         dot.classList.remove('active');
         dot.removeAttribute('aria-current');
+        const progressSpan = dot.querySelector('.dot-progress');
+        if (progressSpan) progressSpan.style.animation = 'none';
       }
     });
   }
@@ -220,29 +249,63 @@
     goToSlide(currentSlide - 1);
   }
 
-  function startCarousel() {
-    stopCarousel();
-    carouselInterval = setInterval(nextSlide, AUTO_INTERVAL_MS);
+  function updatePauseButtonUI() {
+    if (!heroPauseBtn) return;
+    const isPaused = isManuallyPaused || isHoveredOrFocused;
+    if (heroSection) {
+      heroSection.classList.toggle('is-paused', isPaused);
+    }
+    if (isManuallyPaused) {
+      if (pauseSymbol) pauseSymbol.hidden = true;
+      if (playSymbol) playSymbol.hidden = false;
+      heroPauseBtn.setAttribute('aria-label', 'Resume slideshow');
+      heroPauseBtn.setAttribute('title', 'Resume slideshow');
+    } else {
+      if (pauseSymbol) pauseSymbol.hidden = false;
+      if (playSymbol) playSymbol.hidden = true;
+      heroPauseBtn.setAttribute('aria-label', 'Pause slideshow');
+      heroPauseBtn.setAttribute('title', 'Pause slideshow');
+    }
   }
 
-  function stopCarousel() {
+  function startCarousel() {
+    if (isManuallyPaused || prefersReducedMotion) return;
+    stopCarouselTimer();
+    carouselInterval = setInterval(nextSlide, AUTO_INTERVAL_MS);
+    updatePauseButtonUI();
+  }
+
+  function stopCarouselTimer() {
     if (carouselInterval) {
       clearInterval(carouselInterval);
       carouselInterval = null;
     }
+    updatePauseButtonUI();
+  }
+
+  if (heroPauseBtn) {
+    heroPauseBtn.addEventListener('click', () => {
+      isManuallyPaused = !isManuallyPaused;
+      if (isManuallyPaused) {
+        stopCarouselTimer();
+      } else {
+        startCarousel();
+      }
+      updatePauseButtonUI();
+    });
   }
 
   if (prevBtn) {
     prevBtn.addEventListener('click', () => {
       prevSlide();
-      startCarousel();
+      if (!isManuallyPaused) startCarousel();
     });
   }
 
   if (nextBtn) {
     nextBtn.addEventListener('click', () => {
       nextSlide();
-      startCarousel();
+      if (!isManuallyPaused) startCarousel();
     });
   }
 
@@ -251,16 +314,28 @@
       const targetIdx = parseInt(dot.getAttribute('data-slide-go'), 10);
       if (!isNaN(targetIdx)) {
         goToSlide(targetIdx);
-        startCarousel();
+        if (!isManuallyPaused) startCarousel();
       }
     });
   });
 
   if (heroSection) {
-    heroSection.addEventListener('mouseenter', stopCarousel);
-    heroSection.addEventListener('mouseleave', startCarousel);
-    heroSection.addEventListener('focusin', stopCarousel);
-    heroSection.addEventListener('focusout', startCarousel);
+    heroSection.addEventListener('mouseenter', () => {
+      isHoveredOrFocused = true;
+      stopCarouselTimer();
+    });
+    heroSection.addEventListener('mouseleave', () => {
+      isHoveredOrFocused = false;
+      if (!isManuallyPaused) startCarousel();
+    });
+    heroSection.addEventListener('focusin', () => {
+      isHoveredOrFocused = true;
+      stopCarouselTimer();
+    });
+    heroSection.addEventListener('focusout', () => {
+      isHoveredOrFocused = false;
+      if (!isManuallyPaused) startCarousel();
+    });
 
     // Mobile swipe gestures
     let touchStartX = 0;
@@ -274,15 +349,17 @@
       touchEndX = e.changedTouches[0].screenX;
       if (touchStartX - touchEndX > 50) {
         nextSlide();
-        startCarousel();
+        if (!isManuallyPaused) startCarousel();
       } else if (touchEndX - touchStartX > 50) {
         prevSlide();
-        startCarousel();
+        if (!isManuallyPaused) startCarousel();
       }
     }, { passive: true });
 
     goToSlide(0);
-    startCarousel();
+    if (!isManuallyPaused) {
+      startCarousel();
+    }
   }
 
   // --- 5. Interactive One-Time Price Calculator ---
