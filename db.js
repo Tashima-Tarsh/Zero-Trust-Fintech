@@ -75,6 +75,7 @@ function migrateVpaPoolColumns(dbInstance) {
       { name: 'per_tx_limit', type: 'REAL NOT NULL DEFAULT 5000.0' },
       { name: 'unique_senders_daily_limit', type: 'INTEGER NOT NULL DEFAULT 12' },
       { name: 'unique_senders_today', type: 'INTEGER NOT NULL DEFAULT 0' },
+      { name: 'mcc', type: 'TEXT' },
       { name: 'min_gap_minutes', type: 'INTEGER NOT NULL DEFAULT 8' },
       { name: 'notes', type: 'TEXT' },
       { name: 'excel_row_id', type: 'TEXT' }
@@ -127,6 +128,7 @@ function setupSqliteTables() {
       last_used_at INTEGER,
       cooldown_until INTEGER NOT NULL DEFAULT 0,
       merchant_id TEXT NOT NULL DEFAULT 'mer_default',
+      mcc TEXT,
       notes TEXT,
       excel_row_id TEXT,
       created_at INTEGER NOT NULL
@@ -278,42 +280,23 @@ function setupSqliteTables() {
     { id: 'vpa_icici_02', vpa: 'disha82@icici', holder: 'Ramesh Secondary', bank: 'ICICI Bank', score: 96, slot: 'AFTERNOON' },
     { id: 'vpa_yes_03', vpa: 'disha82@ybl', holder: 'Ramesh Retail Store', bank: 'YES Bank', score: 94, slot: 'EVENING' }
   ];
-  const vpaStmt = sqliteDb.prepare(`
-    INSERT OR IGNORE INTO vpa_pool (
-      id, vpa_address, holder_name, bank_name, status, health_score,
-      preferred_time_slot, daily_tx_limit, daily_volume_limit, merchant_id, created_at
-    ) VALUES (?, ?, ?, ?, 'ACTIVE', ?, ?, 15, 25000.0, 'mer_default', ?)
-  `);
+    const vpaStmt = sqliteDb.prepare(`
+      INSERT OR IGNORE INTO vpa_pool (
+        id, vpa_address, holder_name, bank_name, status, health_score,
+        preferred_time_slot, daily_tx_limit, daily_volume_limit, merchant_id, mcc, created_at
+      ) VALUES (?, ?, ?, ?, 'ACTIVE', ?, ?, 15, 25000.0, 'mer_default', '0000', ?)
+    `);
   for (const v of seedVpas) {
     vpaStmt.run(v.id, v.vpa, v.holder, v.bank, v.score, v.slot, now);
   }
 
-  // Seed Default Gaming Company (GameZone Pro) & Server IPs
-  const seedCompany = {
-    id: 'comp_gamezone_01',
-    name: 'GameZone Pro Studio',
-    email: 'security@gamezone.pro',
-    apiKey: 'gz_live_key_a1b2c3d4e5f60718293a4b5c6d7e8f90',
-    apiSecret: 'gz_secret_99887766554433221100aabbccddeeff'
-  };
-  sqliteDb.prepare(`
-    INSERT OR IGNORE INTO gaming_companies (id, company_name, contact_email, api_key, api_secret, status, created_at)
-    VALUES (?, ?, ?, ?, ?, 'ACTIVE', ?)
-  `).run(seedCompany.id, seedCompany.name, seedCompany.email, seedCompany.apiKey, seedCompany.apiSecret, now);
+  // Backfill mcc for any existing seed VPAs inserted without it
+  sqliteDb.prepare(`UPDATE vpa_pool SET mcc = '0000' WHERE mcc IS NULL OR mcc = ''`).run();
 
-  const seedIps = [
-    { id: 'ip_seed_01', ip: '52.84.123.45', range: null, desc: 'AWS Mumbai Game Server 1' },
-    { id: 'ip_seed_02', ip: '13.234.56.78', range: null, desc: 'AWS Mumbai Game Server 2' },
-    { id: 'ip_seed_03', ip: null, range: '103.21.58.0/24', desc: 'DigitalOcean Bangalore Subnet' },
-    { id: 'ip_seed_04', ip: '127.0.0.1', range: null, desc: 'Local Development Server' }
-  ];
-  const ipStmt = sqliteDb.prepare(`
-    INSERT OR IGNORE INTO ip_whitelist (id, company_id, ip_address, ip_range, description, is_active, added_by, added_at)
-    VALUES (?, ?, ?, ?, ?, 1, 'system', ?)
-  `);
-  for (const s of seedIps) {
-    ipStmt.run(s.id, seedCompany.id, s.ip, s.range, s.desc, now);
-  }
+  // Seed Default Gaming Company (GameZone Pro) & Server IPs
+  // Removed hardcoded credentials: create tenants via POST /api/admin/companies
+  // with ADMIN_API_KEY set. Seeding keys in source is a production risk.
+
 }
 
 async function setupPostgresTables() {
@@ -354,13 +337,47 @@ function selectVPA(merchantId = 'mer_default', amount = 100) {
 
 function selectVPARoute(merchantId = 'mer_default', amount = 100, customerRegion = 'MH', timeOfDay = null, customerVpa = null) {
   if (vpaRouter) {
-    return vpaRouter.selectVPASync(merchantId, amount, customerRegion, timeOfDay, customerVpa);
+    const route = vpaRouter.selectVPASync(merchantId, amount, customerRegion, timeOfDay, customerVpa);
+    if (route && route.vpaAddress) {
+      const mt = getVpaMerchantType(route.vpaAddress);
+      return {
+        vpaAddress: route.vpaAddress,
+        healthScore: route.healthScore,
+        cooldownMinutes: route.cooldownMinutes,
+        merchantType: mt.accountType,
+        mcc: mt.mcc
+      };
+    }
   }
+  const vpaAddress = selectVPA(merchantId, amount);
+  const mt = getVpaMerchantType(vpaAddress);
   return {
-    vpaAddress: selectVPA(merchantId, amount),
+    vpaAddress,
     healthScore: 95,
-    cooldownMinutes: 10
+    cooldownMinutes: 10,
+    merchantType: mt.accountType,
+    mcc: mt.mcc
   };
+}
+
+/**
+ * Resolve a VPA's merchant classification (P2P vs P2M) and MCC from vpa_pool.
+ * Used by generateUPILink to gate mc/tr/mode/sign parameters so personal VPAs
+ * never carry merchant-only parameters (NPCI Circular 18: bank decline before PIN).
+ */
+function getVpaMerchantType(vpaAddress) {
+  if (!vpaAddress || !sqliteDb) return { accountType: 'PERSONAL', mcc: null };
+  try {
+    const row = sqliteDb.prepare(`
+      SELECT account_type, mcc FROM vpa_pool WHERE vpa_address = ? LIMIT 1
+    `).get(vpaAddress);
+    if (row) {
+      return { accountType: row.account_type || 'PERSONAL', mcc: row.mcc || null };
+    }
+  } catch (err) {
+    console.warn('[VPA MerchantType Notice]', err.message);
+  }
+  return { accountType: 'PERSONAL', mcc: null };
 }
 
 // Session Management (TASK 3)
@@ -493,7 +510,7 @@ function blacklistUtr(utr, orderId, amount, reason = 'Verified settlement') {
 }
 
 // Double-Entry Ledger Engine (TASK 10)
-function recordTransactionAndLedger(orderId, utr, amount, vpaUsed) {
+async function recordTransactionAndLedger(orderId, utr, amount, vpaUsed) {
   const now = Date.now();
   const txId = 'TX_' + crypto.randomBytes(6).toString('hex').toUpperCase();
   const entryDebitId = 'LE_' + crypto.randomBytes(6).toString('hex').toUpperCase();
@@ -515,7 +532,7 @@ function recordTransactionAndLedger(orderId, utr, amount, vpaUsed) {
       VALUES (?, ?, 'acc_rev_01', 'CREDIT', ?, ?)
     `).run(entryCreditId, txId, amount, now);
 
-    const verification = getLedgerVerification(txId);
+    const verification = await getLedgerVerification(txId);
     if (!verification.balanced) {
       throw new Error(`Double-entry balance violation: Debits ₹${verification.totalDebits} != Credits ₹${verification.totalCredits}`);
     }
@@ -523,10 +540,43 @@ function recordTransactionAndLedger(orderId, utr, amount, vpaUsed) {
     return { txId, verification };
   }
 
+  if (pgPool) {
+    const client = await pgPool.connect();
+    try {
+      await client.query('BEGIN');
+      await client.query(
+        `INSERT INTO transactions (id, order_id, utr, amount, status, vpa_used, created_at)
+         VALUES ($1, $2, $3, $4, 'COMPLETED', $5, $6)`,
+        [txId, orderId, utr, amount, vpaUsed, now]
+      );
+      await client.query(
+        `INSERT INTO ledger_entries (id, transaction_id, account_id, entry_type, amount, created_at)
+         VALUES ($1, $2, 'acc_bank_01', 'DEBIT', $3, $4)`,
+        [entryDebitId, txId, amount, now]
+      );
+      await client.query(
+        `INSERT INTO ledger_entries (id, transaction_id, account_id, entry_type, amount, created_at)
+         VALUES ($1, $2, 'acc_rev_01', 'CREDIT', $3, $4)`,
+        [entryCreditId, txId, amount, now]
+      );
+      await client.query('COMMIT');
+    } catch (err) {
+      await client.query('ROLLBACK');
+      throw err;
+    } finally {
+      client.release();
+    }
+    const verification = await getLedgerVerification(txId);
+    if (!verification.balanced) {
+      throw new Error(`Double-entry balance violation: Debits ₹${verification.totalDebits} != Credits ₹${verification.totalCredits}`);
+    }
+    return { txId, verification };
+  }
+
   return { txId, verification: { balanced: true, totalDebits: amount, totalCredits: amount } };
 }
 
-function getLedgerVerification(txId) {
+async function getLedgerVerification(txId) {
   if (sqliteDb) {
     const rows = sqliteDb.prepare(`SELECT entry_type, amount FROM ledger_entries WHERE transaction_id = ?`).all(txId);
     let totalDebits = 0;
@@ -543,14 +593,37 @@ function getLedgerVerification(txId) {
       totalCredits: cred
     };
   }
+  if (pgPool) {
+    const rows = await pgPool.query(`SELECT entry_type, amount FROM ledger_entries WHERE transaction_id = $1`, [txId]);
+    let totalDebits = 0;
+    let totalCredits = 0;
+    for (const r of rows.rows) {
+      if (r.entry_type === 'DEBIT') totalDebits += Number(r.amount);
+      if (r.entry_type === 'CREDIT') totalCredits += Number(r.amount);
+    }
+    const deb = Math.round(totalDebits * 100) / 100;
+    const cred = Math.round(totalCredits * 100) / 100;
+    return {
+      balanced: Math.abs(deb - cred) < 0.001,
+      totalDebits: deb,
+      totalCredits: cred
+    };
+  }
   return { balanced: true, totalDebits: 0, totalCredits: 0 };
 }
 
-function resetDailyVPAs() {
+async function resetDailyVPAs() {
+  // Reset per-VPA daily counters (SQLite)
+  if (sqliteDb) {
+    sqliteDb.prepare(`UPDATE vpa_pool SET daily_tx_count = 0, daily_volume = 0.0, cooldown_until = 0, unique_senders_today = 0`).run();
+  }
+  // Reset per-VPA daily counters (Postgres)
+  if (pgPool) {
+    await pgPool.query(`UPDATE vpa_pool SET daily_tx_count = 0, daily_volume = 0.0, cooldown_until = 0, unique_senders_today = 0`);
+  }
+  // Router-level health rebalance (quarantine low-health VPAs, etc.)
   if (vpaRouter) {
     vpaRouter.dailyHealthResetAndRebalance();
-  } else if (sqliteDb) {
-    sqliteDb.prepare(`UPDATE vpa_pool SET daily_tx_count = 0, daily_volume = 0.0, cooldown_until = 0`).run();
   }
   console.log('🔄 [VPA Engine] Daily limits reset and health rebalanced successfully.');
 }
@@ -573,5 +646,6 @@ module.exports = {
   blacklistUtr,
   recordTransactionAndLedger,
   getLedgerVerification,
-  resetDailyVPAs
+  resetDailyVPAs,
+  getVpaMerchantType
 };

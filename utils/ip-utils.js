@@ -39,6 +39,16 @@ function getClientIP(req) {
     }
   }
 
+  // X-Real-IP is set by some reverse proxies (e.g., Render LB) with the real client IP.
+  // Only accept it when trust proxy is not set (so we don't double-trust), and validate
+  // it's a public IP to reduce spoofing risk.
+  if (!isTrusted && req.headers && req.headers['x-real-ip']) {
+    const xri = cleanIP(req.headers['x-real-ip']);
+    if (xri && isValidIP(xri) && !isPrivateOrReservedIP(xri)) {
+      return xri;
+    }
+  }
+
   // Fallback to socket remoteAddress (cannot be spoofed via HTTP headers)
   const socketIP = (req.socket && req.socket.remoteAddress) ||
                    (req.connection && req.connection.remoteAddress) ||
@@ -90,6 +100,24 @@ function ipv4ToLong(ip) {
 }
 
 /**
+ * Returns true if the IPv4 address is private or reserved (RFC 1918, loopback,
+ * link-local, multicast, etc.). Used to reject spoofed X-Real-IP headers.
+ */
+function isPrivateOrReservedIP(ip) {
+  if (!isValidIPv4(ip)) return false;
+  const parts = ip.split('.').map(p => parseInt(p, 10));
+  const [a, b] = parts;
+  // 10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16, 127.0.0.0/8, 169.254.0.0/16,
+  // 224.0.0.0/4 (multicast), 240.0.0.0/4 (reserved)
+  return a === 10
+    || (a === 172 && b >= 16 && b <= 31)
+    || (a === 192 && b === 168)
+    || a === 127
+    || (a === 169 && b === 254)
+    || a >= 224;
+}
+
+/**
  * Bitwise subnet test: checks if an IPv4 address belongs to a CIDR range
  * Example: isIPInCIDR("52.84.123.45", "52.84.0.0/16") === true
  */
@@ -119,5 +147,6 @@ module.exports = {
   isValidIPv6,
   isValidCIDR,
   ipv4ToLong,
-  isIPInCIDR
+  isIPInCIDR,
+  isPrivateOrReservedIP
 };

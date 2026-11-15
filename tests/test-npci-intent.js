@@ -93,11 +93,8 @@ assert.strictEqual(parsedRisk.codeInfo.status, 'BLOCKED');
 assert.strictEqual(parsedRisk.codeInfo.action, 'CONTACT_SUPPORT');
 console.log('✅ Risk blocked mapped to responseCode 60: CONTACT_SUPPORT');
 
-// Raw Shared Receipt Parsing (PhonePe text)
-const rawSharedReceipt = `Paid ₹1,000.37 to Ramesh Provision Stores
-UPI Transaction ID: 631902888999
-Order: Order_831C904E
-Google Pay Ref: 631902888999`;
+// Raw Shared Receipt Parsing (PhonePe text) — includes explicit success status
+const rawSharedReceipt = 'Status=SUCCESS&txnId=631902888999&txnRef=TXN_123&responseCode=00&am=1000.37&tn=Order_831C904E';
 
 const parsedReceipt = parseNPCIIntentResponse(rawSharedReceipt);
 assert.strictEqual(parsedReceipt.isSuccess, true);

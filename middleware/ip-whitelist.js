@@ -110,9 +110,14 @@ class IPWhitelistMiddleware {
         const isWhitelisted = await this.isIPWhitelisted(company.id, clientIP);
 
         if (!isWhitelisted) {
-          // Log blocked attempt & evaluate brute force
           await this.logBlockedAttempt(clientIP, company.id, req.baseUrl + (req.path || ''), 'IP_NOT_WHITELISTED');
-          await this.checkBruteForce(clientIP);
+          const attempts = await this.checkBruteForce(clientIP);
+          if (attempts > 50) {
+            return res.status(429).json({
+              error: 'BRUTE_FORCE_BLOCKED',
+              message: 'IP temporarily blocked due to excessive unauthorized attempts.'
+            });
+          }
 
           return res.status(403).json({
             error: 'IP_NOT_WHITELISTED',
@@ -234,7 +239,7 @@ class IPWhitelistMiddleware {
       this.sqliteDb.prepare(`
         UPDATE ip_whitelist
         SET last_used_at = ?
-        WHERE company_id = ? AND (ip_address = ? OR ip_range IS NOT NULL)
+        WHERE company_id = ? AND ip_address = ?
       `).run(now, companyId, clientIP);
 
       this.sqliteDb.prepare(`

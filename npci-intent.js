@@ -251,8 +251,6 @@ function parseNPCIIntentResponse(rawPayload) {
   const statusUpper = (result.status || '').toUpperCase();
   if (statusUpper === 'SUCCESS' || result.responseCode === '00') {
     result.isSuccess = true;
-  } else if (result.txnId && !result.responseCode && !result.status) {
-    result.isSuccess = true;
   }
 
   return result;

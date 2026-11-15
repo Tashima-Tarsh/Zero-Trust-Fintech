@@ -104,7 +104,7 @@ const db = require('../db');
   assert(!db.isUtrBlacklisted(mockUtr), 'UTR must not be blacklisted before settlement');
 
   // Execute settlement
-  const { txId, verification } = db.recordTransactionAndLedger(
+  const { txId, verification } = await db.recordTransactionAndLedger(
     session.orderId,
     mockUtr,
     session.challengeAmount,

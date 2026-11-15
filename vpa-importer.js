@@ -93,7 +93,7 @@ class VPAImporter {
               active_hours_end, daily_tx_limit, daily_volume_limit, per_tx_limit,
               unique_senders_daily_limit, daily_tx_count, daily_volume,
               unique_senders_today, min_gap_minutes, cooldown_until, merchant_id,
-              notes, excel_row_id, created_at
+              mcc, notes, excel_row_id, created_at
             ) VALUES (
               ?, ?, ?, ?, ?, 'ACTIVE',
               100, 'LOW', ?, ?,
@@ -108,7 +108,8 @@ class VPAImporter {
           const info = stmt.run(
             vpaId, vpaAddress, holderName, bankName, accountType,
             timeSlot, startHour, endHour, dailyTxLimit, dailyVolLimit, perTxLimit,
-            minGap, merchantId, notes, `row_${i + 1}`, now
+            minGap, merchantId, notes, `row_${i + 1}`, now,
+            accountType === 'MERCHANT' ? (r.mcc || '5812') : '0000'
           );
 
           if (info.changes > 0) {
@@ -200,6 +201,7 @@ class VPAImporter {
         holder_name: name,
         bank_name: b.name,
         account_type: 'PERSONAL',
+        mcc: '0000',
         preferred_time_slot: slots[i % 3],
         active_hours_start: 8,
         active_hours_end: 22,

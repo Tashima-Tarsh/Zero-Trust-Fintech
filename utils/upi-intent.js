@@ -80,6 +80,16 @@ function buildUpiUri(o) {
     }
     parts.push('tr=' + o.tr);
     parts.push('mc=' + o.mc);
+    if (o.mode) parts.push('mode=' + String(o.mode).substring(0, 2));
+    if (o.orgid) parts.push('orgid=' + encodeURIComponent(String(o.orgid).substring(0, 6)));
+    if (o.tid) parts.push('tid=' + encodeURIComponent(String(o.tid).substring(0, 20)));
+    if (o.mid) parts.push('mid=' + encodeURIComponent(String(o.mid).substring(0, 20)));
+    if (o.msid) parts.push('msid=' + encodeURIComponent(String(o.msid).substring(0, 20)));
+    if (o.mtid) parts.push('mtid=' + encodeURIComponent(String(o.mtid).substring(0, 20)));
+    if (o.mam) {
+      const numMam = Number(o.mam);
+      if (!isNaN(numMam) && numMam > 0) parts.push('mam=' + numMam.toFixed(2));
+    }
     if (o.url) parts.push('url=' + encodeURIComponent(String(o.url).substring(0, 255)));
     if (o.sign) parts.push('sign=' + encodeURIComponent(String(o.sign)));
   }
@@ -113,7 +123,7 @@ function appLinks(upiUri) {
 /**
  * Unique-paise challenge. Uses crypto.randomInt and avoids cents already in
  * use by ACTIVE sessions with the same base amount, so two live orders never
- * share an exact amount. Cents 01-99 except multiples of 10.
+ * share an exact amount. Cents 11–99 except multiples of 5 and 10.
  * @param {number} baseAmount
  * @param {Set<number>} activeAmounts  challenge amounts of live sessions
  */
@@ -121,10 +131,10 @@ function generateChallengeAmount(baseAmount, activeAmounts = new Set()) {
   const baseCents = Math.round(Number(baseAmount) * 100);
   if (!Number.isFinite(baseCents) || baseCents <= 0) throw new Error('bad base amount');
   const free = [];
-  for (let c = 1; c <= 99; c++) {
-    if (c % 10 === 0) continue;
-    const amt = (baseCents + c) / 100;
-    if (!activeAmounts.has(Number(amt.toFixed(2)))) free.push(c);
+  for (let c = 11; c <= 99; c++) {
+    if (c % 10 === 0 || c % 5 === 0) continue;
+    const amt = Number(((baseCents + c) / 100).toFixed(2));
+    if (!activeAmounts.has(amt)) free.push(c);
   }
   if (free.length === 0) throw new Error('no free challenge amount: too many live sessions for this base');
   const cents = free[crypto.randomInt(0, free.length)];

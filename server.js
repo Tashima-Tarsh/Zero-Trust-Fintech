@@ -3,7 +3,6 @@
  * Server implementation combining Express, WebSockets, 7-Layer Fraud Engine,
  * NPCI UPI Spec, VPA Routing, and Double-Entry Ledger.
  */
-
 require('dotenv').config();
 const express = require('express');
 const http = require('http');
@@ -25,18 +24,14 @@ const { buildUpiUri, appLinks, generateChallengeAmount: generateUniqueChallenge 
 const { IPWhitelistMiddleware } = require('./middleware/ip-whitelist');
 const adminRoutes = require('./routes/admin/ip-whitelist');
 const { handleCinematicRequest } = require('./disha-cinematic/server');
-
 const app = express();
-app.set('trust proxy', 1);
+app.set('trust proxy', false);
 const server = http.createServer(app);
 const wss = new WebSocketServer({ server, path: '/ws' });
-
 const PORT = process.env.PORT || 3000;
 const MERCHANT_UPI_ID = process.env.MERCHANT_UPI_ID || 'nkumar906099-7@oksbi';
 const MERCHANT_NAME = process.env.MERCHANT_NAME || 'Nitish Enterprise';
-
 const ipWhitelist = new IPWhitelistMiddleware(db);
-
 // Middleware & Security Headers
 app.use((req, res, next) => {
   res.setHeader('X-Content-Type-Options', 'nosniff');
@@ -52,16 +47,14 @@ app.use((req, res, next) => {
   }
   next();
 });
-
 // CORS Security Middleware
 const ALLOWED_ORIGINS = process.env.ALLOWED_ORIGINS 
   ? process.env.ALLOWED_ORIGINS.split(',').map(o => o.trim())
-  : ['*'];
-
+  : [];
 app.use((req, res, next) => {
   const origin = req.headers.origin;
-  if (ALLOWED_ORIGINS.includes('*') || (origin && ALLOWED_ORIGINS.includes(origin))) {
-    res.setHeader('Access-Control-Allow-Origin', origin || '*');
+  if (origin && ALLOWED_ORIGINS.includes(origin)) {
+    res.setHeader('Access-Control-Allow-Origin', origin);
     res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, PATCH, DELETE, OPTIONS');
     res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-API-Key, X-Admin-Key');
   }
@@ -70,38 +63,128 @@ app.use((req, res, next) => {
   }
   next();
 });
-
-// In-Memory Sliding Window Rate Limiter
+// Redis-backed sliding window rate limiter (shared across replicas)
+// Falls back to per-process Map when Redis is unavailable.
 function createRateLimiter(windowMs, maxRequests, message) {
-  const hits = new Map();
-  return (req, res, next) => {
+  const fallbackHits = new Map();
+  return async (req, res, next) => {
     const ip = req.ip || (req.socket && req.socket.remoteAddress) || '127.0.0.1';
+    const key = `rl:${ip}`;
     const now = Date.now();
-    const timestamps = hits.get(ip) || [];
-    const valid = timestamps.filter(t => now - t < windowMs);
-    if (valid.length >= maxRequests) {
-      return res.status(429).json({
-        success: false,
-        error: 'RATE_LIMIT_EXCEEDED',
-        message: message || 'Too many requests. Please slow down.'
-      });
+    const windowStart = now - windowMs;
+
+    // Redis path: sliding window via ZADD + ZREMRANGEBYSCORE + ZCARD
+    if (redis) {
+      try {
+        const multi = redis.multi();
+        multi.zadd(key, now.toString(), `${now}:${Math.random()}`);
+        multi.zremrangebyscore(key, 0, windowStart);
+        multi.zcard(key);
+        multi.expire(key, Math.ceil(windowMs / 1000) + 1);
+        const results = await multi.exec();
+        const count = results[2][1];
+        if (count >= maxRequests) {
+          return res.status(429).json({
+            success: false,
+            error: 'RATE_LIMIT_EXCEEDED',
+            message: message || 'Too many requests. Please slow down.'
+          });
+        }
+        return next();
+      } catch (e) {
+        return fallbackLimiter();
+      }
     }
-    valid.push(now);
-    hits.set(ip, valid);
-    next();
+
+    // In-memory fallback with TTL cleanup
+    function fallbackLimiter() {
+      const timestamps = (fallbackHits.get(ip) || []).filter(t => now - t < windowMs);
+      if (timestamps.length >= maxRequests) {
+        return res.status(429).json({
+          success: false,
+          error: 'RATE_LIMIT_EXCEEDED',
+          message: message || 'Too many requests. Please slow down.'
+        });
+      }
+      timestamps.push(now);
+      fallbackHits.set(ip, timestamps);
+      // Cleanup expired entries across all IPs to prevent unbounded Map growth
+      const cutoff = now - windowMs;
+      for (const [k, arr] of fallbackHits.entries()) {
+        const filtered = arr.filter(t => t > cutoff);
+        if (filtered.length === 0) fallbackHits.delete(k);
+        else fallbackHits.set(k, filtered);
+      }
+      next();
+    }
+    fallbackLimiter();
   };
 }
-
 const checkoutLimiter = createRateLimiter(60000, 120, 'Rate limit exceeded on checkout session creation.');
 const verifyLimiter = createRateLimiter(60000, 60, 'Rate limit exceeded on payment verification.');
+// ── Idempotency (Redis-backed, in-memory fallback) ──
+let redis;
+try {
+  if (process.env.REDIS_URL) {
+    const IORedis = require('ioredis');
+    redis = new IORedis(process.env.REDIS_URL, { lazyConnect: true, maxRetriesPerRequest: 1 });
+    redis.connect().catch(() => { redis = null; });
+  }
+} catch (e) { redis = null; }
 
+const IDEMPOTENCY_TTL_MS = 24 * 60 * 60 * 1000; // 24h
+const idempotencyCache = new Map(); // fallback: key -> { response, expiresAt }
+
+async function idempotencyMiddleware(req, res, next) {
+  const key = req.header('Idempotency-Key');
+  if (!key || req.method !== 'POST') return next();
+  const cacheKey = `idem:${key}`;
+  // Redis path
+  if (redis) {
+    try {
+      const cached = await redis.get(cacheKey);
+      if (cached) {
+        const parsed = JSON.parse(cached);
+        res.status(parsed.status).set(parsed.headers).send(parsed.body);
+        return;
+      }
+      // Capture response
+      const originalSend = res.send;
+      res.send = function (body) {
+        try {
+          redis.setex(cacheKey, Math.floor(IDEMPOTENCY_TTL_MS / 1000), JSON.stringify({
+            status: res.statusCode,
+            headers: res.getHeaders(),
+            body: body
+          })).catch(() => {});
+        } catch (e) { /* ignore */ }
+        return originalSend.call(this, body);
+      };
+      return next();
+    } catch (e) { /* fall through to in-memory */ }
+  }
+  // In-memory fallback
+  const entry = idempotencyCache.get(cacheKey);
+  if (entry && entry.expiresAt > Date.now()) {
+    res.status(entry.response.status).set(entry.response.headers).send(entry.response.body);
+    return;
+  }
+  const originalSend = res.send;
+  res.send = function (body) {
+    idempotencyCache.set(cacheKey, {
+      response: { status: res.statusCode, headers: res.getHeaders(), body: body },
+      expiresAt: Date.now() + IDEMPOTENCY_TTL_MS
+    });
+    return originalSend.call(this, body);
+  };
+  next();
+}
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
-
+app.use(idempotencyMiddleware);
 // 1. Static Assets: Serve PhonePe marketing styles, console styles, scripts, videos, and icons
 app.use(express.static(path.join(__dirname, 'disha-cinematic', 'public')));
 app.use(express.static(path.join(__dirname, 'public')));
-
 // 2. Health Check Endpoint (Render & Uptime Monitoring)
 app.get(['/health', '/api/health'], (req, res) => {
   res.json({
@@ -112,29 +195,23 @@ app.get(['/health', '/api/health'], (req, res) => {
     timestamp: new Date().toISOString()
   });
 });
-
 // 3. Flagship PhonePe-Inspired Website & Merchant SaaS Routes
 app.get(['/', '/home'], (req, res) => {
   res.sendFile(path.join(__dirname, 'disha-cinematic', 'public', 'index.html'));
 });
-
 app.get('/login', (req, res) => {
   res.sendFile(path.join(__dirname, 'disha-cinematic', 'public', 'login.html'));
 });
-
 app.get('/setup', (req, res) => {
   res.sendFile(path.join(__dirname, 'disha-cinematic', 'public', 'setup.html'));
 });
-
 app.get('/dashboard', (req, res) => {
   res.sendFile(path.join(__dirname, 'disha-cinematic', 'public', 'dashboard.html'));
 });
-
 // 4. Dedicated Sovereign Customer Checkout Gateway Route
 app.get(['/checkout', '/pay'], (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
-
 // 5. Merchant Auth & Dashboard API Delegation
 app.use((req, res, next) => {
   if (req.path.startsWith('/api/auth') || req.path.startsWith('/api/merchant')) {
@@ -142,10 +219,8 @@ app.use((req, res, next) => {
   }
   next();
 });
-
 // Administrative Authentication & Security Helpers
-const ADMIN_API_KEY = process.env.ADMIN_API_KEY || (process.env.NODE_ENV === 'production' ? null : 'disha_dev_admin_key');
-
+const ADMIN_API_KEY = process.env.ADMIN_API_KEY;
 function safeCompareKeys(a, b) {
   if (!a || !b) return false;
   try {
@@ -156,12 +231,10 @@ function safeCompareKeys(a, b) {
     return false;
   }
 }
-
 function requireAdminAuth(req, res, next) {
   const headerKey = req.headers['x-admin-key'] ||
                     req.headers['x-api-key'] ||
                     (req.headers.authorization && req.headers.authorization.replace(/^Bearer\s+/i, ''));
-
   if (!ADMIN_API_KEY && !process.env.EXTRA_ADMIN_KEY) {
     return res.status(500).json({
       success: false,
@@ -169,10 +242,8 @@ function requireAdminAuth(req, res, next) {
       message: 'ADMIN_API_KEY environment variable is required in production.'
     });
   }
-
   const isValid = (ADMIN_API_KEY && safeCompareKeys(headerKey, ADMIN_API_KEY)) ||
                   (process.env.EXTRA_ADMIN_KEY && safeCompareKeys(headerKey, process.env.EXTRA_ADMIN_KEY));
-
   if (!isValid) {
     return res.status(401).json({
       success: false,
@@ -182,46 +253,37 @@ function requireAdminAuth(req, res, next) {
   }
   next();
 }
-
 // Inject db and ipWhitelist into request
 app.use((req, res, next) => {
   req.db = db;
   req.ipWhitelist = ipWhitelist;
   next();
 });
-
 // Admin enterprise management routes (Secured with requireAdminAuth)
 app.use('/api/admin', requireAdminAuth, adminRoutes);
-
 // Protect Gaming Enterprise endpoints with IP Whitelisting
 app.use('/api/gaming/*', ipWhitelist.check());
-
 // ═══════════════════════════════════════════════════════════════════
 // TASK 11: WEBSOCKET REAL-TIME CONNECTION HUB
 // ═══════════════════════════════════════════════════════════════════
 const orderWsClients = new Map(); // Map<orderId, Set<WebSocket>>
-
 wss.on('connection', (ws, req) => {
   const url = new URL(req.url, `http://${req.headers.host || 'localhost'}`);
   const orderId = url.searchParams.get('orderId');
-
   // Verify orderId parameter and assert session exists in database
   if (!orderId) {
     ws.close(4400, 'Missing orderId parameter');
     return;
   }
-
   const session = db.findSessionByOrderId(orderId);
   if (!session) {
     ws.close(4404, 'Session not found for orderId');
     return;
   }
-
   if (!orderWsClients.has(orderId)) {
     orderWsClients.set(orderId, new Set());
   }
   orderWsClients.get(orderId).add(ws);
-
   // Send acknowledgement
   ws.send(JSON.stringify({
     type: 'CONNECTED',
@@ -229,7 +291,6 @@ wss.on('connection', (ws, req) => {
     status: session.status,
     timestamp: Date.now()
   }));
-
   ws.on('close', () => {
     if (orderWsClients.has(orderId)) {
       orderWsClients.get(orderId).delete(ws);
@@ -238,25 +299,21 @@ wss.on('connection', (ws, req) => {
       }
     }
   });
-
   ws.on('error', (err) => {
     console.error(`[WebSocket] Client error for ${orderId}:`, err.message);
   });
 });
-
 function maskUtr(utr) {
   if (!utr || typeof utr !== 'string') return '************';
   if (utr.length <= 6) return '******';
   return utr.substring(0, 4) + '****' + utr.substring(utr.length - 4);
 }
-
 function maskVpa(vpa) {
   if (!vpa || typeof vpa !== 'string' || !vpa.includes('@')) return '***@upi';
   const [user, bank] = vpa.split('@');
   const maskedUser = user.length > 3 ? user.substring(0, 2) + '***' + user.substring(user.length - 1) : user[0] + '***';
   return `${maskedUser}@${bank}`;
 }
-
 function broadcastOrderSuccess(orderId, payload) {
   const clients = orderWsClients.get(orderId);
   if (clients && clients.size > 0) {
@@ -268,7 +325,7 @@ function broadcastOrderSuccess(orderId, payload) {
       vpaAddress: maskVpa(payload.vpaAddress),
       senderVpa: maskVpa(payload.senderVpa),
       maskedUtr: maskUtr(payload.utr),
-      utr: payload.utr,
+      maskedUtr: maskUtr(payload.utr),
       txId: payload.txId,
       timestamp: payload.timestamp,
       message: 'Settlement confirmed'
@@ -281,7 +338,6 @@ function broadcastOrderSuccess(orderId, payload) {
     console.log(`📡 [WebSocket] Broadcasted SUCCESS to ${clients.size} client(s) for order ${orderId}`);
   }
 }
-
 function broadcastOrderPendingConfirmation(orderId, payload) {
   const clients = orderWsClients.get(orderId);
   if (clients && clients.size > 0) {
@@ -304,37 +360,10 @@ function broadcastOrderPendingConfirmation(orderId, payload) {
     console.log(`📡 [WebSocket] Broadcasted AWAITING_SHOP_CONFIRMATION to ${clients.size} client(s) for order ${orderId}`);
   }
 }
-
 // ═══════════════════════════════════════════════════════════════════
 // TASK 2: DYNAMIC CHALLENGE AMOUNT (The Anti-Replay Math)
 // ═══════════════════════════════════════════════════════════════════
-function generateChallengeAmount(baseAmount) {
-  // Adds unique decimal cents to the base amount (11 to 99 cents)
-  // Excludes multiples of 10 and 05 (never round endings like .00, .10, .50)
-  // Checks active sessions in db to guarantee 0 collisions among concurrent orders
-  const activeSessions = typeof db.getActiveSessions === 'function' ? db.getActiveSessions() : [];
-  const usedCents = new Set(
-    activeSessions
-      .filter(s => s && s.status === 'PENDING' && Math.abs(s.baseAmount - Number(baseAmount)) < 0.01)
-      .map(s => Math.round((s.challengeAmount - Math.floor(s.challengeAmount)) * 100))
-  );
-
-  const availableCents = [];
-  for (let c = 11; c <= 99; c++) {
-    if (c % 10 !== 0 && c % 5 !== 0 && !usedCents.has(c)) {
-      availableCents.push(c);
-    }
-  }
-
-  const cents = availableCents.length > 0
-    ? availableCents[Math.floor(Math.random() * availableCents.length)]
-    : (Math.floor(Math.random() * (97 - 11 + 1)) + 11);
-
-  const challenge = Math.round((Number(baseAmount) + (cents / 100)) * 100) / 100;
-  return challenge;
-}
-
-// ═══════════════════════════════════════════════════════════════════
+// ════════════════════════════════════════════════════════════════════
 // TASK 3: SESSION TOKEN GENERATION
 // ═══════════════════════════════════════════════════════════════════
 function generateSession(baseAmount = 100, description = '', customVpa = null) {
@@ -344,14 +373,27 @@ function generateSession(baseAmount = 100, description = '', customVpa = null) {
   const qrRefreshAt = now + (15 * 1000); // 15 seconds dynamic refresh
   const orderId = 'Order_' + crypto.randomBytes(5).toString('hex').toUpperCase();
   const txnRef = 'TXN_' + now + '_' + crypto.randomBytes(3).toString('hex').toUpperCase();
-  const challengeAmount = generateChallengeAmount(baseAmount);
-
+  const activeSessions = typeof db.getActiveSessions === 'function' ? db.getActiveSessions() : [];
+  const activeAmounts = new Set(
+    activeSessions
+      .filter(s => s && s.status === 'PENDING' && Math.abs(s.baseAmount - Number(baseAmount)) < 0.01)
+      .map(s => s.challengeAmount)
+  );
+  const challengeAmount = generateUniqueChallenge(baseAmount, activeAmounts);
   // TASK 9: Select optimal VPA to prevent bans or primary VPA
   let vpaAddress = (customVpa && String(customVpa).trim()) ? String(customVpa).trim() : null;
+  let merchantType = 'PERSONAL';
+  let vpaMcc = null;
   if (!vpaAddress) {
-    vpaAddress = process.env.MERCHANT_UPI_ID || db.selectVPA('mer_default', challengeAmount) || 'nkumar906099-7@oksbi';
+    const route = db.selectVPARoute('mer_default', challengeAmount);
+    vpaAddress = route.vpaAddress || process.env.MERCHANT_UPI_ID || 'nkumar906099-7@oksbi';
+    merchantType = route.merchantType || 'PERSONAL';
+    vpaMcc = route.mcc || null;
+  } else {
+    const mt = db.getVpaMerchantType(vpaAddress);
+    merchantType = mt.accountType;
+    vpaMcc = mt.mcc;
   }
-
   const session = {
     sessionId,
     orderId,
@@ -360,24 +402,24 @@ function generateSession(baseAmount = 100, description = '', customVpa = null) {
     baseAmount: Number(baseAmount),
     txnRef: sanitizeTxnRef(txnRef),
     vpaAddress,
+    merchantType,
+    mcc: vpaMcc,
     createdAt: now,
     expiresAt,
     qrRefreshAt,
     status: 'PENDING',
     utr: null
   };
-
   db.saveSession(session);
   return session;
 }
-
 // ═══════════════════════════════════════════════════════════════════
 // TASK 4: NPCI-COMPLIANT UPI DEEP LINK GENERATOR (v3.2 Spec & upi-intent)
 // ═══════════════════════════════════════════════════════════════════
 function generateUPILink(session) {
   // P2P NPCI Specification: upi://pay?pa=&pn=&am=&tn=&cu=INR
   // mc and tr are strictly forbidden for personal VPAs to avoid bank decline before PIN
-  const isMerchantP2M = session.mc && /^\d{4}$/.test(session.mc) && session.tr;
+  const isMerchantP2M = session.merchantType === 'MERCHANT' && session.mcc && /^\d{4}$/.test(session.mcc);
   if (isMerchantP2M) {
     return buildUpiUri({
       kind: 'P2M',
@@ -385,10 +427,13 @@ function generateUPILink(session) {
       pn: MERCHANT_NAME,
       am: session.challengeAmount,
       tn: session.orderId || session.description || 'Payment',
-      mc: session.mc,
-      tr: session.tr
+      mc: session.mcc,
+      tr: session.txnRef
     });
   } else {
+    if (session.mcc && /^\d{4}$/.test(session.mcc)) {
+      console.warn(`[UPI Link] Stripping merchant MCC ${session.mcc} from personal VPA ${session.vpaAddress} to prevent pre-PIN bank decline`);
+    }
     return buildUpiUri({
       kind: 'P2P',
       pa: session.vpaAddress || MERCHANT_UPI_ID,
@@ -398,11 +443,9 @@ function generateUPILink(session) {
     });
   }
 }
-
 // ═══════════════════════════════════════════════════════════════════
 // REST API ENDPOINTS
 // ═══════════════════════════════════════════════════════════════════
-
 // Create or refresh session
 app.get('/api/session/new', checkoutLimiter, async (req, res) => {
   try {
@@ -426,14 +469,12 @@ app.get('/api/session/new', checkoutLimiter, async (req, res) => {
     const session = generateSession(baseAmount, description, validatedVpa);
     const upiLink = generateUPILink(session);
     const links = appLinks(upiLink);
-
     // Generate base64 QR as helper, though frontend renders direct to canvas
     const qrDataUrl = await QRCode.toDataURL(upiLink, {
       margin: 1,
       width: 320,
       color: { dark: '#05070B', light: '#FFFFFF' }
     });
-
     res.json({
       success: true,
       sessionId: session.sessionId,
@@ -455,7 +496,6 @@ app.get('/api/session/new', checkoutLimiter, async (req, res) => {
     res.status(500).json({ success: false, error: err.message });
   }
 });
-
 // Fetch active session status
 app.get('/api/session/:orderId', (req, res) => {
   const session = db.findSessionByOrderId(req.params.orderId);
@@ -464,13 +504,11 @@ app.get('/api/session/:orderId', (req, res) => {
   }
   res.json({ success: true, session });
 });
-
 // ═══════════════════════════════════════════════════════════════════
 // ZERO-TRUST SERVER-SIDE RECEIPT EVIDENCE EXTRACTION
 // ═══════════════════════════════════════════════════════════════════
 function extractReceiptEvidence(receiptText, sessionContext, clientReported = {}) {
   const now = Date.now();
-
   // If no receipt text or image is provided, fail-closed with zero evidence
   if (!receiptText || typeof receiptText !== 'string' || receiptText.trim().length < 8) {
     return {
@@ -487,10 +525,8 @@ function extractReceiptEvidence(receiptText, sessionContext, clientReported = {}
       rawReceipt: ''
     };
   }
-
   const text = receiptText.trim();
   const lower = text.toLowerCase();
-
   // 1. Payee extraction from receipt text
   let foundPayeeVpa = null;
   let foundPayeeName = null;
@@ -501,7 +537,6 @@ function extractReceiptEvidence(receiptText, sessionContext, clientReported = {}
   if (sessionContext && sessionContext.payeeName && lower.includes(sessionContext.payeeName.toLowerCase())) {
     foundPayeeName = sessionContext.payeeName;
   }
-
   // 2. Status text extraction
   let foundStatusText = null;
   if (/\b(successful|success|completed|paid|debited)\b/i.test(text)) {
@@ -511,7 +546,6 @@ function extractReceiptEvidence(receiptText, sessionContext, clientReported = {}
   } else if (/\b(pending|processing|in progress|awaiting)\b/i.test(text)) {
     foundStatusText = 'PENDING';
   }
-
   // 3. Shown time extraction from receipt or client session context
   let foundShownTime = null;
   if (clientReported.shownTime || clientReported.timestamp) {
@@ -521,10 +555,9 @@ function extractReceiptEvidence(receiptText, sessionContext, clientReported = {}
     }
   }
   if (!foundShownTime && sessionContext) {
-    // If authentic receipt was submitted during active session window
-    foundShownTime = now;
+    // Authentic receipts carry their own time; never synthesize it server-side.
+    foundShownTime = null;
   }
-
   // 4. Layout fields presence check (4 standard UPI layout fields)
   let layoutFieldsFound = 0;
   if (foundPayeeVpa || foundPayeeName || (sessionContext && lower.includes((sessionContext.payeeVpa || '').toLowerCase()))) {
@@ -539,11 +572,9 @@ function extractReceiptEvidence(receiptText, sessionContext, clientReported = {}
   if (foundStatusText) {
     layoutFieldsFound++;
   }
-
   // 5. Authentic UPI App signatures check
   const hasAppSignature = /\b(google\s*pay|gpay|phonepe|paytm|bhim|cred|amazon\s*pay|axis\s*pay|i-mobile|upi)\b/i.test(text);
   const looksLikeScreenshot = hasAppSignature || layoutFieldsFound >= 3;
-
   return {
     payeeVpa: foundPayeeVpa,
     payeeName: foundPayeeName,
@@ -558,34 +589,29 @@ function extractReceiptEvidence(receiptText, sessionContext, clientReported = {}
     rawReceipt: text
   };
 }
-
 // ═══════════════════════════════════════════════════════════════════
 // TASK 8: 7-LAYER FRAUD VERIFICATION & TRUST-SCORING ENGINE
 // ═══════════════════════════════════════════════════════════════════
-app.post('/api/verify', verifyLimiter, (req, res) => {
+app.post('/api/verify', verifyLimiter, async (req, res) => {
   try {
     const { utr, amount, receipt, orderId, txnRef } = req.body;
     const now = Date.now();
-
     // Use NPCI Intent Parser for raw receipt or callback data
     let parsedUtr = utr;
     let parsedAmount = amount ? parseFloat(String(amount).replace(/,/g, '')) : null;
     let detectedOrderId = orderId;
-
     if (receipt) {
       const parsedReceipt = parseNPCIIntentResponse(receipt);
       if (!parsedUtr && parsedReceipt.txnId) parsedUtr = parsedReceipt.txnId;
       if (!parsedAmount && parsedReceipt.amount) parsedAmount = parsedReceipt.amount;
       if (!detectedOrderId && parsedReceipt.orderId) detectedOrderId = parsedReceipt.orderId;
     }
-
     // ─────────────────────────────────────────────────────────────
     // LAYER 1: SESSION CHECK
     // ─────────────────────────────────────────────────────────────
     let session = null;
     if (detectedOrderId) session = db.findSessionByOrderId(detectedOrderId);
     if (!session && txnRef) session = db.findSessionByTxnRef(txnRef);
-
     if (!session) {
       return res.status(400).json({
         success: false,
@@ -594,7 +620,6 @@ app.post('/api/verify', verifyLimiter, (req, res) => {
         reason: 'Order session reference not found in transaction register.'
       });
     }
-
     // Prepare evidence & session context for Zero-Trust scoring engine
     const sessionContext = {
       challengeAmount: Number(session.challengeAmount),
@@ -603,29 +628,24 @@ app.post('/api/verify', verifyLimiter, (req, res) => {
       payeeVpa: session.vpaAddress || MERCHANT_UPI_ID,
       payeeName: MERCHANT_NAME
     };
-
     // Extract server-side verified evidence (NO lenient client defaults)
     const ev = extractReceiptEvidence(receipt, sessionContext, req.body);
     ev.amount = parsedAmount !== null ? Number(parsedAmount) : null;
     ev.utr = parsedUtr;
-
     const attemptsCount = (session.verificationAttempts || 0) + 1;
     session.verificationAttempts = attemptsCount;
-
     const hist = {
       utrSeen: db.isUtrBlacklisted(parsedUtr),
       imageHashSeen: req.body.imageHash ? (typeof db.isImageHashSeen === 'function' ? db.isImageHashSeen(req.body.imageHash) : false) : false,
       attemptsThisSession: attemptsCount,
       priorConfirmed: 0
     };
-
     // Evaluate evidence through trust-score pure scoring engine
     const trustResult = scoreEvidence(sessionContext, ev, hist, {
       now,
       graceMs: 60 * 1000,
       sameDevice: req.body.sameDevice !== false
     });
-
     // ─────────────────────────────────────────────────────────────
     // TIER-DRIVEN PAYMENT STATE MACHINE (RBI / Sovereign Zero-Trust)
     // ─────────────────────────────────────────────────────────────
@@ -642,7 +662,6 @@ app.post('/api/verify', verifyLimiter, (req, res) => {
       } else if (trustResult.gate === 'TOO_MANY_ATTEMPTS') {
         mappedLayer = 6;
       }
-
       return res.status(400).json({
         success: false,
         layer: mappedLayer,
@@ -652,7 +671,6 @@ app.post('/api/verify', verifyLimiter, (req, res) => {
         confidenceTier: trustResult.tier
       });
     }
-
     // LOW tier: Insufficient evidence
     if (trustResult.tier === 'LOW') {
       return res.status(400).json({
@@ -665,7 +683,6 @@ app.post('/api/verify', verifyLimiter, (req, res) => {
         reasons: trustResult.reasons
       });
     }
-
     // PENDING tier: Bank switch interbank pending
     if (trustResult.tier === 'PENDING') {
       db.updateSessionStatus(session.orderId, 'PENDING');
@@ -678,7 +695,6 @@ app.post('/api/verify', verifyLimiter, (req, res) => {
         confidenceTier: 'PENDING'
       });
     }
-
     // ─────────────────────────────────────────────────────────────
     // LAYER 4: UTR FRESHNESS (10-Minute Maximum Latency & Timestamp Audit)
     // ─────────────────────────────────────────────────────────────
@@ -691,7 +707,6 @@ app.post('/api/verify', verifyLimiter, (req, res) => {
         reason: 'Session order age is stale (> 10 minutes old).'
       });
     }
-
     // ─────────────────────────────────────────────────────────────
     // LAYER 5: TRANSACTION NOTE MATCH (Order Reference Cross-Verification)
     // ─────────────────────────────────────────────────────────────
@@ -706,7 +721,6 @@ app.post('/api/verify', verifyLimiter, (req, res) => {
         });
       }
     }
-
     // ─────────────────────────────────────────────────────────────
     // LAYER 6: RATE LIMIT (One Share Verification Per Session)
     // ─────────────────────────────────────────────────────────────
@@ -718,15 +732,12 @@ app.post('/api/verify', verifyLimiter, (req, res) => {
         reason: 'This session has already been settled and closed.'
       });
     }
-
     // Compute suggested shop action based on confidence tier and instant limit (₹500)
     const suggestedAction = suggestAction(trustResult, session.challengeAmount, 500);
-
     // MEDIUM tier OR HIGH tier exceeding instant limit (> ₹500):
     // Requires merchant bank app confirmation before irreversible ledger settlement
     if (trustResult.tier === 'MEDIUM' || (trustResult.tier === 'HIGH' && session.challengeAmount > 500)) {
       db.updateSessionStatus(session.orderId, 'AWAITING_SHOP_CONFIRMATION', parsedUtr);
-
       broadcastOrderPendingConfirmation(session.orderId, {
         orderId: session.orderId,
         utr: parsedUtr,
@@ -735,7 +746,6 @@ app.post('/api/verify', verifyLimiter, (req, res) => {
         confidenceTier: trustResult.tier,
         suggestedAction
       });
-
       return res.status(200).json({
         success: true,
         status: 'AWAITING_SHOP_CONFIRMATION',
@@ -751,18 +761,16 @@ app.post('/api/verify', verifyLimiter, (req, res) => {
         reconciliationState: 'AWAITING_SHOP_CONFIRMATION'
       });
     }
-
     // ─────────────────────────────────────────────────────────────
     // LAYER 7: DOUBLE-ENTRY LEDGER POSTING & BALANCE ASSERTION
     // HIGH tier <= ₹500: Instant settlement & double-entry ledger posting
     // ─────────────────────────────────────────────────────────────
-    const { txId, verification } = db.recordTransactionAndLedger(
+    const { txId, verification } = await db.recordTransactionAndLedger(
       session.orderId,
       parsedUtr,
       session.challengeAmount,
       session.vpaAddress
     );
-
     if (!verification.balanced) {
       return res.status(500).json({
         success: false,
@@ -771,13 +779,10 @@ app.post('/api/verify', verifyLimiter, (req, res) => {
         reason: 'Critical: Double-entry ledger imbalance detected.'
       });
     }
-
     // Blacklist UTR to prevent any future reuse
     db.blacklistUtr(parsedUtr, session.orderId, session.challengeAmount, 'Verified settlement');
-
     // Update session status
     db.updateSessionStatus(session.orderId, 'SUCCESS', parsedUtr);
-
     // Notify connected browser via WebSocket (TASK 11)
     const successPayload = {
       orderId: session.orderId,
@@ -794,7 +799,6 @@ app.post('/api/verify', verifyLimiter, (req, res) => {
       message: 'Settlement confirmed via DISHA 8.2 Zero-Trust Trust-Scoring Engine'
     };
     broadcastOrderSuccess(session.orderId, successPayload);
-
     return res.json({
       success: true,
       layer: 7,
@@ -820,7 +824,6 @@ app.post('/api/verify', verifyLimiter, (req, res) => {
     res.status(500).json({ success: false, error: err.message });
   }
 });
-
 // ═══════════════════════════════════════════════════════════════════
 // TASK 7: ANDROID WEB SHARE TARGET (SINGLE SOURCE OF TRUTH SETTLEMENT)
 // ═══════════════════════════════════════════════════════════════════
@@ -829,14 +832,11 @@ app.post('/handle-share', async (req, res) => {
     const { title, text, url } = req.body || {};
     const rawReceipt = [title, text, url].filter(Boolean).join('\n');
     const now = Date.now();
-
     console.log(`📥 [Android Share Target SST] Received shared receipt payload (${rawReceipt.length} chars)`);
-
     const parsed = parseNPCIIntentResponse(rawReceipt);
     const parsedUtr = parsed.txnId || (req.body && req.body.utr) || '';
     const parsedAmount = parsed.amount || (req.body && parseFloat(req.body.amount)) || null;
     let detectedOrderId = parsed.orderId || (req.body && req.body.orderId) || (req.query && req.query.orderId) || '';
-
     if (!parsedUtr || !parsedAmount) {
       if (req.accepts('json') && !req.accepts('html')) {
         return res.status(400).json({
@@ -847,7 +847,6 @@ app.post('/handle-share', async (req, res) => {
       }
       return res.redirect(`/failed.html?reason=${encodeURIComponent('Could not extract 12-digit UTR or amount from shared receipt')}`);
     }
-
     // RESOLVE SESSION: Match by explicit orderId OR by Unique Mathematical Challenge Amount!
     let session = null;
     if (detectedOrderId) {
@@ -857,7 +856,6 @@ app.post('/handle-share', async (req, res) => {
       // Find active pending session by the exact unique challenge paise
       session = db.findSessionByAmount(parsedAmount);
     }
-
     if (!session) {
       if (req.accepts('json') && !req.accepts('html')) {
         return res.status(404).json({
@@ -868,7 +866,6 @@ app.post('/handle-share', async (req, res) => {
       }
       return res.redirect(`/failed.html?reason=${encodeURIComponent('No active checkout session matched this challenge amount.')}`);
     }
-
     // Evaluate evidence with Zero-Trust scoring engine
     const sessionContext = {
       challengeAmount: Number(session.challengeAmount),
@@ -877,28 +874,23 @@ app.post('/handle-share', async (req, res) => {
       payeeVpa: session.vpaAddress || MERCHANT_UPI_ID,
       payeeName: MERCHANT_NAME
     };
-
     // Extract server-side verified evidence (NO lenient client defaults)
     const ev = extractReceiptEvidence(rawReceipt, sessionContext, req.body);
     ev.amount = parsedAmount;
     ev.utr = parsedUtr;
-
     const attemptsCount = (session.verificationAttempts || 0) + 1;
     session.verificationAttempts = attemptsCount;
-
     const hist = {
       utrSeen: db.isUtrBlacklisted(parsedUtr),
       imageHashSeen: false,
       attemptsThisSession: attemptsCount,
       priorConfirmed: 0
     };
-
     const trustResult = scoreEvidence(sessionContext, ev, hist, {
       now,
       graceMs: 60 * 1000,
       sameDevice: false // Mobile scanning external screen or intent
     });
-
     if (trustResult.tier === 'REJECT') {
       if (req.accepts('json') && !req.accepts('html')) {
         return res.status(400).json({
@@ -911,7 +903,6 @@ app.post('/handle-share', async (req, res) => {
       }
       return res.redirect(`/failed.html?reason=${encodeURIComponent((trustResult.reasons && trustResult.reasons[0]) || 'Verification failed')}`);
     }
-
     if (trustResult.tier === 'LOW') {
       if (req.accepts('json') && !req.accepts('html')) {
         return res.status(400).json({
@@ -925,54 +916,34 @@ app.post('/handle-share', async (req, res) => {
       }
       return res.redirect(`/failed.html?reason=${encodeURIComponent('Evidence confidence score too low. Authentic receipt required.')}`);
     }
-
     const suggestedAction = suggestAction(trustResult, session.challengeAmount, 500);
-
-    // MEDIUM tier OR HIGH tier exceeding instant limit (> ₹500):
-    // Requires merchant bank app confirmation before ledger release
-    if (trustResult.tier === 'MEDIUM' || (trustResult.tier === 'HIGH' && session.challengeAmount > 500)) {
-      db.updateSessionStatus(session.orderId, 'AWAITING_SHOP_CONFIRMATION', parsedUtr);
-
-      broadcastOrderPendingConfirmation(session.orderId, {
-        orderId: session.orderId,
-        utr: parsedUtr,
-        amount: session.challengeAmount,
-        trustScore: trustResult.score,
-        confidenceTier: trustResult.tier,
-        suggestedAction
-      });
-
+    // FULLY AUTOMATED: only HIGH confidence tier settles instantly.
+    // MEDIUM/LOW → reject. No shop confirmation, no manual UTR, no awaited state —
+    // everything completes within the same 3-minute session via Android Share Sheet.
+    if (trustResult.tier !== 'HIGH') {
       if (req.accepts('json') && !req.accepts('html')) {
-        return res.json({
-          success: true,
-          settled: false,
-          status: 'AWAITING_SHOP_CONFIRMATION',
-          orderId: session.orderId,
-          utr: parsedUtr,
-          amount: session.challengeAmount,
+        return res.status(400).json({
+          success: false,
+          code: 'EVIDENCE_INSUFFICIENT',
+          reason: `Automated settlement requires HIGH confidence tier (got ${trustResult.tier}, score ${trustResult.score}/100).`,
           trustScore: trustResult.score,
           confidenceTier: trustResult.tier,
-          suggestedAction,
           reasons: trustResult.reasons
         });
       }
-      return res.redirect(`/success.html?orderId=${encodeURIComponent(session.orderId)}&status=AWAITING_CONFIRMATION`);
+      return res.redirect(`/failed.html?reason=${encodeURIComponent(`Automated settlement requires HIGH confidence tier (got ${trustResult.tier}).`)}`);
     }
-
-    // Ledger posting & anti-replay for HIGH <= ₹500
-    const { txId, verification } = db.recordTransactionAndLedger(
+    // Ledger posting & anti-replay — instant settlement (DISHA never holds funds)
+    const { txId, verification } = await db.recordTransactionAndLedger(
       session.orderId,
       parsedUtr,
       session.challengeAmount,
       session.vpaAddress
     );
-
     // Blacklist UTR to prevent any future reuse
     db.blacklistUtr(parsedUtr, session.orderId, session.challengeAmount, 'Settled via Android Share Sheet SST');
-
     // Update session status in DB
     db.updateSessionStatus(session.orderId, 'SUCCESS', parsedUtr);
-
     // ⚡ CRITICAL: INSTANT WEBSOCKET DISPATCH TO WAITING CHECKOUT (LAPTOP/DESKTOP/MOBILE)
     const successPayload = {
       orderId: session.orderId,
@@ -990,9 +961,7 @@ app.post('/handle-share', async (req, res) => {
       message: 'Settlement confirmed via Android Share Sheet Single Source of Truth (SST)'
     };
     broadcastOrderSuccess(session.orderId, successPayload);
-
     console.log(`✅ [Android Share Target SST] Successfully settled order ${session.orderId} and notified checkout client via WebSocket`);
-
     if (req.accepts('json') && !req.accepts('html')) {
       return res.json({
         success: true,
@@ -1006,7 +975,6 @@ app.post('/handle-share', async (req, res) => {
         ledgerTxId: txId
       });
     }
-
     // Redirect to success page with parameters
     res.redirect(`/success.html?utr=${encodeURIComponent(parsedUtr)}&amount=${encodeURIComponent(String(session.challengeAmount))}&orderId=${encodeURIComponent(session.orderId)}`);
   } catch (err) {
@@ -1017,7 +985,6 @@ app.post('/handle-share', async (req, res) => {
     res.redirect(`/failed.html?reason=${encodeURIComponent(err.message)}`);
   }
 });
-
 // Official NPCI Intent Callback / Webhook Endpoint
 app.post('/api/npci-callback', (req, res) => {
   try {
@@ -1029,10 +996,8 @@ app.post('/api/npci-callback', (req, res) => {
     } else if (req.query && Object.keys(req.query).length > 0) {
       payload = new URLSearchParams(req.query).toString();
     }
-
     const parsed = parseNPCIIntentResponse(payload);
     console.log('📡 [NPCI Intent Callback] Parsed payload:', parsed);
-
     if (parsed.responseCode && parsed.responseCode !== '00') {
       const codeInfo = NPCI_RESPONSE_CODES[parsed.responseCode] || { description: 'Payment Failed', action: 'SHOW_ERROR' };
       return res.status(400).json({
@@ -1043,7 +1008,6 @@ app.post('/api/npci-callback', (req, res) => {
         reason: codeInfo.description
       });
     }
-
     if (!parsed.txnId || !parsed.amount) {
       return res.status(400).json({
         success: false,
@@ -1051,7 +1015,6 @@ app.post('/api/npci-callback', (req, res) => {
         reason: 'Required UTR (txnId) or amount missing in callback'
       });
     }
-
     return res.json({
       success: true,
       status: 'SUCCESS',
@@ -1065,18 +1028,15 @@ app.post('/api/npci-callback', (req, res) => {
     res.status(500).json({ success: false, error: err.message });
   }
 });
-
 // Simulation helper for one-click developer testing (guarded against production abuse - OFF by default)
-app.post('/api/simulate-payment', (req, res) => {
+app.post('/api/simulate-payment', async (req, res) => {
   const isProd = process.env.NODE_ENV === 'production';
   const simulationEnabled = process.env.ENABLE_PAYMENT_SIMULATION === 'true'; // OFF by default
   const headerKey = req.headers['x-admin-key'] ||
                     req.headers['x-api-key'] ||
                     (req.headers.authorization && req.headers.authorization.replace(/^Bearer\s+/i, ''));
-
   const isAdmin = safeCompareKeys(headerKey, ADMIN_API_KEY) ||
                   (process.env.EXTRA_ADMIN_KEY && safeCompareKeys(headerKey, process.env.EXTRA_ADMIN_KEY));
-
   // In production or when not explicitly enabled, simulation is strictly forbidden without admin credentials
   if (!simulationEnabled && !isAdmin) {
     return res.status(403).json({
@@ -1085,7 +1045,6 @@ app.post('/api/simulate-payment', (req, res) => {
       message: 'Payment simulation is disabled by default. Enable via ENABLE_PAYMENT_SIMULATION=true or provide administrative credentials.'
     });
   }
-
   if (isProd && !isAdmin) {
     return res.status(403).json({
       success: false,
@@ -1093,28 +1052,23 @@ app.post('/api/simulate-payment', (req, res) => {
       message: 'Payment simulation is strictly forbidden in production without administrative credentials.'
     });
   }
-
   const { orderId } = req.body;
   const session = db.findSessionByOrderId(orderId);
   if (!session) {
     return res.status(404).json({ success: false, error: 'Order not found' });
   }
-
   // Generate realistic 12-digit NPCI Bank UTR (e.g., 631902XXXXXX)
   const randomSuffix = Math.floor(100000 + Math.random() * 900000);
   const mockUtr = `631902${randomSuffix}`;
-
   // Execute verification flow
-  const { txId, verification } = db.recordTransactionAndLedger(
+  const { txId, verification } = await db.recordTransactionAndLedger(
     session.orderId,
     mockUtr,
     session.challengeAmount,
     session.vpaAddress
   );
-
   db.blacklistUtr(mockUtr, session.orderId, session.challengeAmount, 'Simulated payment');
   db.updateSessionStatus(session.orderId, 'SUCCESS', mockUtr);
-
   const payload = {
     orderId: session.orderId,
     utr: mockUtr,
@@ -1124,11 +1078,9 @@ app.post('/api/simulate-payment', (req, res) => {
     txId,
     timestamp: Date.now()
   };
-
   broadcastOrderSuccess(session.orderId, payload);
   res.json({ success: true, ...payload, ledgerVerification: verification });
 });
-
 // Ledger receipts API
 app.get('/api/ledger/:orderId', (req, res) => {
   const session = db.findSessionByOrderId(req.params.orderId);
@@ -1146,11 +1098,9 @@ app.get('/api/ledger/:orderId', (req, res) => {
     vpaAddress: session.vpaAddress
   });
 });
-
 // ═══════════════════════════════════════════════════════════════════
 // TASK 12: 1000 VPA ROUTING, TELEMETRY & ANTI-BAN REST ENDPOINTS
 // ═══════════════════════════════════════════════════════════════════
-
 // 1. Select optimal VPA (5-Factor anti-ban scoring + chaos jitter)
 app.post('/api/vpa/select', requireAdminAuth, async (req, res) => {
   try {
@@ -1161,7 +1111,6 @@ app.post('/api/vpa/select', requireAdminAuth, async (req, res) => {
     res.status(500).json({ success: false, error: err.message });
   }
 });
-
 // 2. Bulk upload VPAs (CSV text or JSON rows)
 app.post('/api/vpa/upload', requireAdminAuth, async (req, res) => {
   try {
@@ -1174,14 +1123,12 @@ app.post('/api/vpa/upload', requireAdminAuth, async (req, res) => {
     if (!vpaRows || !Array.isArray(vpaRows) || vpaRows.length === 0) {
       return res.status(400).json({ success: false, error: 'No valid rows or CSV content provided' });
     }
-
     const result = await db.vpaImporter.importVPAs(vpaRows, merchantId);
     res.json({ success: true, ...result });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
   }
 });
-
 // 3. Emergency quarantine (7-day cooldown + health reduction)
 app.post('/api/vpa/quarantine', requireAdminAuth, (req, res) => {
   try {
@@ -1195,7 +1142,6 @@ app.post('/api/vpa/quarantine', requireAdminAuth, (req, res) => {
     res.status(500).json({ success: false, error: err.message });
   }
 });
-
 // 4. Pool analytics & bank diversity breakdown
 app.get('/api/vpa/analytics', requireAdminAuth, (req, res) => {
   try {
@@ -1206,7 +1152,6 @@ app.get('/api/vpa/analytics', requireAdminAuth, (req, res) => {
     res.status(500).json({ success: false, error: err.message });
   }
 });
-
 // 5. Daily health reset & rebalance (6 AM Cron trigger)
 app.post('/api/vpa/health-check', requireAdminAuth, (req, res) => {
   try {
@@ -1220,7 +1165,6 @@ app.post('/api/vpa/health-check', requireAdminAuth, (req, res) => {
     res.status(500).json({ success: false, error: err.message });
   }
 });
-
 // ═══════════════════════════════════════════════════════════════════
 // GAMING ENTERPRISE VERIFICATION API (IP WHITELIST PROTECTED)
 // ═══════════════════════════════════════════════════════════════════
@@ -1229,7 +1173,6 @@ app.post('/api/gaming/verify-payment', async (req, res) => {
     const { utr, amount, sessionId, orderId } = req.body;
     const company = req.company;
     const clientIP = req.clientIP;
-
     if (!utr || !/^\d{12}$/.test(String(utr).trim())) {
       return res.status(400).json({
         success: false,
@@ -1237,12 +1180,10 @@ app.post('/api/gaming/verify-payment', async (req, res) => {
         message: 'Valid 12-digit transaction UTR is required'
       });
     }
-
     // Look up session
     let session = null;
     if (sessionId) session = db.findSessionByTxnRef(sessionId);
     if (!session && orderId) session = db.findSessionByOrderId(orderId);
-
     if (session) {
       const amt = Number(amount || session.challengeAmount);
       if (Math.abs(amt - session.challengeAmount) > 0.001) {
@@ -1253,7 +1194,6 @@ app.post('/api/gaming/verify-payment', async (req, res) => {
           receivedAmount: amt
         });
       }
-
       if (db.isUtrBlacklisted(utr)) {
         return res.status(400).json({
           success: false,
@@ -1261,8 +1201,7 @@ app.post('/api/gaming/verify-payment', async (req, res) => {
           message: 'This UTR has already been claimed and settled'
         });
       }
-
-      const { txId, verification } = db.recordTransactionAndLedger(
+      const { txId, verification } = await db.recordTransactionAndLedger(
         session.orderId,
         utr,
         session.challengeAmount,
@@ -1270,7 +1209,6 @@ app.post('/api/gaming/verify-payment', async (req, res) => {
       );
       db.blacklistUtr(utr, session.orderId, session.challengeAmount, `Gaming verification: ${company.company_name}`);
       db.updateSessionStatus(session.orderId, 'SUCCESS', utr);
-
       return res.json({
         success: true,
         status: 'VERIFIED',
@@ -1284,7 +1222,6 @@ app.post('/api/gaming/verify-payment', async (req, res) => {
         ledgerVerification: verification
       });
     }
-
     // If explicit session or order ID was provided but not found
     if (sessionId || orderId) {
       return res.status(404).json({
@@ -1293,7 +1230,6 @@ app.post('/api/gaming/verify-payment', async (req, res) => {
         message: 'No active payment session found for the provided sessionId or orderId.'
       });
     }
-
     // Direct enterprise settlement for authorized IP-whitelisted gaming partners
     if (db.isUtrBlacklisted(utr)) {
       return res.status(400).json({
@@ -1302,7 +1238,6 @@ app.post('/api/gaming/verify-payment', async (req, res) => {
         message: 'This UTR has already been claimed and settled'
       });
     }
-
     const assignedVpa = 'gaming@okaxis';
     const numAmount = parseFloat(amount || 0);
     if (!numAmount || isNaN(numAmount) || numAmount <= 0) {
@@ -1313,15 +1248,13 @@ app.post('/api/gaming/verify-payment', async (req, res) => {
       });
     }
     const generatedOrderId = `ORD_GAME_${Date.now()}_${crypto.randomBytes(3).toString('hex').toUpperCase()}`;
-
-    const { txId, verification } = db.recordTransactionAndLedger(
+    const { txId, verification } = await db.recordTransactionAndLedger(
       generatedOrderId,
       utr,
       numAmount,
       assignedVpa
     );
     db.blacklistUtr(utr, generatedOrderId, numAmount, `Gaming direct settlement: ${company.company_name}`);
-
     return res.json({
       success: true,
       status: 'VERIFIED',
@@ -1339,15 +1272,12 @@ app.post('/api/gaming/verify-payment', async (req, res) => {
     res.status(500).json({ success: false, error: err.message });
   }
 });
-
 // Route fallbacks
 app.get('/success', (req, res) => res.sendFile(path.join(__dirname, 'public', 'success.html')));
 app.get('/failed', (req, res) => res.sendFile(path.join(__dirname, 'public', 'failed.html')));
-
 // Initialize database and start server
 (async () => {
   await db.initDb();
-
   // Daily cron at 00:05 to reset daily VPA limits
   setInterval(() => {
     const d = new Date();
@@ -1355,10 +1285,10 @@ app.get('/failed', (req, res) => res.sendFile(path.join(__dirname, 'public', 'fa
       db.resetDailyVPAs();
     }
   }, 60000);
-
   server.listen(PORT, () => {
     console.log(`\n🚀 DISHA 8.2 Sovereign UPI Checkout running on http://localhost:${PORT}`);
     console.log(`📱 PWA Manifest: http://localhost:${PORT}/manifest.json`);
     console.log(`📡 WebSocket Gateway: ws://localhost:${PORT}/ws\n`);
   });
 })();
+
