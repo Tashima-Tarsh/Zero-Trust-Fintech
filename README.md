@@ -541,7 +541,7 @@ timeline
 ## 🛡️ Security & Contribution Protocols
 
 ### Responsible Disclosure & Vulnerability Bounty
-If you discover a vulnerability within DISHA's verification engine, double-entry ledger, or anti-ban routing logic, please report it via encrypted email to `security@disha.network`. We commit to:
+If you discover a vulnerability within DISHA's verification engine, double-entry ledger, or anti-ban routing logic, please report it via encrypted email to `nitish@thenitishkr.in`. We commit to:
 - Acknowledge receipt within **4 hours**.
 - Provide a patch in a security release within **24 hours**.
 - Public recognition in the DISHA Hall of Fame and commercial bug bounty rewards.
