@@ -506,5 +506,135 @@
     });
   }, { passive: true });
 
+  // --- 9. 15-Second Cinematic Cartoon Video Controller (Phase 8) ---
+  const storyVideo = document.getElementById('storyVideo');
+  const playPauseBtn = document.getElementById('storyPlayPauseBtn');
+  const soundBtn = document.getElementById('storySoundBtn');
+  const replayBtn = document.getElementById('storyReplayBtn');
+  const captionsBtn = document.getElementById('storyCaptionsBtn');
+  const progressBar = document.getElementById('videoProgressBar');
+  const timeline = document.querySelector('.video-timeline');
+  const timeDisplay = document.getElementById('videoTimeDisplay');
+  const sceneTextEl = document.getElementById('videoSceneText');
+  const captionsEl = document.getElementById('videoCaptions');
+
+  if (storyVideo) {
+    const iconPause = playPauseBtn ? playPauseBtn.querySelector('.ctrl-icon-pause') : null;
+    const iconPlay = playPauseBtn ? playPauseBtn.querySelector('.ctrl-icon-play') : null;
+    const iconUnmute = soundBtn ? soundBtn.querySelector('.ctrl-icon-unmute') : null;
+    const iconMute = soundBtn ? soundBtn.querySelector('.ctrl-icon-mute') : null;
+
+    // 5-Scene Script Breakdown for 15s Cartoon Ad
+    const scenes = [
+      { start: 0, end: 3.2, title: 'SCENE 1: Marketplace Connection', caption: 'Customer and shopkeeper in a colorful Indian marketplace ready to make a sale.' },
+      { start: 3.2, end: 7.0, title: 'SCENE 2: Aggregator Hand-Lock', caption: 'A payment aggregator appears and locks their hands. Extra fees and held funds block the payment.' },
+      { start: 7.0, end: 10.2, title: 'SCENE 3: DISHA Breaks Barrier', caption: 'DISHA 8.2 arrives. A single tap dissolves the obstruction without middleman fees.' },
+      { start: 10.2, end: 13.0, title: 'SCENE 4: Direct Connection', caption: 'Customer and merchant connect directly with an instant handshake.' },
+      { start: 13.0, end: 16.0, title: 'SCENE 5: DISHA Emerald Glow', caption: 'Everything dims. The original DISHA logo rises with a cinematic emerald-cyan glow.' }
+    ];
+
+    function updateVideoUI() {
+      const isPaused = storyVideo.paused;
+      if (iconPause) iconPause.hidden = isPaused;
+      if (iconPlay) iconPlay.hidden = !isPaused;
+      if (playPauseBtn) {
+        playPauseBtn.setAttribute('aria-label', isPaused ? 'Play video' : 'Pause video');
+        playPauseBtn.setAttribute('title', isPaused ? 'Play' : 'Pause');
+      }
+
+      const isMuted = storyVideo.muted;
+      if (iconUnmute) iconUnmute.hidden = !isMuted;
+      if (iconMute) iconMute.hidden = isMuted;
+      if (soundBtn) {
+        soundBtn.setAttribute('aria-label', isMuted ? 'Unmute audio' : 'Mute audio');
+        soundBtn.setAttribute('title', isMuted ? 'Unmute' : 'Mute');
+        soundBtn.classList.toggle('active', !isMuted);
+      }
+    }
+
+    function formatVideoTime(secs) {
+      const m = Math.floor(secs / 60);
+      const s = Math.floor(secs % 60);
+      return `${m}:${s < 10 ? '0' : ''}${s}`;
+    }
+
+    storyVideo.addEventListener('timeupdate', () => {
+      const cur = storyVideo.currentTime;
+      const dur = storyVideo.duration || 15;
+      const pct = Math.min(100, Math.max(0, (cur / dur) * 100));
+
+      if (progressBar) {
+        progressBar.style.width = pct + '%';
+      }
+      if (timeDisplay) {
+        timeDisplay.textContent = `${formatVideoTime(cur)} / ${formatVideoTime(dur)}`;
+      }
+
+      // Sync scene milestone and live caption
+      const currentScene = scenes.find(s => cur >= s.start && cur < s.end) || scenes[0];
+      if (sceneTextEl && sceneTextEl.textContent !== currentScene.title) {
+        sceneTextEl.textContent = currentScene.title;
+      }
+      if (captionsEl) {
+        const span = captionsEl.querySelector('span');
+        if (span && span.textContent !== currentScene.caption) {
+          span.textContent = currentScene.caption;
+        }
+      }
+    });
+
+    if (playPauseBtn) {
+      playPauseBtn.addEventListener('click', () => {
+        if (storyVideo.paused) {
+          storyVideo.play().catch(() => {});
+        } else {
+          storyVideo.pause();
+        }
+        updateVideoUI();
+      });
+    }
+
+    if (soundBtn) {
+      soundBtn.addEventListener('click', () => {
+        storyVideo.muted = !storyVideo.muted;
+        updateVideoUI();
+      });
+    }
+
+    if (replayBtn) {
+      replayBtn.addEventListener('click', () => {
+        storyVideo.currentTime = 0;
+        storyVideo.play().catch(() => {});
+        updateVideoUI();
+      });
+    }
+
+    if (captionsBtn && captionsEl) {
+      captionsBtn.addEventListener('click', () => {
+        const isHidden = captionsEl.classList.toggle('hidden-captions');
+        captionsBtn.classList.toggle('active', !isHidden);
+        captionsBtn.setAttribute('aria-label', isHidden ? 'Enable captions' : 'Disable captions');
+      });
+    }
+
+    if (timeline) {
+      timeline.addEventListener('click', (e) => {
+        const rect = timeline.getBoundingClientRect();
+        const clickPos = (e.clientX - rect.left) / rect.width;
+        const dur = storyVideo.duration || 15;
+        storyVideo.currentTime = clickPos * dur;
+      });
+    }
+
+    storyVideo.addEventListener('play', updateVideoUI);
+    storyVideo.addEventListener('pause', updateVideoUI);
+    storyVideo.addEventListener('volumechange', updateVideoUI);
+
+    // Silent autoplay default
+    storyVideo.muted = true;
+    storyVideo.play().catch(() => {});
+    updateVideoUI();
+  }
+
   console.log('DISHA 8.2 PhonePe navigation & interaction system initialized.');
 })();
