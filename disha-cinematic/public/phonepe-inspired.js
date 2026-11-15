@@ -154,6 +154,7 @@
   function closeMobileDrawer() {
     if (!mobileDrawer || !mobileMenuButton) return;
     mobileDrawer.hidden = true;
+    mobileDrawer.classList.remove('open');
     mobileMenuButton.setAttribute('aria-expanded', 'false');
   }
 
@@ -165,6 +166,7 @@
         closeMobileDrawer();
       } else {
         mobileDrawer.hidden = false;
+        mobileDrawer.classList.add('open');
         mobileMenuButton.setAttribute('aria-expanded', 'true');
       }
     });
