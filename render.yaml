@@ -60,8 +60,6 @@ services:
           name: disha-redis
           type: redis
           property: connectionString
-      - key: MERCHANT_UPI_ID
-        value: "nkumar906099-7@oksbi"
       - key: MERCHANT_NAME
         value: "Nitish Enterprise"
       - key: ENABLE_PAYMENT_SIMULATION

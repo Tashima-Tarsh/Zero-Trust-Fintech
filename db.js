@@ -632,21 +632,19 @@ function getUtrBoundOrder(utr) {
  */
 function bindUtrToOrder(utr, orderId) {
   if (!utr || !sqliteDb) return false;
-  const existing = getUtrBoundOrder(utr);
-  if (!existing) {
-    // First time this UTR is seen — bind it to this order forever
-    sqliteDb.prepare(`
-      INSERT OR REPLACE INTO utr_order_bindings (utr, order_id, bound_at)
-      VALUES (?, ?, ?)
-    `).run(utr, orderId, Date.now());
-    return true;
+  try {
+    const tx = sqliteDb.transaction((utr, orderId) => {
+      const existing = sqliteDb.prepare(`SELECT order_id FROM utr_order_bindings WHERE utr = ? LIMIT 1`).get(utr);
+      if (!existing) {
+        sqliteDb.prepare(`INSERT INTO utr_order_bindings (utr, order_id, bound_at) VALUES (?, ?, ?)`).run(utr, orderId, Date.now());
+        return true;
+      }
+      return existing.order_id === orderId ? true : 'BOUND_TO_OTHER_ORDER';
+    });
+    return tx(utr, orderId);
+  } catch (e) {
+    return false;
   }
-  if (existing === orderId) {
-    // Same order re-submitting (idempotent)
-    return true;
-  }
-  // UTR already bound to a DIFFERENT order — cross-order reuse attempt
-  return 'BOUND_TO_OTHER_ORDER';
 }
 
 /**

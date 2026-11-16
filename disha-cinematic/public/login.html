@@ -101,19 +101,6 @@
             </button>
           </div>
         </form>
-
-        <!-- Quick Fill Helper for Local Testing -->
-        <div class="quick-creds-container">
-          <span class="quick-creds-title">LOCAL DEMO ACCOUNTS</span>
-          <div class="quick-creds-buttons">
-            <button type="button" class="btn-cred-chip" onclick="fillCredentials('ramesh@kirana.in', 'Ramesh@123')">
-              <span>🏪 Ramesh Kirana</span>
-            </button>
-            <button type="button" class="btn-cred-chip" onclick="fillCredentials('new@merchant.in', 'Merchant@123')">
-              <span>✨ Fresh Setup</span>
-            </button>
-          </div>
-        </div>
       </div>
 
       <!-- VIEW 2: GET STARTED / REQUEST ACCESS -->
@@ -245,14 +232,6 @@
         updateAccessSavings();
       }
     }
-
-    // Quick fill helper
-    window.fillCredentials = function(email, pass) {
-      emailInput.value = email;
-      passwordInput.value = pass;
-      errorAlert.style.display = 'none';
-      submitBtn.focus();
-    };
 
     // Password visibility toggle
     togglePasswordBtn.addEventListener('click', () => {

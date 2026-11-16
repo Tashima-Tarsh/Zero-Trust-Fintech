@@ -36,8 +36,11 @@ app.set('trust proxy', process.env.TRUST_PROXY === 'true');
 const server = http.createServer(app);
 const wss = new WebSocketServer({ server, path: '/ws' });
 const PORT = process.env.PORT || 3000;
-const MERCHANT_UPI_ID = process.env.MERCHANT_UPI_ID || 'merchant@upi';
+const MERCHANT_UPI_ID = process.env.MERCHANT_UPI_ID;
 const MERCHANT_NAME = process.env.MERCHANT_NAME || 'Nitish Enterprise';
+if (!MERCHANT_UPI_ID && process.env.NODE_ENV === 'production') {
+  throw new Error('MERCHANT_UPI_ID environment variable is required in production');
+}
 const ipWhitelist = new IPWhitelistMiddleware(db);
 // Middleware & Security Headers
 app.use((req, res, next) => {
@@ -67,6 +70,27 @@ app.use((req, res, next) => {
   }
   if (req.method === 'OPTIONS') {
     return res.sendStatus(204);
+  }
+  next();
+});
+// CSRF protection for state-changing requests
+// Binds the session token to the request via X-CSRF-Token header
+app.use((req, res, next) => {
+  if (req.method === 'GET' || req.method === 'HEAD' || req.method === 'OPTIONS') {
+    return next();
+  }
+  const origin = req.headers.origin;
+  const referer = req.headers.referer;
+  const allowedOrigin = ALLOWED_ORIGINS.length > 0 ? ALLOWED_ORIGINS[0] : null;
+  // Reject cross-origin state-changing requests without a valid Origin
+  if (origin && allowedOrigin && origin !== allowedOrigin) {
+    return res.status(403).json({ success: false, error: 'CSRF: invalid origin' });
+  }
+  // Require X-CSRF-Token matching the session token for authenticated state changes
+  const csrfToken = req.headers['x-csrf-token'] || req.headers['x-xsrf-token'];
+  const sessionToken = req.headers['authorization'] || req.query.token || req.body?.token;
+  if (sessionToken && csrfToken !== sessionToken) {
+    return res.status(403).json({ success: false, error: 'CSRF: token mismatch' });
   }
   next();
 });
@@ -309,6 +333,13 @@ wss.on('connection', (ws, req) => {
     ws.close(4429, 'Too many WebSocket connections. Slow down.');
     return;
   }
+  // Validate WebSocket Origin to prevent cross-site WebSocket hijacking
+  const wsOrigin = req.headers.origin;
+  const allowedOrigin = ALLOWED_ORIGINS.length > 0 ? ALLOWED_ORIGINS[0] : null;
+  if (wsOrigin && allowedOrigin && wsOrigin !== allowedOrigin) {
+    ws.close(4403, 'Invalid origin');
+    return;
+  }
   const url = new URL(req.url, `http://${req.headers.host || 'localhost'}`);
   const orderId = url.searchParams.get('orderId');
   const token = url.searchParams.get('token');
@@ -474,7 +505,15 @@ function generateUPILink(session) {
 // Create or refresh session
 app.get('/api/session/new', checkoutLimiter, async (req, res) => {
   try {
-    const baseAmount = parseFloat(req.query.amount) || 100.0;
+    const baseAmountRaw = parseFloat(req.query.amount);
+    if (!Number.isFinite(baseAmountRaw) || baseAmountRaw <= 0) {
+      return res.status(400).json({
+        success: false,
+        error: 'INVALID_AMOUNT',
+        message: 'Amount must be a positive number.'
+      });
+    }
+    const baseAmount = baseAmountRaw;
     const description = req.query.description || req.query.desc || req.query.item || 'Kirana Order';
     let validatedVpa = null;
     const requestedVpa = (req.query.vpa || req.query.pa || req.query.vpaAddress || '').trim();
@@ -855,6 +894,7 @@ app.post('/api/verify', verifyLimiter, async (req, res) => {
       vpaAddress: session.vpaAddress,
       senderVpa: req.body.senderVpa || 'customer@okhdfcbank',
       txId,
+      successToken: txId,
       timestamp: now,
       ledgerVerification: verification,
       reconciliationState: 'CLAIM_VERIFIED_PENDING_BANK_RECONCILIATION'
@@ -1044,17 +1084,18 @@ app.post('/handle-share', shareLimiter, async (req, res) => {
         orderId: session.orderId,
         utr: parsedUtr,
         amount: session.challengeAmount,
-        ledgerTxId: txId
+        ledgerTxId: txId,
+        successToken: txId
       });
     }
-    // Redirect to success page with parameters
-    res.redirect(`/success.html?utr=${encodeURIComponent(parsedUtr)}&amount=${encodeURIComponent(String(session.challengeAmount))}&orderId=${encodeURIComponent(session.orderId)}`);
+    // Redirect to success page without exposing UTR in URL
+    res.redirect(`/success.html?token=${encodeURIComponent(txId)}&order_id=${encodeURIComponent(session.orderId)}`);
   } catch (err) {
     console.error('[Android Share Target] Error:', err);
     if (req.accepts('json') && !req.accepts('html')) {
       return res.status(500).json({ success: false, error: 'INTERNAL_SERVER_ERROR' });
     }
-    res.redirect(`/failed.html?reason=${encodeURIComponent(err.message)}`);
+    res.redirect('/failed.html?reason=verification_error');
   }
 });
 // Official NPCI Intent Callback / Webhook Endpoint

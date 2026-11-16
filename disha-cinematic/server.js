@@ -131,6 +131,17 @@ async function handleCinematicRequest(req, res) {
   // =========================================================================
   if (pathname.startsWith('/api/')) {
     try {
+      // CSRF protection via Origin validation for state-changing requests
+      if (method === 'POST' || method === 'PUT' || method === 'PATCH' || method === 'DELETE') {
+        const origin = req.headers.origin;
+        const allowedOrigin = corsOrigin || (isProduction ? null : '*');
+        // Cross-origin state-changing requests are rejected
+        if (origin && allowedOrigin && origin !== allowedOrigin) {
+          return sendError(res, 403, 'CSRF: invalid origin');
+        }
+        // Same-origin requests (no Origin or matching Origin) proceed
+      }
+
       // 1. Auth: Login
       if (pathname === '/api/auth/login' && method === 'POST') {
         const body = await readBody(req);
@@ -153,7 +164,7 @@ async function handleCinematicRequest(req, res) {
         const session = db.createSession(merchant.id);
         const safeMerchant = db.findMerchantById(merchant.id);
 
-        res.setHeader('Set-Cookie', `disha_session=${session.token}; Path=/; HttpOnly; SameSite=Lax; Max-Age=86400${isProduction ? '; Secure' : ''}`);
+        res.setHeader('Set-Cookie', `disha_session=${session.token}; Path=/; HttpOnly; SameSite=Lax; Max-Age=3600${isProduction ? '; Secure' : ''}`);
         return sendJson(res, 200, {
           success: true,
           token: session.token,
