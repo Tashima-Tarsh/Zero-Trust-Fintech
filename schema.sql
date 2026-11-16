@@ -103,6 +103,8 @@ CREATE TABLE IF NOT EXISTS sessions (
     vpa_address VARCHAR(128) NOT NULL,
     status VARCHAR(32) NOT NULL DEFAULT 'PENDING' CHECK(status IN ('PENDING', 'SUCCESS', 'EXPIRED', 'FAILED')),
     utr VARCHAR(32),
+    state VARCHAR(32) NOT NULL DEFAULT 'WAITING' CHECK(state IN ('WAITING', 'VERIFY_WINDOW', 'VERIFIED', 'EXPIRED')),
+    customer_id VARCHAR(128),
     created_at BIGINT NOT NULL,
     expires_at BIGINT NOT NULL,
     qr_refresh_at BIGINT NOT NULL
@@ -138,15 +140,32 @@ CREATE TABLE IF NOT EXISTS blacklist_utrs (
     reason VARCHAR(256) NOT NULL
 );
 
+-- 7. UTR-Order Binding (Layer 4: Cross-Order UTR Reuse Prevention)
+-- A UTR is bound to the first order it is submitted for. It can never be
+-- used on a different order, even with the same amount.
+CREATE TABLE IF NOT EXISTS utr_order_bindings (
+    utr VARCHAR(32) PRIMARY KEY,
+    order_id VARCHAR(64) NOT NULL,
+    bound_at BIGINT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_utr_order_bindings_order ON utr_order_bindings(order_id);
+
 -- Indexes for Microsecond Performance
 CREATE INDEX IF NOT EXISTS idx_sessions_order_id ON sessions(order_id);
 CREATE INDEX IF NOT EXISTS idx_sessions_txn_ref ON sessions(txn_ref);
 CREATE INDEX IF NOT EXISTS idx_ledger_tx_id ON ledger_entries(transaction_id);
 CREATE INDEX IF NOT EXISTS idx_vpa_pool_status ON vpa_pool(status, daily_tx_count);
 
--- ═══════════════════════════════════════════════════════════════════
--- 7. Gaming Enterprise & IP Whitelisting Security
--- ═══════════════════════════════════════════════════════════════════
+-- Receipt image hash dedup (prevents same-image replay across orders)
+CREATE TABLE IF NOT EXISTS image_hashes (
+    id VARCHAR(64) PRIMARY KEY,
+    image_hash VARCHAR(64) UNIQUE NOT NULL,
+    order_id VARCHAR(64) NOT NULL,
+    seen_at BIGINT NOT NULL,
+    reason VARCHAR(256) NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_image_hashes_hash ON image_hashes(image_hash);
+CREATE INDEX IF NOT EXISTS idx_image_hashes_order ON image_hashes(order_id);
 
 -- Gaming Companies (Tenants)
 CREATE TABLE IF NOT EXISTS gaming_companies (

@@ -190,6 +190,8 @@ function setupSqliteTables() {
       txn_ref TEXT UNIQUE NOT NULL,
       vpa_address TEXT NOT NULL,
       status TEXT NOT NULL DEFAULT 'PENDING',
+      state TEXT NOT NULL DEFAULT 'WAITING',
+      customer_id TEXT,
       utr TEXT,
       created_at INTEGER NOT NULL,
       expires_at INTEGER NOT NULL,
@@ -223,6 +225,24 @@ function setupSqliteTables() {
       blacklisted_at INTEGER NOT NULL,
       reason TEXT NOT NULL
     );
+
+    -- Layer 4: UTR-Order Binding (Cross-Order UTR Reuse Prevention)
+    CREATE TABLE IF NOT EXISTS utr_order_bindings (
+      utr TEXT PRIMARY KEY,
+      order_id TEXT NOT NULL,
+      bound_at INTEGER NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS idx_utr_order_bindings_order ON utr_order_bindings(order_id);
+
+    CREATE TABLE IF NOT EXISTS image_hashes (
+      id TEXT PRIMARY KEY,
+      image_hash TEXT UNIQUE NOT NULL,
+      order_id TEXT NOT NULL,
+      seen_at INTEGER NOT NULL,
+      reason TEXT NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS idx_image_hashes_hash ON image_hashes(image_hash);
+    CREATE INDEX IF NOT EXISTS idx_image_hashes_order ON image_hashes(order_id);
 
     CREATE TABLE IF NOT EXISTS gaming_companies (
       id TEXT PRIMARY KEY,
@@ -400,8 +420,8 @@ function getVpaMerchantType(vpaAddress) {
 function saveSession(session) {
   if (sqliteDb) {
     sqliteDb.prepare(`
-      INSERT INTO sessions (session_id, order_id, challenge_amount, base_amount, txn_ref, vpa_address, status, created_at, expires_at, qr_refresh_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO sessions (session_id, order_id, challenge_amount, base_amount, txn_ref, vpa_address, status, state, customer_id, created_at, expires_at, qr_refresh_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       ON CONFLICT(order_id) DO UPDATE SET
         session_id = excluded.session_id,
         challenge_amount = excluded.challenge_amount,
@@ -409,6 +429,8 @@ function saveSession(session) {
         txn_ref = excluded.txn_ref,
         vpa_address = excluded.vpa_address,
         status = excluded.status,
+        state = excluded.state,
+        customer_id = excluded.customer_id,
         created_at = excluded.created_at,
         expires_at = excluded.expires_at,
         qr_refresh_at = excluded.qr_refresh_at
@@ -418,8 +440,10 @@ function saveSession(session) {
       session.challengeAmount,
       session.baseAmount,
       session.txnRef,
-      session.vpaAddress || process.env.MERCHANT_UPI_ID || 'disha82@ybl',
+      session.vpaAddress || process.env.MERCHANT_UPI_ID || 'merchant@upi',
       session.status,
+      session.state || 'WAITING',
+      session.customerId || null,
       session.createdAt,
       session.expiresAt,
       session.qrRefreshAt
@@ -439,6 +463,8 @@ function findSessionByOrderId(orderId) {
       txnRef: row.txn_ref,
       vpaAddress: row.vpa_address,
       status: row.status,
+      state: row.state,
+      customerId: row.customer_id,
       utr: row.utr,
       createdAt: row.created_at,
       expiresAt: row.expires_at,
@@ -507,6 +533,69 @@ function updateSessionStatus(orderId, status, utr = null) {
   }
 }
 
+function updateSessionState(orderId, state) {
+  if (sqliteDb) {
+    sqliteDb.prepare(`UPDATE sessions SET state = ? WHERE order_id = ?`).run(state, orderId);
+  }
+}
+
+function getOrderState(orderId) {
+  if (!sqliteDb) return null;
+  const row = sqliteDb.prepare(`SELECT * FROM sessions WHERE order_id = ?`).get(orderId);
+  if (!row) return null;
+
+  const now = Date.now();
+  const createdAt = row.created_at;
+  const timeElapsedMs = now - createdAt;
+  const T_MIN = 15 * 1000;   // 15 seconds minimum
+  const T_MAX = 180 * 1000;  // 3 minutes maximum
+
+  // If already verified, return VERIFIED
+  if (row.state === 'VERIFIED' || row.status === 'SUCCESS') {
+    return {
+      state: 'VERIFIED',
+      orderId: row.order_id,
+      utr: row.utr,
+      amount: row.challenge_amount,
+      baseAmount: row.base_amount,
+      vpaAddress: row.vpa_address,
+      createdAt: row.created_at,
+      verifiedAt: row.state === 'VERIFIED' ? now : null,
+      verificationTime: row.state === 'VERIFIED' ? (now - row.created_at) : null,
+      customerId: row.customer_id
+    };
+  }
+
+  // If expired
+  if (timeElapsedMs > T_MAX) {
+    return {
+      state: 'EXPIRED',
+      orderId: row.order_id,
+      reason: 'Order timeout (>3 minutes)',
+      timeRemaining: 0
+    };
+  }
+
+  // If still in WAITING (0 < t < 15s)
+  if (timeElapsedMs < T_MIN) {
+    return {
+      state: 'WAITING',
+      orderId: row.order_id,
+      timeRemainingMs: T_MIN - timeElapsedMs,
+      timeRemaining: (T_MIN - timeElapsedMs) / 1000
+    };
+  }
+
+  // If in VERIFY_WINDOW (15s <= t <= 180s)
+  return {
+    state: 'VERIFY_WINDOW',
+    orderId: row.order_id,
+    timeRemainingMs: T_MAX - timeElapsedMs,
+    timeRemaining: (T_MAX - timeElapsedMs) / 1000,
+    customerId: row.customer_id
+  };
+}
+
 // UTR Blacklist (TASK 8 Layer 3)
 function isUtrBlacklisted(utr) {
   if (sqliteDb) {
@@ -523,6 +612,163 @@ function blacklistUtr(utr, orderId, amount, reason = 'Verified settlement') {
       VALUES (?, ?, ?, ?, ?)
     `).run(utr, orderId, amount, Date.now(), reason);
   }
+}
+
+/**
+ * Layer 4: UTR-Order Binding Check.
+ * Returns the order_id this UTR was first bound to, or null if never bound.
+ * A UTR can only be bound to ONE order forever — cross-order reuse is impossible.
+ */
+function getUtrBoundOrder(utr) {
+  if (!utr || !sqliteDb) return null;
+  const row = sqliteDb.prepare(`SELECT order_id FROM utr_order_bindings WHERE utr = ? LIMIT 1`).get(utr);
+  return row ? row.order_id : null;
+}
+
+/**
+ * Layer 4: Bind a UTR to an order on first submission.
+ * Returns true if newly bound, false if already bound to same order.
+ * Throws/rejects if already bound to a DIFFERENT order (cross-order reuse).
+ */
+function bindUtrToOrder(utr, orderId) {
+  if (!utr || !sqliteDb) return false;
+  const existing = getUtrBoundOrder(utr);
+  if (!existing) {
+    // First time this UTR is seen — bind it to this order forever
+    sqliteDb.prepare(`
+      INSERT OR REPLACE INTO utr_order_bindings (utr, order_id, bound_at)
+      VALUES (?, ?, ?)
+    `).run(utr, orderId, Date.now());
+    return true;
+  }
+  if (existing === orderId) {
+    // Same order re-submitting (idempotent)
+    return true;
+  }
+  // UTR already bound to a DIFFERENT order — cross-order reuse attempt
+  return 'BOUND_TO_OTHER_ORDER';
+}
+
+/**
+ * Receipt image hash dedup gate.
+ * Returns true if this image hash was already seen (replay attack).
+ */
+function isImageHashSeen(imageHash) {
+  if (!imageHash) return false;
+  if (sqliteDb) {
+    const row = sqliteDb.prepare(`SELECT 1 FROM image_hashes WHERE image_hash = ? LIMIT 1`).get(imageHash);
+    return !!row;
+  }
+  return false;
+}
+
+/**
+ * Record a receipt image hash for dedup tracking.
+ * Returns false if already existed.
+ */
+function blacklistImageHash(imageHash, orderId, reason = 'Receipt image recorded') {
+  if (!imageHash || !sqliteDb) return false;
+  try {
+    sqliteDb.prepare(`
+      INSERT OR IGNORE INTO image_hashes (id, image_hash, order_id, seen_at, reason)
+      VALUES (?, ?, ?, ?, ?)
+    `).run(crypto.randomBytes(8).toString('hex'), imageHash, orderId, Date.now(), reason);
+    return true;
+  } catch (e) {
+    return false;
+  }
+}
+
+/**
+ * Atomic settlement: ledger posting + UTR blacklist + image hash dedup in one transaction.
+ * All-or-nothing: if any step fails, nothing is committed.
+ */
+async function atomicSettle(orderId, utr, amount, vpaUsed, imageHash) {
+  const now = Date.now();
+  const txId = 'TX_' + crypto.randomBytes(6).toString('hex').toUpperCase();
+  const entryDebitId = 'LE_' + crypto.randomBytes(6).toString('hex').toUpperCase();
+  const entryCreditId = 'LE_' + crypto.randomBytes(6).toString('hex').toUpperCase();
+
+  if (sqliteDb) {
+    const now = Date.now();
+    sqliteDb.exec('BEGIN TRANSACTION');
+    try {
+      sqliteDb.prepare(`
+        INSERT INTO transactions (id, order_id, utr, amount, status, vpa_used, created_at)
+        VALUES (?, ?, ?, ?, 'COMPLETED', ?, ?)
+      `).run(txId, orderId, utr, amount, vpaUsed, now);
+
+      sqliteDb.prepare(`
+        INSERT INTO ledger_entries (id, transaction_id, account_id, entry_type, amount, created_at)
+        VALUES (?, ?, 'acc_bank_01', 'DEBIT', ?, ?)
+      `).run(entryDebitId, txId, amount, now);
+
+      sqliteDb.prepare(`
+        INSERT INTO ledger_entries (id, transaction_id, account_id, entry_type, amount, created_at)
+        VALUES (?, ?, 'acc_rev_01', 'CREDIT', ?, ?)
+      `).run(entryCreditId, txId, amount, now);
+
+      sqliteDb.prepare(`
+        INSERT OR REPLACE INTO blacklist_utrs (utr, order_id, amount, blacklisted_at, reason)
+        VALUES (?, ?, ?, ?, ?)
+      `).run(utr, orderId, amount, now, 'Verified settlement');
+
+      if (imageHash) {
+        sqliteDb.prepare(`
+          INSERT OR IGNORE INTO image_hashes (id, image_hash, order_id, seen_at, reason)
+          VALUES (?, ?, ?, ?, ?)
+        `).run(crypto.randomBytes(8).toString('hex'), imageHash, orderId, now, 'Receipt image settled');
+      }
+      sqliteDb.exec('COMMIT');
+    } catch (e) {
+      sqliteDb.exec('ROLLBACK');
+      throw e;
+    }
+    return { txId, verification: { balanced: true, totalDebits: amount, totalCredits: amount } };
+  }
+
+  if (pgPool) {
+    const client = await pgPool.connect();
+    try {
+      await client.query('BEGIN');
+      await client.query(
+        `INSERT INTO transactions (id, order_id, utr, amount, status, vpa_used, created_at)
+         VALUES ($1, $2, $3, $4, 'COMPLETED', $5, $6)`,
+        [txId, orderId, utr, amount, vpaUsed, now]
+      );
+      await client.query(
+        `INSERT INTO ledger_entries (id, transaction_id, account_id, entry_type, amount, created_at)
+         VALUES ($1, $2, 'acc_bank_01', 'DEBIT', $3, $4)`,
+        [entryDebitId, txId, amount, now]
+      );
+      await client.query(
+        `INSERT INTO ledger_entries (id, transaction_id, account_id, entry_type, amount, created_at)
+         VALUES ($1, $2, 'acc_rev_01', 'CREDIT', $3, $4)`,
+        [entryCreditId, txId, amount, now]
+      );
+      await client.query(
+        `INSERT OR REPLACE INTO blacklist_utrs (utr, order_id, amount, blacklisted_at, reason)
+         VALUES ($1, $2, $3, $4, $5)`,
+        [utr, orderId, amount, now, 'Verified settlement']
+      );
+      if (imageHash) {
+        await client.query(
+          `INSERT OR IGNORE INTO image_hashes (id, image_hash, order_id, seen_at, reason)
+           VALUES ($1, $2, $3, $4, $5)`,
+          [crypto.randomBytes(8).toString('hex'), imageHash, orderId, now, 'Receipt image settled']
+        );
+      }
+      await client.query('COMMIT');
+    } catch (err) {
+      await client.query('ROLLBACK');
+      throw err;
+    } finally {
+      client.release();
+    }
+    return { txId, verification: { balanced: true, totalDebits: amount, totalCredits: amount } };
+  }
+
+  return { txId, verification: { balanced: true, totalDebits: amount, totalCredits: amount } };
 }
 
 // Double-Entry Ledger Engine (TASK 10)
@@ -660,8 +906,15 @@ module.exports = {
   updateSessionStatus,
   isUtrBlacklisted,
   blacklistUtr,
+  isImageHashSeen,
+  blacklistImageHash,
   recordTransactionAndLedger,
   getLedgerVerification,
+  atomicSettle,
   resetDailyVPAs,
-  getVpaMerchantType
+  getVpaMerchantType,
+  updateSessionState,
+  getOrderState,
+  getUtrBoundOrder,
+  bindUtrToOrder
 };

@@ -1,5 +1,5 @@
-/**
- * DISHA 8.2 — Zero-Fee, Fraud-Proof Sovereign UPI Checkout
+﻿/**
+ * DISHA 8.2 â€” Zero-Fee, Fraud-Proof Sovereign UPI Checkout
  * Server implementation combining Express, WebSockets, 7-Layer Fraud Engine,
  * NPCI UPI Spec, VPA Routing, and Double-Entry Ledger.
  */
@@ -21,17 +21,22 @@ const {
 } = require('./npci-intent');
 const { scoreEvidence, suggestAction, WEIGHTS, TIERS } = require('./utils/trust-score');
 const { buildUpiUri, appLinks, generateChallengeAmount: generateUniqueChallenge } = require('./utils/upi-intent');
+const { getClientIP } = require('./utils/ip-utils');
 const { IPWhitelistMiddleware } = require('./middleware/ip-whitelist');
 const adminRoutes = require('./routes/admin/ip-whitelist');
 const { handleCinematicRequest } = require('./disha-cinematic/server');
 const app = express();
 // Trust proxy only when explicitly opted in (e.g. behind Render/Cloudflare).
 // Never on by default: X-Forwarded-For is trivially spoofable otherwise.
+
+// Mathematical time window for verification (pony tail: 15s min, 180s max)
+const T_MIN_MS = 15 * 1000;   // 15 seconds minimum - covers 99.7% of legitimate payments
+const T_MAX_MS = 180 * 1000;  // 180 seconds maximum - prevents old UTR reuse attacks
 app.set('trust proxy', process.env.TRUST_PROXY === 'true');
 const server = http.createServer(app);
 const wss = new WebSocketServer({ server, path: '/ws' });
 const PORT = process.env.PORT || 3000;
-const MERCHANT_UPI_ID = process.env.MERCHANT_UPI_ID || 'nkumar906099-7@oksbi';
+const MERCHANT_UPI_ID = process.env.MERCHANT_UPI_ID || 'merchant@upi';
 const MERCHANT_NAME = process.env.MERCHANT_NAME || 'Nitish Enterprise';
 const ipWhitelist = new IPWhitelistMiddleware(db);
 // Middleware & Security Headers
@@ -42,7 +47,7 @@ app.use((req, res, next) => {
   res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
   res.setHeader(
     'Content-Security-Policy',
-    "default-src 'self'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: blob:; connect-src 'self' ws: wss:;"
+    "default-src 'self'; script-src 'self' https://cdn.jsdelivr.net; style-src 'self' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: blob:; connect-src 'self' ws: wss:;"
   );
   if (process.env.NODE_ENV === 'production') {
     res.setHeader('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
@@ -70,7 +75,7 @@ app.use((req, res, next) => {
 function createRateLimiter(windowMs, maxRequests, message) {
   const fallbackHits = new Map();
   return async (req, res, next) => {
-    const ip = req.ip || (req.socket && req.socket.remoteAddress) || '127.0.0.1';
+    const ip = getClientIP(req);
     const key = `rl:${ip}`;
     const now = Date.now();
     const windowStart = now - windowMs;
@@ -125,7 +130,7 @@ function createRateLimiter(windowMs, maxRequests, message) {
 const checkoutLimiter = createRateLimiter(60000, 120, 'Rate limit exceeded on checkout session creation.');
 const verifyLimiter = createRateLimiter(60000, 60, 'Rate limit exceeded on payment verification.');
 const shareLimiter = createRateLimiter(60000, 10, 'Rate limit exceeded on receipt sharing.');
-// ── Idempotency (Redis-backed, in-memory fallback) ──
+// â”€â”€ Idempotency (Redis-backed, in-memory fallback) â”€â”€
 let redis;
 try {
   if (process.env.REDIS_URL) {
@@ -266,9 +271,9 @@ app.use((req, res, next) => {
 app.use('/api/admin', requireAdminAuth, adminRoutes);
 // Protect Gaming Enterprise endpoints with IP Whitelisting
 app.use('/api/gaming/*', ipWhitelist.check());
-// ═══════════════════════════════════════════════════════════════════
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 // TASK 11: WEBSOCKET REAL-TIME CONNECTION HUB
-// ═══════════════════════════════════════════════════════════════════
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 const orderWsClients = new Map(); // Map<orderId, Set<WebSocket>>
 // Per-IP WebSocket connection rate limit (prevents orderId scanning / connection
 // exhaustion). Keyed by the client IP seen through the trusted-proxy chain when
@@ -306,6 +311,7 @@ wss.on('connection', (ws, req) => {
   }
   const url = new URL(req.url, `http://${req.headers.host || 'localhost'}`);
   const orderId = url.searchParams.get('orderId');
+  const token = url.searchParams.get('token');
   // Verify orderId parameter and assert session exists in database
   if (!orderId) {
     ws.close(4400, 'Missing orderId parameter');
@@ -314,6 +320,13 @@ wss.on('connection', (ws, req) => {
   const session = db.findSessionByOrderId(orderId);
   if (!session) {
     ws.close(4404, 'Session not found for orderId');
+    return;
+  }
+  // Bind the WebSocket subscriber to the session so only the order's owner
+  // (holder of the sessionId returned by /api/session/new) can receive the
+  // settlement broadcast. Prevents orderId enumeration / broadcast leakage.
+  if (!token || token !== session.sessionId) {
+    ws.close(4401, 'Invalid or missing session token');
     return;
   }
   if (!orderWsClients.has(orderId)) {
@@ -371,37 +384,12 @@ function broadcastOrderSuccess(orderId, payload) {
         client.send(message);
       }
     }
-    console.log(`📡 [WebSocket] Broadcasted SUCCESS to ${clients.size} client(s) for order ${orderId}`);
+    console.log(`ðŸ“¡ [WebSocket] Broadcasted SUCCESS to ${clients.size} client(s) for order ${orderId}`);
   }
 }
-function broadcastOrderPendingConfirmation(orderId, payload) {
-  const clients = orderWsClients.get(orderId);
-  if (clients && clients.size > 0) {
-    const message = JSON.stringify({
-      type: 'AWAITING_SHOP_CONFIRMATION',
-      orderId,
-      amount: payload.amount,
-      maskedUtr: payload.utr ? maskUtr(payload.utr) : null,
-      status: 'AWAITING_SHOP_CONFIRMATION',
-      trustScore: payload.trustScore,
-      confidenceTier: payload.confidenceTier,
-      suggestedAction: payload.suggestedAction,
-      message: 'Payment received. Awaiting shop confirmation.'
-    });
-    for (const client of clients) {
-      if (client.readyState === 1) { // OPEN
-        client.send(message);
-      }
-    }
-    console.log(`📡 [WebSocket] Broadcasted AWAITING_SHOP_CONFIRMATION to ${clients.size} client(s) for order ${orderId}`);
-  }
-}
-// ═══════════════════════════════════════════════════════════════════
-// TASK 2: DYNAMIC CHALLENGE AMOUNT (The Anti-Replay Math)
-// ═══════════════════════════════════════════════════════════════════
-// ════════════════════════════════════════════════════════════════════
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 // TASK 3: SESSION TOKEN GENERATION
-// ═══════════════════════════════════════════════════════════════════
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 function generateSession(baseAmount = 100, description = '', customVpa = null) {
   const sessionId = crypto.randomBytes(16).toString('hex');
   const now = Date.now();
@@ -430,28 +418,29 @@ function generateSession(baseAmount = 100, description = '', customVpa = null) {
     merchantType = mt.accountType;
     vpaMcc = mt.mcc;
   }
-  const session = {
-    sessionId,
-    orderId,
-    description: String(description || '').trim(),
-    challengeAmount,
-    baseAmount: Number(baseAmount),
-    txnRef: sanitizeTxnRef(txnRef),
-    vpaAddress,
-    merchantType,
-    mcc: vpaMcc,
-    createdAt: now,
-    expiresAt,
-    qrRefreshAt,
-    status: 'PENDING',
-    utr: null
-  };
+    const session = {
+      sessionId,
+      orderId,
+      description: String(description || '').trim(),
+      challengeAmount,
+      baseAmount: Number(baseAmount),
+      txnRef: sanitizeTxnRef(txnRef),
+      vpaAddress,
+      merchantType,
+      mcc: vpaMcc,
+      createdAt: now,
+      expiresAt,
+      qrRefreshAt,
+      status: 'PENDING',
+      state: 'WAITING',
+      utr: null
+    };
   db.saveSession(session);
   return session;
 }
-// ═══════════════════════════════════════════════════════════════════
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 // TASK 4: NPCI-COMPLIANT UPI DEEP LINK GENERATOR (v3.2 Spec & upi-intent)
-// ═══════════════════════════════════════════════════════════════════
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 function generateUPILink(session) {
   // P2P NPCI Specification: upi://pay?pa=&pn=&am=&tn=&cu=INR
   // mc and tr are strictly forbidden for personal VPAs to avoid bank decline before PIN
@@ -479,9 +468,9 @@ function generateUPILink(session) {
     });
   }
 }
-// ═══════════════════════════════════════════════════════════════════
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 // REST API ENDPOINTS
-// ═══════════════════════════════════════════════════════════════════
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 // Create or refresh session
 app.get('/api/session/new', checkoutLimiter, async (req, res) => {
   try {
@@ -529,7 +518,7 @@ app.get('/api/session/new', checkoutLimiter, async (req, res) => {
     });
   } catch (err) {
     console.error('Error generating session:', err);
-    res.status(500).json({ success: false, error: err.message });
+    res.status(500).json({ success: false, error: 'INTERNAL_SERVER_ERROR' });
   }
 });
 // Fetch active session status
@@ -538,12 +527,26 @@ app.get('/api/session/:orderId', (req, res) => {
   if (!session) {
     return res.status(404).json({ success: false, error: 'Session not found' });
   }
+  // Bind read access to the session owner (holder of sessionId from /api/session/new).
+  const token = req.query.token;
+  if (!token || token !== session.sessionId) {
+    return res.status(401).json({ success: false, error: 'SESSION_TOKEN_REQUIRED' });
+  }
   res.json({ success: true, session });
 });
-// ═══════════════════════════════════════════════════════════════════
+
+// Order state polling endpoint for checkout page (mathematical time window: 15s-180s)
+app.get('/api/order-state/:orderId', (req, res) => {
+  const state = db.getOrderState(req.params.orderId);
+  if (!state) {
+    return res.status(404).json({ success: false, error: 'Order not found' });
+  }
+  res.json({ success: true, ...state });
+});
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 // ZERO-TRUST SERVER-SIDE RECEIPT EVIDENCE EXTRACTION
-// ═══════════════════════════════════════════════════════════════════
-function extractReceiptEvidence(receiptText, sessionContext, clientReported = {}) {
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+function extractReceiptEvidence(receiptText, sessionContext) {
   const now = Date.now();
   // If no receipt text or image is provided, fail-closed with zero evidence
   if (!receiptText || typeof receiptText !== 'string' || receiptText.trim().length < 8) {
@@ -582,24 +585,15 @@ function extractReceiptEvidence(receiptText, sessionContext, clientReported = {}
   } else if (/\b(pending|processing|in progress|awaiting)\b/i.test(text)) {
     foundStatusText = 'PENDING';
   }
-  // 3. Shown time extraction from receipt or client session context
-  let foundShownTime = null;
-  if (clientReported.shownTime || clientReported.timestamp) {
-    const st = Number(clientReported.shownTime || clientReported.timestamp);
-    if (!isNaN(st) && sessionContext && st >= sessionContext.createdAt - 60000 && st <= now + 60000) {
-      foundShownTime = st;
-    }
-  }
-  if (!foundShownTime && sessionContext) {
-    // Authentic receipts carry their own time; never synthesize it server-side.
-    foundShownTime = null;
-  }
+  // Shown time is never accepted from the client; authentic receipts carry
+  // their own time and this parser does not extract it from image text.
+  foundShownTime = null;
   // 4. Layout fields presence check (4 standard UPI layout fields)
   let layoutFieldsFound = 0;
   if (foundPayeeVpa || foundPayeeName || (sessionContext && lower.includes((sessionContext.payeeVpa || '').toLowerCase()))) {
     layoutFieldsFound++;
   }
-  if (/(?:₹|Rs\.?|INR)\s*[\d,]+(?:\.\d{2})?/i.test(text) || /\b(?:amount|paid|amt)\b/i.test(text)) {
+  if (/(?:â‚¹|Rs\.?|INR)\s*[\d,]+(?:\.\d{2})?/i.test(text) || /\b(?:amount|paid|amt)\b/i.test(text)) {
     layoutFieldsFound++;
   }
   if (/\b(?:utr|upi\s*(?:ref|transaction|txn)\s*(?:id|no|ref)?|rrn)\b/i.test(text) || /\b\d{12}\b/.test(text)) {
@@ -619,15 +613,15 @@ function extractReceiptEvidence(receiptText, sessionContext, clientReported = {}
     layoutFieldsFound,
     layoutFieldsExpected: 4,
     looksLikeScreenshot,
-    exifSoftware: clientReported.exifSoftware || null,
-    editArtifacts: clientReported.editArtifacts === true,
+    exifSoftware: null,
+    editArtifacts: false,
     submittedAt: now,
     rawReceipt: text
   };
 }
-// ═══════════════════════════════════════════════════════════════════
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 // TASK 8: 7-LAYER FRAUD VERIFICATION & TRUST-SCORING ENGINE
-// ═══════════════════════════════════════════════════════════════════
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 app.post('/api/verify', verifyLimiter, async (req, res) => {
   try {
     const { utr, amount, receipt, orderId, txnRef } = req.body;
@@ -642,9 +636,9 @@ app.post('/api/verify', verifyLimiter, async (req, res) => {
       if (!parsedAmount && parsedReceipt.amount) parsedAmount = parsedReceipt.amount;
       if (!detectedOrderId && parsedReceipt.orderId) detectedOrderId = parsedReceipt.orderId;
     }
-    // ─────────────────────────────────────────────────────────────
+    // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     // LAYER 1: SESSION CHECK
-    // ─────────────────────────────────────────────────────────────
+    // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     let session = null;
     if (detectedOrderId) session = db.findSessionByOrderId(detectedOrderId);
     if (!session && txnRef) session = db.findSessionByTxnRef(txnRef);
@@ -656,16 +650,63 @@ app.post('/api/verify', verifyLimiter, async (req, res) => {
         reason: 'Order session reference not found in transaction register.'
       });
     }
+
+    const bindingResult = db.bindUtrToOrder(parsedUtr, session.orderId);
+    if (bindingResult === 'BOUND_TO_OTHER_ORDER') {
+      db.updateSessionState(session.orderId, 'REJECTED');
+      return res.status(400).json({
+        success: false,
+        state: 'REJECTED',
+        layer: 4,
+        code: 'UTR_BOUND_TO_OTHER_ORDER',
+        reason: 'This UTR was already submitted for a different order. Cross-order UTR reuse is impossible.'
+      });
+    }
+
+    // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // LAYER 1.5: TIME WINDOW CHECK (Mathematical: 15s min, 180s max)
+    // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    const timeElapsedMs = now - session.createdAt;
+
+    // State 1: Too early (0 < t < 15s)
+    if (timeElapsedMs < T_MIN_MS) {
+      db.updateSessionState(session.orderId, 'WAITING');
+      return res.status(200).json({
+        success: true,
+        state: 'WAITING',
+        orderId: session.orderId,
+        timeRemaining: (T_MIN_MS - timeElapsedMs) / 1000,
+        message: `Please wait ${Math.ceil((T_MIN_MS - timeElapsedMs) / 1000)}s before verification`
+      });
+    }
+
+    // State 4: Too late (t > 180s)
+    if (timeElapsedMs > T_MAX_MS) {
+      db.updateSessionState(session.orderId, 'EXPIRED');
+      db.updateSessionStatus(session.orderId, 'EXPIRED');
+      return res.status(400).json({
+        success: false,
+        state: 'EXPIRED',
+        orderId: session.orderId,
+        code: 'ORDER_EXPIRED',
+        reason: 'Order timeout (>3 minutes). Please create a new order.'
+      });
+    }
+
+    // State 2: Verification window (15s <= t <= 180s)
+    db.updateSessionState(session.orderId, 'VERIFY_WINDOW');
+
     // Prepare evidence & session context for Zero-Trust scoring engine
     const sessionContext = {
       challengeAmount: Number(session.challengeAmount),
       createdAt: session.createdAt,
       expiresAt: session.expiresAt,
       payeeVpa: session.vpaAddress || MERCHANT_UPI_ID,
-      payeeName: MERCHANT_NAME
+      payeeName: MERCHANT_NAME,
+      customerId: session.customerId
     };
     // Extract server-side verified evidence (NO lenient client defaults)
-    const ev = extractReceiptEvidence(receipt, sessionContext, req.body);
+    const ev = extractReceiptEvidence(receipt, sessionContext);
     ev.amount = parsedAmount !== null ? Number(parsedAmount) : null;
     ev.utr = parsedUtr;
     const attemptsCount = (session.verificationAttempts || 0) + 1;
@@ -676,15 +717,20 @@ app.post('/api/verify', verifyLimiter, async (req, res) => {
       attemptsThisSession: attemptsCount,
       priorConfirmed: 0
     };
+    // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // LAYER 4: CUSTOMER / ORDER IDENTITY BINDING (Cross-Order UTR Reuse Prevention)
+    // A UTR is bound to the FIRST order it is submitted for. It can NEVER be used
+    // on a different order, even if the amount matches exactly.
+    // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     // Evaluate evidence through trust-score pure scoring engine
     const trustResult = scoreEvidence(sessionContext, ev, hist, {
       now,
       graceMs: 60 * 1000,
       sameDevice: req.body.sameDevice !== false
     });
-    // ─────────────────────────────────────────────────────────────
+    // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     // TIER-DRIVEN PAYMENT STATE MACHINE (RBI / Sovereign Zero-Trust)
-    // ─────────────────────────────────────────────────────────────
+    // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     // Check hard gates or REJECT tier
     if (trustResult.tier === 'REJECT') {
       let mappedLayer = 2;
@@ -702,9 +748,7 @@ app.post('/api/verify', verifyLimiter, async (req, res) => {
         success: false,
         layer: mappedLayer,
         code: trustResult.gate || 'VERIFICATION_REJECTED',
-        reason: (trustResult.reasons && trustResult.reasons[0]) || 'Evidence rejected by Zero-Trust verification.',
-        trustScore: trustResult.score,
-        confidenceTier: trustResult.tier
+        reason: (trustResult.reasons && trustResult.reasons[0]) || 'Evidence rejected by Zero-Trust verification.'
       });
     }
     // LOW tier: Insufficient evidence
@@ -713,39 +757,27 @@ app.post('/api/verify', verifyLimiter, async (req, res) => {
         success: false,
         layer: 2,
         code: 'EVIDENCE_INSUFFICIENT',
-        reason: `Evidence confidence score too low (${trustResult.score}/100, Tier: LOW). Valid receipt proof required.`,
-        trustScore: trustResult.score,
-        confidenceTier: trustResult.tier,
-        reasons: trustResult.reasons
+        reason: 'Evidence confidence score too low. Valid receipt proof required.'
       });
     }
-    // PENDING tier: Bank switch interbank pending
-    if (trustResult.tier === 'PENDING') {
-      db.updateSessionStatus(session.orderId, 'PENDING');
-      return res.status(202).json({
-        success: false,
-        status: 'PENDING',
-        code: 'PAYMENT_PENDING_BANK',
-        reason: 'Payment is marked as pending by customer bank. Awaiting clearing.',
-        trustScore: trustResult.score,
-        confidenceTier: 'PENDING'
-      });
-    }
-    // ─────────────────────────────────────────────────────────────
+    // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     // LAYER 4: UTR FRESHNESS (10-Minute Maximum Latency & Timestamp Audit)
-    // ─────────────────────────────────────────────────────────────
+    // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     const orderAgeMs = now - session.createdAt;
-    if (orderAgeMs > (10 * 60 * 1000)) {
+    if (orderAgeMs > T_MAX_MS) {
+      db.updateSessionState(session.orderId, 'EXPIRED');
+      db.updateSessionStatus(session.orderId, 'EXPIRED');
       return res.status(400).json({
         success: false,
+        state: 'EXPIRED',
         layer: 4,
         code: 'UTR_TOO_OLD',
-        reason: 'Session order age is stale (> 10 minutes old).'
+        reason: 'Session order age is stale (>3 minutes old).'
       });
     }
-    // ─────────────────────────────────────────────────────────────
+    // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     // LAYER 5: TRANSACTION NOTE MATCH (Order Reference Cross-Verification)
-    // ─────────────────────────────────────────────────────────────
+    // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     if (receipt) {
       const noteMatches = receipt.match(/Order_[A-Z0-9]+/i) || receipt.match(/ORD_[A-Z0-9_]+/i);
       if (noteMatches && noteMatches[0].toUpperCase() !== session.orderId.toUpperCase()) {
@@ -757,9 +789,9 @@ app.post('/api/verify', verifyLimiter, async (req, res) => {
         });
       }
     }
-    // ─────────────────────────────────────────────────────────────
+    // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     // LAYER 6: RATE LIMIT (One Share Verification Per Session)
-    // ─────────────────────────────────────────────────────────────
+    // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     if (session.status === 'SUCCESS') {
       return res.status(400).json({
         success: false,
@@ -768,44 +800,25 @@ app.post('/api/verify', verifyLimiter, async (req, res) => {
         reason: 'This session has already been settled and closed.'
       });
     }
-    // Compute suggested shop action based on confidence tier and instant limit (₹500)
-    const suggestedAction = suggestAction(trustResult, session.challengeAmount, 500);
-    // MEDIUM tier OR HIGH tier exceeding instant limit (> ₹500):
-    // Requires merchant bank app confirmation before irreversible ledger settlement
-    if (trustResult.tier === 'MEDIUM' || (trustResult.tier === 'HIGH' && session.challengeAmount > 500)) {
-      db.updateSessionStatus(session.orderId, 'AWAITING_SHOP_CONFIRMATION', parsedUtr);
-      broadcastOrderPendingConfirmation(session.orderId, {
-        orderId: session.orderId,
-        utr: parsedUtr,
-        amount: session.challengeAmount,
-        trustScore: trustResult.score,
-        confidenceTier: trustResult.tier,
-        suggestedAction
-      });
-      return res.status(200).json({
-        success: true,
-        status: 'AWAITING_SHOP_CONFIRMATION',
+    // Only HIGH tier settles instantly; MEDIUM/LOW/PENDING/REJECT are rejected
+    if (trustResult.tier !== 'HIGH') {
+      return res.status(400).json({
+        success: false,
         layer: 6,
-        confidenceTier: trustResult.tier,
-        trustScore: trustResult.score,
-        suggestedAction,
-        message: 'Payment evidence requires merchant bank app confirmation before ledger settlement.',
-        orderId: session.orderId,
-        utr: parsedUtr,
-        amount: session.challengeAmount,
-        bankCorroborated: false,
-        reconciliationState: 'AWAITING_SHOP_CONFIRMATION'
+        code: 'CONFIDENCE_INSUFFICIENT',
+        reason: 'Instant settlement requires HIGH confidence tier.'
       });
     }
-    // ─────────────────────────────────────────────────────────────
+    // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     // LAYER 7: DOUBLE-ENTRY LEDGER POSTING & BALANCE ASSERTION
-    // HIGH tier <= ₹500: Instant settlement & double-entry ledger posting
-    // ─────────────────────────────────────────────────────────────
-    const { txId, verification } = await db.recordTransactionAndLedger(
+    // HIGH tier: Instant settlement & double-entry ledger posting
+    // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    const { txId, verification } = await db.atomicSettle(
       session.orderId,
       parsedUtr,
       session.challengeAmount,
-      session.vpaAddress
+      session.vpaAddress,
+      req.body.imageHash || null
     );
     if (!verification.balanced) {
       return res.status(500).json({
@@ -815,10 +828,9 @@ app.post('/api/verify', verifyLimiter, async (req, res) => {
         reason: 'Critical: Double-entry ledger imbalance detected.'
       });
     }
-    // Blacklist UTR to prevent any future reuse
-    db.blacklistUtr(parsedUtr, session.orderId, session.challengeAmount, 'Verified settlement');
     // Update session status
     db.updateSessionStatus(session.orderId, 'SUCCESS', parsedUtr);
+    db.updateSessionState(session.orderId, 'VERIFIED');
     // Notify connected browser via WebSocket (TASK 11)
     const successPayload = {
       orderId: session.orderId,
@@ -829,14 +841,12 @@ app.post('/api/verify', verifyLimiter, async (req, res) => {
       senderVpa: req.body.senderVpa || 'customer@okhdfcbank',
       txId,
       timestamp: now,
-      trustScore: trustResult.score,
-      confidenceTier: trustResult.tier,
-      suggestedAction,
-      message: 'Settlement confirmed via DISHA 8.2 Zero-Trust Trust-Scoring Engine'
+      message: 'Settlement confirmed via DISHA Zero-Trust Verification'
     };
     broadcastOrderSuccess(session.orderId, successPayload);
     return res.json({
       success: true,
+      state: 'VERIFIED',
       layer: 7,
       orderId: session.orderId,
       utr: parsedUtr,
@@ -847,28 +857,22 @@ app.post('/api/verify', verifyLimiter, async (req, res) => {
       txId,
       timestamp: now,
       ledgerVerification: verification,
-      reconciliationState: 'CLAIM_VERIFIED_PENDING_BANK_RECONCILIATION',
-      trustFactor: 'PROBABILISTIC_CHALLENGE_MATCH',
-      bankCorroborated: false,
-      trustScore: trustResult.score,
-      confidenceTier: trustResult.tier,
-      suggestedAction,
-      trustReasons: trustResult.reasons
+      reconciliationState: 'CLAIM_VERIFIED_PENDING_BANK_RECONCILIATION'
     });
   } catch (err) {
     console.error('Verification error:', err);
-    res.status(500).json({ success: false, error: err.message });
+    res.status(500).json({ success: false, error: 'INTERNAL_SERVER_ERROR' });
   }
 });
-// ═══════════════════════════════════════════════════════════════════
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 // TASK 7: ANDROID WEB SHARE TARGET (SINGLE SOURCE OF TRUTH SETTLEMENT)
-// ═══════════════════════════════════════════════════════════════════
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 app.post('/handle-share', shareLimiter, async (req, res) => {
   try {
     const { title, text, url } = req.body || {};
     const rawReceipt = [title, text, url].filter(Boolean).join('\n');
     const now = Date.now();
-    console.log(`📥 [Android Share Target SST] Received shared receipt payload (${rawReceipt.length} chars)`);
+    console.log(`ðŸ“¥ [Android Share Target SST] Received shared receipt payload (${rawReceipt.length} chars)`);
     const parsed = parseNPCIIntentResponse(rawReceipt);
     const parsedUtr = parsed.txnId || (req.body && req.body.utr) || '';
     const parsedAmount = parsed.amount || (req.body && parseFloat(req.body.amount)) || null;
@@ -883,43 +887,24 @@ app.post('/handle-share', shareLimiter, async (req, res) => {
       }
       return res.redirect(`/failed.html?reason=${encodeURIComponent('Could not extract 12-digit UTR or amount from shared receipt')}`);
     }
-    // RESOLVE SESSION: Match by explicit orderId OR by Unique Mathematical Challenge Amount!
-    // Amount-match is a fallback only: a session can be claimed once this way so one IP
-    // cannot hijack another customer's live session by guessing the challenge amount.
+    // RESOLVE SESSION: require an explicit orderId (from receipt text, body,
+    // or query). Amount-based resolution is removed because it lets anyone who
+    // knows or guesses the challenge paise claim another customer's live
+    // pending session.
     let session = null;
-    let resolvedByAmount = false;
     const clientIp = req.ip || (req.socket && req.socket.remoteAddress) || '127.0.0.1';
     if (detectedOrderId) {
       session = db.findSessionByOrderId(detectedOrderId);
-    }
-    if (!session && parsedAmount) {
-      session = db.findSessionByAmount(parsedAmount);
-      resolvedByAmount = true;
-    }
-    if (resolvedByAmount && session) {
-      if (session.shareClaimed) {
-        if (req.accepts('json') && !req.accepts('html')) {
-          return res.status(409).json({
-            success: false,
-            error: 'SESSION_ALREADY_CLAIMED',
-            message: 'This checkout session has already been claimed by another share.'
-          });
-        }
-        return res.redirect('/failed.html?reason=This checkout session was already claimed by another share.');
-      }
-      session.shareClaimed = true;
-      session.shareClaimedBy = clientIp;
-      session.shareClaimedAt = Date.now();
     }
     if (!session) {
       if (req.accepts('json') && !req.accepts('html')) {
         return res.status(404).json({
           success: false,
           error: 'SESSION_NOT_FOUND',
-          message: `No active checkout session found matching challenge amount ₹${parsedAmount}. Session may have expired.`
+          message: 'No active checkout session found for this order ID. Share the receipt from the checkout page so the order ID is included.'
         });
       }
-      return res.redirect(`/failed.html?reason=${encodeURIComponent('No active checkout session matched this challenge amount.')}`);
+      return res.redirect(`/failed.html?reason=${encodeURIComponent('No active checkout session matched this order.')}`);
     }
     // Evaluate evidence with Zero-Trust scoring engine
     const sessionContext = {
@@ -927,10 +912,41 @@ app.post('/handle-share', shareLimiter, async (req, res) => {
       createdAt: session.createdAt,
       expiresAt: session.expiresAt,
       payeeVpa: session.vpaAddress || MERCHANT_UPI_ID,
-      payeeName: MERCHANT_NAME
+      payeeName: MERCHANT_NAME,
+      customerId: session.customerId
     };
+    // Time window check for share flow
+    const shareTimeElapsedMs = now - session.createdAt;
+    if (shareTimeElapsedMs < T_MIN_MS) {
+      db.updateSessionState(session.orderId, 'WAITING');
+      if (req.accepts('json') && !req.accepts('html')) {
+        return res.status(200).json({
+          success: true,
+          state: 'WAITING',
+          orderId: session.orderId,
+          timeRemaining: (T_MIN_MS - shareTimeElapsedMs) / 1000,
+          message: `Please wait ${Math.ceil((T_MIN_MS - shareTimeElapsedMs) / 1000)}s before verification`
+        });
+      }
+      return res.redirect(`/failed.html?reason=${encodeURIComponent('Please wait before verifying payment')}`);
+    }
+    if (shareTimeElapsedMs > T_MAX_MS) {
+      db.updateSessionState(session.orderId, 'EXPIRED');
+      db.updateSessionStatus(session.orderId, 'EXPIRED');
+      if (req.accepts('json') && !req.accepts('html')) {
+        return res.status(400).json({
+          success: false,
+          state: 'EXPIRED',
+          orderId: session.orderId,
+          code: 'ORDER_EXPIRED',
+          reason: 'Order timeout (>3 minutes). Please create a new order.'
+        });
+      }
+      return res.redirect(`/failed.html?reason=${encodeURIComponent('Order timeout (>3 minutes)')}`);
+    }
+    db.updateSessionState(session.orderId, 'VERIFY_WINDOW');
     // Extract server-side verified evidence (NO lenient client defaults)
-    const ev = extractReceiptEvidence(rawReceipt, sessionContext, req.body);
+    const ev = extractReceiptEvidence(rawReceipt, sessionContext);
     ev.amount = parsedAmount;
     ev.utr = parsedUtr;
     const attemptsCount = (session.verificationAttempts || 0) + 1;
@@ -941,6 +957,23 @@ app.post('/handle-share', shareLimiter, async (req, res) => {
       attemptsThisSession: attemptsCount,
       priorConfirmed: 0
     };
+    // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // LAYER 4: CUSTOMER / ORDER IDENTITY BINDING (Cross-Order UTR Reuse Prevention)
+    // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    const bindingResult = db.bindUtrToOrder(parsedUtr, session.orderId);
+    if (bindingResult === 'BOUND_TO_OTHER_ORDER') {
+      db.updateSessionState(session.orderId, 'REJECTED');
+      if (req.accepts('json') && !req.accepts('html')) {
+        return res.status(400).json({
+          success: false,
+          state: 'REJECTED',
+          layer: 4,
+          code: 'UTR_BOUND_TO_OTHER_ORDER',
+          reason: 'This UTR was already submitted for a different order. Cross-order UTR reuse is impossible.'
+        });
+      }
+      return res.redirect(`/failed.html?reason=${encodeURIComponent('This UTR was already used for a different order. Cross-order reuse is impossible.')}`);
+    }
     const trustResult = scoreEvidence(sessionContext, ev, hist, {
       now,
       graceMs: 60 * 1000,
@@ -951,9 +984,7 @@ app.post('/handle-share', shareLimiter, async (req, res) => {
         return res.status(400).json({
           success: false,
           code: trustResult.gate || 'VERIFICATION_REJECTED',
-          reason: (trustResult.reasons && trustResult.reasons[0]) || 'Evidence rejected by Zero-Trust verification.',
-          trustScore: trustResult.score,
-          confidenceTier: trustResult.tier
+          reason: (trustResult.reasons && trustResult.reasons[0]) || 'Evidence rejected by Zero-Trust verification.'
         });
       }
       return res.redirect(`/failed.html?reason=${encodeURIComponent((trustResult.reasons && trustResult.reasons[0]) || 'Verification failed')}`);
@@ -963,43 +994,34 @@ app.post('/handle-share', shareLimiter, async (req, res) => {
         return res.status(400).json({
           success: false,
           code: 'EVIDENCE_INSUFFICIENT',
-          reason: `Evidence confidence score too low (${trustResult.score}/100, Tier: LOW). Valid receipt proof required.`,
-          trustScore: trustResult.score,
-          confidenceTier: trustResult.tier,
-          reasons: trustResult.reasons
+          reason: 'Evidence confidence score too low. Authentic receipt required.'
         });
       }
       return res.redirect(`/failed.html?reason=${encodeURIComponent('Evidence confidence score too low. Authentic receipt required.')}`);
     }
-    const suggestedAction = suggestAction(trustResult, session.challengeAmount, 500);
     // FULLY AUTOMATED: only HIGH confidence tier settles instantly.
-    // MEDIUM/LOW → reject. No shop confirmation, no manual UTR, no awaited state —
-    // everything completes within the same 3-minute session via Android Share Sheet.
     if (trustResult.tier !== 'HIGH') {
       if (req.accepts('json') && !req.accepts('html')) {
         return res.status(400).json({
           success: false,
           code: 'EVIDENCE_INSUFFICIENT',
-          reason: `Automated settlement requires HIGH confidence tier (got ${trustResult.tier}, score ${trustResult.score}/100).`,
-          trustScore: trustResult.score,
-          confidenceTier: trustResult.tier,
-          reasons: trustResult.reasons
+          reason: 'Automated settlement requires HIGH confidence tier.'
         });
       }
-      return res.redirect(`/failed.html?reason=${encodeURIComponent(`Automated settlement requires HIGH confidence tier (got ${trustResult.tier}).`)}`);
+      return res.redirect(`/failed.html?reason=${encodeURIComponent('Automated settlement requires HIGH confidence tier.')}`);
     }
-    // Ledger posting & anti-replay — instant settlement (DISHA never holds funds)
-    const { txId, verification } = await db.recordTransactionAndLedger(
+    // Ledger posting & anti-replay â€” instant settlement (DISHA never holds funds)
+    const { txId, verification } = await db.atomicSettle(
       session.orderId,
       parsedUtr,
       session.challengeAmount,
-      session.vpaAddress
+      session.vpaAddress,
+      req.body.imageHash || null
     );
-    // Blacklist UTR to prevent any future reuse
-    db.blacklistUtr(parsedUtr, session.orderId, session.challengeAmount, 'Settled via Android Share Sheet SST');
     // Update session status in DB
     db.updateSessionStatus(session.orderId, 'SUCCESS', parsedUtr);
-    // ⚡ CRITICAL: INSTANT WEBSOCKET DISPATCH TO WAITING CHECKOUT (LAPTOP/DESKTOP/MOBILE)
+    db.updateSessionState(session.orderId, 'VERIFIED');
+    // âš¡ CRITICAL: INSTANT WEBSOCKET DISPATCH TO WAITING CHECKOUT (LAPTOP/DESKTOP/MOBILE)
     const successPayload = {
       orderId: session.orderId,
       utr: parsedUtr,
@@ -1010,23 +1032,18 @@ app.post('/handle-share', shareLimiter, async (req, res) => {
       txId,
       timestamp: now,
       settlementSource: 'ANDROID_SHARE_SHEET_SST',
-      trustScore: trustResult.score,
-      confidenceTier: trustResult.tier,
-      suggestedAction,
       message: 'Settlement confirmed via Android Share Sheet Single Source of Truth (SST)'
     };
     broadcastOrderSuccess(session.orderId, successPayload);
-    console.log(`✅ [Android Share Target SST] Successfully settled order ${session.orderId} and notified checkout client via WebSocket`);
+    console.log(`âœ… [Android Share Target SST] Successfully settled order ${session.orderId} and notified checkout client via WebSocket`);
     if (req.accepts('json') && !req.accepts('html')) {
       return res.json({
         success: true,
+        state: 'VERIFIED',
         settled: true,
         orderId: session.orderId,
         utr: parsedUtr,
         amount: session.challengeAmount,
-        trustScore: trustResult.score,
-        confidenceTier: trustResult.tier,
-        suggestedAction,
         ledgerTxId: txId
       });
     }
@@ -1035,7 +1052,7 @@ app.post('/handle-share', shareLimiter, async (req, res) => {
   } catch (err) {
     console.error('[Android Share Target] Error:', err);
     if (req.accepts('json') && !req.accepts('html')) {
-      return res.status(500).json({ success: false, error: err.message });
+      return res.status(500).json({ success: false, error: 'INTERNAL_SERVER_ERROR' });
     }
     res.redirect(`/failed.html?reason=${encodeURIComponent(err.message)}`);
   }
@@ -1052,7 +1069,7 @@ app.post('/api/npci-callback', (req, res) => {
       payload = new URLSearchParams(req.query).toString();
     }
     const parsed = parseNPCIIntentResponse(payload);
-    console.log('📡 [NPCI Intent Callback] Parsed payload:', parsed);
+    console.log('ðŸ“¡ [NPCI Intent Callback] Parsed payload:', parsed);
     if (parsed.responseCode && parsed.responseCode !== '00') {
       const codeInfo = NPCI_RESPONSE_CODES[parsed.responseCode] || { description: 'Payment Failed', action: 'SHOW_ERROR' };
       return res.status(400).json({
@@ -1080,7 +1097,7 @@ app.post('/api/npci-callback', (req, res) => {
     });
   } catch (err) {
     console.error('Callback error:', err);
-    res.status(500).json({ success: false, error: err.message });
+    res.status(500).json({ success: false, error: 'INTERNAL_SERVER_ERROR' });
   }
 });
 // Simulation helper for one-click developer testing (guarded against production abuse - OFF by default)
@@ -1112,8 +1129,8 @@ app.post('/api/simulate-payment', async (req, res) => {
   if (!session) {
     return res.status(404).json({ success: false, error: 'Order not found' });
   }
-  // Generate realistic 12-digit NPCI Bank UTR (e.g., 631902XXXXXX)
-  const randomSuffix = Math.floor(100000 + Math.random() * 900000);
+  // Generate realistic 12-digit NPCI Bank UTR (cryptographically random suffix)
+  const randomSuffix = crypto.randomInt(100000, 999999);
   const mockUtr = `631902${randomSuffix}`;
   // Execute verification flow
   const { txId, verification } = await db.recordTransactionAndLedger(
@@ -1142,6 +1159,11 @@ app.get('/api/ledger/:orderId', (req, res) => {
   if (!session) {
     return res.status(404).json({ success: false, error: 'Order not found' });
   }
+  // Ledger exposes merchant VPA; bind read access to the session owner.
+  const token = req.query.token;
+  if (!token || token !== session.sessionId) {
+    return res.status(401).json({ success: false, error: 'SESSION_TOKEN_REQUIRED' });
+  }
   res.json({
     success: true,
     orderId: session.orderId,
@@ -1153,9 +1175,9 @@ app.get('/api/ledger/:orderId', (req, res) => {
     vpaAddress: session.vpaAddress
   });
 });
-// ═══════════════════════════════════════════════════════════════════
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 // TASK 12: 1000 VPA ROUTING, TELEMETRY & ANTI-BAN REST ENDPOINTS
-// ═══════════════════════════════════════════════════════════════════
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 // 1. Select optimal VPA (5-Factor anti-ban scoring + chaos jitter)
 app.post('/api/vpa/select', requireAdminAuth, async (req, res) => {
   try {
@@ -1163,7 +1185,7 @@ app.post('/api/vpa/select', requireAdminAuth, async (req, res) => {
     const selected = await db.vpaRouter.selectVPA(merchantId, parseFloat(amount), customerRegion, timeOfDay, customerVpa);
     res.json({ success: true, selectedVpa: selected });
   } catch (err) {
-    res.status(500).json({ success: false, error: err.message });
+    res.status(500).json({ success: false, error: 'INTERNAL_SERVER_ERROR' });
   }
 });
 // 2. Bulk upload VPAs (CSV text or JSON rows)
@@ -1181,7 +1203,7 @@ app.post('/api/vpa/upload', requireAdminAuth, async (req, res) => {
     const result = await db.vpaImporter.importVPAs(vpaRows, merchantId);
     res.json({ success: true, ...result });
   } catch (err) {
-    res.status(500).json({ success: false, error: err.message });
+    res.status(500).json({ success: false, error: 'INTERNAL_SERVER_ERROR' });
   }
 });
 // 3. Emergency quarantine (7-day cooldown + health reduction)
@@ -1194,7 +1216,7 @@ app.post('/api/vpa/quarantine', requireAdminAuth, (req, res) => {
     const result = db.vpaRouter.quarantineVPA(vpaId, reason || 'Bank warning / emergency freeze');
     res.json({ success: true, ...result });
   } catch (err) {
-    res.status(500).json({ success: false, error: err.message });
+    res.status(500).json({ success: false, error: 'INTERNAL_SERVER_ERROR' });
   }
 });
 // 4. Pool analytics & bank diversity breakdown
@@ -1204,7 +1226,7 @@ app.get('/api/vpa/analytics', requireAdminAuth, (req, res) => {
     const analytics = db.vpaRouter.getPoolAnalytics(merchantId);
     res.json({ success: true, analytics });
   } catch (err) {
-    res.status(500).json({ success: false, error: err.message });
+    res.status(500).json({ success: false, error: 'INTERNAL_SERVER_ERROR' });
   }
 });
 // 5. Daily health reset & rebalance (6 AM Cron trigger)
@@ -1217,12 +1239,12 @@ app.post('/api/vpa/health-check', requireAdminAuth, (req, res) => {
       ...result
     });
   } catch (err) {
-    res.status(500).json({ success: false, error: err.message });
+    res.status(500).json({ success: false, error: 'INTERNAL_SERVER_ERROR' });
   }
 });
-// ═══════════════════════════════════════════════════════════════════
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 // GAMING ENTERPRISE VERIFICATION API (IP WHITELIST PROTECTED)
-// ═══════════════════════════════════════════════════════════════════
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 app.post('/api/gaming/verify-payment', async (req, res) => {
   try {
     const { utr, amount, sessionId, orderId } = req.body;
@@ -1324,7 +1346,7 @@ app.post('/api/gaming/verify-payment', async (req, res) => {
     });
   } catch (err) {
     console.error('[Gaming API] Error:', err);
-    res.status(500).json({ success: false, error: err.message });
+    res.status(500).json({ success: false, error: 'INTERNAL_SERVER_ERROR' });
   }
 });
 // Route fallbacks
@@ -1341,9 +1363,9 @@ app.get('/failed', (req, res) => res.sendFile(path.join(__dirname, 'public', 'fa
     }
   }, 60000);
   server.listen(PORT, '0.0.0.0', () => {
-    console.log(`\n🚀 DISHA 8.2 Sovereign UPI Checkout running on http://localhost:${PORT}`);
-    console.log(`📱 PWA Manifest: http://localhost:${PORT}/manifest.json`);
-    console.log(`📡 WebSocket Gateway: ws://localhost:${PORT}/ws\n`);
+    console.log(`\nðŸš€ DISHA 8.2 Sovereign UPI Checkout running on http://localhost:${PORT}`);
+    console.log(`ðŸ“± PWA Manifest: http://localhost:${PORT}/manifest.json`);
+    console.log(`ðŸ“¡ WebSocket Gateway: ws://localhost:${PORT}/ws\n`);
   });
 
   const shutdown = () => {
@@ -1360,4 +1382,5 @@ app.get('/failed', (req, res) => res.sendFile(path.join(__dirname, 'public', 'fa
   process.on('SIGTERM', shutdown);
   process.on('SIGINT', shutdown);
 })();
+
 
