@@ -26,6 +26,7 @@ const MIME_TYPES = {
   '.html': 'text/html; charset=utf-8',
   '.css': 'text/css; charset=utf-8',
   '.js': 'application/javascript; charset=utf-8',
+  '.mjs': 'application/javascript; charset=utf-8',
   '.json': 'application/json; charset=utf-8',
   '.png': 'image/png',
   '.jpg': 'image/jpeg',
@@ -271,42 +272,6 @@ async function handleCinematicRequest(req, res) {
           return sendError(res, 404, `Order '${orderId}' not found`);
         }
         return sendJson(res, 200, { success: true, order });
-      }
-
-      // Payments: Test Simulator (Mark payment completed in test mode)
-      const simulateMatch = pathname.match(/^\/api\/merchant\/payments\/([^/]+)\/simulate$/);
-      if (simulateMatch && method === 'POST') {
-        const orderId = simulateMatch[1];
-
-        // Payment simulation is opt-in only. Disabled by default in every
-        // environment; enable with ALLOW_SIMULATION=true (never in production
-        // unless explicitly accepted).
-        const simulationAllowed = process.env.ALLOW_SIMULATION === 'true';
-        if (!simulationAllowed) {
-          return sendError(
-            res,
-            403,
-            'Payment simulation is disabled unless ALLOW_SIMULATION=true'
-          );
-        }
-
-        // Validate order existence (handled 404 rejection instead of 500 error)
-        const order = db.getMerchantOrderById(currentMerchant.id, orderId);
-        if (!order) {
-          return sendError(res, 404, `Order '${orderId}' not found`);
-        }
-
-        if (order.status === 'COMPLETED') {
-          return sendError(res, 400, `Order '${orderId}' is already settled`);
-        }
-
-        try {
-          const body = await readBody(req);
-          const completedOrder = db.simulateOrderPayment(currentMerchant.id, orderId, body.utr);
-          return sendJson(res, 200, { success: true, order: completedOrder });
-        } catch (simErr) {
-          return sendError(res, 400, simErr.message);
-        }
       }
 
       // UPI IDs: List
