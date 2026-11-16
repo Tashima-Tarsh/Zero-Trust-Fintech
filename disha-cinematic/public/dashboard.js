@@ -13,6 +13,7 @@ let activePaymentsSearch = '';
 
 // Check Authentication and Initialize
 document.addEventListener('DOMContentLoaded', async () => {
+  authToken = await window.dishaAuth.token();
   if (!authToken) {
     window.location.href = '/login';
     return;
@@ -1424,6 +1425,7 @@ document.getElementById('passwordForm')?.addEventListener('submit', async (e) =>
 
 // Logout
 window.handleLogout = async function() {
+  if (window.dishaAuth) return window.dishaAuth.signOut();
   try {
     await fetch('/api/auth/logout', {
       method: 'POST',
