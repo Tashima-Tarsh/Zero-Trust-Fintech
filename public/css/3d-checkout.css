@@ -1,45 +1,66 @@
 /* ══════════════════════════════════════════════════════════════════════════════
-   DISHA 8.2 — 3D Checkout CSS
+   DISHA 8.2 — Premium Design System
    Foreground-only 3D design. No background leakage.
-   Typography: Space Grotesk (display), Inter (body), JetBrains Mono (data)
+   Typography: Space Grotesk (display), Inter (UI), JetBrains Mono (data)
    ══════════════════════════════════════════════════════════════════════════════ */
-
 :root {
-  /* Brand palette — obsidian/indigo/teal */
-  --obsidian: #05070b;
+  /* Brand palette — Obsidian/Indigo/Emerald */
+  --bg: #05070b;
+  --bg-deep: #030406;
   --surface: #0a0d15;
-  --surface-elev: #111621;
-  --border: rgba(20, 184, 166, 0.25);
-  --border-dim: rgba(20, 184, 166, 0.10);
+  --surface-elev: #0f1526;
+  --border: rgba(20, 184, 166, 0.15);
+  --border-hover: rgba(20, 184, 166, 0.4);
+  --border-dim: rgba(255, 255, 255, 0.05);
 
   --text-primary: #f8fafc;
   --text-secondary: #94a3b8;
   --text-muted: #475569;
   --text-inverse: #05070b;
 
-  --teal: #10b981;
-  --teal-glow: rgba(20, 184, 166, 0.35);
-  --teal-soft: rgba(20, 184, 166, 0.10);
+  --emerald: #10b981;
+  --emerald-glow: rgba(20, 184, 166, 0.4);
+  --emerald-soft: rgba(20, 184, 166, 0.08);
+  --emerald-text: #065f46;
 
-  --indigo: #6366f1;
+  --indigo: #4f46e5;
   --indigo-glow: rgba(99, 102, 241, 0.35);
+  --indigo-text: #1e3a8a;
 
-  --emerald: #059669;
-  --rose: #ef4444;
   --amber: #f59e0b;
+  --amber-glow: rgba(245, 158, 111, 0.35);
 
-  --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.30);
-  --shadow-md: 0 8px 24px rgba(0, 0, 0, 0.40);
-  --shadow-lg: 0 16px 48px rgba(0, 0, 0, 0.50);
-  --shadow-glow: 0 0 30px rgba(20, 184, 166, 0.15);
+  --rose: #ef4444;
+  --rose-soft: rgba(239, 68, 68, 0.1);
 
-  --radius: 12px;
-  --radius-lg: 16px;
+  /* Shadows & Depth */
+  --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.3);
+  --shadow-md: 0 8px 24px rgba(0, 0, 0, 0.4);
+  --shadow-lg: 0 16px 48px rgba(0, 0, 0, 0.5);
+  --shadow-xl: 0 32px 64px rgba(0, 0, 0, 0.6);
+  --shadow-glow: 0 0 40px rgba(20, 184, 166, 0.15);
+  --shadow-indigo: 0 0 40px rgba(99, 102, 241, 0.15);
 
-  --font-sans: 'Space Grotesk', 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-  --font-mono: 'JetBrains Mono', 'SF Mono', Consolas, monospace;
+  /* Radius */
+  --radius: 16px;
+  --radius-lg: 24px;
+  --radius-xl: 32px;
+  --radius-pill: 9999px;
 
-  --transition: 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  /* Transitions */
+  --transition: 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  --transition-fast: 0.15s cubic-bezier(0.4, 0, 0.2, 1);
+
+  /* Fonts */
+  --font-display: "Space Grotesk", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  --font-sans: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  --font-mono: "JetBrains Mono", "SF Mono", Consolas, monospace;
+
+  /* Z-index */
+  --z-canvas: 0;
+  --z-base: 10;
+  --z-modal: 100;
+  --z-modal-overlay: 200;
 }
 
 * {
@@ -48,33 +69,58 @@
   padding: 0;
 }
 
-html, body {
-  height: 100%;
-  width: 100%;
-  background: var(--obsidian);
-  color: var(--text-primary);
-  font-family: var(--font-sans);
-  font-size: 16px;
-  line-height: 1.5;
-  -webkit-font-smoothing: antialiased;
-  overflow-x: hidden;
+ul[class], ol[class] {
+  padding: 0;
+  list-style: none;
 }
 
-/* Canvas sits behind everything but transparent where HTML shows through */
+body {
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--font-sans);
+  font-size: 16px;
+  line-height: 1.6;
+  overflow-x: hidden;
+  min-height: 100vh;
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+button {
+  font: inherit;
+  cursor: pointer;
+  background: none;
+  border: none;
+  color: inherit;
+}
+
+img, svg {
+  max-width: 100%;
+  display: block;
+}
+
+[hidden] {
+  display: none !important;
+}
+
+/* ── Canvas (Foreground 3D) ── */
 .disha-canvas {
   position: fixed;
   inset: 0;
   width: 100vw;
   height: 100vh;
-  z-index: 0;
+  z-index: var(--z-canvas);
   pointer-events: none;
   display: block;
 }
 
-/* Shell wraps all HTML content on top of canvas */
+/* ── Shell ── */
 .shell {
   position: relative;
-  z-index: 10;
+  z-index: var(--z-base);
   max-width: 1100px;
   margin: 0 auto;
   padding: 0 24px;
@@ -90,21 +136,27 @@ html, body {
   justify-content: space-between;
   padding: 24px 0;
   margin-bottom: 40px;
+  border-bottom: 1px solid var(--border);
 }
 
 .brand {
   display: flex;
   align-items: center;
-  gap: 12px;
-}
-
-.brand-mark {
-  display: flex;
-  align-items: center;
   gap: 10px;
 }
 
-.brand-name {
+.brand-mark {
+  width: 32px;
+  height: 32px;
+  background: linear-gradient(135deg, var(--indigo), var(--emerald));
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+}
+
+.brand-text {
   font-size: 1.5rem;
   font-weight: 800;
   letter-spacing: -0.02em;
@@ -115,7 +167,7 @@ html, body {
   font-size: 0.75rem;
   font-weight: 700;
   letter-spacing: 0.05em;
-  color: var(--teal);
+  color: var(--emerald);
   text-transform: uppercase;
   margin-left: 4px;
 }
@@ -142,7 +194,7 @@ html, body {
 }
 
 .nav-link:hover {
-  color: var(--teal);
+  color: var(--emerald);
 }
 
 .btn {
@@ -151,22 +203,21 @@ html, body {
   justify-content: center;
   gap: 8px;
   border: none;
-  border-radius: 10px;
+  border-radius: var(--radius);
   font-family: var(--font-sans);
-  font-weight: 700;
+  font-weight: 600;
   cursor: pointer;
   transition: all 0.2s ease;
 }
 
 .btn-primary {
-  background: var(--teal);
-  color: #05070b;
+  background: linear-gradient(135deg, var(--indigo), var(--emerald));
+  color: #fff;
   padding: 10px 20px;
   font-size: 0.85rem;
 }
 
 .btn-primary:hover {
-  background: #14b8a6;
   transform: translateY(-1px);
   box-shadow: var(--shadow-glow);
 }
@@ -180,54 +231,37 @@ html, body {
   width: 100%;
 }
 
-.btn-ghost {
-  background: rgba(255, 255, 255, 0.08);
-  color: var(--text-primary);
-  padding: 10px 20px;
-  font-size: 0.85rem;
-  border: 1px solid var(--border);
-}
-
-.btn-ghost:hover {
-  background: rgba(255, 255, 255, 0.15);
-}
-
 .btn-secondary {
-  background: rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.06);
   color: var(--text-primary);
   padding: 10px 16px;
   font-size: 0.85rem;
   font-weight: 600;
   border: 1px solid var(--border);
-  border-radius: 10px;
+  border-radius: var(--radius);
   cursor: pointer;
   transition: all 0.2s ease;
 }
 
 .btn-secondary:hover {
   background: rgba(255, 255, 255, 0.15);
+  border-color: var(--border-hover);
 }
 
-.btn-success {
-  background: var(--emerald);
-  color: #ffffff;
-}
-
-.btn-close {
+.btn-ghost {
   background: none;
   border: none;
   color: var(--text-muted);
   font-size: 1.25rem;
   cursor: pointer;
   padding: 6px;
+  border-radius: var(--radius);
+  transition: background 0.2s ease, color 0.2s ease;
 }
 
-.btn-close:hover {
+.btn-ghost:hover {
+  background: rgba(255, 255, 255, 0.05);
   color: var(--text-primary);
-}
-
-.btn-full {
-  width: 100%;
 }
 
 /* ── Hero ── */
@@ -259,7 +293,7 @@ html, body {
 
 .hero-line-2 {
   display: block;
-  color: var(--teal);
+  color: var(--emerald);
 }
 
 .hero-sub {
@@ -336,7 +370,7 @@ html, body {
 .modal-overlay {
   position: fixed;
   inset: 0;
-  z-index: 100;
+  z-index: var(--z-modal);
   background: rgba(5, 7, 11, 0.85);
   backdrop-filter: blur(12px);
   display: flex;
@@ -387,7 +421,7 @@ html, body {
 .brand-mark-small {
   width: 28px;
   height: 28px;
-  background: linear-gradient(135deg, var(--teal), var(--indigo));
+  background: linear-gradient(135deg, var(--indigo), var(--emerald));
   border-radius: 8px;
   display: flex;
   align-items: center;
@@ -400,13 +434,35 @@ html, body {
   height: 16px;
 }
 
+.brand-mark-small + span {
+  font-size: 1rem;
+  font-weight: 800;
+  color: var(--text-primary);
+}
+
+.btn-close {
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  font-size: 1.25rem;
+  cursor: pointer;
+  padding: 6px;
+  border-radius: var(--radius);
+  transition: background 0.2s ease, color 0.2s ease;
+}
+
+.btn-close:hover {
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--text-primary);
+}
+
+/* ── Checkout Steps ── */
 .modal-body {
   flex: 1;
   overflow-y: auto;
   padding: 24px;
 }
 
-/* ── Checkout Steps ── */
 .checkout-step {
   display: none;
   animation: slideIn 0.35s ease;
@@ -499,16 +555,16 @@ html, body {
 
 .qr-wrapper {
   position: relative;
-  margin: 0 auto 12px auto;
   width: 260px;
   height: 260px;
   border-radius: 10px;
+  overflow: hidden;
   background: #05070b;
   border: 1px solid var(--border);
-  overflow: hidden;
   display: flex;
   align-items: center;
   justify-content: center;
+  margin: 0 auto 12px auto;
 }
 
 .qr-wrapper canvas {
@@ -602,7 +658,7 @@ html, body {
   font-size: 0.8rem;
   font-weight: 700;
   color: #05070b;
-  margin-bottom: 8px;
+  margin-bottom: 6px;
 }
 
 .receipt-amount {
@@ -642,10 +698,6 @@ html, body {
   gap: 8px;
 }
 
-.btn-copy-clipboard {
-  flex: 1;
-}
-
 .utr-input-box {
   margin-top: 16px;
 }
@@ -654,7 +706,7 @@ html, body {
   width: 100%;
   padding: 12px;
   font-family: var(--font-mono);
-  font-size: 1rem;
+  font-size: 0.86rem;
   background: rgba(255, 255, 255, 0.04);
   border: 1px solid var(--border);
   border-radius: 8px;
@@ -678,7 +730,6 @@ html, body {
   display: flex;
   flex-direction: column;
   gap: 10px;
-  margin-bottom: 20px;
 }
 
 .layer-row {
@@ -796,8 +847,13 @@ html, body {
   padding-top: 12px;
 }
 
-.ledger-total .ledger-value {
+.ledger-row.ledger-total .ledger-value {
   color: var(--emerald);
+}
+
+.settlement-actions {
+  display: flex;
+  gap: 8px;
 }
 
 /* Responsive */

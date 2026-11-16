@@ -1,8 +1,8 @@
-/* ══════════════════════════════════════════════════════════════════════════════
-   DISHA 8.2 — 3D Scene Engine
-   Foreground Three.js visualization: floating payment nodes, trust score rings,
-   glowing transaction paths. Renders on transparent canvas over HTML.
-   ══════════════════════════════════════════════════════════════════════════════ */
+/* ═════════════════════════════════════════════════════════════════════════════
+   DISHA 8.2 — 3D Scene Engine (Premium)
+   Foreground Three.js scene: floating nodes, glowing transaction paths,
+   trust score rings. Renders on transparent canvas over HTML.
+   ═════════════════════════════════════════════════════════════════════════════ */
 
 class Disha3DScene {
   constructor(canvas) {
@@ -23,15 +23,12 @@ class Disha3DScene {
   }
 
   init() {
-    // Scene
     this.scene = new THREE.Scene();
 
-    // Camera
     this.camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 100);
-    this.camera.position.set(0, 2, 6);
+    this.camera.position.set(0, 2.5, 7);
     this.camera.lookAt(0, 0, 0);
 
-    // Renderer
     this.renderer = new THREE.WebGLRenderer({
       canvas: this.canvas,
       antialias: true,
@@ -40,47 +37,49 @@ class Disha3DScene {
     });
     this.renderer.setSize(window.innerWidth, window.innerHeight);
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-    this.renderer.setClearColor(0x05070b, 0); // transparent background
+    this.renderer.setClearColor(0x05070b, 0);
 
-    // Ambient light
-    const ambient = new THREE.AmbientLight(0xffffff, 0.3);
+    const ambient = new THREE.AmbientLight(0xffffff, 0.4);
     this.scene.add(ambient);
 
-    // Key light
-    const keyLight = new THREE.DirectionalLight(0x10b981, 1.5);
-    keyLight.position.set(3, 5, 4);
+    const keyLight = new THREE.DirectionalLight(0x10b981, 2);
+    keyLight.position.set(3, 6, 4);
+    keyLight.castShadow = true;
     this.scene.add(keyLight);
 
-    const fillLight = new THREE.DirectionalLight(0x6366f1, 0.8);
+    const fillLight = new THREE.DirectionalLight(0x4f46e5, 1.2);
     fillLight.position.set(-3, 2, -2);
     this.scene.add(fillLight);
 
-    // Build scene elements
+    const rimLight = new THREE.PointLight(0x10b981, 1);
+    rimLight.position.set(0, 4, -4);
+    this.scene.add(rimLight);
+
     this.buildNodes();
     this.buildPaths();
     this.buildRings();
 
-    // Start render loop
     this.animate();
   }
 
   buildNodes() {
-    const geometry = new THREE.IcosahedronGeometry(0.25, 2);
+    const geometry = new THREE.IcosahedronGeometry(0.28, 3);
     const material = new THREE.MeshStandardMaterial({
       color: 0x10b981,
       emissive: 0x10b981,
-      emissiveIntensity: 0.5,
-      metalness: 0.4,
+      emissiveIntensity: 0.6,
+      metalness: 0.5,
       roughness: 0.2
     });
 
     const positions = [
-      { x: -1.5, y: 0.8, z: -1 },
-      { x: 1.5, y: -0.5, z: -1 },
-      { x: -0.8, y: -1.2, z: 0 },
-      { x: 0.8, y: 1.0, z: 0 },
-      { x: 0, y: 2.0, z: -1.5 },
-      { x: -1.5, y: -0.8, z: 1 }
+      { x: -1.8, y: 1.0, z: -0.8 },
+      { x: 1.8, y: -0.5, z: -0.8 },
+      { x: -1.0, y: -1.4, z: 0 },
+      { x: 1.0, y: 1.2, z: 0 },
+      { x: 0, y: 2.2, z: -1.2 },
+      { x: -1.6, y: -0.9, z: 1.0 },
+      { x: 1.6, y: -0.2, z: 0.8 }
     ];
 
     positions.forEach((pos, i) => {
@@ -91,7 +90,7 @@ class Disha3DScene {
         basePos: { x: pos.x, y: pos.y, z: pos.z },
         scale: 1,
         active: false,
-        pulseOffset: i * 0.7
+        pulseOffset: i * 0.8
       };
       this.scene.add(mesh);
       this.nodes.push(mesh);
@@ -113,16 +112,16 @@ class Disha3DScene {
       const material = new THREE.LineBasicMaterial({
         color: 0x10b981,
         transparent: true,
-        opacity: 0.3
+        opacity: 0.25
       });
       const line = new THREE.Line(geometry, material);
       this.scene.add(line);
-      return { line, start, end, opacity: 0.3, targetOpacity: 0.3 };
+      return { line, start, end, opacity: 0.25, targetOpacity: 0.25 };
     });
   }
 
   buildRings() {
-    const ringGeo = new THREE.RingGeometry(0.2, 0.28, 32);
+    const ringGeo = new THREE.RingGeometry(0.2, 0.3, 32);
     const ringMat = new THREE.MeshBasicMaterial({
       color: 0x10b981,
       transparent: true,
@@ -136,9 +135,9 @@ class Disha3DScene {
       ring.userData = {
         scale: 0,
         opacity: 0,
-        maxScale: 1.5 + i * 0.5,
+        maxScale: 1.8 + i * 0.6,
         active: false,
-        delay: i * 0.4
+        delay: i * 0.5
       };
       this.scene.add(ring);
       this.rings.push(ring);
@@ -148,53 +147,55 @@ class Disha3DScene {
   setState(state) {
     this.state = state;
     if (state === 'idle') {
-      this.nodes.forEach((node, i) => {
+      this.nodes.forEach((node) => {
         node.userData.active = false;
         node.userData.scale = 1;
       });
       this.paths.forEach(p => {
-        p.targetOpacity = 0.3;
-        p.material.opacity = 0.3;
+        p.targetOpacity = 0.25;
+        p.material.opacity = 0.25;
       });
       this.rings.forEach(r => {
         r.userData.active = false;
         r.material.opacity = 0;
       });
     } else if (state === 'scanning') {
-      this.nodes.forEach((node, i) => {
+      this.nodes.forEach((node) => {
         node.userData.active = true;
-        node.userData.scale = 1.1;
+        node.userData.scale = 1.15;
       });
     } else if (state === 'verified') {
-      this.nodes.forEach((node, i) => {
+      this.nodes.forEach((node) => {
         node.userData.active = true;
-        node.userData.scale = 1.3;
+        node.userData.scale = 1.35;
       });
       this.paths.forEach(p => {
-        p.targetOpacity = 0.8;
+        p.targetOpacity = 0.85;
       });
     } else if (state === 'settled') {
-      this.nodes.forEach(node => {
+      this.nodes.forEach((node) => {
         node.userData.active = true;
-        node.userData.scale = 1.5;
-        node.material.emissiveIntensity = 1.5;
+        node.userData.scale = 1.6;
+        node.material.emissiveIntensity = 2;
       });
       this.rings.forEach((ring, i) => {
         ring.userData.active = true;
-        ring.userData.maxScale = 2 + i * 0.8;
-        ring.userData.delay = i * 0.3;
+        ring.userData.maxScale = 2.2 + i * 0.8;
+        ring.userData.delay = i * 0.35;
       });
     }
   }
 
   triggerSettle(utr, amount) {
     this.setState('settled');
-    const targetPos = new THREE.Vector3(0, 1, 4);
-    this.animateCamera(targetPos, new THREE.Vector3(0, 0, 0), 1.5);
+    const targetPos = new THREE.Vector3(0, 1.2, 4.5);
+    this.animateCamera(targetPos, new THREE.Vector3(0, 0, 0), 1.6);
   }
 
   animateCamera(targetPos, targetLook, duration) {
     const startPos = this.camera.position.clone();
+    const startLook = this.camera.position.clone();
+    this.camera.lookAt(targetLook);
     const start = performance.now();
 
     const animate = (time) => {
@@ -227,15 +228,15 @@ class Disha3DScene {
     this.nodes.forEach((node, i) => {
       const data = node.userData;
       if (data.active) {
-        const pulse = Math.sin(this.time * 3 + data.pulseOffset) * 0.1 + 1;
+        const pulse = Math.sin(this.time * 2.5 + data.pulseOffset) * 0.08 + 1;
         node.scale.setScalar(data.scale * pulse);
-        node.material.emissiveIntensity = 0.5 + Math.sin(this.time * 4 + i) * 0.3;
-        node.position.y = data.basePos.y + Math.sin(this.time * 2 + i) * 0.05;
-        node.position.z = data.basePos.z + Math.sin(this.time * 1.5 + i) * 0.05;
-        node.rotation.y += 0.01;
-        node.rotation.x += 0.005;
+        node.material.emissiveIntensity = 0.6 + Math.sin(this.time * 3 + i) * 0.4;
+        node.position.y = data.basePos.y + Math.sin(this.time * 2 + i) * 0.04;
+        node.position.z = data.basePos.z + Math.sin(this.time * 1.5 + i) * 0.04;
+        node.rotation.y += 0.012;
+        node.rotation.x += 0.006;
       } else {
-        node.scale.setScalar(1 + Math.sin(this.time * 2 + i) * 0.02);
+        node.scale.setScalar(1 + Math.sin(this.time * 2 + i) * 0.015);
         node.position.y = data.basePos.y;
         node.position.z = data.basePos.z;
         node.material.emissiveIntensity = 0.3;
@@ -243,22 +244,20 @@ class Disha3DScene {
     });
 
     this.paths.forEach((p, i) => {
-      if (p.line.material.opacity !== undefined) {
-        if (this.state === 'scanning' || this.state === 'verified' || this.state === 'settled') {
-          p.targetOpacity = 0.8;
-          const glow = Math.sin(this.time * 4 + i) * 0.3 + 0.5;
-          p.material.opacity = THREE.MathUtils.lerp(p.material.opacity, p.targetOpacity, 0.05);
-          p.material.color.setHex(0x10b981);
-        } else {
-          p.material.opacity = THREE.MathUtils.lerp(p.material.opacity, 0.3, 0.05);
-        }
+      if (this.state === 'scanning' || this.state === 'verified' || this.state === 'settled') {
+        p.targetOpacity = 0.8;
+        const glow = Math.sin(this.time * 3 + i) * 0.2 + 0.5;
+        p.material.opacity = THREE.MathUtils.lerp(p.material.opacity, p.targetOpacity, 0.06);
+        p.material.color.setHex(0x10b981);
+      } else {
+        p.material.opacity = THREE.MathUtils.lerp(p.material.opacity, 0.25, 0.05);
       }
     });
 
     this.rings.forEach((ring, i) => {
       const data = ring.userData;
       if (data.active) {
-        data.scale += 0.04;
+        data.scale += 0.035;
         data.opacity = Math.max(0, 1 - data.scale / data.maxScale);
         ring.scale.setScalar(data.scale);
         ring.material.opacity = data.opacity;
