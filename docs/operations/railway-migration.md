@@ -1,10 +1,10 @@
 # Railway migration and agent connections
 
-Status as of 2026-11-16: PREPARATION ONLY. No migration, DNS cutover, database restore, or Clerk integration has been completed.
+Status as of 2026-11-16: INITIAL APP ONLINE, MIGRATION INCOMPLETE. No DNS cutover, database restore, or Clerk integration has been completed.
 
 ## Confirmed blockers
 
-- Railway workspace NITISH KUMAR's Projects shows Trial expired; project brave-gratitude has 0 of 2 services online. An account owner must restore an active plan before deployment.
+- The first Railway login was the wrong account. The corrected account shows 30 days OR $5.00 credit remaining. Project patient-presence (62335465-abaa-4269-ba72-e87ddbba908c), production environment 6491bbe6-0841-446b-81ea-8334a153f999, now has an initial Zero-Trust-Fintech service a487c30e-0424-4bc9-af3a-0ccc9943cf70 marked Online. Data migration, persistent volumes, API cutover and external health verification remain incomplete. GitHub app connection is waiting on GitHub Mobile sudo verification; the current source settings show auto deploy unavailable.
 - This change configures MCP endpoints, not authenticated sessions. Complete each editor's OAuth flow, then verify a read-only account/project call.
 - The original Windows checkout at D:\Downloads\Zero-Trust-Fintech is outside this session's writable directories. These changes are on the ops/railway-agent-connections branch, not installed in that checkout.
 
@@ -12,7 +12,7 @@ Status as of 2026-11-16: PREPARATION ONLY. No migration, DNS cutover, database r
 
 Kilo 7.8 uses .kilo/kilo.jsonc with a top-level mcp object. VS Code uses .vscode/mcp.json with a servers object. Both contain GitHub, Railway, Cloudflare, Clerk, and Resend remote endpoints; the existing VS Code n8n connection is retained. No access tokens or secrets belong in these files. Each client maintains its own authentication; one client's login does not authenticate all agents.
 
-In Kilo, run `kilo mcp list`, authenticate each pending server with `kilo mcp auth <name>`, and run the list command again. OAuth access must be reviewed by the account owner. In VS Code, start the configured MCP servers and complete their authentication prompts. Validate repository access, Railway project listing, Cloudflare account/domain access, Clerk application access, and Resend domain listing with read-only tool calls before attempting writes. A model must support tool calling; adding MCP cannot fix a provider/model that rejects tools.
+In Kilo, run `kilo mcp list`, authenticate Railway, Cloudflare, Clerk and Resend with `kilo mcp auth <name>`, and run the list command again. OAuth access must be reviewed by the account owner. Kilo cannot dynamically register with GitHub's OAuth server. Its GitHub entry sets oauth=false. Merge docs/operations/kilo-global-mcp.example.jsonc into the trusted global ~/.config/kilo/kilo.jsonc configuration, preserving all other settings, and supply a repository-scoped GITHUB_MCP_TOKEN in the editor environment. Do not put the token in project files. The env reference belongs in trusted global configuration because Kilo restricts env expansion in repository configuration. VS Code can use its native GitHub authentication separately. The token is still required; GitHub is not connected merely by adding the endpoint. In VS Code, start the configured MCP servers and complete their authentication prompts. Validate repository access, Railway project listing, Cloudflare account/domain access, Clerk application access, and Resend domain listing with read-only tool calls before attempting writes. A model must support tool calling; adding MCP cannot fix a provider/model that rejects tools.
 
 ## Data inventory before migration
 
