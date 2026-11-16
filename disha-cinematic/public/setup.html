@@ -10,8 +10,10 @@
   <link rel="stylesheet" href="/styles.css">
   <link rel="stylesheet" href="/disha-console.css">
   <link rel="icon" type="image/png" href="/assets/disha-symbol-transparent.png">
+  <script src="/auth-client.js"></script>
 </head>
 <body class="setup-body">
+<div id="disha-account" style="position:fixed;right:20px;top:18px;z-index:1000"></div>
 
   <div class="setup-wrapper">
     <div class="setup-card">
@@ -198,6 +200,7 @@
 
     // Auth Guard
     (async () => {
+      token = await window.dishaAuth.token();
       if (!token) {
         window.location.href = '/login';
         return;
@@ -340,6 +343,7 @@
     };
 
     window.handleLogout = async function() {
+      if (window.dishaAuth) return window.dishaAuth.signOut();
       try {
         await fetch('/api/auth/logout', { method: 'POST' });
       } catch (_) {}
