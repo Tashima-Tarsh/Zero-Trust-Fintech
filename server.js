@@ -1340,10 +1340,24 @@ app.get('/failed', (req, res) => res.sendFile(path.join(__dirname, 'public', 'fa
       db.resetDailyVPAs();
     }
   }, 60000);
-  server.listen(PORT, () => {
+  server.listen(PORT, '0.0.0.0', () => {
     console.log(`\n🚀 DISHA 8.2 Sovereign UPI Checkout running on http://localhost:${PORT}`);
     console.log(`📱 PWA Manifest: http://localhost:${PORT}/manifest.json`);
     console.log(`📡 WebSocket Gateway: ws://localhost:${PORT}/ws\n`);
   });
+
+  const shutdown = () => {
+    console.log('\nReceived kill signal, shutting down gracefully...');
+    server.close(() => {
+      console.log('Closed HTTP & WebSocket servers.');
+      process.exit(0);
+    });
+    setTimeout(() => {
+      console.error('Forcefully terminating process after timeout');
+      process.exit(1);
+    }, 10000);
+  };
+  process.on('SIGTERM', shutdown);
+  process.on('SIGINT', shutdown);
 })();
 

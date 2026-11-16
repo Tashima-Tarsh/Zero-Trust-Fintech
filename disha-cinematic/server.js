@@ -680,6 +680,20 @@ if (require.main === module) {
     console.log(`   > Merchant Dashboard: http://localhost:${PORT}/dashboard`);
     console.log(`============================================================`);
   });
+
+  const shutdown = () => {
+    console.log('\nReceived kill signal, shutting down gracefully...');
+    server.close(() => {
+      console.log('Closed Merchant SaaS HTTP server.');
+      process.exit(0);
+    });
+    setTimeout(() => {
+      console.error('Forcefully terminating process after timeout');
+      process.exit(1);
+    }, 10000);
+  };
+  process.on('SIGTERM', shutdown);
+  process.on('SIGINT', shutdown);
 }
 
 module.exports = {
