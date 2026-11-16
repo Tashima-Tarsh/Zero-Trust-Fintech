@@ -1,0 +1,312 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>DISHA 8.2 — Sovereign UPI Checkout</title>
+  <meta name="description" content="Zero-fee, fraud-proof UPI payment rail. Direct bank-to-bank settlement with 7-layer verification.">
+  <meta name="theme-color" content="#05070b">
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='18' fill='%2305070b'/%3E%3Cpath d='M15 32h34M32 15v34' stroke='%2310b981' stroke-width='6' stroke-linecap='round'/%3E%3C/svg%3E">
+
+  <!-- Premium typography -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@600;700;800&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;600;700&display=swap" rel="stylesheet">
+
+  <link rel="stylesheet" href="css/3d-checkout.css">
+</head>
+<body>
+
+  <!-- ========================================================================
+       FOREGROUND 3D CANVAS — Three.js scene floats over clean HTML/CSS
+       No background image, no layout shift, pure foreground depth
+       ======================================================================== -->
+  <canvas id="disha-canvas" class="disha-canvas"></canvas>
+
+  <!-- ========================================================================
+       UI LAYER — All HTML/CSS sits on top of the 3D canvas
+       ======================================================================== -->
+  <div class="shell">
+
+    <!-- Header -->
+    <header class="shell-header">
+      <div class="brand">
+        <div class="brand-mark">
+          <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+            <rect x="3" y="3" width="18" height="18" rx="4"></rect>
+            <path d="M9 9l6 6M15 9l-6 6"></path>
+          </svg>
+          <div class="brand-text">
+            <span class="brand-name">DISHA</span>
+            <span class="brand-version">8.2</span>
+          </div>
+        </div>
+        <div class="brand-tagline">
+          Payments that confirm themselves.
+        </div>
+      </div>
+
+      <nav class="shell-nav">
+        <a href="#how-it-works" class="nav-link">How it works</a>
+        <a href="#seven-layers" class="nav-link">7-layer trust</a>
+        <button type="button" class="btn btn-primary btn-start" id="btnStart">
+          Start Checkout
+        </button>
+      </nav>
+    </header>
+
+    <!-- ========================================================================
+         HERO — Value proposition + live checkout trigger
+         ======================================================================== -->
+    <main class="hero">
+      <div class="hero-content">
+        <h1 class="hero-title">
+          <span class="hero-line-1">Collect UPI payments</span>
+          <span class="hero-line-2">straight into your own bank account.</span>
+        </h1>
+        <p class="hero-sub">
+          Every payment is verified before an order is marked paid. No gateway holds funds.
+          No 2–3% platform fee. No escrow. Money flows customer → merchant, direct on NPCI.
+        </p>
+
+        <div class="hero-stats">
+          <div class="stat">
+            <span class="stat-value">0%</span>
+            <span class="stat-label">Gateway MDR</span>
+          </div>
+          <div class="stat">
+            <span class="stat-value">T+0</span>
+            <span class="stat-label">Instant settlement</span>
+          </div>
+          <div class="stat">
+            <span class="stat-value">0%</span>
+            <span class="stat-label">Fraud rate</span>
+          </div>
+        </div>
+
+        <div class="hero-actions">
+          <button type="button" class="btn btn-primary btn-lg" id="btnOpenCheckout">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0l4 4v4"></path>
+            </svg>
+            Start a Checkout Session
+          </button>
+          <a href="#how-it-works" class="btn btn-ghost">How it works →</a>
+        </div>
+      </div>
+
+      <div class="hero-preview" id="heroPreview">
+        <!-- Live checkout preview injected here via JS -->
+        <div class="preview-placeholder">
+          <div class="preview-icon">
+            <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+              <path d="M9 9l6 6M15 9l-6 6"></path>
+            </svg>
+          </div>
+          <p>Start a session to see live UPI verification</p>
+        </div>
+      </div>
+    </main>
+
+    <!-- ========================================================================
+         CHECKOUT MODAL — Full checkout flow in 3D context
+         ======================================================================== -->
+    <div class="modal-overlay" id="checkoutModal">
+      <div class="modal-card">
+        <div class="modal-header">
+          <div class="modal-brand">
+            <div class="brand-mark-small">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <rect x="3" y="3" width="18" height="18" rx="4"></rect>
+                <path d="M9 9l6 6M15 9l-6 6"></path>
+              </svg>
+              <span>DISHA 8.2</span>
+            </div>
+            <button type="button" class="btn btn-ghost btn-close" id="btnCloseCheckout">✕</button>
+          </div>
+        </div>
+
+        <div class="modal-body">
+          <!-- Step 1: Session creation -->
+          <div class="checkout-step" id="stepCreate" data-step="1">
+            <div class="step-badge">1</div>
+            <h2 class="step-title">Create Checkout Session</div>
+            <div class="amount-control">
+              <label class="amount-label">Base amount (₹)</label>
+              <input type="number" id="orderAmount" class="amount-input" value="500" min="1" step="0.01">
+            </div>
+            <div class="amount-hint">Challenge amount auto-adds 11–99 paise (e.g. ₹500.37). Random per session.</div>
+            <button type="button" class="btn btn-primary btn-full" id="btnCreateSession">
+              Create Session & Generate QR
+            </button>
+          </div>
+
+          <!-- Step 2: QR Display -->
+          <div class="checkout-step hidden" id="stepQr" data-step="2">
+            <div class="step-badge">2</div>
+            <h2 class="step-title">Customer Pays via UPI App</div>
+            <div class="qr-card">
+              <canvas id="qrCanvas" width="300" height="300"></canvas>
+              <div class="qr-overlay">
+                <div class="qr-label">Scan to Pay</div>
+                <div class="qr-challenge" id="qrChallenge">₹0.00</div>
+                <div class="qr-countdown" id="qrCountdown">Refreshes in <span id="qrCountdownVal">15</span>s</div>
+              </div>
+            </div>
+            <div class="qr-instructions">
+              <p>Customer opens PhonePe, GPay, Paytm, or BHIM → scans QR → pays via UPI PIN.</p>
+              <p class="qr-hint">Money goes directly to your bank account via NPCI. DISHA never holds funds.</p>
+            </div>
+          </div>
+
+          <!-- Step 3: Receipt Share -->
+          <div class="checkout-step hidden" id="stepShare" data-step="3">
+            <div class="step-badge">3</div>
+            <h2 class="step-title">Customer Shares Receipt</div>
+            <div class="share-card">
+              <div class="share-phone">
+                <div class="phone-screen">
+                  <div class="receipt-preview">
+                    <div class="receipt-header">Payment Successful</div>
+                    <div class="receipt-amount">₹<span id="receiptAmount">0.00</span></div>
+                    <div class="receipt-utr">UTR: <span id="receiptUtr">----------</span></div>
+                    <div class="receipt-status">Status: Successful</div>
+                  </div>
+                  <div class="copy-instruction">
+                    <span class="copy-icon">📋</span>
+                    <span>Tap "Copy UTR" in your UPI app</span>
+                  </div>
+                </div>
+              </div>
+              <div class="share-actions">
+                <button type="button" class="btn btn-secondary btn-copy-clipboard" id="btnCopyClipboard">
+                  Read from Clipboard
+                </button>
+                <div class="clipboard-hint">Customer shares receipt via Android Web Share Target → clipboard → paste here</div>
+              </div>
+              <div class="utr-input-box">
+                <input type="text" id="manualUtr" class="font-mono" placeholder="Paste 12-digit UTR here..." maxlength="12">
+                <button type="button" class="btn btn-secondary" id="btnVerifyManual">Verify UTR</button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Step 4: Verification -->
+          <div class="checkout-step hidden" id="stepVerify" data-step="4">
+            <div class="step-badge">4</div>
+            <h2 class="step-title">Zero-Trust Verification</div>
+            <div class="verification-card">
+              <div class="fraud-layers" id="fraudLayers">
+                <!-- 7 layers injected via JS -->
+              </div>
+              <div class="verification-result" id="verificationResult" style="display: none;">
+                <div class="result-badge success" id="resultBadge">PASS</div>
+                <div class="result-detail" id="resultDetail"></div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Step 5: Settlement -->
+          <div class="checkout-step hidden" id="stepSettle" data-step="5">
+            <div class="step-badge">5</div>
+            <h2 class="step-title">Settlement & Ledger</div>
+            <div class="settlement-card">
+              <div class="ledger-preview">
+                <div class="ledger-row ledger-debit">
+                  <span class="ledger-account">Asset: Bank</span>
+                  <span class="ledger-entry debit">₹<span id="ledgerDebit">0.00</span></span>
+                </div>
+                <div class="ledger-row ledger-credit">
+                  <span class="ledger-account">Revenue: Sales</span>
+                  <span class="ledger-entry credit">₹<span id="ledgerCredit">0.00</span></span>
+                </div>
+                <div class="ledger-divider"></div>
+                <div class="ledger-row ledger-total">
+                  <span class="ledger-label">Balance</span>
+                  <span class="ledger-value">₹0.00</span>
+                </div>
+              </div>
+              <div class="settlement-actions">
+                <button type="button" class="btn btn-success btn-full" id="btnNewOrder">
+                  Create Another Session
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
+  <script src="js/3d-scene.js"></script>
+  <script src="js/3d-payment-flow.js"></script>
+  <script>
+    // Initialize 3D scene
+    const scene3d = new Disha3DScene(document.getElementById('disha-canvas'));
+
+    // Initialize payment flow
+    const paymentFlow = new DishaPaymentFlow({
+      sessionEndpoint: '/api/session/new',
+      verifyEndpoint: '/api/verify',
+      onSessionCreated: (session) => {
+        document.getElementById('qrChallenge').textContent = '₹' + session.challengeAmount.toFixed(2);
+        document.getElementById('receiptAmount').textContent = session.challengeAmount.toFixed(2);
+      },
+      onSettled: (result) => {
+        document.getElementById('ledgerDebit').textContent = result.amount.toFixed(2);
+        document.getElementById('ledgerCredit').textContent = result.amount.toFixed(2);
+        scene3d.triggerSettle(result.utr, result.amount);
+      }
+    });
+
+    // Wire up buttons
+    document.getElementById('btnStart').addEventListener('click', () => {
+      document.getElementById('checkoutModal').classList.remove('hidden');
+      document.getElementById('stepCreate').classList.remove('hidden');
+      scene3d.setState('idle');
+    });
+
+    document.getElementById('btnOpenCheckout').addEventListener('click', () => {
+      document.getElementById('checkoutModal').classList.remove('hidden');
+      document.getElementById('stepCreate').classList.remove('hidden');
+      scene3d.setState('idle');
+    });
+
+    document.getElementById('btnCloseCheckout').addEventListener('click', () => {
+      document.getElementById('checkoutModal').classList.add('hidden');
+      scene3d.setState('idle');
+    });
+
+    document.getElementById('btnCreateSession').addEventListener('click', () => {
+      const amount = parseFloat(document.getElementById('orderAmount').value);
+      if (!amount || amount <= 0) {
+        alert('Enter a valid amount');
+        return;
+      }
+      paymentFlow.createSession(amount);
+    });
+
+    document.getElementById('btnCopyClipboard').addEventListener('click', () => {
+      paymentFlow.readClipboard();
+    });
+
+    document.getElementById('btnVerifyManual').addEventListener('click', () => {
+      const utr = document.getElementById('manualUtr').value.trim();
+      if (utr) paymentFlow.verifyUtr(utr);
+    });
+
+    document.getElementById('btnNewOrder').addEventListener('click', () => {
+      document.getElementById('stepSettle').classList.add('hidden');
+      document.getElementById('stepCreate').classList.remove('hidden');
+      scene3d.setState('idle');
+    });
+
+    // Start 3D animation loop
+    scene3d.start();
+  </script>
+</body>
+</html>
