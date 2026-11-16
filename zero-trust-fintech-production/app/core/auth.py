@@ -33,9 +33,14 @@ def _b64url_decode(data_str: str) -> bytes:
 
 
 def _get_jwt_secret() -> str:
-    return getattr(settings, "JWT_SECRET_KEY", None) or getattr(
-        settings, "SECRET_KEY", "zerotrust-fintech-jwt-secret-key-32bytes-minimum!"
+    secret = getattr(settings, "JWT_SECRET_KEY", None) or getattr(
+        settings, "SECRET_KEY", None
     )
+    if not secret:
+        raise RuntimeError(
+            "JWT_SECRET_KEY and SECRET_KEY are not configured; set them via env or .env"
+        )
+    return secret
 
 
 def _jwt_encode(payload: dict, secret: str, algorithm: str = "HS256") -> str:

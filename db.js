@@ -24,27 +24,13 @@ const dbAccessor = {
 vpaRouter = new VPARouter(dbAccessor);
 vpaImporter = new VPAImporter(dbAccessor);
 
-// Attempt PostgreSQL initialization if DATABASE_URL is set and reachable
+// Attempt PostgreSQL initialization if DATABASE_URL is set and reachable.
+// NOTE: SQLite (session / order / VPA store) is ALWAYS initialized first so
+// sessions can never silently disappear when only Postgres is configured.
 async function initDb() {
-  const dbUrl = process.env.DATABASE_URL;
-  if (dbUrl && !dbUrl.includes('localhost:5432/disha82')) {
-    try {
-      const { Pool } = require('pg');
-      const testPool = new Pool({ connectionString: dbUrl, connectionTimeoutMillis: 2000 });
-      const client = await testPool.connect();
-      await client.query('SELECT 1');
-      client.release();
-      pgPool = testPool;
-      isPostgres = true;
-      console.log('✅ [Database] Connected to PostgreSQL at', dbUrl.split('@')[1] || 'remote host');
-      await setupPostgresTables();
-      return;
-    } catch (err) {
-      console.log('ℹ️ [Database] PostgreSQL unavailable (' + err.message + '). Falling back to native SQLite.');
-    }
-  }
+  let sqliteOk = false;
 
-  // Fallback to Node.js native node:sqlite
+  // 1. Native SQLite session store — always required.
   try {
     const { DatabaseSync } = require('node:sqlite');
     const dbPath = join(__dirname, 'disha82.db');
@@ -53,10 +39,40 @@ async function initDb() {
     sqliteDb.exec('PRAGMA busy_timeout = 5000;');
     sqliteDb.exec('PRAGMA synchronous = NORMAL;');
     sqliteDb.exec('PRAGMA foreign_keys = ON;');
-    console.log('✅ [Database] Initialized Native SQLite Store at', dbPath);
     setupSqliteTables();
+    sqliteOk = true;
+    console.log('✅ [Database] Initialized Native SQLite Store at', dbPath);
   } catch (err) {
     console.error('❌ [Database] Failed to initialize SQLite:', err.message);
+  }
+
+  // 2. PostgreSQL (ledger / VPA analytics) — additive, never replaces SQLite.
+  const dbUrl = process.env.DATABASE_URL;
+  if (dbUrl && !dbUrl.includes('localhost:5432/disha82') && sqliteOk) {
+    try {
+      const { Pool } = require('pg');
+      const testPool = new Pool({ connectionString: dbUrl, connectionTimeoutMillis: 2000 });
+      const client = await testPool.connect();
+      await client.query('SELECT 1');
+      client.release();
+      pgPool = testPool;
+      isPostgres = true;
+      console.log(
+        '✅ [Database] Connected to PostgreSQL at',
+        dbUrl.split('@')[1] || 'remote host'
+      );
+      await setupPostgresTables();
+    } catch (err) {
+      console.log(
+        'ℹ️ [Database] PostgreSQL unavailable (' + err.message + '). Continuing SQLite-only.'
+      );
+    }
+  }
+
+  if (!sqliteOk) {
+    throw new Error(
+      'Database initialization failed: SQLite session store could not be created'
+    );
   }
 }
 

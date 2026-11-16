@@ -263,15 +263,24 @@ def _b64url_decode(data_str: str) -> bytes:
     return base64.urlsafe_b64decode(data_str)
 
 
+def _jwt_secret() -> str:
+    secret = getattr(settings, "SECRET_KEY", None) or getattr(
+        settings, "JWT_SECRET_KEY", None
+    )
+    if not secret:
+        raise RuntimeError(
+            "SECRET_KEY/JWT_SECRET_KEY are not configured; set them via env or .env"
+        )
+    return secret
+
+
 def create_jwt_token(
     merchant_id: str, user_id: str = None, expires_in_seconds: int = 86400
 ) -> str:
     """
     Create signed HS256 JWT token for authenticated WebSocket and API access.
     """
-    secret = getattr(
-        settings, "SECRET_KEY", "zerotrust-fintech-jwt-secret-key-32bytes-minimum!"
-    )
+    secret = _jwt_secret()
     user_id = user_id or merchant_id
     now = time.time()
     payload = {
@@ -303,9 +312,7 @@ def verify_jwt_token(token: str) -> dict:
         raise JWTError("Invalid JWT token format")
 
     h_b64, p_b64, s_b64 = parts
-    secret = getattr(
-        settings, "SECRET_KEY", "zerotrust-fintech-jwt-secret-key-32bytes-minimum!"
-    )
+    secret = _jwt_secret()
     msg = f"{h_b64}.{p_b64}"
 
     import hashlib

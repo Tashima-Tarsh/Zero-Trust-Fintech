@@ -25,7 +25,9 @@ const { IPWhitelistMiddleware } = require('./middleware/ip-whitelist');
 const adminRoutes = require('./routes/admin/ip-whitelist');
 const { handleCinematicRequest } = require('./disha-cinematic/server');
 const app = express();
-app.set('trust proxy', false);
+// Trust proxy only when explicitly opted in (e.g. behind Render/Cloudflare).
+// Never on by default: X-Forwarded-For is trivially spoofable otherwise.
+app.set('trust proxy', process.env.TRUST_PROXY === 'true');
 const server = http.createServer(app);
 const wss = new WebSocketServer({ server, path: '/ws' });
 const PORT = process.env.PORT || 3000;
@@ -122,6 +124,7 @@ function createRateLimiter(windowMs, maxRequests, message) {
 }
 const checkoutLimiter = createRateLimiter(60000, 120, 'Rate limit exceeded on checkout session creation.');
 const verifyLimiter = createRateLimiter(60000, 60, 'Rate limit exceeded on payment verification.');
+const shareLimiter = createRateLimiter(60000, 10, 'Rate limit exceeded on receipt sharing.');
 // ── Idempotency (Redis-backed, in-memory fallback) ──
 let redis;
 try {
@@ -267,7 +270,40 @@ app.use('/api/gaming/*', ipWhitelist.check());
 // TASK 11: WEBSOCKET REAL-TIME CONNECTION HUB
 // ═══════════════════════════════════════════════════════════════════
 const orderWsClients = new Map(); // Map<orderId, Set<WebSocket>>
+// Per-IP WebSocket connection rate limit (prevents orderId scanning / connection
+// exhaustion). Keyed by the client IP seen through the trusted-proxy chain when
+// TRUST_PROXY is set, otherwise by the direct socket address.
+const wsConnectionHits = new Map();
+const WS_CONNECTION_WINDOW_MS = 60000;
+const WS_MAX_CONNECTIONS = 15;
+function wsClientIp(req) {
+  if (app.get('trust proxy') && req.headers['x-forwarded-for']) {
+    return req.headers['x-forwarded-for'].split(',')[0].trim();
+  }
+  return (req.socket && req.socket.remoteAddress) || '127.0.0.1';
+}
+function wsRateLimit(ip) {
+  const now = Date.now();
+  const cutoff = now - WS_CONNECTION_WINDOW_MS;
+  const hits = (wsConnectionHits.get(ip) || []).filter((t) => t > cutoff);
+  if (hits.length >= WS_MAX_CONNECTIONS) return false;
+  hits.push(now);
+  wsConnectionHits.set(ip, hits);
+  // Tidy stale buckets
+  const keys = Array.from(wsConnectionHits.keys());
+  for (const k of keys) {
+    const arr = (wsConnectionHits.get(k) || []).filter((t) => t > cutoff);
+    if (arr.length === 0) wsConnectionHits.delete(k);
+    else wsConnectionHits.set(k, arr);
+  }
+  return true;
+}
 wss.on('connection', (ws, req) => {
+  const wsIp = wsClientIp(req);
+  if (!wsRateLimit(wsIp)) {
+    ws.close(4429, 'Too many WebSocket connections. Slow down.');
+    return;
+  }
   const url = new URL(req.url, `http://${req.headers.host || 'localhost'}`);
   const orderId = url.searchParams.get('orderId');
   // Verify orderId parameter and assert session exists in database
@@ -827,7 +863,7 @@ app.post('/api/verify', verifyLimiter, async (req, res) => {
 // ═══════════════════════════════════════════════════════════════════
 // TASK 7: ANDROID WEB SHARE TARGET (SINGLE SOURCE OF TRUTH SETTLEMENT)
 // ═══════════════════════════════════════════════════════════════════
-app.post('/handle-share', async (req, res) => {
+app.post('/handle-share', shareLimiter, async (req, res) => {
   try {
     const { title, text, url } = req.body || {};
     const rawReceipt = [title, text, url].filter(Boolean).join('\n');
@@ -848,13 +884,32 @@ app.post('/handle-share', async (req, res) => {
       return res.redirect(`/failed.html?reason=${encodeURIComponent('Could not extract 12-digit UTR or amount from shared receipt')}`);
     }
     // RESOLVE SESSION: Match by explicit orderId OR by Unique Mathematical Challenge Amount!
+    // Amount-match is a fallback only: a session can be claimed once this way so one IP
+    // cannot hijack another customer's live session by guessing the challenge amount.
     let session = null;
+    let resolvedByAmount = false;
+    const clientIp = req.ip || (req.socket && req.socket.remoteAddress) || '127.0.0.1';
     if (detectedOrderId) {
       session = db.findSessionByOrderId(detectedOrderId);
     }
     if (!session && parsedAmount) {
-      // Find active pending session by the exact unique challenge paise
       session = db.findSessionByAmount(parsedAmount);
+      resolvedByAmount = true;
+    }
+    if (resolvedByAmount && session) {
+      if (session.shareClaimed) {
+        if (req.accepts('json') && !req.accepts('html')) {
+          return res.status(409).json({
+            success: false,
+            error: 'SESSION_ALREADY_CLAIMED',
+            message: 'This checkout session has already been claimed by another share.'
+          });
+        }
+        return res.redirect('/failed.html?reason=This checkout session was already claimed by another share.');
+      }
+      session.shareClaimed = true;
+      session.shareClaimedBy = clientIp;
+      session.shareClaimedAt = Date.now();
     }
     if (!session) {
       if (req.accepts('json') && !req.accepts('html')) {

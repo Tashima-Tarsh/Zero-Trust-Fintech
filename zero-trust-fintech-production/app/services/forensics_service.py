@@ -89,28 +89,35 @@ class ForensicsService:
                 await asyncio.sleep(5)
 
     async def _run_ela_analysis(self, image_data: Any) -> Dict[str, Any]:
-        """Run Error Level Analysis on receipt bitmap"""
+        """Run Error Level Analysis on receipt bitmap.
+
+        NOTE: This is a stub. Real ELA is not implemented; do not treat the
+        result as forensic evidence. Returns performed=False so callers know
+        no analysis was actually performed.
+        """
         return {
-            "manipulation_detected": False,
-            "confidence": 0.95,
-            "details": "Compression levels uniform across image canvas",
+            "performed": False,
+            "reason": "ELA analyzer not implemented",
         }
 
     async def _run_ocr_analysis(self, data: Dict[str, Any]) -> Dict[str, Any]:
-        """Run OCR on receipt payload"""
+        """Run OCR on receipt payload.
+
+        NOTE: This is a stub. Real OCR is not implemented.
+        """
         return {
-            "text_extracted": True,
-            "amount_detected": str(data.get("amount", "")),
-            "utr_detected": str(data.get("utr", "")),
-            "match": True,
+            "performed": False,
+            "reason": "OCR analyzer not implemented",
         }
 
     async def _run_metadata_analysis(self, data: Dict[str, Any]) -> Dict[str, Any]:
-        """Cross-check transaction metadata and hardware timestamps"""
+        """Cross-check transaction metadata and hardware timestamps.
+
+        NOTE: This is a stub. Real metadata validation is not implemented.
+        """
         return {
-            "device_consistency": True,
-            "timestamp_valid": True,
-            "location_plausible": True,
+            "performed": False,
+            "reason": "metadata analyzer not implemented",
         }
 
     async def _store_forensics_results(

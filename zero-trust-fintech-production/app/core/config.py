@@ -35,9 +35,9 @@ class Settings(BaseSettings):
     REDIS_CHALLENGE_TTL: int = 300
     CHALLENGE_TTL_SECONDS: int = 300
 
-    # JWT Authentication
-    JWT_SECRET_KEY: str = "zerotrust-fintech-jwt-secret-key-32bytes-minimum!"
-    SECRET_KEY: str = "zerotrust-fintech-jwt-secret-key-32bytes-minimum!"
+    # JWT Authentication (required in production — no insecure fallback)
+    JWT_SECRET_KEY: str
+    SECRET_KEY: str
     JWT_ALGORITHM: str = "HS256"
     JWT_ACCESS_TOKEN_EXPIRE_MINUTES: int = 60
     JWT_REFRESH_TOKEN_EXPIRE_DAYS: int = 7
@@ -83,15 +83,27 @@ class Settings(BaseSettings):
     class Config:
         env_file = ".env"
         case_sensitive = True
-        extra = "allow"
+        extra = "ignore"
 
-    @validator_compat("JWT_SECRET_KEY")
-    def validate_jwt_secret(cls, v):
-        if v == "CHANGE_THIS_TO_A_RANDOM_64_CHAR_STRING":
-            raise ValueError("JWT_SECRET_KEY must be changed from default placeholder")
+    @validator_compat("JWT_SECRET_KEY", "SECRET_KEY")
+    def validate_secret_strength(cls, v):
+        insecure_defaults = {
+            "zerotrust-fintech-jwt-secret-key-32bytes-minimum!",
+            "CHANGE_THIS_TO_A_RANDOM_64_CHAR_STRING",
+            "CHANGE_THIS",
+            "secret",
+            "changeme",
+            "password",
+            "development",
+            "insecure",
+        }
+        if v in insecure_defaults:
+            raise ValueError(
+                "JWT_SECRET_KEY/SECRET_KEY must not be an insecure default value"
+            )
         if len(v) < 32:
             raise ValueError(
-                "JWT_SECRET_KEY must be at least 32 characters for security"
+                "JWT_SECRET_KEY/SECRET_KEY must be at least 32 characters"
             )
         return v
 
@@ -115,7 +127,15 @@ class Settings(BaseSettings):
 @lru_cache()
 def get_settings() -> Settings:
     try:
-        return Settings()
+        settings = Settings()
     except Exception as e:
         logger.error(f"❌ Configuration error: {e}")
         raise
+
+    if settings.APP_ENV == "production":
+        if "SecurePass123!" in settings.DATABASE_URL:
+            raise ValueError(
+                "DATABASE_URL must not use the default placeholder password in production"
+            )
+
+    return settings

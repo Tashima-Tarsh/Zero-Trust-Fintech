@@ -108,18 +108,13 @@ class MerkleTreeLedger:
         blocks = self.db.query(TransactionBlock).order_by(TransactionBlock.id).all()
 
         if not blocks:
-            try:
-                genesis_tx = {
-                    "event": "GENESIS_INITIALIZATION",
-                    "system": "DISHA 8.2 Sovereign Fintech",
-                    "timestamp": datetime.now(timezone.utc).isoformat(),
-                    "status": "INITIALIZED",
-                }
-                genesis_block = self.commit_transaction(genesis_tx)
-                blocks = [genesis_block]
-            except Exception as e:
-                logger.warning(f"Genesis block initialization notice: {e}")
-                return {"status": "empty", "message": "No blocks in ledger"}
+            # Read-only integrity check: never bootstrap a genesis block here.
+            # Genesis creation is a separate setup/migration step, not a GET endpoint.
+            return {
+                "status": "empty",
+                "total_blocks": 0,
+                "message": "No blocks in ledger",
+            }
 
         tampered_blocks = []
 

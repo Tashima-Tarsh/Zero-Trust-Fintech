@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, Request
 from sqlalchemy.orm import Session
 from pydantic import BaseModel
 from datetime import timedelta
@@ -6,6 +6,7 @@ import logging
 import secrets
 import hashlib
 import hmac
+import time
 from ..models.database import get_db, Merchant, MerchantUser
 from ..core.auth import (
     create_access_token,
@@ -18,6 +19,16 @@ from ..core.config import get_settings
 
 logger = logging.getLogger(__name__)
 settings = get_settings()
+
+# Brute-force protection for /auth/login (in-memory, per process).
+# Production behind multiple replicas should back this with Redis.
+_LOGIN_ATTEMPTS: dict = {}
+LOGIN_MAX_ATTEMPTS = 5
+LOGIN_LOCKOUT_SECONDS = 15 * 60  # 15 minutes
+
+
+def _login_key(ip: str, email: str) -> str:
+    return f"{ip}:{(email or '').lower().strip()}"
 
 router = APIRouter(prefix="/auth", tags=["authentication"])
 
@@ -118,14 +129,40 @@ class TokenResponse(BaseModel):
 
 
 @router.post("/login", response_model=TokenResponse)
-async def login(request: LoginRequest, db: Session = Depends(get_db)):
+async def login(request: LoginRequest, http_request: Request, db: Session = Depends(get_db)):
     """Authenticate merchant user and issue access & refresh tokens"""
-    user = db.query(MerchantUser).filter(MerchantUser.email == request.email).first()
+    client_ip = http_request.client.host if http_request.client else "unknown"
+    key = _login_key(client_ip, request.email)
+    now = time.time()
+    record = _LOGIN_ATTEMPTS.get(key) or {"count": 0, "locked_until": 0}
+    if record.get("locked_until", 0) > now:
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail="Too many failed login attempts. Try again later.",
+        )
 
-    if not user or not pwd_context.verify(request.password, user.hashed_password):
+    user = db.query(MerchantUser).filter(MerchantUser.email == request.email).first()
+    password_valid = bool(user) and pwd_context.verify(request.password, user.hashed_password)
+
+    if not password_valid:
+        record["count"] = record.get("count", 0) + 1
+        if record["count"] >= LOGIN_MAX_ATTEMPTS:
+            record["locked_until"] = now + LOGIN_LOCKOUT_SECONDS
+        _LOGIN_ATTEMPTS[key] = record
+        logger.warning(
+            f"Failed login attempt for {request.email} from {client_ip} (count={record['count']})"
+        )
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid credentials"
         )
+
+    if not user.is_active:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN, detail="User account is inactive"
+        )
+
+    # Successful login: clear any prior failure record for this key
+    _LOGIN_ATTEMPTS.pop(key, None)
 
     if not user.is_active:
         raise HTTPException(

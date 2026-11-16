@@ -6,6 +6,21 @@ const db = require('./db');
 
 const PORT = process.env.PORT || 5000;
 const PUBLIC_DIR = path.join(__dirname, 'public');
+const isProduction = process.env.NODE_ENV === 'production';
+
+// CORS: no wildcard by default. In production only the explicitly listed
+// origin is reflected; same-origin requests (this app serves UI+API on one
+// port) work fine without any CORS header.
+const corsOrigin = process.env.CORS_ALLOWED_ORIGIN || (isProduction ? null : '*');
+
+function corsHeaders() {
+  const h = {
+    'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+    'Access-Control-Allow-Methods': 'GET, POST, PUT, PATCH, DELETE, OPTIONS',
+  };
+  if (corsOrigin) h['Access-Control-Allow-Origin'] = corsOrigin;
+  return h;
+}
 
 const MIME_TYPES = {
   '.html': 'text/html; charset=utf-8',
@@ -39,9 +54,7 @@ function sendJson(res, statusCode, data) {
   res.writeHead(statusCode, {
     'Content-Type': 'application/json; charset=utf-8',
     'Cache-Control': 'no-store, no-cache, must-revalidate',
-    'Access-Control-Allow-Origin': '*',
-    'Access-Control-Allow-Headers': 'Content-Type, Authorization',
-    'Access-Control-Allow-Methods': 'GET, POST, PUT, PATCH, DELETE, OPTIONS'
+    ...corsHeaders()
   });
   res.end(JSON.stringify(data));
 }
@@ -96,10 +109,7 @@ async function handleCinematicRequest(req, res) {
   // CORS preflight
   if (method === 'OPTIONS') {
     res.writeHead(204, {
-      'Access-Control-Allow-Origin': '*',
-      'Access-Control-Allow-Headers': 'Content-Type, Authorization',
-      'Access-Control-Allow-Methods': 'GET, POST, PUT, PATCH, DELETE, OPTIONS',
-      'Access-Control-Max-Age': '86400'
+      ...corsHeaders()
     });
     res.end();
     return;
@@ -142,7 +152,7 @@ async function handleCinematicRequest(req, res) {
         const session = db.createSession(merchant.id);
         const safeMerchant = db.findMerchantById(merchant.id);
 
-        res.setHeader('Set-Cookie', `disha_session=${session.token}; Path=/; HttpOnly; SameSite=Lax; Max-Age=86400`);
+        res.setHeader('Set-Cookie', `disha_session=${session.token}; Path=/; HttpOnly; SameSite=Lax; Max-Age=86400${isProduction ? '; Secure' : ''}`);
         return sendJson(res, 200, {
           success: true,
           token: session.token,
@@ -268,10 +278,16 @@ async function handleCinematicRequest(req, res) {
       if (simulateMatch && method === 'POST') {
         const orderId = simulateMatch[1];
 
-        // Production Guard: Strict production disables arbitrary payment simulation
-        const isStrictProd = process.env.NODE_ENV === 'production' && process.env.ALLOW_SIMULATION === 'false';
-        if (isStrictProd) {
-          return sendError(res, 403, 'Payment simulation is disabled in production environment');
+        // Payment simulation is opt-in only. Disabled by default in every
+        // environment; enable with ALLOW_SIMULATION=true (never in production
+        // unless explicitly accepted).
+        const simulationAllowed = process.env.ALLOW_SIMULATION === 'true';
+        if (!simulationAllowed) {
+          return sendError(
+            res,
+            403,
+            'Payment simulation is disabled unless ALLOW_SIMULATION=true'
+          );
         }
 
         // Validate order existence (handled 404 rejection instead of 500 error)
@@ -643,11 +659,11 @@ async function handleCinematicRequest(req, res) {
         return;
       }
 
-      res.writeHead(200, {
-        'Content-Type': contentType,
-        'Cache-Control': ext === '.html' ? 'no-cache, must-revalidate' : 'public, max-age=3600',
-        'Access-Control-Allow-Origin': '*'
-      });
+    res.writeHead(200, {
+      'Content-Type': contentType,
+      'Cache-Control': ext === '.html' ? 'no-cache, must-revalidate' : 'public, max-age=3600',
+      ...corsHeaders()
+    });
       res.end(content);
     });
   });
