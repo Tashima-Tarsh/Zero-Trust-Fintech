@@ -33,7 +33,9 @@ async function initDb() {
   // 1. Native SQLite session store — always required.
   try {
     const { DatabaseSync } = require('node:sqlite');
-    const dbPath = join(__dirname, 'disha82.db');
+    const dataDir = process.env.DATA_DIR || __dirname;
+    require('fs').mkdirSync(dataDir, { recursive: true });
+    const dbPath = join(dataDir, 'disha82.db');
     sqliteDb = new DatabaseSync(dbPath);
     sqliteDb.exec('PRAGMA journal_mode = WAL;');
     sqliteDb.exec('PRAGMA busy_timeout = 5000;');
