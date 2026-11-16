@@ -157,7 +157,7 @@ class Disha3DScene {
       });
       this.paths.forEach(p => {
         p.targetOpacity = 0.25;
-        p.material.opacity = 0.25;
+        p.line.material.opacity = 0.25;
       });
       this.rings.forEach(r => {
         r.userData.active = false;
@@ -249,10 +249,10 @@ class Disha3DScene {
       if (this.state === 'scanning' || this.state === 'verified' || this.state === 'settled') {
         p.targetOpacity = 0.8;
         const glow = Math.sin(this.time * 4 + i) * 0.3 + 0.5;
-        p.material.opacity = THREE.MathUtils.lerp(p.material.opacity, p.targetOpacity, 0.06);
-        p.material.color.setHex(0x10b981);
+        p.line.material.opacity = THREE.MathUtils.lerp(p.line.material.opacity, p.targetOpacity, 0.06);
+        p.line.material.color.setHex(0x10b981);
       } else {
-        p.material.opacity = THREE.MathUtils.lerp(p.material.opacity, 0.25, 0.05);
+        p.line.material.opacity = THREE.MathUtils.lerp(p.line.material.opacity, 0.25, 0.05);
       }
     });
 
