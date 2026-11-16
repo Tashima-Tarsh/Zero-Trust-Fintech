@@ -18,6 +18,8 @@ const http = require('http');
 const TESTS_DIR = path.join(__dirname);
 
 const UNIT_TESTS = [
+  'test-identity.js',
+  'test-identity-store.js',
   'test-disha.js',        // challenge math, session, NPCI link, double-entry ledger
   'test-npci-intent.js',  // NPCI URI builder / parser / timestamp
   'test-vpa-router.js',   // 5-factor anti-ban scoring
