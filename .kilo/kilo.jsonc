@@ -1,31 +1,37 @@
 {
-  "$schema": "https://app.kilo.ai/config.json",
-  "mcp": {
-    "github": {
-      "type": "remote",
-      "url": "https://api.githubcopilot.com/mcp/",
-      "oauth": false,
-      "enabled": true
-    },
-    "railway": {
-      "type": "remote",
-      "url": "https://mcp.railway.com",
-      "enabled": true
-    },
-    "cloudflare": {
-      "type": "remote",
-      "url": "https://mcp.cloudflare.com/mcp",
-      "enabled": true
-    },
-    "clerk": {
-      "type": "remote",
-      "url": "https://mcp.clerk.com/mcp",
-      "enabled": true
-    },
-    "resend": {
-      "type": "remote",
-      "url": "https://mcp.resend.com/mcp",
-      "enabled": true
-    }
-  }
+    "$schema":  "https://app.kilo.ai/config.json",
+    "mcp":  {
+                "github":  {
+                               "type":  "remote",
+                               "url":  "https://api.githubcopilot.com/mcp/",
+                               "oauth":  false,
+                               "enabled":  true
+                           },
+                "cloudflare":  {
+                                   "type":  "remote",
+                                   "url":  "https://mcp.cloudflare.com/mcp",
+                                   "enabled":  true
+                               },
+                "clerk":  {
+                              "type":  "remote",
+                              "url":  "https://mcp.clerk.com/mcp",
+                              "enabled":  true
+                          },
+                "resend":  {
+                               "type":  "remote",
+                               "url":  "https://mcp.resend.com/mcp",
+                               "enabled":  true
+                           },
+                "railway":  {
+                                "type":  "local",
+                                "command":  [
+                                                "cmd",
+                                                "/c",
+                                                "railway",
+                                                "mcp"
+                                            ],
+                                "enabled":  true,
+                                "timeout":  60000
+                            }
+            }
 }
