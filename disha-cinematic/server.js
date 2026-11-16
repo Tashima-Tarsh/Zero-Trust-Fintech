@@ -3,6 +3,7 @@ const fs = require('fs');
 const path = require('path');
 const url = require('url');
 const db = require('./db');
+const { getIdentityService } = require('./identity');
 
 const PORT = process.env.PORT || 5000;
 const PUBLIC_DIR = path.join(__dirname, 'public');
@@ -87,7 +88,9 @@ function readBody(req) {
   });
 }
 
-function authenticateRequest(req) {
+async function authenticateRequest(req) {
+  const identity = getIdentityService();
+  if (identity) return identity.authenticate(req);
   let token = null;
   const authHeader = req.headers['authorization'];
   if (authHeader && authHeader.startsWith('Bearer ')) {
@@ -130,8 +133,13 @@ async function handleCinematicRequest(req, res) {
   // =========================================================================
   if (pathname.startsWith('/api/')) {
     try {
+      if (pathname === '/api/auth/config' && method === 'GET') {
+        const publishableKey = process.env.CLERK_PUBLISHABLE_KEY || '';
+        return sendJson(res, 200, { provider: publishableKey ? 'clerk' : 'legacy', publishableKey });
+      }
       // 1. Auth: Login
       if (pathname === '/api/auth/login' && method === 'POST') {
+        if (getIdentityService()) return sendError(res, 409, 'Use secure sign-in to continue');
         const body = await readBody(req);
         const { email, password } = body;
 
@@ -182,7 +190,7 @@ async function handleCinematicRequest(req, res) {
 
       // 3. Auth: Current User Profile
       if (pathname === '/api/auth/me' && method === 'GET') {
-        const merchant = authenticateRequest(req);
+        const merchant = await authenticateRequest(req);
         if (!merchant) {
           return sendError(res, 401, 'Unauthorized session. Please log in.');
         }
@@ -190,7 +198,7 @@ async function handleCinematicRequest(req, res) {
       }
 
       // --- PROTECTED MERCHANT ROUTES ---
-      const currentMerchant = authenticateRequest(req);
+      const currentMerchant = await authenticateRequest(req);
       if (!currentMerchant) {
         return sendError(res, 401, 'Authentication required to access merchant workspace');
       }
@@ -598,6 +606,7 @@ async function handleCinematicRequest(req, res) {
       }
 
       if (pathname === '/api/merchant/change-password' && method === 'POST') {
+        if (getIdentityService()) return sendError(res, 409, 'Manage your password in your account profile');
         const body = await readBody(req);
         const { currentPassword, newPassword } = body;
         if (!currentPassword || !newPassword) {
