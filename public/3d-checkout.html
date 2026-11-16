@@ -18,7 +18,7 @@
 <body>
 
   <!-- ========================================================================
-       FOREGROUND 3D CANVAS — Three.js scene floats over clean HTML/CSS
+       FOREGROUND 3D CANVAS — Three.js scene floats over HTML
        No background image, no layout shift, pure foreground depth
        ======================================================================== -->
   <canvas id="disha-canvas" class="disha-canvas"></canvas>
@@ -96,7 +96,6 @@
       </div>
 
       <div class="hero-preview" id="heroPreview">
-        <!-- Live checkout preview injected here via JS -->
         <div class="preview-placeholder">
           <div class="preview-icon">
             <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -131,7 +130,7 @@
           <!-- Step 1: Session creation -->
           <div class="checkout-step" id="stepCreate" data-step="1">
             <div class="step-badge">1</div>
-            <h2 class="step-title">Create Checkout Session</div>
+            <div class="step-title">Create Checkout Session</div>
             <div class="amount-control">
               <label class="amount-label">Base amount (₹)</label>
               <input type="number" id="orderAmount" class="amount-input" value="500" min="1" step="0.01">
@@ -145,7 +144,7 @@
           <!-- Step 2: QR Display -->
           <div class="checkout-step hidden" id="stepQr" data-step="2">
             <div class="step-badge">2</div>
-            <h2 class="step-title">Customer Pays via UPI App</div>
+            <div class="step-title">Customer Pays via UPI App</div>
             <div class="qr-card">
               <canvas id="qrCanvas" width="300" height="300"></canvas>
               <div class="qr-overlay">
@@ -163,7 +162,7 @@
           <!-- Step 3: Receipt Share -->
           <div class="checkout-step hidden" id="stepShare" data-step="3">
             <div class="step-badge">3</div>
-            <h2 class="step-title">Customer Shares Receipt</div>
+            <div class="step-title">Customer Shares Receipt</div>
             <div class="share-card">
               <div class="share-phone">
                 <div class="phone-screen">
@@ -195,7 +194,7 @@
           <!-- Step 4: Verification -->
           <div class="checkout-step hidden" id="stepVerify" data-step="4">
             <div class="step-badge">4</div>
-            <h2 class="step-title">Zero-Trust Verification</div>
+            <div class="step-title">Zero-Trust Verification</div>
             <div class="verification-card">
               <div class="fraud-layers" id="fraudLayers">
                 <!-- 7 layers injected via JS -->
@@ -210,7 +209,7 @@
           <!-- Step 5: Settlement -->
           <div class="checkout-step hidden" id="stepSettle" data-step="5">
             <div class="step-badge">5</div>
-            <h2 class="step-title">Settlement & Ledger</div>
+            <div class="step-title">Settlement & Ledger</div>
             <div class="settlement-card">
               <div class="ledger-preview">
                 <div class="ledger-row ledger-debit">
