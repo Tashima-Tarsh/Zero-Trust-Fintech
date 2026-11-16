@@ -1,6 +1,6 @@
 /* ═════════════════════════════════════════════════════════════════════════════
    DISHA 8.2 — 3D Scene Engine (Premium)
-   Foreground Three.js scene: floating nodes, glowing transaction paths,
+   Foreground Three.js visualization: floating nodes, glowing transaction paths,
    trust score rings. Renders on transparent canvas over HTML.
    ═════════════════════════════════════════════════════════════════════════════ */
 
@@ -25,7 +25,7 @@ class Disha3DScene {
   init() {
     this.scene = new THREE.Scene();
 
-    this.camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 100);
+    this.camera = new THREE.PerspectiveCamera(50, window.innerWidth / window.innerHeight, 0.1, 100);
     this.camera.position.set(0, 2.5, 7);
     this.camera.lookAt(0, 0, 0);
 
@@ -39,7 +39,7 @@ class Disha3DScene {
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     this.renderer.setClearColor(0x05070b, 0);
 
-    const ambient = new THREE.AmbientLight(0xffffff, 0.4);
+    const ambient = new THREE.AmbientLight(0xffffff, 0.35);
     this.scene.add(ambient);
 
     const keyLight = new THREE.DirectionalLight(0x10b981, 2);
@@ -51,9 +51,13 @@ class Disha3DScene {
     fillLight.position.set(-3, 2, -2);
     this.scene.add(fillLight);
 
-    const rimLight = new THREE.PointLight(0x10b981, 1);
-    rimLight.position.set(0, 4, -4);
+    const rimLight = new THREE.PointLight(0x10b981, 1.5);
+    rimLight.position.set(0, 5, -4);
     this.scene.add(rimLight);
+
+    const backLight = new THREE.PointLight(0x4f46e5, 0.8);
+    backLight.position.set(-4, 2, 4);
+    this.scene.add(backLight);
 
     this.buildNodes();
     this.buildPaths();
@@ -63,21 +67,21 @@ class Disha3DScene {
   }
 
   buildNodes() {
-    const geometry = new THREE.IcosahedronGeometry(0.28, 3);
+    const geometry = new THREE.IcosahedronGeometry(0.26, 3);
     const material = new THREE.MeshStandardMaterial({
       color: 0x10b981,
       emissive: 0x10b981,
       emissiveIntensity: 0.6,
-      metalness: 0.5,
-      roughness: 0.2
+      metalness: 0.45,
+      roughness: 0.15
     });
 
     const positions = [
-      { x: -1.8, y: 1.0, z: -0.8 },
-      { x: 1.8, y: -0.5, z: -0.8 },
-      { x: -1.0, y: -1.4, z: 0 },
-      { x: 1.0, y: 1.2, z: 0 },
-      { x: 0, y: 2.2, z: -1.2 },
+      { x: -1.8, y: 0.9, z: -1 },
+      { x: 1.8, y: -0.4, z: -1 },
+      { x: -1.0, y: -1.3, z: 0 },
+      { x: 1.0, y: 1.1, z: 0 },
+      { x: 0, y: 2.1, z: -1.4 },
       { x: -1.6, y: -0.9, z: 1.0 },
       { x: 1.6, y: -0.2, z: 0.8 }
     ];
@@ -135,9 +139,9 @@ class Disha3DScene {
       ring.userData = {
         scale: 0,
         opacity: 0,
-        maxScale: 1.8 + i * 0.6,
+        maxScale: 1.8 + i * 0.7,
         active: false,
-        delay: i * 0.5
+        delay: i * 0.75
       };
       this.scene.add(ring);
       this.rings.push(ring);
@@ -194,8 +198,6 @@ class Disha3DScene {
 
   animateCamera(targetPos, targetLook, duration) {
     const startPos = this.camera.position.clone();
-    const startLook = this.camera.position.clone();
-    this.camera.lookAt(targetLook);
     const start = performance.now();
 
     const animate = (time) => {
@@ -234,7 +236,7 @@ class Disha3DScene {
         node.position.y = data.basePos.y + Math.sin(this.time * 2 + i) * 0.04;
         node.position.z = data.basePos.z + Math.sin(this.time * 1.5 + i) * 0.04;
         node.rotation.y += 0.012;
-        node.rotation.x += 0.006;
+        node.rotation.x += 0.005;
       } else {
         node.scale.setScalar(1 + Math.sin(this.time * 2 + i) * 0.015);
         node.position.y = data.basePos.y;
@@ -246,7 +248,7 @@ class Disha3DScene {
     this.paths.forEach((p, i) => {
       if (this.state === 'scanning' || this.state === 'verified' || this.state === 'settled') {
         p.targetOpacity = 0.8;
-        const glow = Math.sin(this.time * 3 + i) * 0.2 + 0.5;
+        const glow = Math.sin(this.time * 4 + i) * 0.3 + 0.5;
         p.material.opacity = THREE.MathUtils.lerp(p.material.opacity, p.targetOpacity, 0.06);
         p.material.color.setHex(0x10b981);
       } else {

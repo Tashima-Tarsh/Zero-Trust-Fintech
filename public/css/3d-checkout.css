@@ -1,21 +1,22 @@
 /* ══════════════════════════════════════════════════════════════════════════════
    DISHA 8.2 — Premium Design System
    Foreground-only 3D design. No background leakage.
-   Typography: Space Grotesk (display), Inter (UI), JetBrains Mono (data)
+   Typography: Space Grotesk (display), Inter (body), JetBrains Mono (data)
+   Palette: Clean parchment/ivory with emerald + gold accents
    ══════════════════════════════════════════════════════════════════════════════ */
 :root {
-  /* Brand palette — Obsidian/Indigo/Emerald */
-  --bg: #05070b;
-  --bg-deep: #030406;
-  --surface: #0a0d15;
-  --surface-elev: #0f1526;
-  --border: rgba(20, 184, 166, 0.15);
-  --border-hover: rgba(20, 184, 166, 0.4);
-  --border-dim: rgba(255, 255, 255, 0.05);
+  /* Brand palette — Premium warm palette */
+  --bg: #fafaf6;
+  --bg-deep: #f4f1e9;
+  --surface: #ffffff;
+  --surface-elev: #f5f3ed;
+  --border: rgba(0, 0, 0, 0.06);
+  --border-hover: rgba(16, 185, 129, 0.3);
+  --border-dim: rgba(0, 0, 0, 0.03);
 
-  --text-primary: #f8fafc;
-  --text-secondary: #94a3b8;
-  --text-muted: #475569;
+  --text-primary: #1a1a1a;
+  --text-secondary: #6b7280;
+  --text-muted: #9ca3af;
   --text-inverse: #05070b;
 
   --emerald: #10b981;
@@ -23,26 +24,24 @@
   --emerald-soft: rgba(20, 184, 166, 0.08);
   --emerald-text: #065f46;
 
+  --gold: #d4a017;
+  --gold-glow: rgba(212, 160, 23, 0.4);
+  --gold-soft: rgba(212, 160, 23, 0.08);
+  --gold-text: #856404;
+
   --indigo: #4f46e5;
   --indigo-glow: rgba(99, 102, 241, 0.35);
-  --indigo-text: #1e3a8a;
-
-  --amber: #f59e0b;
-  --amber-glow: rgba(245, 158, 111, 0.35);
-
-  --rose: #ef4444;
-  --rose-soft: rgba(239, 68, 68, 0.1);
 
   /* Shadows & Depth */
-  --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.3);
-  --shadow-md: 0 8px 24px rgba(0, 0, 0, 0.4);
-  --shadow-lg: 0 16px 48px rgba(0, 0, 0, 0.5);
-  --shadow-xl: 0 32px 64px rgba(0, 0, 0, 0.6);
+  --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.04);
+  --shadow-md: 0 8px 24px rgba(0, 0, 0, 0.06);
+  --shadow-lg: 0 16px 48px rgba(0, 0, 0, 0.08);
+  --shadow-xl: 0 32px 64px rgba(0, 0, 0, 0.08);
   --shadow-glow: 0 0 40px rgba(20, 184, 166, 0.15);
   --shadow-indigo: 0 0 40px rgba(99, 102, 241, 0.15);
 
   /* Radius */
-  --radius: 16px;
+  --radius: 14px;
   --radius-lg: 24px;
   --radius-xl: 32px;
   --radius-pill: 9999px;
@@ -69,14 +68,20 @@
   padding: 0;
 }
 
-ul[class], ol[class] {
-  padding: 0;
-  list-style: none;
+html {
+  scroll-behavior: smooth;
+  font-family: var(--font-sans);
+  color: var(--text-primary);
+  background: var(--bg);
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
 body {
+  margin: 0;
   background: var(--bg);
-  color: var(--ink);
+  color: var(--text-primary);
   font-family: var(--font-sans);
   font-size: 16px;
   line-height: 1.6;
@@ -136,7 +141,6 @@ img, svg {
   justify-content: space-between;
   padding: 24px 0;
   margin-bottom: 40px;
-  border-bottom: 1px solid var(--border);
 }
 
 .brand {
@@ -658,7 +662,7 @@ img, svg {
   font-size: 0.8rem;
   font-weight: 700;
   color: #05070b;
-  margin-bottom: 6px;
+  margin-bottom: 8px;
 }
 
 .receipt-amount {
