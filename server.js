@@ -25,6 +25,13 @@ const { IPWhitelistMiddleware } = require('./middleware/ip-whitelist');
 const adminRoutes = require('./routes/admin/ip-whitelist');
 const { handleCinematicRequest } = require('./disha-cinematic/server');
 const app = express();
+let clerkOrigin = '';
+if (process.env.CLERK_PUBLISHABLE_KEY) {
+  const domain = Buffer.from(process.env.CLERK_PUBLISHABLE_KEY.split('_')[2] || '', 'base64').toString().replace(/\$/, '');
+  if (!/^[a-zA-Z0-9.-]+$/.test(domain)) throw new Error('Invalid Clerk publishable key');
+  clerkOrigin = 'https://' + domain;
+}
+
 // Trust proxy only when explicitly opted in (e.g. behind Render/Cloudflare).
 // Never on by default: X-Forwarded-For is trivially spoofable otherwise.
 app.set('trust proxy', process.env.TRUST_PROXY === 'true');
@@ -42,7 +49,7 @@ app.use((req, res, next) => {
   res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
   res.setHeader(
     'Content-Security-Policy',
-    "default-src 'self'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: blob:; connect-src 'self' ws: wss:;"
+    `default-src 'self'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net ${clerkOrigin} https://challenges.cloudflare.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: blob: https://img.clerk.com; connect-src 'self' ws: wss: ${clerkOrigin} https://*.clerk.com; frame-src 'self' ${clerkOrigin} https://challenges.cloudflare.com; worker-src 'self' blob:;`
   );
   if (process.env.NODE_ENV === 'production') {
     res.setHeader('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
@@ -218,7 +225,7 @@ app.get(['/checkout', '/pay'], (req, res) => {
 // 5. Merchant Auth & Dashboard API Delegation
 app.use((req, res, next) => {
   if (req.path.startsWith('/api/auth') || req.path.startsWith('/api/merchant')) {
-    return handleCinematicRequest(req, res);
+    return handleCinematicRequest(req, res).catch(next);
   }
   next();
 });
