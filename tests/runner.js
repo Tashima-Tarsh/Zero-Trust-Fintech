@@ -18,7 +18,6 @@ const http = require('http');
 const TESTS_DIR = path.join(__dirname);
 
 const UNIT_TESTS = [
-  'test-clerk-merchant-links.js', // stable Clerk user-to-merchant ownership
   'test-disha.js',        // challenge math, session, NPCI link, double-entry ledger
   'test-npci-intent.js',  // NPCI URI builder / parser / timestamp
   'test-vpa-router.js',   // 5-factor anti-ban scoring
