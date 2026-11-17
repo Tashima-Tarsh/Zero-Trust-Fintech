@@ -437,13 +437,7 @@ function generateSession(baseAmount = 100, description = '', customVpa = null) {
   const qrRefreshAt = now + (15 * 1000); // 15 seconds dynamic refresh
   const orderId = 'Order_' + crypto.randomBytes(5).toString('hex').toUpperCase();
   const txnRef = 'TXN_' + now + '_' + crypto.randomBytes(3).toString('hex').toUpperCase();
-  const activeSessions = typeof db.getActiveSessions === 'function' ? db.getActiveSessions() : [];
-  const activeAmounts = new Set(
-    activeSessions
-      .filter(s => s && s.status === 'PENDING' && Math.abs(s.baseAmount - Number(baseAmount)) < 0.01)
-      .map(s => s.challengeAmount)
-  );
-  const challengeAmount = generateUniqueChallenge(baseAmount, activeAmounts);
+  const challengeAmount = Number(baseAmount);
   // TASK 9: Select optimal VPA to prevent bans or primary VPA
   let vpaAddress = (customVpa && String(customVpa).trim()) ? String(customVpa).trim() : null;
   let merchantType = 'PERSONAL';
