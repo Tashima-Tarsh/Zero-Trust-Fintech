@@ -944,6 +944,135 @@ app.post('/api/verify', verifyLimiter, async (req, res) => {
   }
 });
 // ═══════════════════════════════════════════════════════════════════
+// ════════════════════════════════════════════════════════════════════
+// TASK 12: CFC — CONFIRM FROM CUSTOMER (UTR-ONLY SETTLEMENT)
+// Customer copies the 12-digit UTR from their UPI app SMS/push and clicks CFC.
+// Server validates UTR format, anti-reuse (bindUtrToOrder catches UTR already
+// used on another order = "paid friend" fraud), time window, then settles at
+// the session challenge amount. No bank API needed.
+// ════════════════════════════════════════════════════════════════════
+app.post('/api/verify-cfc', verifyLimiter, async (req, res) => {
+  try {
+    const { utr, orderId, token } = req.body || {};
+    const now = Date.now();
+    if (!utr || !orderId || !token) {
+      return res.status(400).json({
+        success: false,
+        error: 'CFC_REQUIRED_FIELDS',
+        reason: 'UTR, orderId and session token are required.'
+      });
+    }
+    const cleanUtr = String(utr).replace(/\D/g, '');
+    if (!/^\d{12}$/.test(cleanUtr)) {
+      return res.status(400).json({
+        success: false,
+        error: 'UTR_FORMAT',
+        reason: 'UTR must be exactly 12 numeric digits.'
+      });
+    }
+    const session = db.findSessionByOrderId(orderId);
+    if (!session) {
+      return res.status(404).json({
+        success: false,
+        error: 'SESSION_NOT_FOUND',
+        reason: 'No active checkout session for this order ID.'
+      });
+    }
+    if (token !== session.sessionId) {
+      return res.status(401).json({
+        success: false,
+        error: 'SESSION_TOKEN_REQUIRED',
+        reason: 'Invalid or missing session token.'
+      });
+    }
+    if (session.status === 'SUCCESS') {
+      return res.status(400).json({
+        success: false,
+        error: 'SESSION_ALREADY_SETTLED',
+        reason: 'This session has already been settled.'
+      });
+    }
+    const timeElapsedMs = now - session.createdAt;
+    if (timeElapsedMs < T_MIN_MS) {
+      return res.status(200).json({
+        success: true,
+        state: 'WAITING',
+        orderId: session.orderId,
+        timeRemaining: (T_MIN_MS - timeElapsedMs) / 1000,
+        message: `Please wait ${Math.ceil((T_MIN_MS - timeElapsedMs) / 1000)}s before CFC verification`
+      });
+    }
+    if (timeElapsedMs > T_MAX_MS) {
+      db.updateSessionStatus(session.orderId, 'EXPIRED');
+      db.updateSessionState(session.orderId, 'EXPIRED');
+      return res.status(400).json({
+        success: false,
+        state: 'EXPIRED',
+        error: 'ORDER_EXPIRED',
+        reason: 'Order timeout (>3 minutes). Please create a new order.'
+      });
+    }
+    const bindingResult = db.bindUtrToOrder(cleanUtr, session.orderId);
+    if (bindingResult === 'BOUND_TO_OTHER_ORDER') {
+      db.updateSessionState(session.orderId, 'REJECTED');
+      return res.status(400).json({
+        success: false,
+        state: 'REJECTED',
+        error: 'UTR_BOUND_TO_OTHER_ORDER',
+        reason: 'This UTR was already used for a different order. Cross-order UTR reuse is impossible.'
+      });
+    }
+    if (bindingResult === false) {
+      return res.status(400).json({
+        success: false,
+        error: 'UTR_BIND_FAILED',
+        reason: 'Could not bind UTR to order. Please try again.'
+      });
+    }
+    db.updateSessionState(session.orderId, 'VERIFY_WINDOW');
+    const { txId, verification } = await db.atomicSettle(
+      session.orderId,
+      cleanUtr,
+      session.challengeAmount,
+      session.vpaAddress,
+      null
+    );
+    db.updateSessionStatus(session.orderId, 'SUCCESS', cleanUtr);
+    db.updateSessionState(session.orderId, 'VERIFIED');
+    const successPayload = {
+      orderId: session.orderId,
+      utr: cleanUtr,
+      amount: session.challengeAmount,
+      baseAmount: session.baseAmount,
+      vpaAddress: session.vpaAddress,
+      senderVpa: req.body.senderVpa || 'customer@upi',
+      txId,
+      timestamp: now,
+      settlementSource: 'CFC_UTR_ONLY',
+      message: 'Settlement confirmed via CFC (Confirm from Customer)'
+    };
+    broadcastOrderSuccess(session.orderId, successPayload);
+    return res.json({
+      success: true,
+      state: 'VERIFIED',
+      orderId: session.orderId,
+      utr: cleanUtr,
+      amount: session.challengeAmount,
+      baseAmount: session.baseAmount,
+      vpaAddress: session.vpaAddress,
+      txId,
+      successToken: txId,
+      timestamp: now,
+      ledgerVerification: verification,
+      reconciliationState: 'CLAIM_VERIFIED_PENDING_BANK_RECONCILIATION'
+    });
+  } catch (err) {
+    console.error('CFC verification error:', err);
+    res.status(500).json({ success: false, error: 'INTERNAL_SERVER_ERROR' });
+  }
+});
+// ════════════════════════════════════════════════════════════════════
+
 // TASK 7: ANDROID WEB SHARE TARGET (SINGLE SOURCE OF TRUTH SETTLEMENT)
 // ═══════════════════════════════════════════════════════════════════
 app.post('/handle-share', shareLimiter, async (req, res) => {

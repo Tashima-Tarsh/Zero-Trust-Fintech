@@ -186,7 +186,7 @@
               <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
               <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
             </svg>
-            <span id="btnVerifyText">Verify Payment</span>
+            <span id="btnVerifyText">CFC — Confirm from Customer</span>
           </button>
         </form>
 
@@ -319,7 +319,7 @@
     function setVerifying(isLoading) {
       btnVerify.disabled = isLoading;
       btnVerifySpinner.classList.toggle('hidden', !isLoading);
-      btnVerifyText.textContent = isLoading ? 'Verifying with Bank...' : 'Verify Payment';
+      btnVerifyText.textContent = isLoading ? 'CFC Verifying…' : 'CFC — Confirm from Customer';
     }
 
     // 1. Initialize Checkout Session
@@ -415,23 +415,24 @@
       }
 
       setVerifying(true);
-      showStatus('processing', 'Verifying with NPCI Rail...', 'Validating UTR uniqueness, amount match, and bank settlement invariant.');
+      showStatus('processing', 'CFC Verifying…', 'Validating UTR, amount match, and anti-reuse. No bank API needed.');
 
       try {
-        const res = await fetch('/api/verify', {
+        const res = await fetch('/api/verify-cfc', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             utr: utr,
             amount: currentSession.challengeAmount,
-            orderId: currentSession.orderId
+            orderId: currentSession.orderId,
+            token: currentSession.sessionId
           })
         });
         const data = await res.json();
         if (res.status === 200 && data.success) {
           onPaymentSuccess(utr, currentSession.challengeAmount);
         } else {
-          showStatus('error', 'Verification Failed', data.reason || data.error || 'UTR verification failed. Ensure payment was made for the exact challenge amount.');
+          showStatus('error', 'CFC Verification Failed', data.reason || data.error || 'UTR verification failed. Ensure payment was made for the exact challenge amount.');
         }
       } catch (err) {
         showStatus('error', 'Network Error', err.message || 'Unable to contact verification service.');
