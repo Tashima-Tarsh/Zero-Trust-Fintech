@@ -229,12 +229,12 @@ app.get(['/health', '/api/health'], (req, res) => {
     timestamp: new Date().toISOString()
   });
 });
-// 3. Flagship PhonePe-Inspired Website & Merchant SaaS Routes
+// Customer-facing product page and checkout routes
 app.get(['/', '/home'], (req, res) => {
-  res.sendFile(path.join(__dirname, 'public', '3d-checkout.html'));
+  res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 app.get(['/checkout', '/pay'], (req, res) => {
-  res.sendFile(path.join(__dirname, 'public', '3d-checkout.html'));
+  res.sendFile(path.join(__dirname, 'public', 'checkout.html'));
 });
 // 5. Merchant Auth & Dashboard API Delegation
 app.use((req, res, next) => {
