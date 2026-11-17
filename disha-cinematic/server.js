@@ -205,7 +205,7 @@ async function handleCinematicRequest(req, res) {
       if (pathname === '/api/auth/me' && method === 'GET') {
         const merchant = await authenticateRequest(req);
         if (!merchant) {
-          return sendError(res, 401, 'Unauthorized session. Please log in.');
+          return sendError(res, req.auth?.userId ? 403 : 401, req.auth?.userId ? 'Please verify your Clerk email or contact merchant support.' : 'Unauthorized session. Please log in.');
         }
         return sendJson(res, 200, { success: true, merchant });
       }
@@ -213,7 +213,7 @@ async function handleCinematicRequest(req, res) {
       // --- PROTECTED MERCHANT ROUTES ---
       const currentMerchant = await authenticateRequest(req);
       if (!currentMerchant) {
-        return sendError(res, 401, 'Authentication required to access merchant workspace');
+        return sendError(res, req.auth?.userId ? 403 : 401, 'Authentication required to access merchant workspace');
       }
 
       // First-time Onboarding Setup
