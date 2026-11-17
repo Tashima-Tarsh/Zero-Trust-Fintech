@@ -509,7 +509,7 @@ app.get('/api/session/new', checkoutLimiter, async (req, res) => {
       });
     }
     const baseAmount = baseAmountRaw;
-    const description = req.query.description || req.query.desc || req.query.item || 'Kirana Order';
+    const description = req.query.description || req.query.desc || req.query.item || 'Secure UPI payment';
     let validatedVpa = null;
     const requestedVpa = (req.query.vpa || req.query.pa || req.query.vpaAddress || '').trim();
     if (requestedVpa) {

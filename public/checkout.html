@@ -85,8 +85,8 @@ body { font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Robo
     <div class="merchant-row">
       <div class="avatar"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#4F46E5" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path><polyline points="9 22 9 12 15 12 15 22"></polyline></svg></div>
       <div class="merchant-info">
-        <h2 id="merchantName">Ramesh Provision Stores</h2>
-        <p id="orderDesc">Kirana &amp; Grocery Order</p>
+        <h2 id="merchantName">Your business</h2>
+        <p id="orderDesc">Secure UPI payment</p>
       </div>
     </div>
 
@@ -107,7 +107,7 @@ body { font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Robo
     </div>
     <div class="meta-row">
       <span class="meta-title">Pay to UPI:</span>
-      <span id="vpaVal" class="meta-value font-mono text-teal">merchant@ybl</span>
+      <span id="vpaVal" class="meta-value font-mono text-teal">Loading securely…</span>
     </div>
 
     <div class="pay-section">
@@ -205,7 +205,7 @@ const el = {
 
 async function init() {
   try {
-    const res = await fetch('/api/session/new?amount=100&description=Checkout Order', {
+    const res = await fetch('/api/session/new?amount=100&description=Secure UPI payment', {
       headers: { 'X-CSRF-Token': csrfToken || '' }
     });
     if (!res.ok) throw new Error('Session creation failed');
