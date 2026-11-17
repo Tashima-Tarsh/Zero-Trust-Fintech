@@ -199,6 +199,21 @@ function setupSqliteTables() {
     );
     CREATE UNIQUE INDEX IF NOT EXISTS idx_sessions_unique_active_amount ON sessions(vpa_address, challenge_amount) WHERE status = 'PENDING';
 
+    -- Passkey / WebAuthn credential store
+    CREATE TABLE IF NOT EXISTS passkeys (
+      id TEXT PRIMARY KEY,
+      user_id TEXT NOT NULL,
+      credential_id TEXT UNIQUE NOT NULL,
+      public_key TEXT NOT NULL,
+      counter INTEGER NOT NULL DEFAULT 0,
+      device_type TEXT,
+      backed_up INTEGER NOT NULL DEFAULT 0,
+      transports TEXT,
+      created_at INTEGER NOT NULL,
+      sign_count INTEGER NOT NULL DEFAULT 0
+    );
+    CREATE INDEX IF NOT EXISTS idx_passkeys_user ON passkeys(user_id);
+
     CREATE TABLE IF NOT EXISTS transactions (
       id TEXT PRIMARY KEY,
       order_id TEXT NOT NULL,
@@ -660,6 +675,52 @@ function bindUtrToOrder(utr, orderId) {
 }
 
 /**
+ * Passkey / WebAuthn credential storage
+ */
+function savePasskey(userId, credentialId, publicKey, counter = 0, deviceType = null, backedUp = 0, transports = null) {
+  if (!sqliteDb) return false;
+  try {
+    const id = 'pk_' + crypto.randomBytes(8).toString('hex');
+    sqliteDb.prepare(`
+      INSERT INTO passkeys (id, user_id, credential_id, public_key, counter, device_type, backed_up, transports, created_at, sign_count)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(id, userId, credentialId, publicKey, counter, deviceType, backedUp, transports, Date.now(), counter);
+    return { id, userId, credentialId };
+  } catch (e) {
+    return false;
+  }
+}
+
+function findPasskeyByCredentialId(credentialId) {
+  if (!sqliteDb) return null;
+  try {
+    const row = sqliteDb.prepare(`SELECT * FROM passkeys WHERE credential_id = ? LIMIT 1`).get(credentialId);
+    return row || null;
+  } catch (e) {
+    return null;
+  }
+}
+
+function findPasskeysByUserId(userId) {
+  if (!sqliteDb) return [];
+  try {
+    return sqliteDb.prepare(`SELECT * FROM passkeys WHERE user_id = ?`).all(userId);
+  } catch (e) {
+    return [];
+  }
+}
+
+function updatePasskeyCounter(credentialId, newCounter) {
+  if (!sqliteDb) return false;
+  try {
+    sqliteDb.prepare(`UPDATE passkeys SET sign_count = ? WHERE credential_id = ?`).run(newCounter, credentialId);
+    return true;
+  } catch (e) {
+    return false;
+  }
+}
+
+/**
  * Receipt image hash dedup gate.
  * Returns true if this image hash was already seen (replay attack).
  */
@@ -933,5 +994,9 @@ module.exports = {
   getOrderState,
   getUtrBoundOrder,
   bindUtrToOrder,
-  getAllActiveVPAs
+  getAllActiveVPAs,
+  savePasskey,
+  findPasskeyByCredentialId,
+  findPasskeysByUserId,
+  updatePasskeyCounter
 };

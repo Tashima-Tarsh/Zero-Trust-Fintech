@@ -3,8 +3,8 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>DISHA 8.2 — Sovereign UPI Checkout</title>
-  <meta name="description" content="Zero-Fee, Fraud-Proof UPI Checkout. Pay directly to merchant bank account with mathematical zero-trust verification.">
+  <title>DISHA 8.2 — WebAuthn Secured UPI Checkout</title>
+  <meta name="description" content="Hardware-vault secured UPI Checkout. WebAuthn Passkey + UPI Intent. Zero-fee, fraud-proof.">
   <meta name="theme-color" content="#0f172a">
   <link rel="icon" type="image/svg+xml" href="/assets/favicon.svg">
   <link rel="shortcut icon" href="/assets/favicon.svg">
@@ -42,7 +42,6 @@
   </script>
 
   <style>
-    /* Math canvas background */
     #math-canvas {
       position: fixed;
       inset: 0;
@@ -52,7 +51,6 @@
       z-index: 0;
       opacity: 0.18;
     }
-    /* Number input spin removal */
     input::-webkit-outer-spin-button,
     input::-webkit-inner-spin-button {
       -webkit-appearance: none;
@@ -61,6 +59,7 @@
     input[type=number] {
       -moz-appearance: textfield;
     }
+    .hidden { display: none !important; }
   </style>
 </head>
 <body class="min-h-screen bg-gradient-to-b from-slate-100 via-slate-50 to-slate-200 text-slate-900 font-sans flex flex-col items-center justify-center p-3 sm:p-5 relative overflow-x-hidden antialiased">
@@ -79,12 +78,11 @@
           </div>
           <div class="flex flex-col">
             <span class="font-sans text-[15px] font-extrabold text-slate-900 tracking-tight leading-none group-hover:text-blue-700 transition-colors">DISHA 8.2</span>
-            <span class="text-[10px] font-mono font-bold text-emerald-600 uppercase tracking-wider mt-0.5">Sovereign UPI Rail</span>
+            <span class="text-[10px] font-mono font-bold text-emerald-600 uppercase tracking-wider mt-0.5">WebAuthn + UPI Rail</span>
           </div>
         </a>
 
-        <!-- WhatsApp Support Badge -->
-        <a href="https://wa.me/919142197135?text=Hi%2C%20I%20have%20questions%20about%20my%20DISHA%20checkout" target="_blank" rel="noopener noreferrer" class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-50 border border-emerald-200/80 text-emerald-700 text-[11px] font-medium hover:bg-emerald-100 transition-colors shadow-2xs" title="Chat on WhatsApp: +91 91421 97135">
+        <a href="https://wa.me/919142197135?text=Hi%2C%20I%20have%20questions%20about%20my%20DISHA%20checkout" target="_blank" rel="noopener noreferrer" class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-50 border border-emerald-200/80 text-emerald-700 text-[11px] font-medium hover:bg-emerald-100 transition-colors shadow-2xs" title="WhatsApp: +91 91421 97135">
           <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
           <span>WhatsApp</span>
         </a>
@@ -96,7 +94,7 @@
         <div class="text-3xl sm:text-4xl font-extrabold text-slate-950 tracking-tight leading-none font-sans" id="challengeAmountEl">₹500.00</div>
         <div class="mt-2 inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 text-[11px] font-medium">
           <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
-          <span>Mathematical Zero-Fraud Challenge</span>
+          <span>Hardware Vault Secured</span>
         </div>
       </section>
 
@@ -145,50 +143,67 @@
         <div class="w-full relative flex items-center justify-center my-2">
           <div class="w-full border-t border-slate-200 absolute"></div>
           <span class="relative bg-white px-3 text-[10px] font-mono uppercase tracking-wider font-bold text-slate-400">
-            Client Copies UTR · Server Verifies
+            WebAuthn Vault → UPI Intent
           </span>
         </div>
 
-        <!-- UTR Form — No paste button inside input, auto-reads from clipboard (SST) -->
-        <form class="w-full mt-3 flex flex-col gap-2.5" id="utrForm" onsubmit="return false;">
-          <div class="w-full relative">
-            <input
-              type="text"
-              id="utrInput"
-              class="w-full h-12 px-4 rounded-xl bg-slate-50 border-2 border-slate-200 text-slate-900 font-mono text-center text-base font-bold tracking-wider placeholder:text-slate-400 placeholder:font-sans placeholder:text-xs placeholder:font-normal placeholder:tracking-normal focus:bg-white focus:border-blue-600 focus:outline-none focus:ring-4 focus:ring-blue-100 transition-all"
-              placeholder="Enter or copy 12-digit UTR"
-              maxlength="12"
-              pattern="\d{12}"
-              inputmode="numeric"
-              autocomplete="off"
-              required
-            >
+        <!-- ============================================================
+             WEBAUTHN / PASSKEY SECTION
+             ============================================================ -->
+
+        <!-- Passkey Status -->
+        <div id="passkeyStatus" class="w-full mb-3 p-3 rounded-xl bg-blue-50 border border-blue-200 text-blue-900 text-xs hidden">
+          <div class="flex items-center gap-2 mb-1">
+            <span class="w-2 h-2 rounded-full bg-blue-600"></span>
+            <span id="passkeyStatusText">Checking passkey...</span>
           </div>
+        </div>
 
-          <!-- SST / Clipboard Auto-read Helper Button -->
-          <button
-            type="button"
-            id="btnAutoClip"
-            class="w-full py-2 px-3 rounded-lg bg-blue-50 hover:bg-blue-100 border border-blue-200/80 text-blue-700 text-xs font-semibold flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
-            title="Read 12-digit UTR from clipboard"
-          >
-            <span>📋</span>
-            <span id="autoClipText">Auto-Read UTR from Clipboard (SST)</span>
+        <!-- Register Passkey (first time only) -->
+        <div id="registerSection" class="w-full mb-3 hidden">
+          <div class="text-center mb-2">
+            <p class="text-[11px] font-mono text-slate-500 mb-2">No passkey found on this device.</p>
+            <p class="text-[11px] font-sans text-slate-700 mb-3">Register your device vault (fingerprint/FaceID) to authorize payments.</p>
+          </div>
+          <input type="text" id="regUserId" class="w-full h-10 px-3 rounded-xl bg-slate-50 border border-slate-200 text-slate-900 font-sans text-sm focus:border-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-100 mb-2" placeholder="Your user ID (e.g., user_123)">
+          <input type="text" id="regUserName" class="w-full h-10 px-3 rounded-xl bg-slate-50 border border-slate-200 text-slate-900 font-sans text-sm focus:border-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-100 mb-3" placeholder="Your display name (e.g., Nitish Kumar)">
+          <button type="button" id="btnRegisterPasskey" class="w-full h-11 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-700 hover:from-blue-700 hover:to-indigo-800 text-white font-bold text-sm shadow-md hover:shadow-lg transition-all active:scale-[0.99]">
+            🔐 Register Device Vault
           </button>
+        </div>
 
-          <!-- Verify Payment Button -->
-          <button
-            type="button"
-            id="btnVerify"
-            class="w-full h-12 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-700 hover:from-emerald-700 hover:to-teal-800 text-white font-bold text-sm tracking-wide shadow-md hover:shadow-lg transition-all flex items-center justify-center gap-2 cursor-pointer active:scale-[0.99] disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            <svg id="btnVerifySpinner" class="animate-spin h-5 w-5 text-white hidden" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-              <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-              <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-            </svg>
-            <span id="btnVerifyText">CFC — Confirm from Customer</span>
+        <!-- Authenticate with Passkey (returning user) -->
+        <div id="authSection" class="w-full mb-3 hidden">
+          <div class="text-center mb-2">
+            <p class="text-[11px] font-mono text-slate-500 mb-2">Device vault found.</p>
+            <p class="text-[11px] font-sans text-slate-700 mb-3">Verify with fingerprint/FaceID to authorize payment.</p>
+          </div>
+          <button type="button" id="btnAuthenticatePasskey" class="w-full h-11 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-700 hover:from-emerald-600 hover:to-teal-800 text-white font-bold text-sm shadow-md hover:shadow-lg transition-all active:scale-[0.99]">
+            👆 Verify Vault (Biometric)
           </button>
-        </form>
+        </div>
+
+        <!-- Vault Verified → Launch UPI -->
+        <div id="vaultVerifiedSection" class="w-full mb-3 hidden">
+          <div class="text-center mb-2">
+            <p class="text-[11px] font-mono text-emerald-700 mb-2">✅ Vault verified — order locked.</p>
+            <p class="text-[11px] font-sans text-slate-700 mb-3">Tap your UPI app to complete payment.</p>
+          </div>
+          <div class="w-full grid grid-cols-4 gap-2 mb-3">
+            <button type="button" id="btnLaunchGPay" class="h-11 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-sm shadow-sm transition-all active:scale-[0.99]" title="Google Pay">
+              <span class="text-lg">💳</span>
+            </button>
+            <button type="button" id="btnLaunchPhonePe" class="h-11 rounded-xl bg-purple-600 hover:bg-purple-700 text-white font-bold text-sm shadow-sm transition-all active:scale-[0.99]" title="PhonePe">
+              <span class="text-lg">🟣</span>
+            </button>
+            <button type="button" id="btnLaunchPaytm" class="h-11 rounded-xl bg-sky-500 hover:bg-sky-600 text-white font-bold text-sm shadow-sm transition-all active:scale-[0.99]" title="Paytm">
+              <span class="text-lg">🔷</span>
+            </button>
+            <button type="button" id="btnLaunchGeneric" class="h-11 rounded-xl bg-amber-500 hover:bg-amber-600 text-white font-bold text-sm shadow-sm transition-all active:scale-[0.99]" title="Generic UPI">
+              <span class="text-lg">🔗</span>
+            </button>
+          </div>
+        </div>
 
         <!-- Status Card -->
         <div id="statusCard" class="w-full mt-3 p-3.5 rounded-xl text-left hidden transition-all text-xs">
@@ -205,7 +220,7 @@
       <footer class="px-5 py-3 bg-slate-50/90 border-t border-slate-100 flex items-center justify-between text-[11px] text-slate-500">
         <div class="flex items-center gap-1.5 font-medium">
           <span class="text-emerald-600">🔒</span>
-          <span>Direct NPCI Interbank Clearing</span>
+          <span>WebAuthn Hardware Vault + Direct NPCI Clearing</span>
         </div>
         <div class="font-mono text-slate-400">
           T+0 Settlement
@@ -222,9 +237,10 @@
       if (!canvas) return;
       const ctx = canvas.getContext('2d');
       const EQ = [
-        'P(fraud) → 0', 'MDR = 0%', 'ΔT = 0', 'H(UTR) = SHA-256',
-        'VPA · sig ≡ NPCI', 'ΣFee = ₹0', 'T+0 IMPS', 'Anti-Replay',
-        'PAN ⊕ VPA', 'idempotency_key', 'E(X) = 0.00', 'Kerckhoffs ≡ Valid'
+        'WebAuthn → Titan M2', 'P(fraud) → 0', 'H(UTR) = SHA-256',
+        'Secure Enclave → Signed', 'ΣFee = ₹0', 'T+0 IMPS',
+        'Anti-Replay UTR', 'VPA · sig ≡ NPCI', 'idempotency_key',
+        'Passkey → Biometric'
       ];
       let p = [];
       function resize() {
@@ -269,8 +285,12 @@
     })();
   </script>
 
-  <!-- Checkout Logic: Dynamic QR, UPI Intents, Clipboard SST, Verification, WebSockets -->
+  <!-- Checkout Logic: WebAuthn + UPI -->
+  <script src="https://cdn.simplewebauthn.org/@simplewebauthn/browser@9.x/dist/umd/simpleWebAuthnBrowser.min.js"></script>
   <script>
+    /* ========================================================================
+       ELEMENTS
+       ======================================================================== */
     const challengeAmountEl = document.getElementById('challengeAmountEl');
     const qrLoading = document.getElementById('qrLoading');
     const qrImg = document.getElementById('qrImg');
@@ -282,21 +302,36 @@
     const linkPaytm = document.getElementById('linkPaytm');
     const linkCred = document.getElementById('linkCred');
 
-    const utrInput = document.getElementById('utrInput');
-    const btnAutoClip = document.getElementById('btnAutoClip');
-    const autoClipText = document.getElementById('autoClipText');
-    const btnVerify = document.getElementById('btnVerify');
-    const btnVerifyText = document.getElementById('btnVerifyText');
-    const btnVerifySpinner = document.getElementById('btnVerifySpinner');
+    // WebAuthn elements
+    const passkeyStatus = document.getElementById('passkeyStatus');
+    const passkeyStatusText = document.getElementById('passkeyStatusText');
+    const registerSection = document.getElementById('registerSection');
+    const authSection = document.getElementById('authSection');
+    const vaultVerifiedSection = document.getElementById('vaultVerifiedSection');
+    const regUserId = document.getElementById('regUserId');
+    const regUserName = document.getElementById('regUserName');
+    const btnRegisterPasskey = document.getElementById('btnRegisterPasskey');
+    const btnAuthenticatePasskey = document.getElementById('btnAuthenticatePasskey');
+    const btnLaunchGPay = document.getElementById('btnLaunchGPay');
+    const btnLaunchPhonePe = document.getElementById('btnLaunchPhonePe');
+    const btnLaunchPaytm = document.getElementById('btnLaunchPaytm');
+    const btnLaunchGeneric = document.getElementById('btnLaunchGeneric');
 
     const statusCard = document.getElementById('statusCard');
     const statusTitle = document.getElementById('statusTitle');
     const statusDesc = document.getElementById('statusDesc');
     const btnRetrySession = document.getElementById('btnRetrySession');
 
+    /* ========================================================================
+       STATE
+       ======================================================================== */
     let currentSession = null;
-    let ws = null;
+    let currentUpIUri = null;
+    let vaultSessionId = null;
 
+    /* ========================================================================
+       UTILITIES
+       ======================================================================== */
     function formatINR(val) {
       return '₹' + Number(val).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
     }
@@ -316,25 +351,33 @@
       statusCard.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
     }
 
-    function setVerifying(isLoading) {
-      btnVerify.disabled = isLoading;
-      btnVerifySpinner.classList.toggle('hidden', !isLoading);
-      btnVerifyText.textContent = isLoading ? 'CFC Verifying…' : 'CFC — Confirm from Customer';
+    function setButtonLoading(btn, isLoading, loadingText, normalText) {
+      if (!btn) return;
+      btn.disabled = isLoading;
+      btn.textContent = isLoading ? loadingText : normalText;
+      btn.classList.toggle('opacity-70', isLoading);
+      btn.classList.toggle('cursor-not-allowed', isLoading);
     }
 
-    // 1. Initialize Checkout Session
+    /* ========================================================================
+       1. INITIALIZE CHECKOUT SESSION
+       ======================================================================== */
     async function initSession() {
       try {
         qrLoading.classList.remove('hidden');
         qrImg.classList.add('hidden');
         statusCard.classList.add('hidden');
+        hideAllWebAuthnSections();
 
         const urlParams = new URLSearchParams(window.location.search);
         const amount = urlParams.get('amount') || 500;
-        const res = await fetch(`/api/session/new?amount=${encodeURIComponent(amount)}&description=Checkout+Order`);
+        const userId = urlParams.get('userId') || 'user_' + Date.now();
+        const userName = urlParams.get('userName') || 'Customer';
+
+        const res = await fetch(`/api/session/new?amount=${encodeURIComponent(amount)}&description=Checkout+Order&userId=${encodeURIComponent(userId)}&userName=${encodeURIComponent(userName)}`);
         if (!res.ok) {
           const errData = await res.json().catch(() => ({}));
-          throw new Error(errData.message || 'Session creation failed: HTTP ' + res.status);
+          throw new Error(errData.message || errData.error || 'Session creation failed: HTTP ' + res.status);
         }
         const data = await res.json();
         if (!data.success) {
@@ -345,154 +388,261 @@
         challengeAmountEl.textContent = formatINR(data.challengeAmount);
         vpaAddress.textContent = data.vpaAddress;
 
-        // Render QR
         if (data.qrDataUrl) {
           qrImg.src = data.qrDataUrl;
           qrImg.classList.remove('hidden');
           qrLoading.classList.add('hidden');
         }
 
-        // Set UPI deep links
         if (data.upiLink) {
+          currentUpIUri = data.upiLink;
           linkGPay.href = data.appLinks?.android?.gpay || data.upiLink;
           linkPhonePe.href = data.appLinks?.android?.phonepe || data.upiLink;
           linkPaytm.href = data.appLinks?.android?.paytm || data.upiLink;
           linkCred.href = data.upiLink;
         }
 
-        // Setup real-time WebSocket listener
-        setupWebSocket(data.orderId);
+        // Check for existing passkey
+        await checkPasskeyStatus(userId, userName);
 
-        // Try reading clipboard automatically on startup (SST flow)
-        tryAutoReadClipboard(false);
+        // Setup WebSocket listener
+        setupWebSocket(data.orderId);
       } catch (err) {
         console.error('Session error:', err);
         showStatus('error', 'Session Failed', err.message || 'Unable to connect to payment switch.', true);
       }
     }
 
-    // 2. Real-time WebSocket settlement notification
+    async function checkPasskeyStatus(userId, userName) {
+      try {
+        const res = await fetch('/api/webauthn/authenticate/start', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ userId, orderId: currentSession.orderId, amount: currentSession.challengeAmount })
+        });
+        const data = await res.json();
+
+        if (data.needsRegistration) {
+          // No passkey — show registration
+          passkeyStatus.classList.add('hidden');
+          registerSection.classList.remove('hidden');
+          authSection.classList.add('hidden');
+          vaultVerifiedSection.classList.add('hidden');
+          regUserId.value = userId;
+          regUserName.value = userName;
+          showStatus('processing', 'Register Device Vault', 'No passkey found. Register your fingerprint/FaceID to authorize payments.');
+        } else if (data.success) {
+          // Has passkey — show authenticate
+          passkeyStatus.classList.remove('hidden');
+          passkeyStatus.className = 'w-full mb-3 p-3 rounded-xl bg-blue-50 border border-blue-200 text-blue-900 text-xs';
+          passkeyStatusText.textContent = 'Device vault ready — verify with biometric';
+          registerSection.classList.add('hidden');
+          authSection.classList.remove('hidden');
+          vaultVerifiedSection.classList.add('hidden');
+          vaultSessionId = data.sessionId;
+          showStatus('processing', 'Vault Verification Required', 'Tap "Verify Vault" to authorize with fingerprint/FaceID.');
+        } else {
+          showStatus('error', 'Passkey Check Failed', data.error || 'Unknown error');
+        }
+      } catch (err) {
+        console.error('Passkey check error:', err);
+        showStatus('error', 'Passkey Check Failed', err.message);
+      }
+    }
+
+    function hideAllWebAuthnSections() {
+      passkeyStatus.classList.add('hidden');
+      registerSection.classList.add('hidden');
+      authSection.classList.add('hidden');
+      vaultVerifiedSection.classList.add('hidden');
+    }
+
+    /* ========================================================================
+       2. WEBAUTHN REGISTRATION (first time)
+       ======================================================================== */
+    btnRegisterPasskey.addEventListener('click', async () => {
+      const userId = regUserId.value.trim();
+      const userName = regUserName.value.trim();
+      if (!userId || !userName) {
+        showStatus('error', 'Missing Info', 'Please enter user ID and display name.');
+        return;
+      }
+
+      setButtonLoading(btnRegisterPasskey, true, 'Registering…', '🔐 Register Device Vault');
+
+      try {
+        const res = await fetch('/api/webauthn/register/start', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ userId, userName, orderId: currentSession.orderId })
+        });
+        const data = await res.json();
+        if (!res.ok || !data.sessionId) throw new Error(data.error || 'Registration start failed');
+
+        // browser-side WebAuthn registration
+        const registration = await SimpleWebAuthnBrowser.startRegistration({
+          ...data.publicKey,
+          challenge: data.publicKey.challenge
+            ? Uint8Array.from(atob(data.publicKey.challenge), c => c.charCodeAt(0))
+            : Uint8Array.from(data.challenge, c => c.charCodeAt(0))
+          // simplewebauthn v9 accepts the publicKeyCredentialCreationOptions directly
+        });
+
+        const finishRes = await fetch('/api/webauthn/register/finish', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ sessionId: data.sessionId, credential: registration })
+        });
+        const finishData = await finishRes.json();
+        if (!finishRes.ok || !finishData.success) throw new Error(finishData.error || 'Registration finish failed');
+
+        showStatus('success', 'Device Vault Registered', 'Your fingerprint/FaceID is now bound to this device.');
+        setTimeout(() => {
+          // Re-check to move to auth section
+          checkPasskeyStatus(userId, userName);
+        }, 1000);
+      } catch (err) {
+        console.error('Registration error:', err);
+        showStatus('error', 'Registration Failed', err.message || 'Could not register device vault.');
+      } finally {
+        setButtonLoading(btnRegisterPasskey, false, 'Registering…', '🔐 Register Device Vault');
+      }
+    });
+
+    /* ========================================================================
+       3. WEBAUTHN AUTHENTICATION (vault verify)
+       ======================================================================== */
+    btnAuthenticatePasskey.addEventListener('click', async () => {
+      const userId = regUserId.value.trim() || 'user_' + Date.now();
+      setButtonLoading(btnAuthenticatePasskey, true, 'Verifying Vault…', '👆 Verify Vault (Biometric)');
+
+      try {
+        const res = await fetch('/api/webauthn/authenticate/start', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ userId, orderId: currentSession.orderId, amount: currentSession.challengeAmount })
+        });
+        const data = await res.json();
+        if (!res.ok || !data.sessionId) throw new Error(data.error || 'Authentication start failed');
+
+        vaultSessionId = data.sessionId;
+
+        // browser-side WebAuthn authentication
+        const credential = await SimpleWebAuthnBrowser.startAuthentication({
+          ...data.publicKey,
+          challenge: data.publicKey.challenge
+            ? Uint8Array.from(atob(data.publicKey.challenge), c => c.charCodeAt(0))
+            : Uint8Array.from(data.challenge, c => c.charCodeAt(0))
+        });
+
+        const finishRes = await fetch('/api/webauthn/authenticate/finish', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ sessionId: data.sessionId, credential })
+        });
+        const finishData = await finishRes.json();
+        if (!finishRes.ok || !finishData.success) throw new Error(finishData.error || 'Vault verification failed');
+
+        // Vault verified — show UPI launch buttons
+        authSection.classList.add('hidden');
+        vaultVerifiedSection.classList.remove('hidden');
+        passkeyStatus.classList.add('hidden');
+        showStatus('success', 'Vault Verified ✅', 'Order locked by hardware vault. Tap your UPI app to pay.');
+      } catch (err) {
+        console.error('Authentication error:', err);
+        showStatus('error', 'Vault Verification Failed', err.message || 'Biometric verification cancelled or failed.');
+      } finally {
+        setButtonLoading(btnAuthenticatePasskey, false, 'Verifying Vault…', '👆 Verify Vault (Biometric)');
+      }
+    });
+
+    /* ========================================================================
+       4. LAUNCH UPI INTENT (after vault verify)
+       ======================================================================== */
+    function launchUPIIntent(app) {
+      if (!vaultSessionId) {
+        showStatus('error', 'Vault Not Verified', 'Please verify the device vault first.');
+        return;
+      }
+      if (!currentUpIUri) {
+        showStatus('error', 'No UPI Link', 'Session missing UPI link. Please refresh.');
+        return;
+      }
+
+      let intent = currentUpIUri;
+      if (app === 'gpay') intent = linkGPay.href || currentUpIUri;
+      if (app === 'phonepe') intent = linkPhonePe.href || currentUpIUri;
+      if (app === 'paytm') intent = linkPaytm.href || currentUpIUri;
+
+      window.location.href = intent;
+    }
+
+    btnLaunchGPay.addEventListener('click', () => launchUPIIntent('gpay'));
+    btnLaunchPhonePe.addEventListener('click', () => launchUPIIntent('phonepe'));
+    btnLaunchPaytm.addEventListener('click', () => launchUPIIntent('paytm'));
+    btnLaunchGeneric.addEventListener('click', () => launchUPIIntent('generic'));
+
+    /* ========================================================================
+       5. UPI RETURN / FINALIZE
+       ======================================================================== */
+    window.addEventListener('load', () => {
+      const urlParams = new URLSearchParams(window.location.search);
+      const status = urlParams.get('Status');
+      const txnRef = urlParams.get('txnRef') || urlParams.get('tr');
+      const orderId = urlParams.get('orderId') || urlParams.get('tr') || (currentSession ? currentSession.orderId : null);
+
+      if (status === 'SUCCESS' && txnRef && orderId && vaultSessionId) {
+        finalizePayment(orderId, txnRef, vaultSessionId);
+      } else if (status === 'FAILURE') {
+        showStatus('error', 'Payment Failed', 'The UPI app reported failure. Please try again.');
+      }
+    });
+
+    async function finalizePayment(orderId, txnRef, sessionId) {
+      try {
+        showStatus('processing', 'Finalizing Settlement', 'Verifying UPI transaction with server…');
+
+        const res = await fetch('/api/checkout/finalize-upi', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ sessionId, orderId, txnRef })
+        });
+        const data = await res.json();
+
+        if (res.status === 200 && data.success) {
+          showStatus('success', '✅ Payment Settled (T+0)', `Transaction verified via hardware vault + UPI. UTR: ${txnRef}. Settled directly to merchant bank account at 0% fee.`);
+        } else {
+          showStatus('error', 'Settlement Failed', data.reason || data.error || 'Final verification failed.');
+        }
+      } catch (err) {
+        console.error('Finalize error:', err);
+        showStatus('error', 'Network Error', err.message || 'Unable to contact verification service.');
+      }
+    }
+
+    /* ========================================================================
+       6. WEBSOCKET REAL-TIME
+       ======================================================================== */
     function setupWebSocket(orderId) {
       try {
         const protocol = location.protocol === 'https:' ? 'wss:' : 'ws:';
-        ws = new WebSocket(`${protocol}//${location.host}/ws/checkout?orderId=${encodeURIComponent(orderId)}`);
+        const ws = new WebSocket(`${protocol}//${location.host}/ws/checkout?orderId=${encodeURIComponent(orderId)}`);
         ws.onmessage = (event) => {
           try {
             const msg = JSON.parse(event.data);
-            if (msg.type === 'SETTLED' || msg.type === 'PAYMENT_VERIFIED') {
-              onPaymentSuccess(msg.utr || 'DIRECT_SETTLED', msg.amount || currentSession.challengeAmount);
+            if (msg.type === 'SUCCESS' || msg.type === 'SETTLED') {
+              showStatus('success', '✅ Payment Settled (T+0)', `Real-time notification: UTR ${msg.utr || 'DIRECT_SETTLED'}. Settled at 0% fee.`);
             }
           } catch (e) {}
         };
       } catch (e) {
-        console.log('WS not connected; client manual UTR verification active');
+        console.log('WS not connected');
       }
     }
 
-    function onPaymentSuccess(utr, amount) {
-      showStatus('success', '✅ Payment Settled (T+0)', `Transaction verified. UTR: ${utr}. Settled directly to merchant bank account at 0% fee.`);
-      btnVerify.style.display = 'none';
-      btnAutoClip.style.display = 'none';
-      utrInput.disabled = true;
-    }
-
-    // 3. Verify UTR
-    async function verifyPayment() {
-      const utr = utrInput.value.trim();
-      if (!utr) {
-        showStatus('error', 'UTR Required', 'Please enter or paste the 12-digit UTR from your UPI payment confirmation.');
-        utrInput.focus();
-        return;
-      }
-      if (!/^\d{12}$/.test(utr)) {
-        showStatus('error', 'Invalid UTR Format', 'The UTR must be exactly 12 numeric digits.');
-        utrInput.focus();
-        return;
-      }
-      if (!currentSession) {
-        showStatus('error', 'No Active Session', 'Please refresh the page to start a new checkout session.');
-        return;
-      }
-
-      setVerifying(true);
-      showStatus('processing', 'CFC Verifying…', 'Validating UTR, amount match, and anti-reuse. No bank API needed.');
-
-      try {
-        const res = await fetch('/api/verify-cfc', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            utr: utr,
-            amount: currentSession.challengeAmount,
-            orderId: currentSession.orderId,
-            token: currentSession.sessionId
-          })
-        });
-        const data = await res.json();
-        if (res.status === 200 && data.success) {
-          onPaymentSuccess(utr, currentSession.challengeAmount);
-        } else {
-          showStatus('error', 'CFC Verification Failed', data.reason || data.error || 'UTR verification failed. Ensure payment was made for the exact challenge amount.');
-        }
-      } catch (err) {
-        showStatus('error', 'Network Error', err.message || 'Unable to contact verification service.');
-      } finally {
-        setVerifying(false);
-      }
-    }
-
-    // 4. Smart System Target (SST) & Clipboard Auto-Detection
-    async function tryAutoReadClipboard(userTriggered = false) {
-      if (!navigator.clipboard || !navigator.clipboard.readText) {
-        if (userTriggered) {
-          showStatus('processing', 'Clipboard Not Available', 'Please type the 12-digit UTR manually.');
-        }
-        return;
-      }
-      try {
-        const text = await navigator.clipboard.readText();
-        if (!text) return;
-        const match = text.match(/\b(\d{12})\b/);
-        if (match) {
-          const detected = match[1];
-          if (utrInput.value !== detected) {
-            utrInput.value = detected;
-            autoClipText.textContent = `✅ UTR Auto-Detected: ${detected}`;
-            showStatus('processing', 'UTR Detected from Clipboard', `Auto-filled UTR: ${detected}. Click "Verify Payment" to confirm.`);
-          }
-        } else if (userTriggered) {
-          const digits = text.replace(/\D/g, '');
-          if (digits.length >= 12) {
-            utrInput.value = digits.slice(0, 12);
-            showStatus('processing', 'UTR Extracted', `Extracted 12 digits: ${utrInput.value}. Click Verify to complete.`);
-          } else {
-            showStatus('processing', 'No 12-Digit UTR Found', 'No 12-digit UTR found on clipboard. Please enter it manually.');
-          }
-        }
-      } catch (e) {
-        // Silent fail if permission not granted on background event
-        if (userTriggered) {
-          utrInput.focus();
-        }
-      }
-    }
-
-    // Event Listeners
-    btnAutoClip.addEventListener('click', () => tryAutoReadClipboard(true));
-    btnVerify.addEventListener('click', verifyPayment);
-    btnRetrySession.addEventListener('click', initSession);
-
-    // Auto-detect UTR on window focus or visibility change (returning from UPI app)
-    document.addEventListener('visibilitychange', () => {
-      if (document.visibilityState === 'visible') {
-        tryAutoReadClipboard(false);
-      }
-    });
-    window.addEventListener('focus', () => {
-      tryAutoReadClipboard(false);
-    });
-
-    // Payee VPA copy
+    /* ========================================================================
+       EVENT LISTENERS
+       ======================================================================== */
     vpaPill.addEventListener('click', () => {
       if (currentSession && currentSession.vpaAddress) {
         navigator.clipboard.writeText(currentSession.vpaAddress).then(() => {
@@ -503,16 +653,7 @@
       }
     });
 
-    // Sanitization on input
-    utrInput.addEventListener('input', () => {
-      utrInput.value = utrInput.value.replace(/\D/g, '').slice(0, 12);
-    });
-    utrInput.addEventListener('keydown', (e) => {
-      if (e.key === 'Enter') {
-        e.preventDefault();
-        verifyPayment();
-      }
-    });
+    btnRetrySession.addEventListener('click', initSession);
 
     // Start
     initSession();
