@@ -25,7 +25,7 @@ const { buildUpiUri, appLinks, generateChallengeAmount: generateUniqueChallenge 
 const { getClientIP } = require('./utils/ip-utils');
 const { IPWhitelistMiddleware } = require('./middleware/ip-whitelist');
 const adminRoutes = require('./routes/admin/ip-whitelist');
-const { handleCinematicRequest } = require('./disha-cinematic/server');
+// disha-cinematic server removed - merchant SaaS deprecated
 const app = express();
 const CLERK_ENABLED = Boolean(process.env.CLERK_PUBLISHABLE_KEY && process.env.CLERK_SECRET_KEY);
 // Trust proxy only when explicitly opted in (e.g. behind Render/Cloudflare).
@@ -265,11 +265,8 @@ app.get(['/dashboard', '/payments', '/analytics'], (req, res) => {
   if (!userId) return res.redirect('/login');
   res.sendFile(path.join(__dirname, 'public', 'merchant-console.html'));
 });
-// 5. Merchant Auth & Dashboard API Delegation
+// disha-cinematic (merchant SaaS) removed - P2P/P2M routing handled via /api/verify
 app.use((req, res, next) => {
-  if (req.path.startsWith('/api/auth') || req.path.startsWith('/api/merchant')) {
-    return Promise.resolve(handleCinematicRequest(req, res)).catch(next);
-  }
   next();
 });
 // Administrative Authentication & Security Helpers

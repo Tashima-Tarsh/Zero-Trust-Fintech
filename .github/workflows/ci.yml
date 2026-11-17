@@ -24,10 +24,6 @@ jobs:
       - name: Install root dependencies
         run: npm install
 
-      - name: Install disha-cinematic dependencies
-        run: npm install
-        working-directory: disha-cinematic
-
       - name: Run lint (syntax check)
         run: npm run lint
 
@@ -38,27 +34,19 @@ jobs:
           NODE_ENV: test
           ADMIN_API_KEY: test-admin-key
 
-      - name: Start merchant SaaS server (port 5000)
-        run: npm start &
-        working-directory: disha-cinematic
-        env:
-          PORT: 5000
-          NODE_ENV: test
-
-      - name: Wait for servers to be healthy
+      - name: Wait for checkout server to be healthy
         run: |
           for i in $(seq 1 30); do
             r3000=$(curl -s http://localhost:3000/health 2>/dev/null || true)
-            r5000=$(curl -s http://localhost:5000/health 2>/dev/null || true)
-            if [ -n "$r3000" ] && [ -n "$r5000" ]; then
-              echo "Both servers healthy"
+            if [ -n "$r3000" ]; then
+              echo "Checkout server healthy"
               break
             fi
-            echo "Waiting for servers... attempt $i"
+            echo "Waiting for checkout server... attempt $i"
             sleep 2
           done
-          if [ -z "$r3000" ] || [ -z "$r5000" ]; then
-            echo "Servers not healthy in time"
+          if [ -z "$r3000" ]; then
+            echo "Checkout server not healthy in time"
             exit 1
           fi
 
