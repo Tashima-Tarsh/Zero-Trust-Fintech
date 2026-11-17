@@ -4,11 +4,8 @@ export default {
   async fetch(request, env) {
     const url = new URL(request.url);
 
-    // Static assets & HTML routes
+    // Static assets & HTML routes are served directly by Cloudflare CDN
     if (!url.pathname.startsWith("/api/") && url.pathname !== "/health" && !url.pathname.startsWith("/ws")) {
-      if (url.pathname === "/checkout" || url.pathname === "/pay") {
-        return env.ASSETS.fetch(new Request(new URL("/checkout.html", url.origin), request));
-      }
       return env.ASSETS.fetch(request);
     }
 

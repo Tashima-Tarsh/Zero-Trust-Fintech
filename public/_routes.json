@@ -3,16 +3,13 @@
   "include": [
     "/api/*",
     "/health",
-    "/ws/*",
-    "/checkout",
-    "/pay"
+    "/ws/*"
   ],
   "exclude": [
     "/assets/*",
     "/favicon.svg",
     "/robots.txt",
     "/sitemap.xml",
-    "/manifest.json",
-    "/*.html"
+    "/manifest.json"
   ]
 }
