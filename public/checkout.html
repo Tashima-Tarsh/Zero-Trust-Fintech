@@ -3,13 +3,17 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>DISHA 8.2 — Secure Checkout</title>
-  <meta name="description" content="Zero-fee, fraud-proof UPI payment. Verify your payment in seconds.">
-  <meta name="theme-color" content="#0f172a">
+  <title>DISHA 8.2 — Sovereign UPI Checkout</title>
+  <meta name="description" content="Zero-Fee, Fraud-Proof UPI Checkout. Pay directly to merchant bank account with mathematical zero-trust verification.">
+  <meta name="theme-color" content="#094cb2">
   <link rel="icon" type="image/svg+xml" href="/assets/favicon.svg">
+  <link rel="shortcut icon" href="/assets/favicon.svg">
+
+  <!-- Typography -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;600;700&family=Noto+Serif:wght@600;700&display=swap" rel="stylesheet">
+
   <style>
     * {
       box-sizing: border-box;
@@ -18,189 +22,343 @@
     }
     html {
       font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      font-size: 16px;
       color: #0f172a;
       background: #f8fafc;
       text-rendering: optimizeLegibility;
       -webkit-font-smoothing: antialiased;
-      -moz-osx-font-smoothing: grayscale;
     }
     body {
       margin: 0;
       min-height: 100vh;
       display: flex;
+      flex-direction: column;
       align-items: center;
       justify-content: center;
-      background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%);
+      background: linear-gradient(180deg, #f1f5f9 0%, #e2e8f0 100%);
+      padding: 16px;
     }
+
+    /* Math Background Particle Canvas */
+    #math-canvas {
+      position: fixed;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      pointer-events: none;
+      z-index: 0;
+      opacity: 0.15;
+    }
+
+    .checkout-shell {
+      position: relative;
+      z-index: 10;
+      width: 100%;
+      max-width: 440px;
+      margin: 0 auto;
+    }
+
     .card {
       width: 100%;
-      max-width: 420px;
-      padding: 0;
       background: #ffffff;
       border: 1px solid #e2e8f0;
-      border-radius: 16px;
-      box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1);
+      border-radius: 20px;
+      box-shadow: 0 20px 40px -15px rgba(15, 23, 42, 0.12), 0 0 1px 1px rgba(15, 23, 42, 0.04);
       overflow: hidden;
-      animation: slideUp 0.4s ease-out;
+      transition: all 0.3s ease;
     }
-    @keyframes slideUp {
-      from { opacity: 0; transform: translateY(20px); }
-      to { opacity: 1; transform: translateY(0); }
+
+    /* Header */
+    .card-header {
+      padding: 20px 24px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      border-bottom: 1px solid #f1f5f9;
+      background: #ffffff;
     }
-    .header {
-      padding: 32px 32px 24px;
-      background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
-      color: #ffffff;
-    }
-    .logo {
+    .brand-wrap {
       display: flex;
       align-items: center;
       gap: 10px;
-      margin-bottom: 20px;
+      text-decoration: none;
     }
-    .logo-mark {
+    .brand-icon {
       width: 32px;
       height: 32px;
-      background: linear-gradient(135deg, #10b981, #3b82f6);
+      background: #094cb2;
       border-radius: 8px;
       display: flex;
       align-items: center;
       justify-content: center;
-      font-weight: 800;
-      font-size: 14px;
       color: #ffffff;
-    }
-    .brand-name {
-      font-size: 1.25rem;
+      font-family: 'Noto Serif', serif;
+      font-size: 18px;
       font-weight: 700;
+    }
+    .brand-info {
+      display: flex;
+      flex-direction: column;
+    }
+    .brand-title {
+      font-size: 1.05rem;
+      font-weight: 800;
+      color: #0f172a;
       letter-spacing: -0.02em;
+      line-height: 1.2;
     }
-    .brand-tagline {
-      font-size: 0.8125rem;
-      color: #94a3b8;
-      margin-top: 4px;
-    }
-    .amount-section {
-      margin: 32px 32px 24px;
-      text-align: center;
-    }
-    .amount-label {
-      font-size: 0.875rem;
+    .brand-sub {
+      font-size: 0.72rem;
+      color: #059669;
       font-weight: 600;
-      color: #64748b;
       text-transform: uppercase;
       letter-spacing: 0.05em;
-      margin-bottom: 8px;
-      display: block;
+    }
+    .support-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      padding: 5px 10px;
+      background: #ecfdf5;
+      border: 1px solid #a7f3d0;
+      border-radius: 9999px;
+      font-size: 0.72rem;
+      font-weight: 600;
+      color: #047857;
+      text-decoration: none;
+      transition: all 0.2s ease;
+    }
+    .support-badge:hover {
+      background: #d1fae5;
+    }
+
+    /* Amount Section */
+    .amount-hero {
+      padding: 24px 24px 20px;
+      text-align: center;
+      background: linear-gradient(180deg, #fafafa 0%, #f8fafc 100%);
+      border-bottom: 1px solid #f1f5f9;
+    }
+    .amount-label {
+      font-size: 0.75rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: #64748b;
+      margin-bottom: 4px;
     }
     .amount-value {
-      font-size: 3rem;
+      font-family: 'Inter', sans-serif;
+      font-size: 2.5rem;
       font-weight: 800;
       color: #0f172a;
       letter-spacing: -0.04em;
-      display: block;
+      line-height: 1.1;
     }
-    .qr-container {
-      width: 100%;
-      max-width: 280px;
-      margin: 0 auto 24px;
+    .amount-paise-note {
+      font-size: 0.75rem;
+      color: #059669;
+      font-weight: 600;
+      margin-top: 6px;
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+    }
+
+    /* QR Code Section */
+    .qr-section {
       padding: 24px;
-      background: #f8fafc;
-      border: 1px solid #e2e8f0;
-      border-radius: 16px;
       text-align: center;
     }
-    .qr-label {
-      font-size: 0.75rem;
-      font-weight: 600;
-      color: #64748b;
-      margin-bottom: 12px;
-      text-transform: uppercase;
-      letter-spacing: 0.06em;
-    }
-    .qr-canvas {
-      width: 200px;
-      height: 200px;
-      margin: 0 auto;
+    .qr-wrapper {
+      position: relative;
+      width: 220px;
+      height: 220px;
+      margin: 0 auto 16px;
+      padding: 10px;
       background: #ffffff;
-      border: 1px solid #e2e8f0;
+      border: 2px solid #e2e8f0;
+      border-radius: 16px;
+      box-shadow: 0 4px 12px rgba(15, 23, 42, 0.05);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .qr-img {
+      width: 100%;
+      height: 100%;
+      object-fit: contain;
+      image-rendering: pixelated;
       border-radius: 8px;
-      padding: 8px;
     }
-    .qr-caption {
-      margin-top: 12px;
-      font-size: 0.8125rem;
+    .qr-loading {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
       color: #64748b;
+      font-size: 0.8rem;
+      height: 100%;
     }
-    .action-card {
-      background: #ffffff;
+
+    .vpa-pill {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      padding: 6px 14px;
+      background: #f8fafc;
       border: 1px solid #e2e8f0;
-      border-radius: 12px;
-      padding: 20px;
-      margin: 0 32px 24px;
+      border-radius: 9999px;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.8rem;
+      color: #334155;
+      margin-bottom: 16px;
+      cursor: pointer;
+      user-select: all;
+      transition: all 0.2s;
     }
-    .copy-section {
+    .vpa-pill:hover {
+      background: #f1f5f9;
+      border-color: #cbd5e1;
+    }
+
+    /* UPI Apps Mobile Grid */
+    .upi-apps-row {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 8px;
       margin-bottom: 20px;
     }
-    .section-title {
-      font-size: 0.875rem;
-      font-weight: 600;
-      color: #475569;
-      margin-bottom: 12px;
-    }
-    .input-group {
-      position: relative;
+    .upi-btn {
       display: flex;
-      gap: 8px;
-    }
-    .input-field {
-      flex: 1;
-      padding: 12px 16px;
-      font-size: 0.9375rem;
-      font-family: 'JetBrains Mono', monospace;
-      font-weight: 600;
-      color: #0f172a;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 10px 4px;
+      background: #f8fafc;
       border: 1px solid #e2e8f0;
-      border-radius: 8px;
-      outline: none;
-      transition: border-color 0.2s ease, box-shadow 0.2s ease;
+      border-radius: 12px;
+      text-decoration: none;
+      color: #1e293b;
+      font-size: 0.72rem;
+      font-weight: 600;
+      transition: all 0.2s ease;
     }
-    .input-field:focus {
-      border-color: #10b981;
-      box-shadow: 0 0 0 3px rgba(16, 184, 166, 0.1);
+    .upi-btn:hover {
+      background: #f1f5f9;
+      border-color: #094cb2;
+      color: #094cb2;
     }
-    .input-field::placeholder {
+    .upi-icon {
+      font-size: 1.25rem;
+      margin-bottom: 4px;
+    }
+
+    /* UTR Verification Section */
+    .verify-section {
+      padding: 0 24px 24px;
+    }
+    .section-divider {
+      position: relative;
+      text-align: center;
+      margin: 16px 0 20px;
+    }
+    .section-divider::before {
+      content: '';
+      position: absolute;
+      top: 50%;
+      left: 0;
+      right: 0;
+      height: 1px;
+      background: #e2e8f0;
+      z-index: 0;
+    }
+    .section-divider span {
+      position: relative;
+      z-index: 1;
+      background: #ffffff;
+      padding: 0 12px;
+      font-size: 0.72rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
       color: #94a3b8;
     }
-    .btn-copy {
-      padding: 0 16px;
-      font-size: 0.875rem;
+
+    .utr-form {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+    .utr-input-wrap {
+      position: relative;
+      display: flex;
+      align-items: center;
+    }
+    .utr-input {
+      width: 100%;
+      height: 48px;
+      padding: 0 110px 0 16px;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.95rem;
       font-weight: 600;
       color: #0f172a;
       background: #f8fafc;
-      border: 1px solid #e2e8f0;
-      border-radius: 8px;
-      cursor: pointer;
+      border: 1.5px solid #cbd5e1;
+      border-radius: 10px;
+      outline: none;
+      letter-spacing: 0.04em;
       transition: all 0.2s ease;
     }
-    .btn-copy:hover {
-      background: #f1f5f9;
+    .utr-input:focus {
+      background: #ffffff;
+      border-color: #094cb2;
+      box-shadow: 0 0 0 3px rgba(9, 76, 178, 0.12);
     }
+    .btn-paste {
+      position: absolute;
+      right: 6px;
+      height: 36px;
+      padding: 0 12px;
+      font-size: 0.75rem;
+      font-weight: 700;
+      color: #094cb2;
+      background: #eff6ff;
+      border: 1px solid #bfdbfe;
+      border-radius: 7px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      transition: all 0.2s;
+    }
+    .btn-paste:hover {
+      background: #dbeafe;
+    }
+
     .btn-verify {
       width: 100%;
-      padding: 14px 24px;
-      font-size: 0.9375rem;
-      font-weight: 700;
+      height: 48px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      background: linear-gradient(135deg, #059669 0%, #047857 100%);
       color: #ffffff;
-      background: linear-gradient(135deg, #10b981, #059669);
       border: none;
       border-radius: 10px;
+      font-size: 0.95rem;
+      font-weight: 700;
       cursor: pointer;
+      box-shadow: 0 4px 12px rgba(5, 150, 105, 0.25);
       transition: all 0.2s ease;
     }
     .btn-verify:hover {
+      background: linear-gradient(135deg, #047857 0%, #065f46 100%);
       transform: translateY(-1px);
-      box-shadow: 0 10px 15px -3px rgba(16, 184, 166, 0.4);
+      box-shadow: 0 6px 16px rgba(5, 150, 105, 0.35);
     }
     .btn-verify:disabled {
       opacity: 0.6;
@@ -208,286 +366,418 @@
       transform: none;
       box-shadow: none;
     }
-    .status-box {
-      margin-top: 20px;
-      padding: 16px;
+
+    .status-card {
+      margin-top: 14px;
+      padding: 14px 16px;
       border-radius: 10px;
       display: none;
+      animation: fadeIn 0.3s ease;
     }
-    .status-box.success {
+    .status-card.success {
       background: #f0fdf4;
       border: 1px solid #86efac;
       color: #14532d;
     }
-    .status-box.error {
+    .status-card.error {
       background: #fef2f2;
       border: 1px solid #fecaca;
       color: #991b1b;
     }
-    .status-box.processing {
+    .status-card.processing {
       background: #eff6ff;
       border: 1px solid #bfdbfe;
       color: #1e3a8a;
     }
     .status-title {
-      font-size: 0.875rem;
+      font-size: 0.88rem;
       font-weight: 700;
-      margin-bottom: 4px;
+      margin-bottom: 2px;
     }
-    .status-detail {
-      font-size: 0.8125rem;
+    .status-desc {
+      font-size: 0.78rem;
+      line-height: 1.4;
       opacity: 0.9;
     }
-    .footer {
-      padding: 24px;
-      text-align: center;
-      font-size: 0.75rem;
-      color: #94a3b8;
-      border-top: 1px solid #e2e8f0;
+
+    .card-footer {
+      padding: 14px 24px;
+      background: #f8fafc;
+      border-top: 1px solid #f1f5f9;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      font-size: 0.72rem;
+      color: #64748b;
     }
+    .footer-secure {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      font-weight: 600;
+    }
+
     .spinner {
-      display: inline-block;
       width: 16px;
       height: 16px;
-      border: 2px solid rgba(16, 184, 166, 0.3);
-      border-top-color: #10b981;
+      border: 2px solid rgba(255, 255, 255, 0.4);
+      border-top-color: #ffffff;
       border-radius: 50%;
-      animation: spin 1s linear infinite;
-      margin-right: 8px;
+      animation: spin 0.8s linear infinite;
     }
     @keyframes spin {
       to { transform: rotate(360deg); }
     }
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(6px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
   </style>
 </head>
 <body>
-  <div class="card">
-    <header class="header">
-      <div class="logo">
-        <div class="logo-mark">D</div>
-        <div class="brand-text">
-          <div class="brand-name">DISHA 8.2</div>
-          <div class="brand-tagline">Zero-Trust UPI Checkout</div>
+  <canvas id="math-canvas"></canvas>
+
+  <main class="checkout-shell">
+    <div class="card">
+      <!-- Header -->
+      <header class="card-header">
+        <a href="/" class="brand-wrap">
+          <div class="brand-icon">D</div>
+          <div class="brand-info">
+            <span class="brand-title">DISHA 8.2</span>
+            <span class="brand-sub">Sovereign UPI Rail</span>
+          </div>
+        </a>
+        <a href="https://wa.me/919142197135?text=Hi%2C%20I%20have%20questions%20about%20my%20DISHA%20checkout" target="_blank" rel="noopener noreferrer" class="support-badge">
+          <span>💬 Support</span>
+        </a>
+      </header>
+
+      <!-- Amount Section -->
+      <section class="amount-hero">
+        <div class="amount-label">Amount to Pay</div>
+        <div class="amount-value" id="challengeAmountEl">₹500.00</div>
+        <div class="amount-paise-note">
+          <span>🛡️ Mathematical Zero-Fraud Challenge</span>
         </div>
-      </div>
-    </header>
+      </section>
 
-    <div class="amount-section">
-      <span class="amount-label">Pay Now</span>
-      <span class="amount-value" id="challengeAmount">₹500.00</span>
-    </div>
-
-    <div class="qr-card">
-      <div class="qr-label">Scan QR Code with Any UPI App</div>
-      <div class="qr-canvas">
-        <canvas id="qrCanvas" width="200" height="200"></canvas>
-      </div>
-      <div class="qr-caption">Pay exactly ₹<span id="qrAmount">500.00</span></div>
-    </div>
-
-    <div class="action-card">
-      <div class="copy-section">
-        <div class="section-title">Step 1 — Copy UTR</div>
-        <div class="input-group">
-          <input type="text" id="utrInput" class="input-field" placeholder="Paste UTR / Transaction ID..." readonly>
-          <button class="btn-copy" id="btnReadClipboard">Read from Clipboard</button>
+      <!-- QR Display & UPI Links -->
+      <section class="qr-section">
+        <div class="qr-wrapper" id="qrWrapper">
+          <div class="qr-loading" id="qrLoading">
+            <div class="spinner" style="border-top-color:#094cb2; border-color: rgba(9,76,178,0.2);"></div>
+            <span>Generating Dynamic QR...</span>
+          </div>
+          <img id="qrImg" class="qr-img" style="display:none;" alt="UPI QR Code">
         </div>
-      </div>
-      <div class="split-section" style="margin-top: 16px;">
-        <div class="section-title">Step 2 — Verify</div>
-        <button class="btn-verify" id="btnVerify">
-          <span id="btnText">Verify Payment</span>
-          <span id="btnSpinner" class="spinner" style="display:none;"></span>
-        </button>
-      </div>
-    </div>
-    <div class="status-box" id="statusBox">
-      <div class="status-title" id="statusTitle"></div>
-      <div class="status-detail" id="statusDetail"></div>
-    </div>
-    <footer class="footer">
-      Secure &amp; Verified · DISHA 8.2 Zero-Trust Rail
-    </footer>
-  </div>
 
+        <div class="vpa-pill" id="vpaPill" title="Click to copy VPA">
+          <span id="vpaAddress">disha82@okaxis</span>
+          <span style="font-size:0.75rem;">📋</span>
+        </div>
+
+        <!-- Fast UPI App Intent Deep Links -->
+        <div class="upi-apps-row">
+          <a class="upi-btn" id="linkGPay" href="#">
+            <span class="upi-icon">💳</span>
+            <span>GPay</span>
+          </a>
+          <a class="upi-btn" id="linkPhonePe" href="#">
+            <span class="upi-icon">🟣</span>
+            <span>PhonePe</span>
+          </a>
+          <a class="upi-btn" id="linkPaytm" href="#">
+            <span class="upi-icon">🔷</span>
+            <span>Paytm</span>
+          </a>
+          <a class="upi-btn" id="linkCred" href="#">
+            <span class="upi-icon">⚡</span>
+            <span>CRED</span>
+          </a>
+        </div>
+
+        <!-- UTR Form -->
+        <div class="section-divider">
+          <span>Client Copies UTR · Server Verifies</span>
+        </div>
+
+        <form class="utr-form" id="utrForm" onsubmit="return false;">
+          <div class="utr-input-wrap">
+            <input type="text" id="utrInput" class="utr-input" placeholder="12-Digit UTR (e.g. 631902888999)" maxlength="12" pattern="\d{12}" required autocomplete="off">
+            <button type="button" class="btn-paste" id="btnPaste">
+              <span>📋 Paste</span>
+            </button>
+          </div>
+
+          <button type="button" class="btn-verify" id="btnVerify">
+            <span id="btnVerifySpinner" class="spinner" style="display:none;"></span>
+            <span id="btnVerifyText">Verify Payment</span>
+          </button>
+        </form>
+
+        <!-- Status Card -->
+        <div class="status-card" id="statusCard">
+          <div class="status-title" id="statusTitle"></div>
+          <div class="status-desc" id="statusDesc"></div>
+        </div>
+      </section>
+
+      <!-- Footer -->
+      <footer class="card-footer">
+        <div class="footer-secure">
+          <span>🔒 Direct NPCI Interbank Clearing</span>
+        </div>
+        <div style="font-size: 0.72rem; color:#64748b;">
+          T+0 Direct Settlement
+        </div>
+      </footer>
+    </div>
+  </main>
+
+  <!-- Background Mathematical Equations Animation -->
   <script>
-    // ---------- Configuration ----------
-    const BASE_URL = window.location.origin;
-    const sessionId = new URLSearchParams(window.location.search).get('sessionId') || 'session_' + Date.now();
+    (function () {
+      const canvas = document.getElementById('math-canvas');
+      if (!canvas) return;
+      const ctx = canvas.getContext('2d');
+      const EQ = [
+        'P(fraud) → 0', 'MDR = 0%', 'ΔT = 0', 'H(UTR) = SHA-256',
+        'VPA · sig ≡ NPCI', 'ΣFee = ₹0', 'T+0 IMPS', 'Anti-Replay',
+        'PAN ⊕ VPA', 'idempotency_key'
+      ];
+      let p = [];
+      function resize() { canvas.width = window.innerWidth; canvas.height = window.innerHeight; }
+      function spawn() {
+        return {
+          x: Math.random() * canvas.width,
+          y: canvas.height + 15,
+          text: EQ[Math.floor(Math.random() * EQ.length)],
+          speed: 0.3 + Math.random() * 0.4,
+          opacity: 0,
+          maxOpacity: 0.4,
+          life: 0,
+          maxLife: 240,
+          color: Math.random() > 0.5 ? '#059669' : '#094cb2'
+        };
+      }
+      function loop() {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        if (p.length < 18 && Math.random() < 0.05) p.push(spawn());
+        p = p.filter(item => {
+          item.life++;
+          item.y -= item.speed;
+          if (item.life < 30) item.opacity = (item.life / 30) * item.maxOpacity;
+          else if (item.life > item.maxLife - 30) item.opacity = ((item.maxLife - item.life) / 30) * item.maxOpacity;
+          if (item.opacity <= 0 || item.y < -20) return false;
+          ctx.save();
+          ctx.globalAlpha = item.opacity;
+          ctx.font = '12px "JetBrains Mono", monospace';
+          ctx.fillStyle = item.color;
+          ctx.fillText(item.text, item.x, item.y);
+          ctx.restore();
+          return true;
+        });
+        requestAnimationFrame(loop);
+      }
+      window.addEventListener('resize', resize);
+      resize();
+      loop();
+    })();
+  </script>
 
-    // Elements
-    const challengeAmountEl = document.getElementById('challengeAmount');
-    const qrAmountEl = document.getElementById('qrAmount');
-    const qrCanvas = document.getElementById('qrCanvas');
+  <!-- Checkout Logic -->
+  <script>
+    const challengeAmountEl = document.getElementById('challengeAmountEl');
+    const qrWrapper = document.getElementById('qrWrapper');
+    const qrLoading = document.getElementById('qrLoading');
+    const qrImg = document.getElementById('qrImg');
+    const vpaPill = document.getElementById('vpaPill');
+    const vpaAddress = document.getElementById('vpaAddress');
+
+    const linkGPay = document.getElementById('linkGPay');
+    const linkPhonePe = document.getElementById('linkPhonePe');
+    const linkPaytm = document.getElementById('linkPaytm');
+    const linkCred = document.getElementById('linkCred');
+
     const utrInput = document.getElementById('utrInput');
-    const btnReadClipboard = document.getElementById('btnReadClipboard');
+    const btnPaste = document.getElementById('btnPaste');
     const btnVerify = document.getElementById('btnVerify');
-    const btnVerifyText = document.getElementById('btnText');
-    const btnVerifySpinner = document.getElementById('btnSpinner');
-    const statusBox = document.getElementById('statusBox');
+    const btnVerifyText = document.getElementById('btnVerifyText');
+    const btnVerifySpinner = document.getElementById('btnVerifySpinner');
+
+    const statusCard = document.getElementById('statusCard');
     const statusTitle = document.getElementById('statusTitle');
-    const statusDetail = document.getElementById('statusDetail');
+    const statusDesc = document.getElementById('statusDesc');
 
-    // State
-    let challengeAmount = '0.00';
-    let sessionId = null;
+    let currentSession = null;
+    let ws = null;
 
-    // ---------- Helpers ----------
-    function formatINR(num) {
-      return new Intl.NumberFormat('en-IN', {
-        style: 'currency',
-        currency: 'INR',
-        minimumFractionDigits: 2,
-        maximumFractionDigits: 2
-      }).format(num);
+    function formatINR(val) {
+      return '₹' + Number(val).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
     }
 
-    function extractUTR(text) {
-      if (!text) return null;
-      // Match 12-digit UTR
-      const m = text.match(/\b(\d{12})\b/);
-      return m ? m[1] : null;
-    }
-
-    function setStatus(type, title, detail) {
-      const box = statusBox;
-      box.className = 'status-box ' + type;
+    function showStatus(type, title, desc) {
+      statusCard.className = 'status-card ' + type;
       statusTitle.textContent = title;
-      statusDetail.textContent = detail || '';
-      box.style.display = 'block';
+      statusDesc.textContent = desc || '';
+      statusCard.style.display = 'block';
     }
 
     function setVerifying(isLoading) {
-      const btn = btnVerify;
-      if (isLoading) {
-        btn.disabled = true;
-        btnVerifyText.textContent = 'Verifying...';
-        btnVerifySpinner.style.display = 'inline-block';
-      } else {
-        btn.disabled = false;
-        btnVerifyText.textContent = 'Verify Payment';
-        btnVerifySpinner.style.display = 'none';
-      }
+      btnVerify.disabled = isLoading;
+      btnVerifySpinner.style.display = isLoading ? 'inline-block' : 'none';
+      btnVerifyText.textContent = isLoading ? 'Verifying with Bank...' : 'Verify Payment';
     }
 
-    // ---------- QR Code ----------
-    function generateQR(text) {
-      const canvas = qrCanvas;
-      const ctx = canvas.getContext('2d');
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
-      ctx.fillStyle = '#ffffff';
-      ctx.fillRect(0, 0, canvas.width, canvas.height);
-      ctx.fillStyle = '#000000';
-
-      // Simple QR-like pattern (visual only, not real QR)
-      // In production, use a proper QR library like qrcode.js
-      const size = 200;
-      const cellSize = Math.floor(size / 25);
-      for (let y = 0; y < 25; y++) {
-        for (let x = 0; x < 25; x++) {
-          // Simple pattern - in production use a real QR library
-          if ((x + y) % 3 === 0 || (x === 0 || x === 24 || y === 0 || y === 24)) {
-            ctx.fillRect(x * cellSize, y * cellSize, cellSize, cellSize);
-          }
-        }
-      }
-    }
-
-    // ---------- API Calls ----------
-    async function createSession() {
+    // 1. Create Session
+    async function initSession() {
       try {
-        const res = await fetch(`${BASE_URL}/api/session/new?amount=500&description=Checkout Payment`, {
-          method: 'GET',
-          headers: { 'Content-Type': 'application/json' }
-        });
-        if (!res.ok) throw new Error('Failed to create session');
+        const urlParams = new URLSearchParams(window.location.search);
+        const amount = urlParams.get('amount') || 500;
+        const res = await fetch(`/api/session/new?amount=${encodeURIComponent(amount)}&description=Checkout+Order`);
+        if (!res.ok) throw new Error('Session creation failed: HTTP ' + res.status);
         const data = await res.json();
-        if (!data.success) throw new Error(data.error || 'Session creation failed');
+        if (!data.success) throw new Error(data.error || 'Failed to initialize session');
 
-        sessionId = data.sessionId;
-        challengeAmount = data.challengeAmount;
+        currentSession = data;
+        challengeAmountEl.textContent = formatINR(data.challengeAmount);
+        vpaAddress.textContent = data.vpaAddress;
 
-        challengeAmountEl.textContent = formatINR(challengeAmount);
-        qrAmountEl.textContent = formatINR(challengeAmount);
+        // Display pre-generated QR data URL
+        if (data.qrDataUrl) {
+          qrImg.src = data.qrDataUrl;
+          qrImg.style.display = 'block';
+          qrLoading.style.display = 'none';
+        }
 
-        // Generate QR with payment info
-        const qrData = `${sessionId}|${challengeAmount}|${Date.now()}`;
-        generateQR(qrData);
+        // Set UPI deep links
+        if (data.upiLink) {
+          linkGPay.href = data.upiLink;
+          linkPhonePe.href = data.upiLink;
+          linkPaytm.href = data.upiLink;
+          linkCred.href = data.upiLink;
+        }
+
+        // Setup real-time WebSocket listener
+        setupWebSocket(data.orderId);
       } catch (err) {
-        console.error('Session creation failed:', err);
-        setStatus('error', 'Session Error', 'Unable to create checkout session. Please try again.');
+        console.error('Session error:', err);
+        showStatus('error', 'Session Failed', err.message || 'Unable to connect to payment switch.');
       }
     }
 
-    async function verifyUTR(utr) {
+    // 2. Real-time WebSocket settlement notification
+    function setupWebSocket(orderId) {
+      try {
+        const protocol = location.protocol === 'https:' ? 'wss:' : 'ws:';
+        ws = new WebSocket(`${protocol}//${location.host}/ws/checkout?orderId=${encodeURIComponent(orderId)}`);
+        ws.onmessage = (event) => {
+          try {
+            const msg = JSON.parse(event.data);
+            if (msg.type === 'SETTLED' || msg.type === 'PAYMENT_VERIFIED') {
+              onPaymentSuccess(msg.utr || 'DIRECT_SETTLED', msg.amount || currentSession.challengeAmount);
+            }
+          } catch (e) {}
+        };
+      } catch (e) {
+        console.log('WS not connected; client manual UTR verification active');
+      }
+    }
+
+    function onPaymentSuccess(utr, amount) {
+      showStatus('success', '✅ Payment Settled (T+0)', `Transaction verified. UTR: ${utr}. Settled directly to merchant bank account at 0% fee.`);
+      btnVerify.style.display = 'none';
+      utrInput.disabled = true;
+      btnPaste.disabled = true;
+    }
+
+    // 3. Verify UTR
+    async function verifyPayment() {
+      const utr = utrInput.value.trim();
+      if (!utr) {
+        showStatus('error', 'UTR Required', 'Please enter the 12-digit UTR from your UPI payment confirmation.');
+        utrInput.focus();
+        return;
+      }
+      if (!/^\d{12}$/.test(utr)) {
+        showStatus('error', 'Invalid UTR Format', 'The UTR must be exactly 12 numeric digits.');
+        utrInput.focus();
+        return;
+      }
+      if (!currentSession) {
+        showStatus('error', 'No Active Session', 'Please refresh the page to start a new checkout session.');
+        return;
+      }
+
       setVerifying(true);
-      statusBox.style.display = 'none';
+      showStatus('processing', 'Verifying with NPCI Rail...', 'Validating UTR uniqueness, amount match, and bank settlement invariant.');
 
       try {
-        const res = await fetch(`${BASE_URL}/api/verify`, {
+        const res = await fetch('/api/verify', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             utr: utr,
-            amount: challengeAmount,
-            orderId: sessionId
+            amount: currentSession.challengeAmount,
+            orderId: currentSession.orderId
           })
         });
         const data = await res.json();
-
         if (res.status === 200 && data.success) {
-          setStatus('success', 'Payment Verified ✅', `UTR ${utr} verified successfully. Order settled.`);
+          onPaymentSuccess(utr, currentSession.challengeAmount);
         } else {
-          setStatus('error', 'Verification Failed', data.reason || 'Payment verification failed. Please check the UTR and try again.');
+          showStatus('error', 'Verification Failed', data.reason || data.error || 'UTR verification failed. Ensure payment was made for the exact challenge amount.');
         }
       } catch (err) {
-        console.error('Verify error:', err);
-        setStatus('error', 'Verification Error', 'Unable to verify payment. Please try again.');
+        showStatus('error', 'Network Error', err.message || 'Unable to contact verification service.');
       } finally {
         setVerifying(false);
       }
     }
 
-    // ---------- Clipboard ----------
-    async function readClipboard() {
+    // 4. Clipboard helper
+    async function pasteFromClipboard() {
       try {
         const text = await navigator.clipboard.readText();
-        const utr = extractUTR(text);
-        if (!utr) {
-          alert('No valid UTR found in clipboard. Please copy the UTR/Transaction ID from your UPI app.');
-          return;
+        const match = text.match(/\b(\d{12})\b/);
+        if (match) {
+          utrInput.value = match[1];
+          showStatus('processing', 'UTR Detected', `Pasted UTR: ${match[1]}. Click Verify to complete.`);
+        } else {
+          utrInput.value = text.replace(/\D/g, '').slice(0, 12);
         }
-        utrInput.value = utr;
+      } catch (e) {
         utrInput.focus();
-        utrInput.select();
-      } catch (err) {
-        console.error('Clipboard read error:', err);
-        alert('Unable to read clipboard. Please paste the UTR manually.');
       }
     }
 
-    // ---------- Event Listeners ----------
-    btnReadClipboard.addEventListener('click', readClipboard);
-
-    btnVerify.addEventListener('click', () => {
-      const utr = utrInput.value.trim();
-      if (!utr) {
-        alert('Please enter or paste a UTR.');
-        return;
+    // Event Listeners
+    btnPaste.addEventListener('click', pasteFromClipboard);
+    btnVerify.addEventListener('click', verifyPayment);
+    vpaPill.addEventListener('click', () => {
+      if (currentSession && currentSession.vpaAddress) {
+        navigator.clipboard.writeText(currentSession.vpaAddress).then(() => {
+          const orig = vpaAddress.textContent;
+          vpaAddress.textContent = 'Copied to Clipboard!';
+          setTimeout(() => vpaAddress.textContent = orig, 1200);
+        });
       }
-      if (!/^\d{12}$/.test(utr)) {
-        alert('Please enter a valid 12-digit UTR.');
-        return;
-      }
-      verifyUTR(utr);
     });
 
     utrInput.addEventListener('input', () => {
       utrInput.value = utrInput.value.replace(/\D/g, '').slice(0, 12);
     });
 
-    // ---------- Initialize ----------
-    createSession();
+    utrInput.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        verifyPayment();
+      }
+    });
+
+    // Start
+    initSession();
   </script>
 </body>
 </html>

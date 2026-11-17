@@ -251,7 +251,7 @@ app.get(['/', '/home'], (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 app.get(['/checkout', '/pay'], (req, res) => {
-  res.sendFile(path.join(__dirname, 'public', '3d-checkout.html'));
+  res.sendFile(path.join(__dirname, 'public', 'checkout.html'));
 });
 app.get('/auth-config.js', (req, res) => {
   res.type('application/javascript').send(`window.DISHA_CLERK_PUBLISHABLE_KEY=${JSON.stringify(process.env.CLERK_PUBLISHABLE_KEY || '')};`);
