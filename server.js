@@ -223,6 +223,8 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(idempotencyMiddleware);
 // 1. Static Assets: Serve PhonePe marketing styles, console styles, scripts, videos, and icons
+// One canonical merchant dashboard; checkout and its APIs remain public.
+app.get('/merchant-console.html', (req, res) => res.redirect(302, '/dashboard'));
 app.use(express.static(path.join(__dirname, 'public')));
 // 2. Health Check Endpoint (Render & Uptime Monitoring)
 app.get(['/health', '/api/health'], (req, res) => {
@@ -251,12 +253,12 @@ app.get(['/dashboard', '/payments', '/analytics'], (req, res) => {
   if (!CLERK_ENABLED) return res.redirect('/login');
   const { userId } = getAuth(req);
   if (!userId) return res.redirect('/login');
-  res.sendFile(path.join(__dirname, 'public', 'merchant-dashboard.html'));
+  res.sendFile(path.join(__dirname, 'public', 'merchant-console.html'));
 });
 // 5. Merchant Auth & Dashboard API Delegation
 app.use((req, res, next) => {
   if (req.path.startsWith('/api/auth') || req.path.startsWith('/api/merchant')) {
-    return handleCinematicRequest(req, res);
+    return Promise.resolve(handleCinematicRequest(req, res)).catch(next);
   }
   next();
 });
