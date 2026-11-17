@@ -32,7 +32,7 @@ body { font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Robo
 .pay-sub { font-size: 0.84rem; color: #64748B; margin-bottom: 16px; }
 .qr-card { width: 100%; max-width: 260px; margin: 0 auto 16px; background: #FFFFFF; border: 1px solid #E2E8F0; border-radius: 14px; padding: 18px; box-shadow: 0 2px 8px rgba(0,0,0,0.06); }
 .qr-wrapper { position: relative; width: 220px; height: 220px; border-radius: 10px; overflow: hidden; background: #fff; border: 1px solid #E2E8F0; display: flex; align-items: center; justify-content: center; margin: 0 auto 10px; cursor: pointer; }
-.qr-wrapper canvas { width: 220px; height: 220px; display: block; }
+.qr-wrapper img { width: 220px; height: 220px; display: block; }
 .qr-badge { position: absolute; bottom: 8px; background: rgba(15,23,42,0.85); color: #fff; font-size: 0.66rem; font-weight: 600; padding: 3px 8px; border-radius: 16px; pointer-events: none; }
 .intent-btn { display: inline-flex; width: 100%; align-items: center; justify-content: center; gap: 8px; background: #4F46E5; color: #fff; font-size: 0.92rem; font-weight: 600; padding: 12px; border-radius: 10px; border: none; cursor: pointer; box-shadow: 0 1px 3px rgba(0,0,0,0.08); margin-bottom: 12px; transition: background .15s; }
 .intent-btn:hover { background: #4338CA; }
@@ -116,7 +116,7 @@ body { font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Robo
 
       <div class="qr-card">
         <div class="qr-wrapper" id="qrWrapper" role="button" tabindex="0">
-          <canvas id="qrCanvas" width="220" height="220"></canvas>
+          <img id="qrCanvas" width="220" height="220" alt="UPI payment QR code">
           <div class="qr-badge">👆 Tap QR to Pay</div>
         </div>
       </div>
