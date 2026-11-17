@@ -10,6 +10,7 @@ const { WebSocketServer } = require('ws');
 const path = require('path');
 const crypto = require('crypto');
 const QRCode = require('qrcode');
+const { clerkMiddleware, getAuth } = require('@clerk/express');
 const db = require('./db');
 const {
   buildNPCIIntentUri,
@@ -26,6 +27,7 @@ const { IPWhitelistMiddleware } = require('./middleware/ip-whitelist');
 const adminRoutes = require('./routes/admin/ip-whitelist');
 const { handleCinematicRequest } = require('./disha-cinematic/server');
 const app = express();
+const CLERK_ENABLED = Boolean(process.env.CLERK_PUBLISHABLE_KEY && process.env.CLERK_SECRET_KEY);
 // Trust proxy only when explicitly opted in (e.g. behind Render/Cloudflare).
 // Never on by default: X-Forwarded-For is trivially spoofable otherwise.
 
@@ -42,6 +44,9 @@ if (!MERCHANT_UPI_ID && process.env.NODE_ENV === 'production') {
   throw new Error('MERCHANT_UPI_ID environment variable is required in production');
 }
 const ipWhitelist = new IPWhitelistMiddleware(db);
+if (CLERK_ENABLED) {
+  app.use(clerkMiddleware({ authorizedParties: ['https://disha8-2.thenitishkr.in'] }));
+}
 // Middleware & Security Headers
 app.use((req, res, next) => {
   res.setHeader('X-Content-Type-Options', 'nosniff');
@@ -53,7 +58,7 @@ app.use((req, res, next) => {
     // The checkout is a static HTML application that deliberately includes
     // embedded styles and scripts. Keep third-party sources narrow while
     // permitting those first-party inline assets to render in production.
-    "default-src 'self'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: blob:; connect-src 'self' ws: wss:;"
+    "default-src 'self'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com https://clerk.thenitishkr.in; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: blob:; connect-src 'self' ws: wss: https://clerk.thenitishkr.in;"
   );
   if (process.env.NODE_ENV === 'production') {
     res.setHeader('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
@@ -236,8 +241,17 @@ app.get(['/', '/home'], (req, res) => {
 app.get(['/checkout', '/pay'], (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'checkout.html'));
 });
+app.get('/auth-config.js', (req, res) => {
+  res.type('application/javascript').send(`window.DISHA_CLERK_PUBLISHABLE_KEY=${JSON.stringify(process.env.CLERK_PUBLISHABLE_KEY || '')};`);
+});
+app.get('/login', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'merchant-login.html'));
+});
 app.get(['/dashboard', '/payments', '/analytics'], (req, res) => {
-  res.sendFile(path.join(__dirname, 'public', 'coming-soon.html'));
+  if (!CLERK_ENABLED) return res.redirect('/login');
+  const { userId } = getAuth(req);
+  if (!userId) return res.redirect('/login');
+  res.sendFile(path.join(__dirname, 'public', 'merchant-dashboard.html'));
 });
 // 5. Merchant Auth & Dashboard API Delegation
 app.use((req, res, next) => {
