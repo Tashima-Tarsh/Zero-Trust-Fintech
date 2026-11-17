@@ -1,0 +1,493 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>DISHA 8.2 — Secure Checkout</title>
+  <meta name="description" content="Zero-fee, fraud-proof UPI payment. Verify your payment in seconds.">
+  <meta name="theme-color" content="#0f172a">
+  <link rel="icon" type="image/svg+xml" href="/assets/favicon.svg">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+    html {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      color: #0f172a;
+      background: #f8fafc;
+      text-rendering: optimizeLegibility;
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+    }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%);
+    }
+    .card {
+      width: 100%;
+      max-width: 420px;
+      padding: 0;
+      background: #ffffff;
+      border: 1px solid #e2e8f0;
+      border-radius: 16px;
+      box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1);
+      overflow: hidden;
+      animation: slideUp 0.4s ease-out;
+    }
+    @keyframes slideUp {
+      from { opacity: 0; transform: translateY(20px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    .header {
+      padding: 32px 32px 24px;
+      background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+      color: #ffffff;
+    }
+    .logo {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 20px;
+    }
+    .logo-mark {
+      width: 32px;
+      height: 32px;
+      background: linear-gradient(135deg, #10b981, #3b82f6);
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 800;
+      font-size: 14px;
+      color: #ffffff;
+    }
+    .brand-name {
+      font-size: 1.25rem;
+      font-weight: 700;
+      letter-spacing: -0.02em;
+    }
+    .brand-tagline {
+      font-size: 0.8125rem;
+      color: #94a3b8;
+      margin-top: 4px;
+    }
+    .amount-section {
+      margin: 32px 32px 24px;
+      text-align: center;
+    }
+    .amount-label {
+      font-size: 0.875rem;
+      font-weight: 600;
+      color: #64748b;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      margin-bottom: 8px;
+      display: block;
+    }
+    .amount-value {
+      font-size: 3rem;
+      font-weight: 800;
+      color: #0f172a;
+      letter-spacing: -0.04em;
+      display: block;
+    }
+    .qr-container {
+      width: 100%;
+      max-width: 280px;
+      margin: 0 auto 24px;
+      padding: 24px;
+      background: #f8fafc;
+      border: 1px solid #e2e8f0;
+      border-radius: 16px;
+      text-align: center;
+    }
+    .qr-label {
+      font-size: 0.75rem;
+      font-weight: 600;
+      color: #64748b;
+      margin-bottom: 12px;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+    }
+    .qr-canvas {
+      width: 200px;
+      height: 200px;
+      margin: 0 auto;
+      background: #ffffff;
+      border: 1px solid #e2e8f0;
+      border-radius: 8px;
+      padding: 8px;
+    }
+    .qr-caption {
+      margin-top: 12px;
+      font-size: 0.8125rem;
+      color: #64748b;
+    }
+    .action-card {
+      background: #ffffff;
+      border: 1px solid #e2e8f0;
+      border-radius: 12px;
+      padding: 20px;
+      margin: 0 32px 24px;
+    }
+    .copy-section {
+      margin-bottom: 20px;
+    }
+    .section-title {
+      font-size: 0.875rem;
+      font-weight: 600;
+      color: #475569;
+      margin-bottom: 12px;
+    }
+    .input-group {
+      position: relative;
+      display: flex;
+      gap: 8px;
+    }
+    .input-field {
+      flex: 1;
+      padding: 12px 16px;
+      font-size: 0.9375rem;
+      font-family: 'JetBrains Mono', monospace;
+      font-weight: 600;
+      color: #0f172a;
+      border: 1px solid #e2e8f0;
+      border-radius: 8px;
+      outline: none;
+      transition: border-color 0.2s ease, box-shadow 0.2s ease;
+    }
+    .input-field:focus {
+      border-color: #10b981;
+      box-shadow: 0 0 0 3px rgba(16, 184, 166, 0.1);
+    }
+    .input-field::placeholder {
+      color: #94a3b8;
+    }
+    .btn-copy {
+      padding: 0 16px;
+      font-size: 0.875rem;
+      font-weight: 600;
+      color: #0f172a;
+      background: #f8fafc;
+      border: 1px solid #e2e8f0;
+      border-radius: 8px;
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+    .btn-copy:hover {
+      background: #f1f5f9;
+    }
+    .btn-verify {
+      width: 100%;
+      padding: 14px 24px;
+      font-size: 0.9375rem;
+      font-weight: 700;
+      color: #ffffff;
+      background: linear-gradient(135deg, #10b981, #059669);
+      border: none;
+      border-radius: 10px;
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+    .btn-verify:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 10px 15px -3px rgba(16, 184, 166, 0.4);
+    }
+    .btn-verify:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+      transform: none;
+      box-shadow: none;
+    }
+    .status-box {
+      margin-top: 20px;
+      padding: 16px;
+      border-radius: 10px;
+      display: none;
+    }
+    .status-box.success {
+      background: #f0fdf4;
+      border: 1px solid #86efac;
+      color: #14532d;
+    }
+    .status-box.error {
+      background: #fef2f2;
+      border: 1px solid #fecaca;
+      color: #991b1b;
+    }
+    .status-box.processing {
+      background: #eff6ff;
+      border: 1px solid #bfdbfe;
+      color: #1e3a8a;
+    }
+    .status-title {
+      font-size: 0.875rem;
+      font-weight: 700;
+      margin-bottom: 4px;
+    }
+    .status-detail {
+      font-size: 0.8125rem;
+      opacity: 0.9;
+    }
+    .footer {
+      padding: 24px;
+      text-align: center;
+      font-size: 0.75rem;
+      color: #94a3b8;
+      border-top: 1px solid #e2e8f0;
+    }
+    .spinner {
+      display: inline-block;
+      width: 16px;
+      height: 16px;
+      border: 2px solid rgba(16, 184, 166, 0.3);
+      border-top-color: #10b981;
+      border-radius: 50%;
+      animation: spin 1s linear infinite;
+      margin-right: 8px;
+    }
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <header class="header">
+      <div class="logo">
+        <div class="logo-mark">D</div>
+        <div class="brand-text">
+          <div class="brand-name">DISHA 8.2</div>
+          <div class="brand-tagline">Zero-Trust UPI Checkout</div>
+        </div>
+      </div>
+    </header>
+
+    <div class="amount-section">
+      <span class="amount-label">Pay Now</span>
+      <span class="amount-value" id="challengeAmount">₹500.00</span>
+    </div>
+
+    <div class="qr-card">
+      <div class="qr-label">Scan QR Code with Any UPI App</div>
+      <div class="qr-canvas">
+        <canvas id="qrCanvas" width="200" height="200"></canvas>
+      </div>
+      <div class="qr-caption">Pay exactly ₹<span id="qrAmount">500.00</span></div>
+    </div>
+
+    <div class="action-card">
+      <div class="copy-section">
+        <div class="section-title">Step 1 — Copy UTR</div>
+        <div class="input-group">
+          <input type="text" id="utrInput" class="input-field" placeholder="Paste UTR / Transaction ID..." readonly>
+          <button class="btn-copy" id="btnReadClipboard">Read from Clipboard</button>
+        </div>
+      </div>
+      <div class="split-section" style="margin-top: 16px;">
+        <div class="section-title">Step 2 — Verify</div>
+        <button class="btn-verify" id="btnVerify">
+          <span id="btnText">Verify Payment</span>
+          <span id="btnSpinner" class="spinner" style="display:none;"></span>
+        </button>
+      </div>
+    </div>
+    <div class="status-box" id="statusBox">
+      <div class="status-title" id="statusTitle"></div>
+      <div class="status-detail" id="statusDetail"></div>
+    </div>
+    <footer class="footer">
+      Secure &amp; Verified · DISHA 8.2 Zero-Trust Rail
+    </footer>
+  </div>
+
+  <script>
+    // ---------- Configuration ----------
+    const BASE_URL = window.location.origin;
+    const sessionId = new URLSearchParams(window.location.search).get('sessionId') || 'session_' + Date.now();
+
+    // Elements
+    const challengeAmountEl = document.getElementById('challengeAmount');
+    const qrAmountEl = document.getElementById('qrAmount');
+    const qrCanvas = document.getElementById('qrCanvas');
+    const utrInput = document.getElementById('utrInput');
+    const btnReadClipboard = document.getElementById('btnReadClipboard');
+    const btnVerify = document.getElementById('btnVerify');
+    const btnVerifyText = document.getElementById('btnText');
+    const btnVerifySpinner = document.getElementById('btnSpinner');
+    const statusBox = document.getElementById('statusBox');
+    const statusTitle = document.getElementById('statusTitle');
+    const statusDetail = document.getElementById('statusDetail');
+
+    // State
+    let challengeAmount = '0.00';
+    let sessionId = null;
+
+    // ---------- Helpers ----------
+    function formatINR(num) {
+      return new Intl.NumberFormat('en-IN', {
+        style: 'currency',
+        currency: 'INR',
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2
+      }).format(num);
+    }
+
+    function extractUTR(text) {
+      if (!text) return null;
+      // Match 12-digit UTR
+      const m = text.match(/\b(\d{12})\b/);
+      return m ? m[1] : null;
+    }
+
+    function setStatus(type, title, detail) {
+      const box = statusBox;
+      box.className = 'status-box ' + type;
+      statusTitle.textContent = title;
+      statusDetail.textContent = detail || '';
+      box.style.display = 'block';
+    }
+
+    function setVerifying(isLoading) {
+      const btn = btnVerify;
+      if (isLoading) {
+        btn.disabled = true;
+        btnVerifyText.textContent = 'Verifying...';
+        btnVerifySpinner.style.display = 'inline-block';
+      } else {
+        btn.disabled = false;
+        btnVerifyText.textContent = 'Verify Payment';
+        btnVerifySpinner.style.display = 'none';
+      }
+    }
+
+    // ---------- QR Code ----------
+    function generateQR(text) {
+      const canvas = qrCanvas;
+      const ctx = canvas.getContext('2d');
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      ctx.fillStyle = '#ffffff';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      ctx.fillStyle = '#000000';
+
+      // Simple QR-like pattern (visual only, not real QR)
+      // In production, use a proper QR library like qrcode.js
+      const size = 200;
+      const cellSize = Math.floor(size / 25);
+      for (let y = 0; y < 25; y++) {
+        for (let x = 0; x < 25; x++) {
+          // Simple pattern - in production use a real QR library
+          if ((x + y) % 3 === 0 || (x === 0 || x === 24 || y === 0 || y === 24)) {
+            ctx.fillRect(x * cellSize, y * cellSize, cellSize, cellSize);
+          }
+        }
+      }
+    }
+
+    // ---------- API Calls ----------
+    async function createSession() {
+      try {
+        const res = await fetch(`${BASE_URL}/api/session/new?amount=500&description=Checkout Payment`, {
+          method: 'GET',
+          headers: { 'Content-Type': 'application/json' }
+        });
+        if (!res.ok) throw new Error('Failed to create session');
+        const data = await res.json();
+        if (!data.success) throw new Error(data.error || 'Session creation failed');
+
+        sessionId = data.sessionId;
+        challengeAmount = data.challengeAmount;
+
+        challengeAmountEl.textContent = formatINR(challengeAmount);
+        qrAmountEl.textContent = formatINR(challengeAmount);
+
+        // Generate QR with payment info
+        const qrData = `${sessionId}|${challengeAmount}|${Date.now()}`;
+        generateQR(qrData);
+      } catch (err) {
+        console.error('Session creation failed:', err);
+        setStatus('error', 'Session Error', 'Unable to create checkout session. Please try again.');
+      }
+    }
+
+    async function verifyUTR(utr) {
+      setVerifying(true);
+      statusBox.style.display = 'none';
+
+      try {
+        const res = await fetch(`${BASE_URL}/api/verify`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            utr: utr,
+            amount: challengeAmount,
+            orderId: sessionId
+          })
+        });
+        const data = await res.json();
+
+        if (res.status === 200 && data.success) {
+          setStatus('success', 'Payment Verified ✅', `UTR ${utr} verified successfully. Order settled.`);
+        } else {
+          setStatus('error', 'Verification Failed', data.reason || 'Payment verification failed. Please check the UTR and try again.');
+        }
+      } catch (err) {
+        console.error('Verify error:', err);
+        setStatus('error', 'Verification Error', 'Unable to verify payment. Please try again.');
+      } finally {
+        setVerifying(false);
+      }
+    }
+
+    // ---------- Clipboard ----------
+    async function readClipboard() {
+      try {
+        const text = await navigator.clipboard.readText();
+        const utr = extractUTR(text);
+        if (!utr) {
+          alert('No valid UTR found in clipboard. Please copy the UTR/Transaction ID from your UPI app.');
+          return;
+        }
+        utrInput.value = utr;
+        utrInput.focus();
+        utrInput.select();
+      } catch (err) {
+        console.error('Clipboard read error:', err);
+        alert('Unable to read clipboard. Please paste the UTR manually.');
+      }
+    }
+
+    // ---------- Event Listeners ----------
+    btnReadClipboard.addEventListener('click', readClipboard);
+
+    btnVerify.addEventListener('click', () => {
+      const utr = utrInput.value.trim();
+      if (!utr) {
+        alert('Please enter or paste a UTR.');
+        return;
+      }
+      if (!/^\d{12}$/.test(utr)) {
+        alert('Please enter a valid 12-digit UTR.');
+        return;
+      }
+      verifyUTR(utr);
+    });
+
+    utrInput.addEventListener('input', () => {
+      utrInput.value = utrInput.value.replace(/\D/g, '').slice(0, 12);
+    });
+
+    // ---------- Initialize ----------
+    createSession();
+  </script>
+</body>
+</html>
