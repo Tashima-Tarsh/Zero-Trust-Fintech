@@ -74,47 +74,19 @@
       setStatus('Awaiting Payment', 'Scan QR or select an app below. Funds settle straight to bank.', 'pending');
       watch(d);
     } catch (e) {
-      // In case of network fallback or preview, show clear simulated session
-      renderFallback(amount, description);
+      setStatus('Could not start payment', 'Unable to create a payment session. Please try again.', 'error');
     }
   }
 
   function render(s) {
     if ($('checkoutMerchant')) $('checkoutMerchant').textContent = s.merchantName || 'Nitish Enterprise';
     if ($('checkoutOrder')) $('checkoutOrder').textContent = s.orderId || 'ORD-LIVE';
-    if ($('checkoutVpa')) $('checkoutVpa').textContent = s.vpaAddress || 'nkumar906099-7@oksbi';
+    if ($('checkoutVpa')) $('checkoutVpa').textContent = s.vpaAddress || '';
     if ($('checkoutDescription')) $('checkoutDescription').textContent = s.description || 'UPI Sovereign Settlement';
     if ($('checkoutAmount')) $('checkoutAmount').textContent = nf.format(s.challengeAmount || s.baseAmount || currentAmount);
     if ($('amountNote')) $('amountNote').textContent = 'Exact challenge amount · 100% direct bank deposit';
     if ($('checkoutQr') && s.qrDataUrl) $('checkoutQr').src = s.qrDataUrl;
     countdown(s);
-  }
-
-  function renderFallback(amount, description) {
-    const mockOrder = 'ORD-' + Date.now().toString(36).toUpperCase();
-    if ($('checkoutMerchant')) $('checkoutMerchant').textContent = 'Nitish Enterprise';
-    if ($('checkoutOrder')) $('checkoutOrder').textContent = mockOrder;
-    if ($('checkoutVpa')) $('checkoutVpa').textContent = 'nkumar906099-7@oksbi';
-    if ($('checkoutDescription')) $('checkoutDescription').textContent = description || 'UPI Sovereign Settlement';
-    if ($('checkoutAmount')) $('checkoutAmount').textContent = nf.format(amount);
-    
-    // Generate inline high-res QR code
-    const upiUri = `upi://pay?pa=nkumar906099-7@oksbi&pn=Nitish+Enterprise&am=${amount.toFixed(2)}&cu=INR&tn=${mockOrder}`;
-    session = {
-      orderId: mockOrder,
-      sessionId: 'sess_' + Date.now(),
-      upiLink: upiUri,
-      expiresAt: Date.now() + 180000
-    };
-
-    if (window.QRCode && $('checkoutQr')) {
-      const tempDiv = document.createElement('div');
-      new QRCode(tempDiv, { text: upiUri, width: 190, height: 190, correctLevel: QRCode.CorrectLevel.M });
-      const img = tempDiv.querySelector('img');
-      if (img) $('checkoutQr').src = img.src;
-    }
-    setStatus('Ready to Pay', 'Scan QR or tap an app below to authorize payment.', 'pending');
-    countdown({ expiresAt: Date.now() + 180000 });
   }
 
   function countdown(s) {

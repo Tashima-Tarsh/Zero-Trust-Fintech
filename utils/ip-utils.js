@@ -25,27 +25,18 @@ function getClientIP(req) {
     return cleanIP(req.ip) || '127.0.0.1';
   }
 
-  // Trusted enterprise reverse proxy headers (e.g. Cloudflare)
-  if (req.headers && req.headers['cf-connecting-ip']) {
+  const isTrusted = req.app && req.app.get && req.app.get('trust proxy');
+
+  // Trusted enterprise reverse proxy headers (e.g. Cloudflare) — only when trust proxy is enabled
+  if (isTrusted && req.headers && req.headers['cf-connecting-ip']) {
     return cleanIP(req.headers['cf-connecting-ip']);
   }
 
   // Only check x-forwarded-for if trust proxy is explicitly enabled
-  const isTrusted = req.app && req.app.get && req.app.get('trust proxy');
   if (isTrusted && req.headers && req.headers['x-forwarded-for']) {
     const parts = String(req.headers['x-forwarded-for']).split(',').map(p => p.trim()).filter(Boolean);
     if (parts.length > 0) {
       return cleanIP(parts[0]);
-    }
-  }
-
-  // X-Real-IP is set by some reverse proxies (e.g., Render LB) with the real client IP.
-  // Only accept it when trust proxy is not set (so we don't double-trust), and validate
-  // it's a public IP to reduce spoofing risk.
-  if (!isTrusted && req.headers && req.headers['x-real-ip']) {
-    const xri = cleanIP(req.headers['x-real-ip']);
-    if (xri && isValidIP(xri) && !isPrivateOrReservedIP(xri)) {
-      return xri;
     }
   }
 

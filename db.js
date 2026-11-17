@@ -197,6 +197,7 @@ function setupSqliteTables() {
       expires_at INTEGER NOT NULL,
       qr_refresh_at INTEGER NOT NULL
     );
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_sessions_unique_active_amount ON sessions(vpa_address, challenge_amount) WHERE status = 'PENDING';
 
     CREATE TABLE IF NOT EXISTS transactions (
       id TEXT PRIMARY KEY,
@@ -414,6 +415,17 @@ function getVpaMerchantType(vpaAddress) {
     console.warn('[VPA MerchantType Notice]', err.message);
   }
   return { accountType: 'PERSONAL', mcc: null };
+}
+
+function getAllActiveVPAs() {
+  if (!sqliteDb) return [];
+  try {
+    return sqliteDb.prepare(
+      `SELECT vpa_address, account_type, mcc, status, health_score FROM vpa_pool WHERE status = 'ACTIVE'`
+    ).all();
+  } catch (e) {
+    return [];
+  }
 }
 
 // Session Management (TASK 3)
@@ -745,14 +757,20 @@ async function atomicSettle(orderId, utr, amount, vpaUsed, imageHash) {
         [entryCreditId, txId, amount, now]
       );
       await client.query(
-        `INSERT OR REPLACE INTO blacklist_utrs (utr, order_id, amount, blacklisted_at, reason)
-         VALUES ($1, $2, $3, $4, $5)`,
+        `INSERT INTO blacklist_utrs (utr, order_id, amount, blacklisted_at, reason)
+         VALUES ($1, $2, $3, $4, $5)
+         ON CONFLICT (utr) DO UPDATE SET
+           order_id = EXCLUDED.order_id,
+           amount = EXCLUDED.amount,
+           blacklisted_at = EXCLUDED.blacklisted_at,
+           reason = EXCLUDED.reason`,
         [utr, orderId, amount, now, 'Verified settlement']
       );
       if (imageHash) {
         await client.query(
-          `INSERT OR IGNORE INTO image_hashes (id, image_hash, order_id, seen_at, reason)
-           VALUES ($1, $2, $3, $4, $5)`,
+          `INSERT INTO image_hashes (id, image_hash, order_id, seen_at, reason)
+           VALUES ($1, $2, $3, $4, $5)
+           ON CONFLICT (image_hash) DO NOTHING`,
           [crypto.randomBytes(8).toString('hex'), imageHash, orderId, now, 'Receipt image settled']
         );
       }
@@ -914,5 +932,6 @@ module.exports = {
   updateSessionState,
   getOrderState,
   getUtrBoundOrder,
-  bindUtrToOrder
+  bindUtrToOrder,
+  getAllActiveVPAs
 };

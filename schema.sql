@@ -109,6 +109,7 @@ CREATE TABLE IF NOT EXISTS sessions (
     expires_at BIGINT NOT NULL,
     qr_refresh_at BIGINT NOT NULL
 );
+CREATE UNIQUE INDEX IF NOT EXISTS idx_sessions_unique_active_amount ON sessions(vpa_address, challenge_amount) WHERE status = 'PENDING';
 
 -- 4. Transactions Ledger
 CREATE TABLE IF NOT EXISTS transactions (

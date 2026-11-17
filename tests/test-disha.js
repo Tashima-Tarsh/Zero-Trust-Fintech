@@ -41,6 +41,9 @@ const db = require('../db');
   const testChallengeAmt = 500.82;
   const testVpa = db.selectVPA('mer_default', testChallengeAmt);
 
+  // Isolate this unit test from leftover PENDING sessions in the dev DB
+  db.sqliteDb.prepare("DELETE FROM sessions").run();
+
   db.saveSession({
     sessionId: 'sess_test_' + now,
     orderId: testOrderId,

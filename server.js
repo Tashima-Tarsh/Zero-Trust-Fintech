@@ -446,7 +446,7 @@ function generateSession(baseAmount = 100, description = '', customVpa = null) {
   const qrRefreshAt = now + (15 * 1000); // 15 seconds dynamic refresh
   const orderId = 'Order_' + crypto.randomBytes(5).toString('hex').toUpperCase();
   const txnRef = 'TXN_' + now + '_' + crypto.randomBytes(3).toString('hex').toUpperCase();
-  const challengeAmount = Number(baseAmount);
+  let challengeAmount = Number(baseAmount); // replaced below by the unique-paise amount
   // TASK 9: Select optimal VPA to prevent bans or primary VPA
   let vpaAddress = (customVpa && String(customVpa).trim()) ? String(customVpa).trim() : null;
   let merchantType = 'P2P';
@@ -467,7 +467,21 @@ function generateSession(baseAmount = 100, description = '', customVpa = null) {
     merchantType = mt.accountType;
     vpaMcc = mt.mcc;
   }
-    const session = {
+  // Unique-paise challenge: avoid amounts held by live sessions on the same VPA.
+  // Retry on constraint collision so concurrent requests never land the same amount.
+  let saved = false;
+  let lastErr = null;
+  let session = null;
+  for (let attempt = 0; attempt < 10 && !saved; attempt++) {
+    const activeAmounts = new Set();
+    try {
+      const rows = db.sqliteDb.prepare(
+        "SELECT challenge_amount FROM sessions WHERE status = 'PENDING' AND expires_at >= ? AND vpa_address = ?"
+      ).all(Date.now(), vpaAddress);
+      for (const r of rows) activeAmounts.add(Number(Number(r.challenge_amount).toFixed(2)));
+    } catch (e) { /* db without sqlite: fall back to empty set */ }
+    challengeAmount = generateUniqueChallenge(Number(baseAmount), activeAmounts);
+    session = {
       sessionId,
       orderId,
       description: String(description || '').trim(),
@@ -484,7 +498,14 @@ function generateSession(baseAmount = 100, description = '', customVpa = null) {
       state: 'WAITING',
       utr: null
     };
-  db.saveSession(session);
+    try {
+      db.saveSession(session);
+      saved = true;
+    } catch (e) {
+      lastErr = e;
+      if (attempt >= 9) throw e;
+    }
+  }
   return session;
 }
 // ═══════════════════════════════════════════════════════════════════
@@ -493,7 +514,7 @@ function generateSession(baseAmount = 100, description = '', customVpa = null) {
 function generateUPILink(session) {
   // P2P NPCI Specification: upi://pay?pa=&pn=&am=&tn=&cu=INR
   // mc and tr are strictly forbidden for personal VPAs to avoid bank decline before PIN
-  const isMerchantP2M = session.merchantType === 'MERCHANT' && session.mcc && /^\d{4}$/.test(session.mcc);
+  const isMerchantP2M = session.merchantType === 'MERCHANT' && session.mcc && /^\d{4}$/.test(session.mcc) && session.mcc !== '0000';
   if (isMerchantP2M) {
     return buildUpiUri({
       kind: 'P2M',
@@ -502,7 +523,7 @@ function generateUPILink(session) {
       am: session.challengeAmount,
       tn: session.orderId || session.description || 'Payment',
       mc: session.mcc,
-      tr: session.txnRef
+      tr: String(session.txnRef || '').replace(/[^A-Za-z0-9]/g, '').substring(0, 35)
     });
   } else {
     if (session.mcc && /^\d{4}$/.test(session.mcc)) {

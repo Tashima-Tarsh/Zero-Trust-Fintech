@@ -58,9 +58,8 @@ function buildUpiUri(o) {
   const pn = cleanText(o.pn, 40) || 'Payee';
   parts.push('pn=' + encodeURIComponent(pn));
 
-  if (kind === 'P2M') {
-    parts.push('am=' + formatAmount(o.am, o.maxAmount || 100000));
-  }
+  // am is sent for BOTH P2P and P2M so the unique-paise challenge amount is prefilled.
+  parts.push('am=' + formatAmount(o.am, o.maxAmount || 100000));
   parts.push('cu=INR');
 
   const tn = cleanText(o.tn, o.tnMax || 50);

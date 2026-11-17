@@ -75,6 +75,17 @@ class VPAImporter {
       const bankName = r.bank_name || this.detectBankFromVpa(vpaAddress);
       const accountType = (r.account_type || 'PERSONAL').toUpperCase();
 
+      // MERCHANT rows require a real 4-digit mcc; reject guesses like 5812
+      let mcc = '0000';
+      if (accountType === 'MERCHANT') {
+        if (!r.mcc || !/^\d{4}$/.test(String(r.mcc).trim())) {
+          results.errors.push({ row: i + 1, vpa: vpaAddress, error: 'MERCHANT VPA requires a real 4-digit mcc' });
+          results.skipped++;
+          continue;
+        }
+        mcc = String(r.mcc).trim();
+      }
+
       const dailyTxLimit = parseInt(r.daily_tx_limit, 10) || 15;
       const dailyVolLimit = parseFloat(r.daily_volume_limit) || 25000.0;
       const perTxLimit = parseFloat(r.per_tx_limit) || 5000.0;
@@ -99,17 +110,15 @@ class VPAImporter {
               100, 'LOW', ?, ?,
               ?, ?, ?, ?,
               12, 0, 0.0,
-              0, ?, 0, ?,
-              ?, ?, ?
+              0, ?, ?, ?,
+              ?, ?, ?, ?
             )
-            ON CONFLICT (vpa_address) DO NOTHING
           `);
 
           const info = stmt.run(
             vpaId, vpaAddress, holderName, bankName, accountType,
             timeSlot, startHour, endHour, dailyTxLimit, dailyVolLimit, perTxLimit,
-            minGap, merchantId, notes, `row_${i + 1}`, now,
-            accountType === 'MERCHANT' ? (r.mcc || '5812') : '0000'
+            minGap, 0, merchantId, mcc, notes, `row_${i + 1}`, now
           );
 
           if (info.changes > 0) {
