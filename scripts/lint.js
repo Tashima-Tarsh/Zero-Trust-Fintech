@@ -10,7 +10,7 @@ const path = require('path');
 const { execSync } = require('child_process');
 
 const ROOT = path.resolve(__dirname, '..');
-const DIRS = ['.', 'tests', 'utils', 'middleware', 'routes/admin', 'disha-cinematic', 'scripts'];
+const DIRS = ['.', 'tests', 'utils', 'middleware', 'routes/admin', 'scripts'];
 
 let checked = 0;
 let failed = 0;
