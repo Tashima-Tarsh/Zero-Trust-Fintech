@@ -188,31 +188,12 @@
       gap: 10px;
     }
 
-    .brand-mark {
-      width: 32px;
-      height: 32px;
-      background: linear-gradient(135deg, var(--indigo), var(--emerald));
-      border-radius: 10px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      color: #fff;
-    }
-
-    .brand-text {
-      font-size: 1.5rem;
-      font-weight: 800;
-      letter-spacing: -0.02em;
-      color: var(--text-primary);
-    }
-
-    .brand-version {
-      font-size: 0.75rem;
-      font-weight: 700;
-      letter-spacing: 0.05em;
-      color: var(--emerald);
-      text-transform: uppercase;
-      margin-left: 4px;
+    .brand-logo {
+      width: min(240px, 42vw);
+      height: 92px;
+      object-fit: contain;
+      object-position: center;
+      display: block;
     }
 
     .brand-tagline {
@@ -905,6 +886,11 @@
         padding: 0 16px;
       }
 
+      .brand-logo {
+        width: min(180px, 48vw);
+        height: 70px;
+      }
+
       .hero-title {
         font-size: 2.25rem;
       }
@@ -946,16 +932,7 @@
     <!-- Header -->
     <header class="shell-header">
       <div class="brand">
-        <div class="brand-mark">
-          <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
-            <rect x="3" y="3" width="18" height="18" rx="4"></rect>
-            <path d="M9 9l6 6M15 9l-6 6"></path>
-          </svg>
-          <div class="brand-text">
-            <span class="brand-name">DISHA</span>
-            <span class="brand-version">8.2</span>
-          </div>
-        </div>
+        <img class="brand-logo" src="assets/disha-8-2-wordmark.png" alt="DISHA 8.2">
         <div class="brand-tagline">
           Payments that confirm themselves.
         </div>
