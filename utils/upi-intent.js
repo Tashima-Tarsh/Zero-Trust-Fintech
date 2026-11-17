@@ -52,16 +52,13 @@ function buildUpiUri(o) {
   const kind = o.kind;
   if (kind !== 'P2P' && kind !== 'P2M') throw new Error("kind must be 'P2P' or 'P2M'");
 
-  const pa = String(o.pa || '').trim();
-  if (!VPA_RE.test(pa)) throw new Error('pa is not a valid VPA');
-
-  const parts = [];
-  parts.push('pa=' + pa); // keep @ raw for widest app compatibility
-
+  parts.push('pa=' + pa);
   const pn = cleanText(o.pn, 40) || 'Payee';
   parts.push('pn=' + encodeURIComponent(pn));
 
-  parts.push('am=' + formatAmount(o.am, o.maxAmount || 100000));
+  if (kind === 'P2M') {
+    parts.push('am=' + formatAmount(o.am, o.maxAmount || 100000));
+  }
   parts.push('cu=INR');
 
   const tn = cleanText(o.tn, o.tnMax || 50);
