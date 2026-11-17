@@ -60,7 +60,7 @@ function scoreEvidence(session, ev, hist = {}, opts = {}) {
   if ((hist.attemptsThisSession || 0) > 3) return gate('TOO_MANY_ATTEMPTS', 'Too many submissions for one session.');
 
   // Payee VPA must match — mandatory for any settlement
-  if (!ev.payeeVpa || norm(ev.payeeVpa) !== norm(session.payeeVpa)) {
+  if (!ev || !ev.payeeVpa || norm(ev.payeeVpa) !== norm(session.payeeVpa)) {
     return gate('PAYEE_MISMATCH', 'Payee VPA does not match order payee.');
   }
 
