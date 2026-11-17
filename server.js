@@ -1,5 +1,5 @@
-﻿/**
- * DISHA 8.2 â€” Zero-Fee, Fraud-Proof Sovereign UPI Checkout
+/**
+ * DISHA 8.2 — Zero-Fee, Fraud-Proof Sovereign UPI Checkout
  * Server implementation combining Express, WebSockets, 7-Layer Fraud Engine,
  * NPCI UPI Spec, VPA Routing, and Double-Entry Ledger.
  */
@@ -58,7 +58,7 @@ app.use((req, res, next) => {
     // The checkout is a static HTML application that deliberately includes
     // embedded styles and scripts. Keep third-party sources narrow while
     // permitting those first-party inline assets to render in production.
-    "default-src 'self'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com https://clerk.thenitishkr.in; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: blob:; connect-src 'self' ws: wss: https://clerk.thenitishkr.in;"
+    "default-src 'self'; script-src 'self' 'unsafe-inline' https://cdn.tailwindcss.com https://cdn.jsdelivr.net https://cdnjs.cloudflare.com https://clerk.thenitishkr.in; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com data:; img-src 'self' data: blob: https://lh3.googleusercontent.com https://lh4.googleusercontent.com; connect-src 'self' ws: wss: https://clerk.thenitishkr.in;"
   );
   if (process.env.NODE_ENV === 'production') {
     res.setHeader('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
@@ -162,7 +162,7 @@ function createRateLimiter(windowMs, maxRequests, message) {
 const checkoutLimiter = createRateLimiter(60000, 120, 'Rate limit exceeded on checkout session creation.');
 const verifyLimiter = createRateLimiter(60000, 60, 'Rate limit exceeded on payment verification.');
 const shareLimiter = createRateLimiter(60000, 10, 'Rate limit exceeded on receipt sharing.');
-// â”€â”€ Idempotency (Redis-backed, in-memory fallback) â”€â”€
+// ── Idempotency (Redis-backed, in-memory fallback) ──
 let redis;
 try {
   if (process.env.REDIS_URL) {
@@ -313,9 +313,9 @@ app.use((req, res, next) => {
 app.use('/api/admin', requireAdminAuth, adminRoutes);
 // Protect Gaming Enterprise endpoints with IP Whitelisting
 app.use('/api/gaming/*', ipWhitelist.check());
-// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+// ═══════════════════════════════════════════════════════════════════
 // TASK 11: WEBSOCKET REAL-TIME CONNECTION HUB
-// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+// ═══════════════════════════════════════════════════════════════════
 const orderWsClients = new Map(); // Map<orderId, Set<WebSocket>>
 // Per-IP WebSocket connection rate limit (prevents orderId scanning / connection
 // exhaustion). Keyed by the client IP seen through the trusted-proxy chain when
@@ -433,12 +433,12 @@ function broadcastOrderSuccess(orderId, payload) {
         client.send(message);
       }
     }
-    console.log(`ðŸ“¡ [WebSocket] Broadcasted SUCCESS to ${clients.size} client(s) for order ${orderId}`);
+    console.log(`📡 [WebSocket] Broadcasted SUCCESS to ${clients.size} client(s) for order ${orderId}`);
   }
 }
-// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+// ════════════════════════════════════════════════════════════════════
 // TASK 3: SESSION TOKEN GENERATION
-// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+// ═══════════════════════════════════════════════════════════════════
 function generateSession(baseAmount = 100, description = '', customVpa = null) {
   const sessionId = crypto.randomBytes(16).toString('hex');
   const now = Date.now();
@@ -481,9 +481,9 @@ function generateSession(baseAmount = 100, description = '', customVpa = null) {
   db.saveSession(session);
   return session;
 }
-// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+// ═══════════════════════════════════════════════════════════════════
 // TASK 4: NPCI-COMPLIANT UPI DEEP LINK GENERATOR (v3.2 Spec & upi-intent)
-// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+// ═══════════════════════════════════════════════════════════════════
 function generateUPILink(session) {
   // P2P NPCI Specification: upi://pay?pa=&pn=&am=&tn=&cu=INR
   // mc and tr are strictly forbidden for personal VPAs to avoid bank decline before PIN
@@ -511,9 +511,9 @@ function generateUPILink(session) {
     });
   }
 }
-// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+// ═══════════════════════════════════════════════════════════════════
 // REST API ENDPOINTS
-// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+// ═══════════════════════════════════════════════════════════════════
 // Create or refresh session
 app.get('/api/session/new', checkoutLimiter, async (req, res) => {
   try {
@@ -594,9 +594,9 @@ app.get('/api/order-state/:orderId', (req, res) => {
   }
   res.json({ success: true, ...state });
 });
-// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+// ═══════════════════════════════════════════════════════════════════
 // ZERO-TRUST SERVER-SIDE RECEIPT EVIDENCE EXTRACTION
-// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+// ═══════════════════════════════════════════════════════════════════
 function extractReceiptEvidence(receiptText, sessionContext) {
   const now = Date.now();
   // If no receipt text or image is provided, fail-closed with zero evidence
@@ -644,7 +644,7 @@ function extractReceiptEvidence(receiptText, sessionContext) {
   if (foundPayeeVpa || foundPayeeName || (sessionContext && lower.includes((sessionContext.payeeVpa || '').toLowerCase()))) {
     layoutFieldsFound++;
   }
-  if (/(?:â‚¹|Rs\.?|INR)\s*[\d,]+(?:\.\d{2})?/i.test(text) || /\b(?:amount|paid|amt)\b/i.test(text)) {
+  if (/(?:₹|Rs\.?|INR)\s*[\d,]+(?:\.\d{2})?/i.test(text) || /\b(?:amount|paid|amt)\b/i.test(text)) {
     layoutFieldsFound++;
   }
   if (/\b(?:utr|upi\s*(?:ref|transaction|txn)\s*(?:id|no|ref)?|rrn)\b/i.test(text) || /\b\d{12}\b/.test(text)) {
@@ -670,9 +670,9 @@ function extractReceiptEvidence(receiptText, sessionContext) {
     rawReceipt: text
   };
 }
-// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+// ═══════════════════════════════════════════════════════════════════
 // TASK 8: 7-LAYER FRAUD VERIFICATION & TRUST-SCORING ENGINE
-// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+// ═══════════════════════════════════════════════════════════════════
 app.post('/api/verify', verifyLimiter, async (req, res) => {
   try {
     const { utr, amount, receipt, orderId, txnRef } = req.body;
@@ -687,9 +687,9 @@ app.post('/api/verify', verifyLimiter, async (req, res) => {
       if (!parsedAmount && parsedReceipt.amount) parsedAmount = parsedReceipt.amount;
       if (!detectedOrderId && parsedReceipt.orderId) detectedOrderId = parsedReceipt.orderId;
     }
-    // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ─────────────────────────────────────────────────────────────
     // LAYER 1: SESSION CHECK
-    // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ─────────────────────────────────────────────────────────────
     let session = null;
     if (detectedOrderId) session = db.findSessionByOrderId(detectedOrderId);
     if (!session && txnRef) session = db.findSessionByTxnRef(txnRef);
@@ -714,9 +714,9 @@ app.post('/api/verify', verifyLimiter, async (req, res) => {
       });
     }
 
-    // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ─────────────────────────────────────────────────────────────
     // LAYER 1.5: TIME WINDOW CHECK (Mathematical: 15s min, 180s max)
-    // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ─────────────────────────────────────────────────────────────
     const timeElapsedMs = now - session.createdAt;
 
     // State 1: Too early (0 < t < 15s)
@@ -768,20 +768,20 @@ app.post('/api/verify', verifyLimiter, async (req, res) => {
       attemptsThisSession: attemptsCount,
       priorConfirmed: 0
     };
-    // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ────────────────────────────────────────────────────────────────
     // LAYER 4: CUSTOMER / ORDER IDENTITY BINDING (Cross-Order UTR Reuse Prevention)
     // A UTR is bound to the FIRST order it is submitted for. It can NEVER be used
     // on a different order, even if the amount matches exactly.
-    // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ───────────────────────────────────────────────────────────
     // Evaluate evidence through trust-score pure scoring engine
     const trustResult = scoreEvidence(sessionContext, ev, hist, {
       now,
       graceMs: 60 * 1000,
       sameDevice: req.body.sameDevice !== false
     });
-    // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ─────────────────────────────────────────────────────────────
     // TIER-DRIVEN PAYMENT STATE MACHINE (RBI / Sovereign Zero-Trust)
-    // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ─────────────────────────────────────────────────────────────
     // Check hard gates or REJECT tier
     if (trustResult.tier === 'REJECT') {
       let mappedLayer = 2;
@@ -811,9 +811,9 @@ app.post('/api/verify', verifyLimiter, async (req, res) => {
         reason: 'Evidence confidence score too low. Valid receipt proof required.'
       });
     }
-    // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ─────────────────────────────────────────────────────────────
     // LAYER 4: UTR FRESHNESS (10-Minute Maximum Latency & Timestamp Audit)
-    // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ─────────────────────────────────────────────────────────────
     const orderAgeMs = now - session.createdAt;
     if (orderAgeMs > T_MAX_MS) {
       db.updateSessionState(session.orderId, 'EXPIRED');
@@ -826,9 +826,9 @@ app.post('/api/verify', verifyLimiter, async (req, res) => {
         reason: 'Session order age is stale (>3 minutes old).'
       });
     }
-    // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ─────────────────────────────────────────────────────────────
     // LAYER 5: TRANSACTION NOTE MATCH (Order Reference Cross-Verification)
-    // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ─────────────────────────────────────────────────────────────
     if (receipt) {
       const noteMatches = receipt.match(/Order_[A-Z0-9]+/i) || receipt.match(/ORD_[A-Z0-9_]+/i);
       if (noteMatches && noteMatches[0].toUpperCase() !== session.orderId.toUpperCase()) {
@@ -840,9 +840,9 @@ app.post('/api/verify', verifyLimiter, async (req, res) => {
         });
       }
     }
-    // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ─────────────────────────────────────────────────────────────
     // LAYER 6: RATE LIMIT (One Share Verification Per Session)
-    // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ─────────────────────────────────────────────────────────────
     if (session.status === 'SUCCESS') {
       return res.status(400).json({
         success: false,
@@ -860,10 +860,10 @@ app.post('/api/verify', verifyLimiter, async (req, res) => {
         reason: 'Instant settlement requires HIGH confidence tier.'
       });
     }
-    // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ─────────────────────────────────────────────────────────────
     // LAYER 7: DOUBLE-ENTRY LEDGER POSTING & BALANCE ASSERTION
     // HIGH tier: Instant settlement & double-entry ledger posting
-    // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ─────────────────────────────────────────────────────────────
     const { txId, verification } = await db.atomicSettle(
       session.orderId,
       parsedUtr,
@@ -916,15 +916,15 @@ app.post('/api/verify', verifyLimiter, async (req, res) => {
     res.status(500).json({ success: false, error: 'INTERNAL_SERVER_ERROR' });
   }
 });
-// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+// ═══════════════════════════════════════════════════════════════════
 // TASK 7: ANDROID WEB SHARE TARGET (SINGLE SOURCE OF TRUTH SETTLEMENT)
-// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+// ═══════════════════════════════════════════════════════════════════
 app.post('/handle-share', shareLimiter, async (req, res) => {
   try {
     const { title, text, url } = req.body || {};
     const rawReceipt = [title, text, url].filter(Boolean).join('\n');
     const now = Date.now();
-    console.log(`ðŸ“¥ [Android Share Target SST] Received shared receipt payload (${rawReceipt.length} chars)`);
+    console.log(`📥 [Android Share Target SST] Received shared receipt payload (${rawReceipt.length} chars)`);
     const parsed = parseNPCIIntentResponse(rawReceipt);
     const parsedUtr = parsed.txnId || (req.body && req.body.utr) || '';
     const parsedAmount = parsed.amount || (req.body && parseFloat(req.body.amount)) || null;
@@ -1009,9 +1009,9 @@ app.post('/handle-share', shareLimiter, async (req, res) => {
       attemptsThisSession: attemptsCount,
       priorConfirmed: 0
     };
-    // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ────────────────────────────────────────────────────────────
     // LAYER 4: CUSTOMER / ORDER IDENTITY BINDING (Cross-Order UTR Reuse Prevention)
-    // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ───────────────────────────────────────────────────────────
     const bindingResult = db.bindUtrToOrder(parsedUtr, session.orderId);
     if (bindingResult === 'BOUND_TO_OTHER_ORDER') {
       db.updateSessionState(session.orderId, 'REJECTED');
@@ -1062,7 +1062,7 @@ app.post('/handle-share', shareLimiter, async (req, res) => {
       }
       return res.redirect(`/failed.html?reason=${encodeURIComponent('Automated settlement requires HIGH confidence tier.')}`);
     }
-    // Ledger posting & anti-replay â€” instant settlement (DISHA never holds funds)
+    // Ledger posting & anti-replay — instant settlement (DISHA never holds funds)
     const { txId, verification } = await db.atomicSettle(
       session.orderId,
       parsedUtr,
@@ -1073,7 +1073,7 @@ app.post('/handle-share', shareLimiter, async (req, res) => {
     // Update session status in DB
     db.updateSessionStatus(session.orderId, 'SUCCESS', parsedUtr);
     db.updateSessionState(session.orderId, 'VERIFIED');
-    // âš¡ CRITICAL: INSTANT WEBSOCKET DISPATCH TO WAITING CHECKOUT (LAPTOP/DESKTOP/MOBILE)
+    // ⚡ CRITICAL: INSTANT WEBSOCKET DISPATCH TO WAITING CHECKOUT (LAPTOP/DESKTOP/MOBILE)
     const successPayload = {
       orderId: session.orderId,
       utr: parsedUtr,
@@ -1087,7 +1087,7 @@ app.post('/handle-share', shareLimiter, async (req, res) => {
       message: 'Settlement confirmed via Android Share Sheet Single Source of Truth (SST)'
     };
     broadcastOrderSuccess(session.orderId, successPayload);
-    console.log(`âœ… [Android Share Target SST] Successfully settled order ${session.orderId} and notified checkout client via WebSocket`);
+    console.log(`✅ [Android Share Target SST] Successfully settled order ${session.orderId} and notified checkout client via WebSocket`);
     if (req.accepts('json') && !req.accepts('html')) {
       return res.json({
         success: true,
@@ -1122,7 +1122,7 @@ app.post('/api/npci-callback', (req, res) => {
       payload = new URLSearchParams(req.query).toString();
     }
     const parsed = parseNPCIIntentResponse(payload);
-    console.log('ðŸ“¡ [NPCI Intent Callback] Parsed payload:', parsed);
+    console.log('📡 [NPCI Intent Callback] Parsed payload:', parsed);
     if (parsed.responseCode && parsed.responseCode !== '00') {
       const codeInfo = NPCI_RESPONSE_CODES[parsed.responseCode] || { description: 'Payment Failed', action: 'SHOW_ERROR' };
       return res.status(400).json({
@@ -1228,9 +1228,9 @@ app.get('/api/ledger/:orderId', (req, res) => {
     vpaAddress: session.vpaAddress
   });
 });
-// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+// ═══════════════════════════════════════════════════════════════════
 // TASK 12: 1000 VPA ROUTING, TELEMETRY & ANTI-BAN REST ENDPOINTS
-// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+// ═══════════════════════════════════════════════════════════════════
 // 1. Select optimal VPA (5-Factor anti-ban scoring + chaos jitter)
 app.post('/api/vpa/select', requireAdminAuth, async (req, res) => {
   try {
@@ -1295,9 +1295,9 @@ app.post('/api/vpa/health-check', requireAdminAuth, (req, res) => {
     res.status(500).json({ success: false, error: 'INTERNAL_SERVER_ERROR' });
   }
 });
-// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+// ═══════════════════════════════════════════════════════════════════
 // GAMING ENTERPRISE VERIFICATION API (IP WHITELIST PROTECTED)
-// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+// ═══════════════════════════════════════════════════════════════════
 app.post('/api/gaming/verify-payment', async (req, res) => {
   try {
     const { utr, amount, sessionId, orderId } = req.body;
@@ -1416,9 +1416,9 @@ app.get('/failed', (req, res) => res.sendFile(path.join(__dirname, 'public', 'fa
     }
   }, 60000);
   server.listen(PORT, '0.0.0.0', () => {
-    console.log(`\nðŸš€ DISHA 8.2 Sovereign UPI Checkout running on http://localhost:${PORT}`);
-    console.log(`ðŸ“± PWA Manifest: http://localhost:${PORT}/manifest.json`);
-    console.log(`ðŸ“¡ WebSocket Gateway: ws://localhost:${PORT}/ws\n`);
+    console.log(`\n🚀 DISHA 8.2 Sovereign UPI Checkout running on http://localhost:${PORT}`);
+    console.log(`📱 PWA Manifest: http://localhost:${PORT}/manifest.json`);
+    console.log(`📡 WebSocket Gateway: ws://localhost:${PORT}/ws\n`);
   });
 
   const shutdown = () => {
@@ -1435,5 +1435,6 @@ app.get('/failed', (req, res) => res.sendFile(path.join(__dirname, 'public', 'fa
   process.on('SIGTERM', shutdown);
   process.on('SIGINT', shutdown);
 })();
+
 
 
