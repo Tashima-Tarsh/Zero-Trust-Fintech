@@ -1,1 +1,177 @@
-<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Sign in — DISHA 8.2</title><link rel="icon" type="image/png" href="/assets/disha-8-2-wordmark.png"><style>body{margin:0;min-height:100vh;display:grid;place-items:center;background:#f7faf8;font-family:Inter,system-ui,sans-serif;color:#10201d}.box{width:min(100% - 32px,440px);text-align:center}.logo{width:190px;height:74px;object-fit:contain;margin:0 auto 16px}p{color:#5c6d68}#sign-in{margin-top:24px;text-align:left}.panel{background:#fff;border:1px solid #dce7e2;border-radius:16px;padding:22px;text-align:center}.button{display:block;width:100%;border:0;background:#08735d;color:white;text-decoration:none;padding:13px;border-radius:10px;font:750 15px Inter,system-ui,sans-serif;margin:12px 0;cursor:pointer}.request{color:#08735d;font-weight:700;font-size:14px}.note{font-size:13px;color:#5c6d68;line-height:1.5}.error{background:#fff;border:1px solid #dce7e2;border-radius:16px;padding:24px;color:#5c6d68;text-align:left}</style></head><body><main class="box"><a href="/"><img class="logo" src="/assets/disha-8-2-wordmark.png" alt="DISHA 8.2"></a><h1>Merchant workspace</h1><p>Sign in to manage your payment operations.</p><div id="sign-in"><div class="panel" id="signin-fallback"><button class="button" id="signin-link" type="button">Sign in securely</button><a class="request" href="mailto:hello@mail.thenitishkr.in?subject=DISHA%20merchant%20access%20request">Request merchant access</a><p class="note">New merchant accounts are created by invitation. Google sign-in can be enabled after your Google identity provider is connected in Clerk.</p></div></div></main><script src="/auth-config.js"></script><script>window.addEventListener('load',async()=>{const key=window.DISHA_CLERK_PUBLISHABLE_KEY,button=document.querySelector('#signin-link');if(!key){button.textContent='Sign-in is being activated';button.disabled=true;return}const domain=atob(key.split('_')[2]).slice(0,-1);button.disabled=true;button.textContent='Preparing secure sign-in…';try{const ui=await new Promise((ok,no)=>{const s=document.createElement('script');s.src=`https://${domain}/npm/@clerk/ui@1/dist/ui.browser.js`;s.crossOrigin='anonymous';s.onload=ok;s.onerror=no;document.head.appendChild(s)});const sdk=await new Promise((ok,no)=>{const s=document.createElement('script');s.src=`https://${domain}/npm/@clerk/clerk-js@6/dist/clerk.browser.js`;s.crossOrigin='anonymous';s.dataset.clerkPublishableKey=key;s.onload=ok;s.onerror=no;document.head.appendChild(s)});await Clerk.load({ui:{ClerkUI:window.__internal_ClerkUICtor}});if(Clerk.isSignedIn){location.replace('/dashboard');return}Clerk.mountSignIn(document.getElementById('sign-in'),{afterSignInUrl:'/dashboard'});}catch(e){button.disabled=false;button.textContent='Sign in securely';button.onclick=()=>{button.textContent='Please refresh and try again'};console.warn('Clerk sign-in unavailable',e)}});</script></body></html>
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Merchant Access — DISHA 8.2</title>
+  <link rel="icon" type="image/png" href="/assets/disha-8-2-wordmark.png">
+  <link rel="stylesheet" href="/premium.css">
+  <style>
+    body {
+      margin: 0;
+      min-height: 100vh;
+      display: grid;
+      place-items: center;
+      background: #06080d;
+      color: var(--text);
+      padding: 24px;
+    }
+    .auth-box {
+      width: min(100%, 460px);
+      text-align: center;
+      position: relative;
+      z-index: 2;
+    }
+    .auth-card {
+      background: rgba(14, 19, 32, 0.85);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-xl);
+      padding: 38px;
+      box-shadow: var(--shadow-lg), 0 0 50px -10px var(--emerald-glow);
+      backdrop-filter: blur(28px);
+      -webkit-backdrop-filter: blur(28px);
+      text-align: left;
+      margin-top: 24px;
+    }
+    .logo {
+      width: 190px;
+      height: 48px;
+      object-fit: contain;
+      margin: 0 auto 12px;
+      display: block;
+      filter: drop-shadow(0 4px 16px rgba(16, 185, 129, 0.2));
+    }
+    .button {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      width: 100%;
+      background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+      color: #042419;
+      text-decoration: none;
+      padding: 14px 20px;
+      border-radius: var(--radius-md);
+      font-weight: 700;
+      font-size: 0.95rem;
+      margin: 16px 0;
+      cursor: pointer;
+      box-shadow: 0 4px 20px var(--emerald-glow);
+      transition: all 0.2s ease;
+      border: 1px solid rgba(167, 243, 208, 0.4);
+    }
+    .button:hover {
+      background: linear-gradient(135deg, #34d399 0%, #10b981 100%);
+      transform: translateY(-2px);
+    }
+    .request {
+      display: block;
+      text-align: center;
+      color: var(--emerald-light);
+      font-weight: 600;
+      font-size: 0.86rem;
+      margin-top: 14px;
+    }
+    .request:hover {
+      text-decoration: underline;
+    }
+    .note {
+      font-size: 0.8rem;
+      color: var(--muted);
+      line-height: 1.6;
+      margin-top: 16px;
+      text-align: center;
+    }
+  </style>
+</head>
+<body>
+  <!-- Ambient Living Aurora Mesh -->
+  <div class="mesh" aria-hidden="true">
+    <div class="orb a"></div>
+    <div class="orb b"></div>
+  </div>
+
+  <main class="auth-box">
+    <a href="/"><img class="logo" src="/assets/disha-8-2-wordmark.png" alt="DISHA 8.2"></a>
+    <h1 style="font-size:1.9rem;margin-bottom:6px;">Merchant Command Center</h1>
+    <p style="font-size:0.95rem;">Enter your verified credentials to access your sovereign node.</p>
+
+    <div class="auth-card">
+      <div id="sign-in">
+        <div id="signin-fallback">
+          <button class="button" id="signin-link" type="button">
+            Sign In Securely
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+          </button>
+          <a class="request" href="mailto:hello@mail.thenitishkr.in?subject=DISHA%20Merchant%20Access%20Request">
+            Request merchant onboarding →
+          </a>
+          <p class="note">
+            Authentication is powered by Clerk Enterprise Identity. Direct bank settlements remain protected.
+          </p>
+        </div>
+      </div>
+    </div>
+
+    <div style="margin-top:24px;text-align:center;">
+      <a class="btn tiny ghost" href="/">← Return to Public Rail</a>
+    </div>
+  </main>
+
+  <script src="/auth-config.js"></script>
+  <script>
+    window.addEventListener('load', async () => {
+      const key = window.DISHA_CLERK_PUBLISHABLE_KEY;
+      const button = document.querySelector('#signin-link');
+      if (!key) {
+        if (button) {
+          button.textContent = 'Sign-in is activating…';
+          button.disabled = true;
+        }
+        return;
+      }
+      const domain = atob(key.split('_')[2]).slice(0, -1);
+      if (button) {
+        button.disabled = true;
+        button.textContent = 'Preparing secure sign-in…';
+      }
+      try {
+        await new Promise((ok, no) => {
+          const s = document.createElement('script');
+          s.src = `https://${domain}/npm/@clerk/ui@1/dist/ui.browser.js`;
+          s.crossOrigin = 'anonymous';
+          s.onload = ok;
+          s.onerror = no;
+          document.head.appendChild(s);
+        });
+        await new Promise((ok, no) => {
+          const s = document.createElement('script');
+          s.src = `https://${domain}/npm/@clerk/clerk-js@6/dist/clerk.browser.js`;
+          s.crossOrigin = 'anonymous';
+          s.dataset.clerkPublishableKey = key;
+          s.onload = ok;
+          s.onerror = no;
+          document.head.appendChild(s);
+        });
+        await Clerk.load({ ui: { ClerkUI: window.__internal_ClerkUICtor } });
+        if (Clerk.isSignedIn) {
+          location.replace('/dashboard');
+          return;
+        }
+        Clerk.mountSignIn(document.getElementById('sign-in'), {
+          afterSignInUrl: '/dashboard'
+        });
+      } catch (e) {
+        if (button) {
+          button.disabled = false;
+          button.textContent = 'Sign In Securely';
+          button.onclick = () => {
+            button.textContent = 'Please refresh page';
+          };
+        }
+        console.warn('Clerk sign-in fallback', e);
+      }
+    });
+  </script>
+</body>
+</html>

@@ -1,10 +1,192 @@
-<!doctype html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#031919"><meta name="description" content="DISHA 8.2 — Premium UPI checkout"><title>UPI Checkout — DISHA 8.2</title><link rel="icon" href="/assets/disha-8-2-wordmark.png"><link rel="stylesheet" href="/premium.css"><script src="/premium-checkout.js" defer></script></head>
-<body class="checkout-page"><div class="mesh" aria-hidden="true"><div class="orb a"></div><div class="orb b"></div><div class="beam"></div></div><header class="site-header"><div class="container nav"><a class="brand" href="/"><img class="brand-logo official-wordmark" src="/assets/disha-8-2-wordmark.png"  alt="DISHA 8.2 logo"></a><div class="pill">Non-custodial UPI checkout</div><a class="btn small ghost" href="/">← Home</a></div></header>
-<main class="checkout-layout"><div class="checkout-grid"><section class="checkout-intro glass gloss"><div class="eyebrow">DISHA 8.2 · SOVEREIGN CHECKOUT</div><h1>Pay the way you know. <span class="gradient-text">With UPI.</span></h1><p class="lead">Scan the QR or open a supported UPI app. See the amount, receiving account and order state in one clear place.</p><div class="checkout-details"><div class="checkout-detail"><span>Merchant</span><strong id="checkoutMerchant">Awaiting payment request</strong></div><div class="checkout-detail"><span>Order reference</span><strong id="checkoutOrder">—</strong></div><div class="checkout-detail"><span>Receiving UPI ID</span><strong id="checkoutVpa">—</strong></div><div class="checkout-detail"><span>Order note</span><strong id="checkoutDescription">UPI payment</strong></div><div class="checkout-detail"><span>Session expires</span><strong id="checkoutTimer">—</strong></div></div><div style="margin-top:30px" class="panel"><div style="display:flex;gap:13px;align-items:flex-start"><span style="color:#56ecc0;font-size:1.2rem">◇</span><div><strong>Familiar payment. Clear status.</strong><p class="fine" style="margin:5px 0 0">Payment is initiated inside your UPI app. This page updates only when the existing DISHA service reports a change in the order state.</p></div></div></div><div class="fine" style="margin-top:25px">Never enter your UPI PIN on a website. Enter it only inside your trusted UPI app.</div></section>
-<section class="checkout-pay glass gloss"><div class="overline">DISHA PAYMENT REQUEST</div><h2 style="margin:8px 0 4px" id="payTitle">Complete your UPI payment</h2><div class="pay-amount" id="checkoutAmount">—</div><p class="pay-note" id="amountNote">Your payment request will appear here.</p>
-<div id="setupPayment"><form id="checkoutStartForm"><label class="field">Payment amount (₹)<input type="number" id="checkoutInputAmount" inputmode="decimal" step=".01" min="1" placeholder="e.g. 500.00" required></label><label class="field" style="margin-top:13px">Order note (optional)<input type="text" id="checkoutInputNote" maxlength="120" placeholder="Order or invoice description"></label><button type="submit" class="btn primary">Create UPI request ↗</button></form><p class="fine" style="margin:12px 0 0">A payment request will only be created when you continue.</p></div>
-<div id="activePayment" hidden><div class="qr-shell" style="max-width:230px;min-height:230px"><img id="checkoutQr" alt="UPI payment QR code" width="204" height="204"></div><p class="pay-note">Scan with a compatible UPI app or choose an option below.</p><button type="button" class="btn primary" id="openGeneric">Open any UPI app ↗</button><div class="app-pay-buttons"><button type="button" class="btn tiny ghost" data-app="gpay">Google Pay</button><button type="button" class="btn tiny ghost" data-app="phonepe">PhonePe</button><button type="button" class="btn tiny ghost" data-app="paytm">Paytm</button></div><button type="button" class="btn ghost" id="copyUpi">Copy UPI link</button></div>
-<div id="paymentStatus" class="payment-status" role="status" aria-live="polite"><span class="dot" style="margin-right:6px"></span><strong id="paymentStatusTitle">Ready when you are</strong><div id="paymentStatusDesc" class="fine" style="margin-top:5px">Create a payment request to begin.</div></div>
-<div id="previewNotice" class="alert-bar" style="display:none">DESIGN PREVIEW · No payment request will be created. Enter a real amount on the live checkout to use its existing API.</div>
-<div class="safe-copy"><span>◇</span><span>DISHA never asks for your bank password or UPI PIN. Do not treat opening an app as proof that a payment succeeded.</span></div><div class="form-actions" style="justify-content:center"><button type="button" class="btn tiny" id="newPayment" hidden>Start new request</button></div>
-</section></div></main><footer class="footer" style="padding:23px 0"><div class="container" style="display:flex;justify-content:space-between;gap:20px;flex-wrap:wrap"><span class="fine">DISHA 8.2 · Your Business. Your Money. Your Payment Infrastructure.</span><span class="fine">Non-custodial software · External UPI network terms apply</span></div></footer><div id="toast" class="toast hidden" role="status" aria-live="polite"></div></body></html>
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#06080d">
+  <meta name="description" content="DISHA 8.2 — Sovereign Zero-Fee UPI Checkout. Instant direct-to-bank settlement.">
+  <title>Sovereign UPI Checkout — DISHA 8.2</title>
+  <link rel="icon" href="/assets/disha-8-2-wordmark.png">
+  <link rel="stylesheet" href="/premium.css">
+  <script src="/premium-checkout.js" defer></script>
+</head>
+<body class="checkout-page">
+  <!-- Living Ambient Aurora Mesh -->
+  <div class="mesh" aria-hidden="true">
+    <div class="orb a"></div>
+    <div class="orb b"></div>
+    <div class="beam"></div>
+  </div>
+
+  <header class="site-header">
+    <div class="container nav">
+      <a class="brand" href="/" aria-label="DISHA 8.2 home">
+        <img class="brand-logo official-wordmark" src="/assets/disha-8-2-wordmark.png" alt="DISHA 8.2">
+      </a>
+      <div class="pill">
+        <span class="dot"></span> Sovereign Direct Rail · 0% Intermediary
+      </div>
+      <a class="btn small ghost" href="/">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
+        Back to Home
+      </a>
+    </div>
+  </header>
+
+  <main class="checkout-layout">
+    <div class="checkout-grid">
+      <!-- Left Order Summary & Trust Pane -->
+      <section class="checkout-intro glass">
+        <div>
+          <div class="eyebrow">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+            NON-CUSTODIAL SETTLEMENT
+          </div>
+          <h1>Pay with UPI. <span class="gradient-text">Zero Middlemen.</span></h1>
+          <p class="lead">
+            Your payment flows directly to the merchant's bank account via NPCI UPI Intent. No intermediate holding accounts.
+          </p>
+
+          <div class="checkout-details">
+            <div class="checkout-detail">
+              <span>Merchant Name</span>
+              <strong id="checkoutMerchant">Awaiting payment request</strong>
+            </div>
+            <div class="checkout-detail">
+              <span>Order Reference</span>
+              <strong id="checkoutOrder" style="font-family:var(--mono);">—</strong>
+            </div>
+            <div class="checkout-detail">
+              <span>Receiving Bank VPA</span>
+              <strong id="checkoutVpa" style="font-family:var(--mono);color:var(--emerald-light);">—</strong>
+            </div>
+            <div class="checkout-detail">
+              <span>Description</span>
+              <strong id="checkoutDescription">UPI Payment</strong>
+            </div>
+            <div class="checkout-detail">
+              <span>Session Window</span>
+              <strong id="checkoutTimer" style="color:var(--amber);">—</strong>
+            </div>
+          </div>
+        </div>
+
+        <div>
+          <div class="panel" style="padding:16px 20px;background:rgba(255,255,255,0.02);border-radius:12px;">
+            <div style="display:flex;gap:12px;align-items:flex-start;">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--emerald-light)" stroke-width="2" style="flex-shrink:0;margin-top:2px;"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+              <div>
+                <strong style="font-size:0.88rem;color:#ffffff;">Direct Bank Verification</strong>
+                <p class="fine" style="margin:4px 0 0;">
+                  Never enter your UPI PIN on any website. Authorize transactions only within your trusted UPI application.
+                </p>
+              </div>
+            </div>
+          </div>
+          <div class="fine" style="margin-top:16px;text-align:center;font-size:0.75rem;">
+            NPCI UPI Intent Compliant · 256-Bit Bank Grade Encryption
+          </div>
+        </div>
+      </section>
+
+      <!-- Right Active Payment / Form Pane -->
+      <section class="checkout-pay glass">
+        <div>
+          <div class="overline">PAYMENT CHALLENGE</div>
+          <h2 style="margin:8px 0 4px;" id="payTitle">Complete Your UPI Payment</h2>
+          
+          <div class="pay-amount-box">
+            <div class="pay-amount" id="checkoutAmount">—</div>
+            <p class="pay-note" id="amountNote">Create or select a payment amount below.</p>
+          </div>
+
+          <!-- Step 1: Payment Request Creation Form -->
+          <div id="setupPayment">
+            <div style="margin-bottom:8px;font-size:0.8rem;color:var(--muted);font-weight:600;">Quick Presets:</div>
+            <div class="preset-chips">
+              <button type="button" class="preset-chip" data-preset="199">₹199</button>
+              <button type="button" class="preset-chip" data-preset="499">₹499</button>
+              <button type="button" class="preset-chip" data-preset="999">₹999</button>
+              <button type="button" class="preset-chip" data-preset="2499">₹2,499</button>
+            </div>
+
+            <form id="checkoutStartForm">
+              <label class="field">
+                Payment Amount (₹)
+                <input type="number" id="checkoutInputAmount" inputmode="decimal" step="0.01" min="1" placeholder="e.g. 500.00" required>
+              </label>
+              <label class="field" style="margin-top:14px;">
+                Order Note (Optional)
+                <input type="text" id="checkoutInputNote" maxlength="120" placeholder="e.g. Order #1042 or Service Invoice">
+              </label>
+              <button type="submit" class="btn primary" style="width:100%;margin-top:20px;">
+                Generate Dynamic UPI QR
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+              </button>
+            </form>
+          </div>
+
+          <!-- Step 2: Active Payment Scanner & Direct Intent Buttons -->
+          <div id="activePayment" hidden>
+            <div class="qr-frame">
+              <div class="qr-corner tl"></div>
+              <div class="qr-corner tr"></div>
+              <div class="qr-corner bl"></div>
+              <div class="qr-corner br"></div>
+              <div class="qr-shell">
+                <img id="checkoutQr" alt="Dynamic UPI QR Code" width="200" height="200">
+              </div>
+            </div>
+            <p class="pay-note">Scan with any UPI app or launch directly below:</p>
+
+            <button type="button" class="btn primary" id="openGeneric" style="width:100%;margin-top:12px;">
+              Launch Installed UPI App ↗
+            </button>
+
+            <div class="app-pay-buttons">
+              <button type="button" class="app-pay-btn" data-app="gpay">Google Pay</button>
+              <button type="button" class="app-pay-btn" data-app="phonepe">PhonePe</button>
+              <button type="button" class="app-pay-btn" data-app="paytm">Paytm</button>
+            </div>
+
+            <button type="button" class="btn ghost small" id="copyUpi" style="width:100%;margin-top:8px;">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
+              Copy UPI Payment Link
+            </button>
+          </div>
+
+          <!-- Real-Time Telemetry Status Badge -->
+          <div id="paymentStatus" class="payment-status" role="status" aria-live="polite">
+            <span class="dot"></span>
+            <div>
+              <strong id="paymentStatusTitle">Ready to Pay</strong>
+              <div id="paymentStatusDesc" class="fine" style="color:var(--text-secondary);margin-top:2px;">
+                Enter an amount above to generate a dynamic request.
+              </div>
+            </div>
+          </div>
+
+          <div id="previewNotice" class="alert-bar" style="display:none;margin-top:12px;">
+            DESIGN PREVIEW · Real requests use your live server session endpoints.
+          </div>
+        </div>
+
+        <div class="form-actions" style="justify-content:center;margin-top:16px;">
+          <button type="button" class="btn tiny ghost" id="newPayment" hidden>
+            ↻ Start New Request
+          </button>
+        </div>
+      </section>
+    </div>
+  </main>
+
+  <footer class="footer" style="padding:24px 0;">
+    <div class="container" style="display:flex;justify-content:space-between;gap:20px;flex-wrap:wrap;">
+      <span class="fine">DISHA 8.2 · Sovereign Zero-Fee UPI Payment Infrastructure</span>
+      <span class="fine">Non-Custodial · Direct Bank Settle · NPCI Compliant</span>
+    </div>
+  </footer>
+
+  <div id="toast" class="toast hidden" role="status" aria-live="polite"></div>
+</body>
+</html>

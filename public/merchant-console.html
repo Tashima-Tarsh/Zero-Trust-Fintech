@@ -1,53 +1,627 @@
-<!doctype html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#031919"><title>Merchant Command Center — DISHA 8.2</title><link rel="icon" href="/assets/disha-8-2-wordmark.png"><link rel="stylesheet" href="/premium.css"><script src="/vendor/qrcode.min.js" defer></script><script src="/auth-config.js"></script><script src="/premium-dashboard.js" defer></script></head>
-<body class="app-page"><div class="mesh" aria-hidden="true"><div class="orb a"></div><div class="orb b"></div></div><div class="mobile-side-backdrop" id="sideBackdrop"></div><div class="app-layout">
-<aside class="side" id="appSide"><a href="/" class="brand"><img class="brand-logo official-wordmark" src="/assets/disha-8-2-wordmark.png"  alt="DISHA 8.2"></a>
- <div class="merchant-chip"><div class="merchant-avatar">◇</div><div><b id="merchantSideName">Merchant workspace</b><small id="merchantSideSub">Merchant Admin</small></div></div>
- <div class="side-group-label">WORKSPACE</div><nav class="side-nav" aria-label="Merchant workspace navigation">
- <button type="button" data-view="overview" class="active"><span class="nav-icon">◈</span> Overview</button>
- <button type="button" data-view="payments"><span class="nav-icon">⇄</span> Transactions</button>
- <button type="button" data-view="create"><span class="nav-icon">＋</span> Create Payment</button>
- <div class="side-group-label">PAYMENT OPERATIONS</div>
- <button type="button" data-view="vpas"><span class="nav-icon">◎</span> UPI Accounts</button>
- <button type="button" data-view="routing"><span class="nav-icon">⌁</span> Routing & Health</button>
- <button type="button" data-view="risk"><span class="nav-icon">◇</span> Risk & Review</button>
- <button type="button" data-view="access"><span class="nav-icon">▧</span> Allowed Server IPs</button>
- <div class="side-group-label">INSIGHTS & TOOLS</div>
- <button type="button" data-view="reports"><span class="nav-icon">▥</span> Reports & Exports</button>
- <button type="button" data-view="notifications"><span class="nav-icon">♧</span> Notifications</button>
- <button type="button" data-view="soundbox"><span class="nav-icon">◖</span> Voice Announcements</button>
- <button type="button" data-view="api"><span class="nav-icon">〈〉</span> Developer API</button>
- <button type="button" data-view="settings"><span class="nav-icon">⚙</span> Settings</button></nav>
- <div class="side-end">Merchant-controlled UPI infrastructure.<br><span style="color:#63e5b9">DISHA 8.2</span><div style="margin-top:15px"><button type="button" class="btn tiny ghost" id="signOut">Sign out →</button></div></div>
-</aside>
-<main class="app-main"><header class="app-top"><div class="flexrow"><button id="sideToggle" type="button" class="icon-button sticky-mobile" aria-label="Open navigation" aria-controls="appSide" aria-expanded="false">☰</button><a class="brand mobile-brand" href="/" aria-label="DISHA 8.2 home"><img class="brand-logo official-wordmark" src="/assets/disha-8-2-wordmark.png"  alt=""></a><div class="search-wrap"><input class="search" id="globalSearch" placeholder="Search order references…" aria-label="Search orders"></div></div><div class="app-top-right"><span class="env" id="environmentLabel">Merchant workspace</span><button class="icon-button" type="button" data-switch="notifications" title="Notifications" aria-label="Notifications">♧</button><span class="user-round" id="merchantInitial">D8</span></div></header>
-<div class="app-title-row"><div><div class="overline">DISHA 8.2 · MERCHANT COMMAND CENTER</div><h1 id="viewHeading">Your business, in one clear view.</h1><p id="viewSubtitle">Manage your payment requests and recorded activity.</p></div><div class="app-title-actions"><select id="periodSelect" class="search" aria-label="Date range"><option value="today">Today</option><option value="7d">Last 7 days</option><option value="30d" selected>Last 30 days</option><option value="all">All time</option></select><button type="button" class="btn primary small" data-switch="create">+ Create Payment</button></div></div>
-<div id="appNotice" class="alert-bar" role="status" style="display:none"></div><div id="merchantSetup" class="module" style="display:none;margin-bottom:22px"><div class="overline">FIRST-TIME SETUP</div><h2>Set up your merchant workspace</h2><p>Add your business name and receiving UPI ID to start using the premium console.</p><form id="setupMerchantForm" class="form-grid"><label class="field">Business name <input id="setupBusinessName" required maxlength="150" placeholder="Your registered business"></label><label class="field">Receiving UPI ID <input id="setupPrimaryVpa" required placeholder="business@bank"></label><div class="form-actions" style="grid-column:1/-1"><button type="submit" class="btn primary">Complete merchant setup</button></div></form></div>
-<section id="view-overview" class="view active" aria-labelledby="viewHeading"><div class="stat-grid">
- <div class="stat"><small>Recorded payment volume</small><strong id="metricVolume">₹0</strong><div class="note">Completed records in selected period</div></div>
- <div class="stat"><small>Completed orders</small><strong id="metricCompleted">0</strong><div class="note">Recorded completed status</div></div>
- <div class="stat"><small>Awaiting activity</small><strong id="metricPending">0</strong><div class="note">Payment requests still pending</div></div>
- <div class="stat"><small>DISHA commission</small><strong>0%</strong><div class="note">External charges may apply</div></div></div>
- <div class="dash-grid"><div class="module"><div class="module-head"><h2>Payment activity</h2><small>Based on recorded completed orders</small></div><div id="activityChart"><div class="empty">Connect your merchant workspace to view payment trends.</div></div></div>
- <div class="module"><div class="module-head"><h2>Payment status</h2><button type="button" class="btn linkish" data-switch="payments">View details →</button></div><div class="flexrow"><div class="progress-circle" id="completionRing"><b id="completionRate">0%</b></div><div class="mini-list" style="flex:1"><span>Completed <strong id="statusCompleted">0</strong></span><span>Pending <strong id="statusPending">0</strong></span><span>Total <strong id="statusTotal">0</strong></span></div></div><p class="fine" style="margin-top:15px">These are workspace records, not a bank availability or uptime guarantee.</p></div></div>
- <div class="dash-grid"><div class="module"><div class="module-head"><h2>Recent transactions</h2><button class="btn linkish" type="button" data-switch="payments">View all →</button></div><div class="table-scroller"><table><thead><tr><th>Reference</th><th>Created</th><th>Amount</th><th>Receiving UPI</th><th>Status</th></tr></thead><tbody id="recentTable"><tr><td class="empty" colspan="5">No transactions found yet.</td></tr></tbody></table></div></div><div class="module"><div class="module-head"><h2>UPI account health</h2><button class="btn linkish" type="button" data-switch="vpas">Manage →</button></div><div class="mini-list"><span>Configured accounts <strong id="overviewVpas">0</strong></span><span>Active receiving accounts <strong id="overviewActiveVpas">0</strong></span></div><div class="subtle-divider"></div><div class="activity" id="overviewNotifications"><div class="empty">No new alerts recorded.</div></div></div></div>
-</section>
-<section id="view-payments" class="view"><div class="module"><div class="module-head"><h2>Transactions</h2><button type="button" id="exportTop" class="btn small">Export CSV ↗</button></div><div class="toolbar"><input id="paymentsSearch" class="search" placeholder="Search order ID, UTR…"><div class="tabs" id="paymentFilter"><button type="button" data-status="ALL" class="tab active">All</button><button type="button" data-status="COMPLETED" class="tab">Completed</button><button type="button" data-status="PENDING" class="tab">Pending</button><button type="button" data-status="EXPIRED" class="tab">Expired</button></div></div><div class="table-scroller"><table><thead><tr><th>Reference</th><th>Created</th><th>Amount</th><th>Receiving UPI</th><th>UTR</th><th>Status</th><th>Details</th></tr></thead><tbody id="paymentsTable"><tr><td colspan="7" class="empty">No transactions found.</td></tr></tbody></table></div></div><div id="txDetails" class="module" style="display:none" aria-live="polite"></div></section>
-<section id="view-create" class="view"><div class="two-cols"><div class="module"><div class="module-head"><h2>Create payment request</h2><small>Uses your existing merchant API</small></div><form id="createPaymentForm" class="form-grid"><label class="field">Amount (₹) <input id="newAmount" type="number" min="1" step="0.01" required placeholder="e.g. 1250.00"></label><label class="field">Order reference <input id="newOrderId" maxlength="120" placeholder="Optional · generated automatically"></label><label class="field">Description <input id="newDesc" maxlength="200" placeholder="Invoice or order note"></label><label class="field">Receiving UPI ID <select id="newVpa"><option value="">Use default active UPI ID</option></select></label><div class="form-actions" style="grid-column:1/-1"><button type="submit" class="btn primary">Generate QR & Payment Link ↗</button></div></form></div><div class="module"><div class="module-head"><h2>Customer payment request</h2><small>Generated from your account</small></div><div id="createResult" class="empty">Create a request to display a QR code, shareable link and recorded payment status.</div></div></div></section>
-<section id="view-vpas" class="view"><div class="stat-grid"><div class="stat"><small>Total UPI accounts</small><strong id="vpaTotal">0</strong></div><div class="stat"><small>Active</small><strong id="vpaActive">0</strong></div><div class="stat"><small>Paused</small><strong id="vpaPaused">0</strong></div><div class="stat"><small>Cooldown</small><strong id="vpaCooldown">0</strong></div></div><div class="module"><div class="module-head"><h2>Your receiving UPI IDs</h2><button type="button" class="btn small" id="refreshVpas">Refresh ↻</button></div><div class="table-scroller"><table><thead><tr><th>UPI ID</th><th>Bank</th><th>Status</th><th>Default</th><th>Actions</th></tr></thead><tbody id="vpaTable"><tr><td colspan="5" class="empty">No receiving UPI IDs configured.</td></tr></tbody></table></div></div><div class="module"><h2>Add receiving UPI ID</h2><form id="addVpaForm" class="form-grid" style="margin-top:18px"><label class="field">UPI ID <input id="vpaAddress" placeholder="your-business@bank" required></label><label class="field">Bank / provider <input id="vpaBank" placeholder="Optional"></label><div class="form-actions" style="grid-column:1/-1"><button class="btn primary" type="submit">Add UPI ID</button></div></form></div></section>
-<section id="view-routing" class="view"><div class="two-cols"><div class="module"><div class="module-head"><h2>Receiving account availability</h2><button class="btn linkish" type="button" data-switch="vpas">Manage accounts →</button></div><div id="routingAccounts" class="mini-list"><div class="empty">No receiving accounts found.</div></div></div><div class="module"><div class="module-head"><h2>Routing configuration</h2></div><p>Set your preferred receiving account from UPI Accounts. New payment requests use the configured/default account.</p><div class="alert-bar" style="margin:12px 0 0">Advanced automatic routing policies shown in the older dashboard were not persisted. This UI does not claim to save unsupported routing settings.</div></div></div></section>
-<section id="view-risk" class="view"><div class="module"><div class="module-head"><h2>Security & risk review</h2><span class="pill">Demo framework</span></div><p>Current risk-statistics responses in this implementation contain sample scores and example incidents. They're not shown as live merchant alerts.</p><div class="form-grid"><label class="field">Run a controlled test case <select id="riskScenario"><option value="duplicate_utr">Duplicate transaction reference</option><option value="expired_session">Expired request</option><option value="amount_mismatch">Amount mismatch</option><option value="legitimate">Baseline scenario</option></select></label><div class="form-actions"><button type="button" class="btn" id="runRiskTest">Run simulated check</button></div></div><div id="riskResult" class="module" style="margin-top:16px;display:none"></div></div></section>
-<section id="view-access" class="view"><div class="module"><div class="module-head"><h2>Allowed server IPs</h2><button type="button" class="btn small" id="refreshAccess">Refresh ↻</button></div><p>Restrict supported server integrations to approved IPs or CIDR ranges. Avoid exposing private API keys in the browser.</p><div class="table-scroller"><table><thead><tr><th>IP / CIDR</th><th>Description</th><th>Active</th><th>Action</th></tr></thead><tbody id="accessTable"><tr><td colspan="4" class="empty">No server IPs configured.</td></tr></tbody></table></div></div><div class="module"><h2>Add an allowed IP</h2><form id="addAccessForm" class="form-grid" style="margin-top:16px"><label class="field">IP address or CIDR <input id="accessIp" placeholder="203.0.113.10 or 203.0.113.0/24" required></label><label class="field">Description <input id="accessDesc" placeholder="Server identifier"></label><div class="form-actions" style="grid-column:1/-1"><button type="submit" class="btn primary">Add allowed IP</button></div></form></div><div class="module"><h2>Blocked access attempts</h2><div id="blockedAccess" class="activity"><div class="empty">No blocked events reported.</div></div></div></section>
-<section id="view-reports" class="view"><div class="module"><h2>Business reports</h2><p>Export your recorded transaction history or review the current period totals. Tax calculations are not inferred from UPI transaction volume.</p><div class="stat-grid" style="margin-top:20px"><div class="stat"><small>Recorded volume</small><strong id="reportVolume">₹0</strong></div><div class="stat"><small>Completed orders</small><strong id="reportCompleted">0</strong></div><div class="stat"><small>Pending requests</small><strong id="reportPending">0</strong></div><div class="stat"><small>Saved software fees</small><strong>—</strong><div class="note">Requires verified cost baseline</div></div></div><div class="form-actions"><button class="btn primary" id="exportReport" type="button">Download transaction CSV ↗</button></div><p class="fine" style="margin-top:15px">Amounts are operational records; consult a tax professional for taxable turnover and applicable GST.</p></div></section>
-<section id="view-notifications" class="view"><div class="module"><div class="module-head"><h2>Notification center</h2><button type="button" class="btn small" id="markRead">Mark all read</button></div><div class="activity" id="fullNotifications"><div class="empty">No notifications recorded.</div></div></div></section>
-<section id="view-soundbox" class="view"><div class="module"><h2>Voice announcements</h2><p>Use the browser's speech support to test how announcements sound. Test audio never implies that money has been received.</p><div class="form-grid" style="margin-top:18px"><label class="field">Language <select id="voiceLanguage"><option value="en-IN">English</option><option value="hi-IN">हिन्दी</option><option value="mr-IN">मराठी</option></select></label><label class="field">Volume <input type="range" id="voiceVolume" min="0" max="100" value="80"></label></div><div class="form-actions"><button class="btn primary" id="playVoice" type="button">Play test announcement</button></div></div></section>
-<section id="view-api" class="view"><div class="module"><h2>Developer integration</h2><p>Use the supported merchant endpoints from your existing Railway-backed service. Production credentials and sessions must stay private.</p><div class="overline">EXISTING MERCHANT ENDPOINTS</div><pre class="code-preview"><code>GET  /api/auth/me
-GET  /api/merchant/dashboard
-GET  /api/merchant/payments
-POST /api/merchant/payments
-GET  /api/merchant/vpas
-POST /api/merchant/vpas
-GET  /api/merchant/reports
-GET  /api/merchant/notifications</code></pre><div class="form-grid" style="margin-top:20px"><label class="field">Explore a read-only endpoint<select id="apiExplorerEndpoint"><option value="/health">System health</option><option value="/api/auth/me">Merchant profile</option><option value="/api/merchant/dashboard">Merchant overview</option><option value="/api/merchant/vpas">Receiving UPI accounts</option><option value="/api/merchant/notifications">Notifications</option></select></label><div class="form-actions"><button class="btn" type="button" id="runApiExplorer">Send GET request</button></div></div><pre id="apiExplorerResult" class="code-preview" style="margin-top:15px" aria-live="polite">Choose an endpoint to inspect its response.</pre><div class="form-actions"><button type="button" class="btn" id="copyEndpoints">Copy endpoint list</button><button type="button" class="btn ghost" id="testHealth">Check service health</button></div><div id="healthResult" class="fine" style="margin-top:14px"></div></div></section>
-<section id="view-settings" class="view"><div class="two-cols"><div class="module"><h2>Business profile</h2><form id="settingsForm" class="form-grid" style="margin-top:17px"><label class="field">Business name <input id="settingsName" required></label><label class="field">Contact phone <input id="settingsPhone"></label><label class="field">City / region <input id="settingsCity"></label><div class="form-actions" style="grid-column:1/-1"><button class="btn primary" type="submit">Save business profile</button></div></form></div><div class="module"><h2>Access & security</h2><p>Your merchant session is managed by the existing authentication service. DISHA 8.2 never needs your banking password or UPI PIN.</p><button class="btn ghost" id="settingsLogout" type="button">Sign out of workspace →</button></div></div></section>
-<div class="fine" style="margin-top:40px;text-align:center">DISHA 8.2 · Your Business. Your Money. Your Payment Infrastructure.</div>
-</main></div><div id="toast" class="toast hidden" role="status" aria-live="polite"></div></body></html>
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#06080d">
+  <title>Executive Command Center — DISHA 8.2</title>
+  <link rel="icon" href="/assets/disha-8-2-wordmark.png">
+  <link rel="stylesheet" href="/premium.css">
+  <script src="/vendor/qrcode.min.js" defer></script>
+  <script src="/auth-config.js"></script>
+  <script src="/premium-dashboard.js" defer></script>
+</head>
+<body class="app-page">
+  <!-- Living Ambient Aurora Mesh -->
+  <div class="mesh" aria-hidden="true">
+    <div class="orb a"></div>
+    <div class="orb b"></div>
+  </div>
+
+  <div class="mobile-side-backdrop" id="sideBackdrop"></div>
+
+  <div class="app-layout">
+    <!-- Executive Dark Sidebar -->
+    <aside class="side" id="appSide">
+      <a href="/" class="brand">
+        <img class="brand-logo official-wordmark" src="/assets/disha-8-2-wordmark.png" alt="DISHA 8.2">
+      </a>
+
+      <div class="merchant-chip">
+        <div class="merchant-avatar" id="merchantAvatarIcon">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
+        </div>
+        <div>
+          <b id="merchantSideName">Merchant Workspace</b>
+          <small id="merchantSideSub">Direct Settlement Node</small>
+        </div>
+      </div>
+
+      <div class="side-group-label">OPERATIONAL CORE</div>
+      <nav class="side-nav" aria-label="Merchant workspace navigation">
+        <button type="button" data-view="overview" class="active">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"></rect><rect x="14" y="3" width="7" height="7"></rect><rect x="14" y="14" width="7" height="7"></rect><rect x="3" y="14" width="7" height="7"></rect></svg>
+          Overview
+        </button>
+        <button type="button" data-view="payments">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="1" x2="12" y2="23"></line><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path></svg>
+          Transactions
+        </button>
+        <button type="button" data-view="create">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="16"></line><line x1="8" y1="12" x2="16" y2="12"></line></svg>
+          Create Payment
+        </button>
+
+        <div class="side-group-label">PAYMENT INFRASTRUCTURE</div>
+        <button type="button" data-view="vpas">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="1" y="4" width="22" height="16" rx="2" ry="2"></rect><line x1="1" y1="10" x2="23" y2="10"></line></svg>
+          UPI Accounts
+        </button>
+        <button type="button" data-view="routing">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline></svg>
+          Routing & Health
+        </button>
+        <button type="button" data-view="risk">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path></svg>
+          Fraud & Risk Checks
+        </button>
+        <button type="button" data-view="access">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="2" width="20" height="8" rx="2" ry="2"></rect><rect x="2" y="14" width="20" height="8" rx="2" ry="2"></rect><line x1="6" y1="6" x2="6.01" y2="6"></line><line x1="6" y1="18" x2="6.01" y2="18"></line></svg>
+          Allowed Server IPs
+        </button>
+
+        <div class="side-group-label">INTELLIGENCE & SETTINGS</div>
+        <button type="button" data-view="reports">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line></svg>
+          Reports & Exports
+        </button>
+        <button type="button" data-view="notifications">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path><path d="M13.73 21a2 2 0 0 1-3.46 0"></path></svg>
+          Notifications
+        </button>
+        <button type="button" data-view="soundbox">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon><path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"></path></svg>
+          Voice Audio Alert
+        </button>
+        <button type="button" data-view="api">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="16 18 22 12 16 6"></polyline><polyline points="8 6 2 12 8 18"></polyline></svg>
+          Developer API
+        </button>
+        <button type="button" data-view="settings">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
+          Settings
+        </button>
+      </nav>
+
+      <div class="side-end">
+        Direct Bank Rail Active<br>
+        <span style="color:var(--emerald-light);font-weight:600;">DISHA 8.2 Production</span>
+        <div style="margin-top:14px;">
+          <button type="button" class="btn tiny ghost" id="signOut" style="width:100%;">
+            Sign Out
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path><polyline points="16 17 21 12 16 7"></polyline><line x1="21" y1="12" x2="9" y2="12"></line></svg>
+          </button>
+        </div>
+      </div>
+    </aside>
+
+    <!-- Main Command Center Viewport -->
+    <main class="app-main">
+      <header class="app-top">
+        <div class="flexrow" style="display:flex;align-items:center;gap:12px;">
+          <button id="sideToggle" type="button" class="icon-button sticky-mobile" aria-label="Open Navigation" aria-controls="appSide">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="3" y1="12" x2="21" y2="12"></line><line x1="3" y1="6" x2="21" y2="6"></line><line x1="3" y1="18" x2="21" y2="18"></line></svg>
+          </button>
+          <a class="brand mobile-brand" href="/" aria-label="DISHA 8.2 Home">
+            <img class="brand-logo official-wordmark" src="/assets/disha-8-2-wordmark.png" alt="">
+          </a>
+          <div class="search-wrap">
+            <input class="search" id="globalSearch" placeholder="Search reference, UTR, amount… (Press Enter)" aria-label="Search orders">
+          </div>
+        </div>
+
+        <div class="app-top-right">
+          <span class="env" id="environmentLabel">
+            <span class="dot"></span> Production Node · 12ms
+          </span>
+          <button class="icon-button" type="button" data-switch="notifications" title="Notifications" aria-label="Notifications">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path><path d="M13.73 21a2 2 0 0 1-3.46 0"></path></svg>
+          </button>
+          <span class="merchant-avatar" id="merchantInitial" style="width:36px;height:36px;font-size:0.8rem;">D8</span>
+        </div>
+      </header>
+
+      <!-- View Title Row -->
+      <div class="app-title-row">
+        <div>
+          <div class="overline">DISHA 8.2 · EXECUTIVE COMMAND CENTER</div>
+          <h1 id="viewHeading">Your Business, In Real-Time.</h1>
+          <p id="viewSubtitle">Monitor live collections, settlements, and bank telemetry.</p>
+        </div>
+        <div class="app-title-actions">
+          <select id="periodSelect" class="search" style="max-width:140px;" aria-label="Date Range">
+            <option value="today">Today</option>
+            <option value="7d">Last 7 Days</option>
+            <option value="30d" selected>Last 30 Days</option>
+            <option value="all">All Time</option>
+          </select>
+          <button type="button" class="btn primary small" data-switch="create">
+            + Create Payment
+          </button>
+        </div>
+      </div>
+
+      <div id="appNotice" class="alert-bar" role="status" style="display:none;"></div>
+
+      <div id="merchantSetup" class="module" style="display:none;margin-bottom:24px;">
+        <div class="overline">INITIALIZE WORKSPACE</div>
+        <h2>Complete Merchant Account Setup</h2>
+        <p>Register your verified business name and primary receiving UPI ID.</p>
+        <form id="setupMerchantForm" class="form-grid" style="margin-top:16px;">
+          <label class="field">
+            Registered Business Name
+            <input id="setupBusinessName" required maxlength="150" placeholder="e.g. Ramesh Enterprises">
+          </label>
+          <label class="field">
+            Receiving Bank VPA (UPI ID)
+            <input id="setupPrimaryVpa" required placeholder="business@oksbi or merchant@okhdfcbank">
+          </label>
+          <div class="form-actions" style="grid-column:1/-1;">
+            <button type="submit" class="btn primary">Save & Activate Rail</button>
+          </div>
+        </form>
+      </div>
+
+      <!-- VIEW 1: OVERVIEW -->
+      <section id="view-overview" class="view active" aria-labelledby="viewHeading">
+        <div class="stat-grid">
+          <div class="stat">
+            <small>Recorded UPI Turnover</small>
+            <strong id="metricVolume">₹0</strong>
+            <div class="note">Direct bank settlement</div>
+          </div>
+          <div class="stat">
+            <small>Completed Transactions</small>
+            <strong id="metricCompleted">0</strong>
+            <div class="note">100% verified via UTR</div>
+          </div>
+          <div class="stat">
+            <small>Awaiting Authorization</small>
+            <strong id="metricPending">0</strong>
+            <div class="note" style="color:var(--amber);">Active checkout sessions</div>
+          </div>
+          <div class="stat">
+            <small>DISHA Commission Taken</small>
+            <strong style="color:var(--emerald-light);">0%</strong>
+            <div class="note">100% margin retained</div>
+          </div>
+        </div>
+
+        <div class="dash-grid">
+          <div class="module">
+            <div class="module-head">
+              <h2>Payment Volume Trend</h2>
+              <small>Completed orders timeline</small>
+            </div>
+            <div id="activityChart">
+              <div class="empty">Connect your merchant workspace to view payment trends.</div>
+            </div>
+          </div>
+
+          <div class="module">
+            <div class="module-head">
+              <h2>Settlement Health</h2>
+              <button type="button" class="btn linkish" data-switch="payments">Details →</button>
+            </div>
+            <div class="flexrow" style="display:flex;align-items:center;gap:18px;">
+              <div class="progress-circle" id="completionRing">
+                <b id="completionRate">0%</b>
+              </div>
+              <div class="mini-list" style="flex:1;">
+                <span>Completed: <strong id="statusCompleted">0</strong></span>
+                <span>Pending: <strong id="statusPending">0</strong></span>
+                <span>Total Orders: <strong id="statusTotal">0</strong></span>
+              </div>
+            </div>
+            <p class="fine" style="margin-top:16px;">
+              Direct-to-bank settlement records verified cryptographically via unique 12-digit UTR.
+            </p>
+          </div>
+        </div>
+
+        <div class="dash-grid">
+          <div class="module">
+            <div class="module-head">
+              <h2>Recent Live Transactions</h2>
+              <button class="btn linkish" type="button" data-switch="payments">View All →</button>
+            </div>
+            <div class="table-scroller">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Reference</th>
+                    <th>Created</th>
+                    <th>Amount</th>
+                    <th>Receiving VPA</th>
+                    <th>Status</th>
+                  </tr>
+                </thead>
+                <tbody id="recentTable">
+                  <tr><td class="empty" colspan="5">No transactions recorded yet.</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <div class="module">
+            <div class="module-head">
+              <h2>Receiving Accounts & Alerts</h2>
+              <button class="btn linkish" type="button" data-switch="vpas">Manage →</button>
+            </div>
+            <div class="mini-list">
+              <span>Configured VPAs: <strong id="overviewVpas">0</strong></span>
+              <span>Active Receiving VPAs: <strong id="overviewActiveVpas">0</strong></span>
+            </div>
+            <div class="subtle-divider" style="height:1px;background:var(--border);margin:16px 0;"></div>
+            <div class="activity" id="overviewNotifications">
+              <div class="empty">No new alerts recorded.</div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- VIEW 2: TRANSACTIONS -->
+      <section id="view-payments" class="view">
+        <div class="module">
+          <div class="module-head">
+            <h2>Transaction Ledger</h2>
+            <button type="button" id="exportTop" class="btn small">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+              Export CSV
+            </button>
+          </div>
+          <div class="toolbar">
+            <input id="paymentsSearch" class="search" placeholder="Search order ID, UTR, VPA…">
+            <div class="tabs" id="paymentFilter">
+              <button type="button" data-status="ALL" class="tab active">All</button>
+              <button type="button" data-status="COMPLETED" class="tab">Completed</button>
+              <button type="button" data-status="PENDING" class="tab">Pending</button>
+              <button type="button" data-status="EXPIRED" class="tab">Expired</button>
+            </div>
+          </div>
+          <div class="table-scroller">
+            <table>
+              <thead>
+                <tr>
+                  <th>Reference</th>
+                  <th>Timestamp</th>
+                  <th>Amount</th>
+                  <th>Receiving VPA</th>
+                  <th>Bank UTR</th>
+                  <th>Status</th>
+                  <th>Action</th>
+                </tr>
+              </thead>
+              <tbody id="paymentsTable">
+                <tr><td colspan="7" class="empty">No transactions found.</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+        <div id="txDetails" class="module" style="display:none;margin-top:18px;" aria-live="polite"></div>
+      </section>
+
+      <!-- VIEW 3: CREATE PAYMENT -->
+      <section id="view-create" class="view">
+        <div class="two-cols" style="display:grid;grid-template-columns:1fr 1fr;gap:20px;">
+          <div class="module">
+            <div class="module-head">
+              <h2>Generate Payment Request</h2>
+              <small>Creates dynamic UPI challenge</small>
+            </div>
+            <form id="createPaymentForm" class="form-grid">
+              <label class="field">
+                Amount (₹)
+                <input id="newAmount" type="number" min="1" step="0.01" required placeholder="e.g. 1500.00">
+              </label>
+              <label class="field">
+                Custom Reference
+                <input id="newOrderId" maxlength="120" placeholder="Auto-generated if empty">
+              </label>
+              <label class="field" style="grid-column:1/-1;">
+                Description / Memo
+                <input id="newDesc" maxlength="200" placeholder="e.g. Invoice #2026-A">
+              </label>
+              <label class="field" style="grid-column:1/-1;">
+                Receiving Bank Account
+                <select id="newVpa">
+                  <option value="">Use primary active UPI ID</option>
+                </select>
+              </label>
+              <div class="form-actions" style="grid-column:1/-1;margin-top:16px;">
+                <button type="submit" class="btn primary">
+                  Generate Instant QR & Link ↗
+                </button>
+              </div>
+            </form>
+          </div>
+
+          <div class="module">
+            <div class="module-head">
+              <h2>Live Dynamic QR View</h2>
+              <small>Ready for customer scanning</small>
+            </div>
+            <div id="createResult" class="empty">
+              Fill in the form to generate an authentic dynamic QR code and customer payment link.
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- VIEW 4: VPAs / ACCOUNTS -->
+      <section id="view-vpas" class="view">
+        <div class="stat-grid">
+          <div class="stat"><small>Total Accounts</small><strong id="vpaTotal">0</strong></div>
+          <div class="stat"><small>Active Receiving</small><strong id="vpaActive" style="color:var(--emerald-light);">0</strong></div>
+          <div class="stat"><small>Paused</small><strong id="vpaPaused">0</strong></div>
+          <div class="stat"><small>In Cooldown</small><strong id="vpaCooldown">0</strong></div>
+        </div>
+
+        <div class="module">
+          <div class="module-head">
+            <h2>Configured Receiving VPAs</h2>
+            <button type="button" class="btn small" id="refreshVpas">Refresh ↻</button>
+          </div>
+          <div class="table-scroller">
+            <table>
+              <thead>
+                <tr>
+                  <th>UPI Address</th>
+                  <th>Bank / Rail</th>
+                  <th>Status</th>
+                  <th>Role</th>
+                  <th>Controls</th>
+                </tr>
+              </thead>
+              <tbody id="vpaTable">
+                <tr><td colspan="5" class="empty">No receiving UPI IDs configured. Add one below.</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="module" style="margin-top:20px;">
+          <h2>Add New Receiving Bank VPA</h2>
+          <form id="addVpaForm" class="form-grid" style="margin-top:16px;">
+            <label class="field">
+              UPI Address
+              <input id="vpaAddress" placeholder="business@oksbi or merchant@okhdfcbank" required>
+            </label>
+            <label class="field">
+              Bank / Rail Name
+              <input id="vpaBank" placeholder="e.g. State Bank of India">
+            </label>
+            <div class="form-actions" style="grid-column:1/-1;">
+              <button class="btn primary" type="submit">Add Receiving VPA</button>
+            </div>
+          </form>
+        </div>
+      </section>
+
+      <!-- VIEW 5: ROUTING & HEALTH -->
+      <section id="view-routing" class="view">
+        <div class="two-cols" style="display:grid;grid-template-columns:1fr 1fr;gap:20px;">
+          <div class="module">
+            <div class="module-head">
+              <h2>Account Availability</h2>
+              <button class="btn linkish" type="button" data-switch="vpas">Manage →</button>
+            </div>
+            <div id="routingAccounts" class="mini-list">
+              <div class="empty">No receiving accounts found.</div>
+            </div>
+          </div>
+          <div class="module">
+            <div class="module-head">
+              <h2>Sovereign Routing Directives</h2>
+            </div>
+            <p>
+              New payment challenges route to your designated Primary Active VPA. All funds settle directly to your bank with zero intermediary hops.
+            </p>
+          </div>
+        </div>
+      </section>
+
+      <!-- VIEW 6: RISK & FRAUD -->
+      <section id="view-risk" class="view">
+        <div class="module">
+          <div class="module-head">
+            <h2>Cryptographic Anti-Fraud Engine</h2>
+            <span class="pill">Active Protection</span>
+          </div>
+          <p>
+            DISHA's anti-replay engine validates the 12-digit bank UTR and session challenge window to prevent screenshot fraud. Test scenarios below:
+          </p>
+          <div class="form-grid" style="margin-top:16px;">
+            <label class="field">
+              Select Test Scenario
+              <select id="riskScenario">
+                <option value="duplicate_utr">Replayed / Duplicate Bank UTR</option>
+                <option value="expired_session">Expired Time-Bounded Session</option>
+                <option value="amount_mismatch">Amount Challenge Mismatch</option>
+                <option value="legitimate">Legitimate Valid Transaction</option>
+              </select>
+            </label>
+            <div class="form-actions" style="align-items:flex-end;">
+              <button type="button" class="btn primary" id="runRiskTest">Execute Simulation</button>
+            </div>
+          </div>
+          <div id="riskResult" class="module" style="margin-top:20px;display:none;"></div>
+        </div>
+      </section>
+
+      <!-- VIEW 7: ACCESS & IP ALLOWLIST -->
+      <section id="view-access" class="view">
+        <div class="module">
+          <div class="module-head">
+            <h2>Allowed Server IPs</h2>
+            <button type="button" class="btn small" id="refreshAccess">Refresh ↻</button>
+          </div>
+          <p>Restrict server-side payment challenge creation to approved IP addresses.</p>
+          <div class="table-scroller" style="margin-top:16px;">
+            <table>
+              <thead>
+                <tr>
+                  <th>IP Address / CIDR</th>
+                  <th>Label</th>
+                  <th>State</th>
+                  <th>Action</th>
+                </tr>
+              </thead>
+              <tbody id="accessTable">
+                <tr><td colspan="4" class="empty">No server IPs restricted yet.</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="module" style="margin-top:20px;">
+          <h2>Add Approved Server IP</h2>
+          <form id="addAccessForm" class="form-grid" style="margin-top:16px;">
+            <label class="field">
+              IP or CIDR
+              <input id="accessIp" placeholder="e.g. 203.0.113.10" required>
+            </label>
+            <label class="field">
+              Server Description
+              <input id="accessDesc" placeholder="e.g. Production Backend">
+            </label>
+            <div class="form-actions" style="grid-column:1/-1;">
+              <button type="submit" class="btn primary">Add Allowed IP</button>
+            </div>
+          </form>
+        </div>
+      </section>
+
+      <!-- VIEW 8: REPORTS & EXPORTS -->
+      <section id="view-reports" class="view">
+        <div class="module">
+          <h2>Financial Transaction Reports</h2>
+          <p>Export operational transaction ledger for accounting and audit.</p>
+          <div class="stat-grid" style="margin-top:20px;">
+            <div class="stat"><small>Turnover in Period</small><strong id="reportVolume">₹0</strong></div>
+            <div class="stat"><small>Completed Records</small><strong id="reportCompleted">0</strong></div>
+            <div class="stat"><small>Pending Requests</small><strong id="reportPending">0</strong></div>
+            <div class="stat"><small>Platform Fee Charged</small><strong style="color:var(--emerald-light);">₹0.00</strong></div>
+          </div>
+          <div class="form-actions" style="margin-top:24px;">
+            <button class="btn primary" id="exportReport" type="button">
+              Download Full Ledger (CSV) ↗
+            </button>
+          </div>
+        </div>
+      </section>
+
+      <!-- VIEW 9: NOTIFICATIONS -->
+      <section id="view-notifications" class="view">
+        <div class="module">
+          <div class="module-head">
+            <h2>Operational Activity Center</h2>
+            <button type="button" class="btn small" id="markRead">Mark All as Read</button>
+          </div>
+          <div class="activity" id="fullNotifications">
+            <div class="empty">No activity notifications recorded.</div>
+          </div>
+        </div>
+      </section>
+
+      <!-- VIEW 10: VOICE SOUNDBOX -->
+      <section id="view-soundbox" class="view">
+        <div class="module">
+          <h2>Virtual Voice Soundbox</h2>
+          <p>Zero-cost instant audio announcements on incoming payments via browser speech synthesis.</p>
+          <div class="form-grid" style="margin-top:18px;">
+            <label class="field">
+              Announcement Language
+              <select id="voiceLanguage">
+                <option value="en-IN">English (India)</option>
+                <option value="hi-IN">Hindi (हिन्दी)</option>
+                <option value="mr-IN">Marathi (मराठी)</option>
+              </select>
+            </label>
+            <label class="field">
+              Speaker Volume
+              <input type="range" id="voiceVolume" min="0" max="100" value="80">
+            </label>
+          </div>
+          <div class="form-actions" style="margin-top:20px;">
+            <button class="btn primary" id="playVoice" type="button">
+              Play Sample Voice Confirmation 🔊
+            </button>
+          </div>
+        </div>
+      </section>
+
+      <!-- VIEW 11: DEVELOPER API -->
+      <section id="view-api" class="view">
+        <div class="module">
+          <h2>Backend API Endpoints</h2>
+          <p>Integrate your self-hosted instance with any custom web app or ERP.</p>
+          <pre class="code-preview" style="background:rgba(6,9,16,0.8);border-radius:12px;padding:16px;font-family:var(--mono);font-size:0.8rem;color:var(--emerald-light);border:1px solid var(--border);">
+GET  /api/auth/me              - Merchant authentication
+GET  /api/merchant/dashboard   - Real-time telemetry & volume
+GET  /api/merchant/payments    - Transaction history
+POST /api/merchant/payments    - Generate dynamic payment challenge
+GET  /api/merchant/vpas        - Manage receiving UPI accounts
+POST /api/merchant/vpas        - Register new VPA
+GET  /api/merchant/reports     - Download CSV ledger
+          </pre>
+          <div class="form-actions" style="margin-top:16px;">
+            <button type="button" class="btn small ghost" id="testHealth">Test Rail Health Check</button>
+            <span id="healthResult" class="fine" style="margin-left:12px;"></span>
+          </div>
+        </div>
+      </section>
+
+      <!-- VIEW 12: SETTINGS -->
+      <section id="view-settings" class="view">
+        <div class="two-cols" style="display:grid;grid-template-columns:1fr 1fr;gap:20px;">
+          <div class="module">
+            <h2>Business Details</h2>
+            <form id="settingsForm" class="form-grid" style="margin-top:18px;">
+              <label class="field">
+                Business Name
+                <input id="settingsName" required>
+              </label>
+              <label class="field">
+                Contact Phone
+                <input id="settingsPhone">
+              </label>
+              <label class="field" style="grid-column:1/-1;">
+                Operating City
+                <input id="settingsCity">
+              </label>
+              <div class="form-actions" style="grid-column:1/-1;margin-top:12px;">
+                <button class="btn primary" type="submit">Save Business Profile</button>
+              </div>
+            </form>
+          </div>
+
+          <div class="module">
+            <h2>Security & Sessions</h2>
+            <p>Your session is managed directly by Clerk Enterprise Auth. Banking secrets and UPI PINs are never stored.</p>
+            <button class="btn ghost" id="settingsLogout" type="button" style="margin-top:20px;">
+              Sign Out of Node →
+            </button>
+          </div>
+        </div>
+      </section>
+
+      <div class="fine" style="margin-top:48px;text-align:center;">
+        DISHA 8.2 · Sovereign Zero-Fee UPI Payment Infrastructure for Indian Merchants
+      </div>
+    </main>
+  </div>
+
+  <div id="toast" class="toast hidden" role="status" aria-live="polite"></div>
+</body>
+</html>
