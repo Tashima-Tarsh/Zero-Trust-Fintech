@@ -88,7 +88,10 @@ function readBody(req) {
   });
 }
 
-function authenticateRequest(req) {
+async function authenticateRequest(req) {
+  if (process.env.CLERK_SECRET_KEY && process.env.CLERK_PUBLISHABLE_KEY) {
+    return require('./clerk-merchants').authenticate(req);
+  }
   let token = null;
   const authHeader = req.headers['authorization'];
   if (authHeader && authHeader.startsWith('Bearer ')) {
@@ -144,6 +147,9 @@ async function handleCinematicRequest(req, res) {
 
       // 1. Auth: Login
       if (pathname === '/api/auth/login' && method === 'POST') {
+        if (process.env.CLERK_SECRET_KEY && process.env.CLERK_PUBLISHABLE_KEY) {
+          return sendError(res, 410, 'Use Clerk sign-in at /login');
+        }
         const body = await readBody(req);
         const { email, password } = body;
 
@@ -175,6 +181,9 @@ async function handleCinematicRequest(req, res) {
 
       // 2. Auth: Logout
       if (pathname === '/api/auth/logout' && method === 'POST') {
+        if (process.env.CLERK_SECRET_KEY && process.env.CLERK_PUBLISHABLE_KEY) {
+          return sendError(res, 410, 'Sign out using Clerk');
+        }
         let token = null;
         const authHeader = req.headers['authorization'];
         if (authHeader && authHeader.startsWith('Bearer ')) {
@@ -194,7 +203,7 @@ async function handleCinematicRequest(req, res) {
 
       // 3. Auth: Current User Profile
       if (pathname === '/api/auth/me' && method === 'GET') {
-        const merchant = authenticateRequest(req);
+        const merchant = await authenticateRequest(req);
         if (!merchant) {
           return sendError(res, 401, 'Unauthorized session. Please log in.');
         }
@@ -202,7 +211,7 @@ async function handleCinematicRequest(req, res) {
       }
 
       // --- PROTECTED MERCHANT ROUTES ---
-      const currentMerchant = authenticateRequest(req);
+      const currentMerchant = await authenticateRequest(req);
       if (!currentMerchant) {
         return sendError(res, 401, 'Authentication required to access merchant workspace');
       }
