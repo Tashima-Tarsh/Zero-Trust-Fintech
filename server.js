@@ -449,13 +449,19 @@ function generateSession(baseAmount = 100, description = '', customVpa = null) {
   const challengeAmount = Number(baseAmount);
   // TASK 9: Select optimal VPA to prevent bans or primary VPA
   let vpaAddress = (customVpa && String(customVpa).trim()) ? String(customVpa).trim() : null;
-  let merchantType = 'PERSONAL';
+  let merchantType = 'P2P';
   let vpaMcc = null;
   if (!vpaAddress) {
-    const route = db.selectVPARoute('mer_default', challengeAmount);
-    vpaAddress = route.vpaAddress || process.env.MERCHANT_UPI_ID || 'nkumar906099-7@oksbi';
-    merchantType = route.merchantType || 'PERSONAL';
-    vpaMcc = route.mcc || null;
+    let route = null;
+    try {
+      route = db.selectVPARoute('mer_default', challengeAmount);
+    } catch (e) {
+      route = null;
+    }
+    const routeObj = route || {};
+    vpaAddress = routeObj.vpaAddress || process.env.MERCHANT_UPI_ID || 'merchant@upi';
+    merchantType = routeObj.merchantType || 'P2P';
+    vpaMcc = routeObj.mcc || null;
   } else {
     const mt = db.getVpaMerchantType(vpaAddress);
     merchantType = mt.accountType;
