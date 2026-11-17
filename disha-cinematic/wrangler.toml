@@ -1,0 +1,6 @@
+name = "disha-8.2-checkout"
+compatibility_date = "2024-11-17"
+pages_build_output_dir = "public"
+
+[build]
+command = "node ../scripts/build.js"
