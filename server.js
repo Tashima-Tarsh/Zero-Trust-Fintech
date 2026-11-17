@@ -236,6 +236,9 @@ app.get(['/', '/home'], (req, res) => {
 app.get(['/checkout', '/pay'], (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'checkout.html'));
 });
+app.get(['/dashboard', '/payments', '/analytics'], (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'coming-soon.html'));
+});
 // 5. Merchant Auth & Dashboard API Delegation
 app.use((req, res, next) => {
   if (req.path.startsWith('/api/auth') || req.path.startsWith('/api/merchant')) {
