@@ -57,7 +57,7 @@ async function logout(){
   if(clerkEnabled){
     try{
       const key=window.DISHA_CLERK_PUBLISHABLE_KEY;
-      const domain=atob(key.split('_')[2]).replace(/\\$/,'');
+      const domain=atob(key.split('_')[2]).slice(0,-1);
       if(!/^[a-z0-9.-]+$/i.test(domain))throw Error('Invalid Clerk domain');
       if(!window.Clerk){
         await new Promise((resolve,reject)=>{
