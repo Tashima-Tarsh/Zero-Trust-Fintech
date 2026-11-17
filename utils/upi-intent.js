@@ -52,6 +52,7 @@ function buildUpiUri(o) {
   const kind = o.kind;
   if (kind !== 'P2P' && kind !== 'P2M') throw new Error("kind must be 'P2P' or 'P2M'");
 
+  const parts = [];
   const pa = encodeURIComponent(o.pa || '');
   parts.push('pa=' + pa);
   const pn = cleanText(o.pn, 40) || 'Payee';

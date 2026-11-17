@@ -575,7 +575,7 @@ app.get('/api/session/new', checkoutLimiter, async (req, res) => {
     });
   } catch (err) {
     console.error('Error generating session:', err);
-    res.status(500).json({ success: false, error: 'INTERNAL_SERVER_ERROR' });
+    res.status(500).json({ success: false, error: 'INTERNAL_SERVER_ERROR', message: err.message });
   }
 });
 // Fetch active session status

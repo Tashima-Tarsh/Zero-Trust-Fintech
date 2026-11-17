@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <title>DISHA 8.2 — Sovereign UPI Checkout</title>
   <meta name="description" content="Zero-Fee, Fraud-Proof UPI Checkout. Pay directly to merchant bank account with mathematical zero-trust verification.">
-  <meta name="theme-color" content="#094cb2">
+  <meta name="theme-color" content="#0f172a">
   <link rel="icon" type="image/svg+xml" href="/assets/favicon.svg">
   <link rel="shortcut icon" href="/assets/favicon.svg">
 
@@ -14,32 +14,35 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;600;700&family=Noto+Serif:wght@600;700&display=swap" rel="stylesheet">
 
-  <style>
-    * {
-      box-sizing: border-box;
-      margin: 0;
-      padding: 0;
-    }
-    html {
-      font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-      font-size: 16px;
-      color: #0f172a;
-      background: #f8fafc;
-      text-rendering: optimizeLegibility;
-      -webkit-font-smoothing: antialiased;
-    }
-    body {
-      margin: 0;
-      min-height: 100vh;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      background: linear-gradient(180deg, #f1f5f9 0%, #e2e8f0 100%);
-      padding: 16px;
-    }
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Inter', '-apple-system', 'BlinkMacSystemFont', 'Segoe UI', 'Roboto', 'sans-serif'],
+            mono: ['JetBrains Mono', 'monospace'],
+            serif: ['Noto Serif', 'serif']
+          },
+          colors: {
+            brand: {
+              50: '#eff6ff',
+              100: '#dbeafe',
+              500: '#3b82f6',
+              600: '#2563eb',
+              700: '#1d4ed8',
+              800: '#1e40af',
+              900: '#1e3a8a'
+            }
+          }
+        }
+      }
+    };
+  </script>
 
-    /* Math Background Particle Canvas */
+  <style>
+    /* Math canvas background */
     #math-canvas {
       position: fixed;
       inset: 0;
@@ -47,491 +50,168 @@
       height: 100%;
       pointer-events: none;
       z-index: 0;
-      opacity: 0.15;
+      opacity: 0.18;
     }
-
-    .checkout-shell {
-      position: relative;
-      z-index: 10;
-      width: 100%;
-      max-width: 440px;
-      margin: 0 auto;
+    /* Number input spin removal */
+    input::-webkit-outer-spin-button,
+    input::-webkit-inner-spin-button {
+      -webkit-appearance: none;
+      margin: 0;
     }
-
-    .card {
-      width: 100%;
-      background: #ffffff;
-      border: 1px solid #e2e8f0;
-      border-radius: 20px;
-      box-shadow: 0 20px 40px -15px rgba(15, 23, 42, 0.12), 0 0 1px 1px rgba(15, 23, 42, 0.04);
-      overflow: hidden;
-      transition: all 0.3s ease;
-    }
-
-    /* Header */
-    .card-header {
-      padding: 20px 24px;
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      border-bottom: 1px solid #f1f5f9;
-      background: #ffffff;
-    }
-    .brand-wrap {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      text-decoration: none;
-    }
-    .brand-icon {
-      width: 32px;
-      height: 32px;
-      background: #094cb2;
-      border-radius: 8px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      color: #ffffff;
-      font-family: 'Noto Serif', serif;
-      font-size: 18px;
-      font-weight: 700;
-    }
-    .brand-info {
-      display: flex;
-      flex-direction: column;
-    }
-    .brand-title {
-      font-size: 1.05rem;
-      font-weight: 800;
-      color: #0f172a;
-      letter-spacing: -0.02em;
-      line-height: 1.2;
-    }
-    .brand-sub {
-      font-size: 0.72rem;
-      color: #059669;
-      font-weight: 600;
-      text-transform: uppercase;
-      letter-spacing: 0.05em;
-    }
-    .support-badge {
-      display: inline-flex;
-      align-items: center;
-      gap: 5px;
-      padding: 5px 10px;
-      background: #ecfdf5;
-      border: 1px solid #a7f3d0;
-      border-radius: 9999px;
-      font-size: 0.72rem;
-      font-weight: 600;
-      color: #047857;
-      text-decoration: none;
-      transition: all 0.2s ease;
-    }
-    .support-badge:hover {
-      background: #d1fae5;
-    }
-
-    /* Amount Section */
-    .amount-hero {
-      padding: 24px 24px 20px;
-      text-align: center;
-      background: linear-gradient(180deg, #fafafa 0%, #f8fafc 100%);
-      border-bottom: 1px solid #f1f5f9;
-    }
-    .amount-label {
-      font-size: 0.75rem;
-      font-weight: 700;
-      text-transform: uppercase;
-      letter-spacing: 0.08em;
-      color: #64748b;
-      margin-bottom: 4px;
-    }
-    .amount-value {
-      font-family: 'Inter', sans-serif;
-      font-size: 2.5rem;
-      font-weight: 800;
-      color: #0f172a;
-      letter-spacing: -0.04em;
-      line-height: 1.1;
-    }
-    .amount-paise-note {
-      font-size: 0.75rem;
-      color: #059669;
-      font-weight: 600;
-      margin-top: 6px;
-      display: inline-flex;
-      align-items: center;
-      gap: 4px;
-    }
-
-    /* QR Code Section */
-    .qr-section {
-      padding: 24px;
-      text-align: center;
-    }
-    .qr-wrapper {
-      position: relative;
-      width: 220px;
-      height: 220px;
-      margin: 0 auto 16px;
-      padding: 10px;
-      background: #ffffff;
-      border: 2px solid #e2e8f0;
-      border-radius: 16px;
-      box-shadow: 0 4px 12px rgba(15, 23, 42, 0.05);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-    }
-    .qr-img {
-      width: 100%;
-      height: 100%;
-      object-fit: contain;
-      image-rendering: pixelated;
-      border-radius: 8px;
-    }
-    .qr-loading {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      gap: 10px;
-      color: #64748b;
-      font-size: 0.8rem;
-      height: 100%;
-    }
-
-    .vpa-pill {
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      gap: 8px;
-      padding: 6px 14px;
-      background: #f8fafc;
-      border: 1px solid #e2e8f0;
-      border-radius: 9999px;
-      font-family: 'JetBrains Mono', monospace;
-      font-size: 0.8rem;
-      color: #334155;
-      margin-bottom: 16px;
-      cursor: pointer;
-      user-select: all;
-      transition: all 0.2s;
-    }
-    .vpa-pill:hover {
-      background: #f1f5f9;
-      border-color: #cbd5e1;
-    }
-
-    /* UPI Apps Mobile Grid */
-    .upi-apps-row {
-      display: grid;
-      grid-template-columns: repeat(4, 1fr);
-      gap: 8px;
-      margin-bottom: 20px;
-    }
-    .upi-btn {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      padding: 10px 4px;
-      background: #f8fafc;
-      border: 1px solid #e2e8f0;
-      border-radius: 12px;
-      text-decoration: none;
-      color: #1e293b;
-      font-size: 0.72rem;
-      font-weight: 600;
-      transition: all 0.2s ease;
-    }
-    .upi-btn:hover {
-      background: #f1f5f9;
-      border-color: #094cb2;
-      color: #094cb2;
-    }
-    .upi-icon {
-      font-size: 1.25rem;
-      margin-bottom: 4px;
-    }
-
-    /* UTR Verification Section */
-    .verify-section {
-      padding: 0 24px 24px;
-    }
-    .section-divider {
-      position: relative;
-      text-align: center;
-      margin: 16px 0 20px;
-    }
-    .section-divider::before {
-      content: '';
-      position: absolute;
-      top: 50%;
-      left: 0;
-      right: 0;
-      height: 1px;
-      background: #e2e8f0;
-      z-index: 0;
-    }
-    .section-divider span {
-      position: relative;
-      z-index: 1;
-      background: #ffffff;
-      padding: 0 12px;
-      font-size: 0.72rem;
-      font-weight: 700;
-      text-transform: uppercase;
-      letter-spacing: 0.08em;
-      color: #94a3b8;
-    }
-
-    .utr-form {
-      display: flex;
-      flex-direction: column;
-      gap: 12px;
-    }
-    .utr-input-wrap {
-      position: relative;
-      display: flex;
-      align-items: center;
-    }
-    .utr-input {
-      width: 100%;
-      height: 48px;
-      padding: 0 110px 0 16px;
-      font-family: 'JetBrains Mono', monospace;
-      font-size: 0.95rem;
-      font-weight: 600;
-      color: #0f172a;
-      background: #f8fafc;
-      border: 1.5px solid #cbd5e1;
-      border-radius: 10px;
-      outline: none;
-      letter-spacing: 0.04em;
-      transition: all 0.2s ease;
-    }
-    .utr-input:focus {
-      background: #ffffff;
-      border-color: #094cb2;
-      box-shadow: 0 0 0 3px rgba(9, 76, 178, 0.12);
-    }
-    .btn-paste {
-      position: absolute;
-      right: 6px;
-      height: 36px;
-      padding: 0 12px;
-      font-size: 0.75rem;
-      font-weight: 700;
-      color: #094cb2;
-      background: #eff6ff;
-      border: 1px solid #bfdbfe;
-      border-radius: 7px;
-      cursor: pointer;
-      display: flex;
-      align-items: center;
-      gap: 4px;
-      transition: all 0.2s;
-    }
-    .btn-paste:hover {
-      background: #dbeafe;
-    }
-
-    .btn-verify {
-      width: 100%;
-      height: 48px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      gap: 8px;
-      background: linear-gradient(135deg, #059669 0%, #047857 100%);
-      color: #ffffff;
-      border: none;
-      border-radius: 10px;
-      font-size: 0.95rem;
-      font-weight: 700;
-      cursor: pointer;
-      box-shadow: 0 4px 12px rgba(5, 150, 105, 0.25);
-      transition: all 0.2s ease;
-    }
-    .btn-verify:hover {
-      background: linear-gradient(135deg, #047857 0%, #065f46 100%);
-      transform: translateY(-1px);
-      box-shadow: 0 6px 16px rgba(5, 150, 105, 0.35);
-    }
-    .btn-verify:disabled {
-      opacity: 0.6;
-      cursor: not-allowed;
-      transform: none;
-      box-shadow: none;
-    }
-
-    .status-card {
-      margin-top: 14px;
-      padding: 14px 16px;
-      border-radius: 10px;
-      display: none;
-      animation: fadeIn 0.3s ease;
-    }
-    .status-card.success {
-      background: #f0fdf4;
-      border: 1px solid #86efac;
-      color: #14532d;
-    }
-    .status-card.error {
-      background: #fef2f2;
-      border: 1px solid #fecaca;
-      color: #991b1b;
-    }
-    .status-card.processing {
-      background: #eff6ff;
-      border: 1px solid #bfdbfe;
-      color: #1e3a8a;
-    }
-    .status-title {
-      font-size: 0.88rem;
-      font-weight: 700;
-      margin-bottom: 2px;
-    }
-    .status-desc {
-      font-size: 0.78rem;
-      line-height: 1.4;
-      opacity: 0.9;
-    }
-
-    .card-footer {
-      padding: 14px 24px;
-      background: #f8fafc;
-      border-top: 1px solid #f1f5f9;
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      font-size: 0.72rem;
-      color: #64748b;
-    }
-    .footer-secure {
-      display: flex;
-      align-items: center;
-      gap: 5px;
-      font-weight: 600;
-    }
-
-    .spinner {
-      width: 16px;
-      height: 16px;
-      border: 2px solid rgba(255, 255, 255, 0.4);
-      border-top-color: #ffffff;
-      border-radius: 50%;
-      animation: spin 0.8s linear infinite;
-    }
-    @keyframes spin {
-      to { transform: rotate(360deg); }
-    }
-    @keyframes fadeIn {
-      from { opacity: 0; transform: translateY(6px); }
-      to { opacity: 1; transform: translateY(0); }
+    input[type=number] {
+      -moz-appearance: textfield;
     }
   </style>
 </head>
-<body>
+<body class="min-h-screen bg-gradient-to-b from-slate-100 via-slate-50 to-slate-200 text-slate-900 font-sans flex flex-col items-center justify-center p-3 sm:p-5 relative overflow-x-hidden antialiased">
+
+  <!-- Floating Mathematical Equations Particle Canvas -->
   <canvas id="math-canvas"></canvas>
 
-  <main class="checkout-shell">
-    <div class="card">
+  <main class="w-full max-w-[420px] relative z-10 mx-auto my-auto">
+    <div class="w-full bg-white rounded-3xl border border-slate-200/90 shadow-[0_20px_50px_-15px_rgba(15,23,42,0.14)] overflow-hidden backdrop-blur-md">
+
       <!-- Header -->
-      <header class="card-header">
-        <a href="/" class="brand-wrap">
-          <div class="brand-icon">D</div>
-          <div class="brand-info">
-            <span class="brand-title">DISHA 8.2</span>
-            <span class="brand-sub">Sovereign UPI Rail</span>
+      <header class="px-5 py-4 flex items-center justify-between border-b border-slate-100 bg-white/95">
+        <a href="/" class="flex items-center gap-2.5 text-decoration-none group">
+          <div class="w-9 h-9 rounded-xl bg-gradient-to-tr from-blue-700 to-indigo-600 flex items-center justify-center text-white font-serif font-bold text-lg shadow-sm">
+            D
+          </div>
+          <div class="flex flex-col">
+            <span class="font-sans text-[15px] font-extrabold text-slate-900 tracking-tight leading-none group-hover:text-blue-700 transition-colors">DISHA 8.2</span>
+            <span class="text-[10px] font-mono font-bold text-emerald-600 uppercase tracking-wider mt-0.5">Sovereign UPI Rail</span>
           </div>
         </a>
-        <a href="https://wa.me/919142197135?text=Hi%2C%20I%20have%20questions%20about%20my%20DISHA%20checkout" target="_blank" rel="noopener noreferrer" class="support-badge">
-          <span>💬 Support</span>
+
+        <!-- WhatsApp Support Badge -->
+        <a href="https://wa.me/919142197135?text=Hi%2C%20I%20have%20questions%20about%20my%20DISHA%20checkout" target="_blank" rel="noopener noreferrer" class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-50 border border-emerald-200/80 text-emerald-700 text-[11px] font-medium hover:bg-emerald-100 transition-colors shadow-2xs" title="Chat on WhatsApp: +91 91421 97135">
+          <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+          <span>WhatsApp</span>
         </a>
       </header>
 
       <!-- Amount Section -->
-      <section class="amount-hero">
-        <div class="amount-label">Amount to Pay</div>
-        <div class="amount-value" id="challengeAmountEl">₹500.00</div>
-        <div class="amount-paise-note">
-          <span>🛡️ Mathematical Zero-Fraud Challenge</span>
+      <section class="px-5 py-4 text-center bg-gradient-to-b from-slate-50/80 to-white border-b border-slate-100">
+        <div class="text-[11px] font-mono uppercase tracking-wider text-slate-500 font-semibold mb-1">Amount to Pay</div>
+        <div class="text-3xl sm:text-4xl font-extrabold text-slate-950 tracking-tight leading-none font-sans" id="challengeAmountEl">₹500.00</div>
+        <div class="mt-2 inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 text-[11px] font-medium">
+          <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+          <span>Mathematical Zero-Fraud Challenge</span>
         </div>
       </section>
 
-      <!-- QR Display & UPI Links -->
-      <section class="qr-section">
-        <div class="qr-wrapper" id="qrWrapper">
-          <div class="qr-loading" id="qrLoading">
-            <div class="spinner" style="border-top-color:#094cb2; border-color: rgba(9,76,178,0.2);"></div>
-            <span>Generating Dynamic QR...</span>
+      <!-- QR & UPI Intent Section -->
+      <section class="p-5 text-center flex flex-col items-center">
+
+        <!-- Dynamic QR Wrapper -->
+        <div class="relative w-[210px] h-[210px] p-2 bg-white rounded-2xl border-2 border-slate-200/90 shadow-sm flex items-center justify-center mb-3">
+          <div id="qrLoading" class="flex flex-col items-center justify-center gap-2 text-slate-500 text-xs">
+            <svg class="animate-spin h-6 w-6 text-blue-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+              <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+              <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+            </svg>
+            <span class="font-medium">Generating Dynamic QR...</span>
           </div>
-          <img id="qrImg" class="qr-img" style="display:none;" alt="UPI QR Code">
+          <img id="qrImg" class="w-full h-full object-contain rounded-lg hidden" alt="UPI Dynamic QR">
         </div>
 
-        <div class="vpa-pill" id="vpaPill" title="Click to copy VPA">
+        <!-- VPA Pill (Click to copy) -->
+        <button type="button" id="vpaPill" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200 text-xs font-mono font-medium transition-all mb-4 active:scale-95 cursor-pointer" title="Tap to copy Payee VPA">
           <span id="vpaAddress">disha82@okaxis</span>
-          <span style="font-size:0.75rem;">📋</span>
-        </div>
+          <span class="text-[13px]">📋</span>
+        </button>
 
-        <!-- Fast UPI App Intent Deep Links -->
-        <div class="upi-apps-row">
-          <a class="upi-btn" id="linkGPay" href="#">
-            <span class="upi-icon">💳</span>
+        <!-- Fast UPI App Intent Deep Links Grid -->
+        <div class="w-full grid grid-cols-4 gap-2 mb-4">
+          <a id="linkGPay" href="#" class="flex flex-col items-center justify-center py-2.5 px-1 rounded-xl bg-slate-50 hover:bg-slate-100 border border-slate-200 text-slate-800 text-[11px] font-semibold transition-all hover:border-blue-500 hover:text-blue-700 active:scale-95">
+            <span class="text-lg mb-0.5">💳</span>
             <span>GPay</span>
           </a>
-          <a class="upi-btn" id="linkPhonePe" href="#">
-            <span class="upi-icon">🟣</span>
+          <a id="linkPhonePe" href="#" class="flex flex-col items-center justify-center py-2.5 px-1 rounded-xl bg-slate-50 hover:bg-slate-100 border border-slate-200 text-slate-800 text-[11px] font-semibold transition-all hover:border-purple-500 hover:text-purple-700 active:scale-95">
+            <span class="text-lg mb-0.5">🟣</span>
             <span>PhonePe</span>
           </a>
-          <a class="upi-btn" id="linkPaytm" href="#">
-            <span class="upi-icon">🔷</span>
+          <a id="linkPaytm" href="#" class="flex flex-col items-center justify-center py-2.5 px-1 rounded-xl bg-slate-50 hover:bg-slate-100 border border-slate-200 text-slate-800 text-[11px] font-semibold transition-all hover:border-sky-500 hover:text-sky-700 active:scale-95">
+            <span class="text-lg mb-0.5">🔷</span>
             <span>Paytm</span>
           </a>
-          <a class="upi-btn" id="linkCred" href="#">
-            <span class="upi-icon">⚡</span>
+          <a id="linkCred" href="#" class="flex flex-col items-center justify-center py-2.5 px-1 rounded-xl bg-slate-50 hover:bg-slate-100 border border-slate-200 text-slate-800 text-[11px] font-semibold transition-all hover:border-amber-500 hover:text-amber-700 active:scale-95">
+            <span class="text-lg mb-0.5">⚡</span>
             <span>CRED</span>
           </a>
         </div>
 
-        <!-- UTR Form -->
-        <div class="section-divider">
-          <span>Client Copies UTR · Server Verifies</span>
+        <!-- Section Divider -->
+        <div class="w-full relative flex items-center justify-center my-2">
+          <div class="w-full border-t border-slate-200 absolute"></div>
+          <span class="relative bg-white px-3 text-[10px] font-mono uppercase tracking-wider font-bold text-slate-400">
+            Client Copies UTR · Server Verifies
+          </span>
         </div>
 
-        <form class="utr-form" id="utrForm" onsubmit="return false;">
-          <div class="utr-input-wrap">
-            <input type="text" id="utrInput" class="utr-input" placeholder="12-Digit UTR (e.g. 631902888999)" maxlength="12" pattern="\d{12}" required autocomplete="off">
-            <button type="button" class="btn-paste" id="btnPaste">
-              <span>📋 Paste</span>
-            </button>
+        <!-- UTR Form — No paste button inside input, auto-reads from clipboard (SST) -->
+        <form class="w-full mt-3 flex flex-col gap-2.5" id="utrForm" onsubmit="return false;">
+          <div class="w-full relative">
+            <input
+              type="text"
+              id="utrInput"
+              class="w-full h-12 px-4 rounded-xl bg-slate-50 border-2 border-slate-200 text-slate-900 font-mono text-center text-base font-bold tracking-wider placeholder:text-slate-400 placeholder:font-sans placeholder:text-xs placeholder:font-normal placeholder:tracking-normal focus:bg-white focus:border-blue-600 focus:outline-none focus:ring-4 focus:ring-blue-100 transition-all"
+              placeholder="Enter or copy 12-digit UTR"
+              maxlength="12"
+              pattern="\d{12}"
+              inputmode="numeric"
+              autocomplete="off"
+              required
+            >
           </div>
 
-          <button type="button" class="btn-verify" id="btnVerify">
-            <span id="btnVerifySpinner" class="spinner" style="display:none;"></span>
+          <!-- SST / Clipboard Auto-read Helper Button -->
+          <button
+            type="button"
+            id="btnAutoClip"
+            class="w-full py-2 px-3 rounded-lg bg-blue-50 hover:bg-blue-100 border border-blue-200/80 text-blue-700 text-xs font-semibold flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
+            title="Read 12-digit UTR from clipboard"
+          >
+            <span>📋</span>
+            <span id="autoClipText">Auto-Read UTR from Clipboard (SST)</span>
+          </button>
+
+          <!-- Verify Payment Button -->
+          <button
+            type="button"
+            id="btnVerify"
+            class="w-full h-12 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-700 hover:from-emerald-700 hover:to-teal-800 text-white font-bold text-sm tracking-wide shadow-md hover:shadow-lg transition-all flex items-center justify-center gap-2 cursor-pointer active:scale-[0.99] disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            <svg id="btnVerifySpinner" class="animate-spin h-5 w-5 text-white hidden" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+              <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+              <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+            </svg>
             <span id="btnVerifyText">Verify Payment</span>
           </button>
         </form>
 
         <!-- Status Card -->
-        <div class="status-card" id="statusCard">
-          <div class="status-title" id="statusTitle"></div>
-          <div class="status-desc" id="statusDesc"></div>
+        <div id="statusCard" class="w-full mt-3 p-3.5 rounded-xl text-left hidden transition-all text-xs">
+          <div class="font-bold mb-0.5" id="statusTitle"></div>
+          <div class="leading-relaxed opacity-90" id="statusDesc"></div>
+          <button type="button" id="btnRetrySession" class="mt-2 px-3 py-1 rounded-md bg-red-100 hover:bg-red-200 text-red-800 font-semibold text-xs hidden cursor-pointer">
+            🔄 Retry Session Creation
+          </button>
         </div>
+
       </section>
 
       <!-- Footer -->
-      <footer class="card-footer">
-        <div class="footer-secure">
-          <span>🔒 Direct NPCI Interbank Clearing</span>
+      <footer class="px-5 py-3 bg-slate-50/90 border-t border-slate-100 flex items-center justify-between text-[11px] text-slate-500">
+        <div class="flex items-center gap-1.5 font-medium">
+          <span class="text-emerald-600">🔒</span>
+          <span>Direct NPCI Interbank Clearing</span>
         </div>
-        <div style="font-size: 0.72rem; color:#64748b;">
-          T+0 Direct Settlement
+        <div class="font-mono text-slate-400">
+          T+0 Settlement
         </div>
       </footer>
+
     </div>
   </main>
 
@@ -544,26 +224,29 @@
       const EQ = [
         'P(fraud) → 0', 'MDR = 0%', 'ΔT = 0', 'H(UTR) = SHA-256',
         'VPA · sig ≡ NPCI', 'ΣFee = ₹0', 'T+0 IMPS', 'Anti-Replay',
-        'PAN ⊕ VPA', 'idempotency_key'
+        'PAN ⊕ VPA', 'idempotency_key', 'E(X) = 0.00', 'Kerckhoffs ≡ Valid'
       ];
       let p = [];
-      function resize() { canvas.width = window.innerWidth; canvas.height = window.innerHeight; }
+      function resize() {
+        canvas.width = window.innerWidth;
+        canvas.height = window.innerHeight;
+      }
       function spawn() {
         return {
           x: Math.random() * canvas.width,
-          y: canvas.height + 15,
+          y: canvas.height + 20,
           text: EQ[Math.floor(Math.random() * EQ.length)],
-          speed: 0.3 + Math.random() * 0.4,
+          speed: 0.25 + Math.random() * 0.4,
           opacity: 0,
-          maxOpacity: 0.4,
+          maxOpacity: 0.35,
           life: 0,
-          maxLife: 240,
-          color: Math.random() > 0.5 ? '#059669' : '#094cb2'
+          maxLife: 260,
+          color: Math.random() > 0.5 ? '#059669' : '#2563eb'
         };
       }
       function loop() {
         ctx.clearRect(0, 0, canvas.width, canvas.height);
-        if (p.length < 18 && Math.random() < 0.05) p.push(spawn());
+        if (p.length < 20 && Math.random() < 0.06) p.push(spawn());
         p = p.filter(item => {
           item.life++;
           item.y -= item.speed;
@@ -586,10 +269,9 @@
     })();
   </script>
 
-  <!-- Checkout Logic -->
+  <!-- Checkout Logic: Dynamic QR, UPI Intents, Clipboard SST, Verification, WebSockets -->
   <script>
     const challengeAmountEl = document.getElementById('challengeAmountEl');
-    const qrWrapper = document.getElementById('qrWrapper');
     const qrLoading = document.getElementById('qrLoading');
     const qrImg = document.getElementById('qrImg');
     const vpaPill = document.getElementById('vpaPill');
@@ -601,7 +283,8 @@
     const linkCred = document.getElementById('linkCred');
 
     const utrInput = document.getElementById('utrInput');
-    const btnPaste = document.getElementById('btnPaste');
+    const btnAutoClip = document.getElementById('btnAutoClip');
+    const autoClipText = document.getElementById('autoClipText');
     const btnVerify = document.getElementById('btnVerify');
     const btnVerifyText = document.getElementById('btnVerifyText');
     const btnVerifySpinner = document.getElementById('btnVerifySpinner');
@@ -609,6 +292,7 @@
     const statusCard = document.getElementById('statusCard');
     const statusTitle = document.getElementById('statusTitle');
     const statusDesc = document.getElementById('statusDesc');
+    const btnRetrySession = document.getElementById('btnRetrySession');
 
     let currentSession = null;
     let ws = null;
@@ -617,53 +301,73 @@
       return '₹' + Number(val).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
     }
 
-    function showStatus(type, title, desc) {
-      statusCard.className = 'status-card ' + type;
+    function showStatus(type, title, desc, showRetry = false) {
+      statusCard.className = 'w-full mt-3 p-3.5 rounded-xl text-left block text-xs ';
+      if (type === 'success') {
+        statusCard.className += 'bg-emerald-50 border border-emerald-200 text-emerald-900';
+      } else if (type === 'error') {
+        statusCard.className += 'bg-rose-50 border border-rose-200 text-rose-900';
+      } else {
+        statusCard.className += 'bg-blue-50 border border-blue-200 text-blue-900';
+      }
       statusTitle.textContent = title;
       statusDesc.textContent = desc || '';
-      statusCard.style.display = 'block';
+      btnRetrySession.style.display = showRetry ? 'inline-block' : 'none';
+      statusCard.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
     }
 
     function setVerifying(isLoading) {
       btnVerify.disabled = isLoading;
-      btnVerifySpinner.style.display = isLoading ? 'inline-block' : 'none';
+      btnVerifySpinner.classList.toggle('hidden', !isLoading);
       btnVerifyText.textContent = isLoading ? 'Verifying with Bank...' : 'Verify Payment';
     }
 
-    // 1. Create Session
+    // 1. Initialize Checkout Session
     async function initSession() {
       try {
+        qrLoading.classList.remove('hidden');
+        qrImg.classList.add('hidden');
+        statusCard.classList.add('hidden');
+
         const urlParams = new URLSearchParams(window.location.search);
         const amount = urlParams.get('amount') || 500;
         const res = await fetch(`/api/session/new?amount=${encodeURIComponent(amount)}&description=Checkout+Order`);
-        if (!res.ok) throw new Error('Session creation failed: HTTP ' + res.status);
+        if (!res.ok) {
+          const errData = await res.json().catch(() => ({}));
+          throw new Error(errData.message || 'Session creation failed: HTTP ' + res.status);
+        }
         const data = await res.json();
-        if (!data.success) throw new Error(data.error || 'Failed to initialize session');
+        if (!data.success) {
+          throw new Error(data.message || data.error || 'Failed to initialize session');
+        }
 
         currentSession = data;
         challengeAmountEl.textContent = formatINR(data.challengeAmount);
         vpaAddress.textContent = data.vpaAddress;
 
-        // Display pre-generated QR data URL
+        // Render QR
         if (data.qrDataUrl) {
           qrImg.src = data.qrDataUrl;
-          qrImg.style.display = 'block';
-          qrLoading.style.display = 'none';
+          qrImg.classList.remove('hidden');
+          qrLoading.classList.add('hidden');
         }
 
         // Set UPI deep links
         if (data.upiLink) {
-          linkGPay.href = data.upiLink;
-          linkPhonePe.href = data.upiLink;
-          linkPaytm.href = data.upiLink;
+          linkGPay.href = data.appLinks?.android?.gpay || data.upiLink;
+          linkPhonePe.href = data.appLinks?.android?.phonepe || data.upiLink;
+          linkPaytm.href = data.appLinks?.android?.paytm || data.upiLink;
           linkCred.href = data.upiLink;
         }
 
         // Setup real-time WebSocket listener
         setupWebSocket(data.orderId);
+
+        // Try reading clipboard automatically on startup (SST flow)
+        tryAutoReadClipboard(false);
       } catch (err) {
         console.error('Session error:', err);
-        showStatus('error', 'Session Failed', err.message || 'Unable to connect to payment switch.');
+        showStatus('error', 'Session Failed', err.message || 'Unable to connect to payment switch.', true);
       }
     }
 
@@ -688,15 +392,15 @@
     function onPaymentSuccess(utr, amount) {
       showStatus('success', '✅ Payment Settled (T+0)', `Transaction verified. UTR: ${utr}. Settled directly to merchant bank account at 0% fee.`);
       btnVerify.style.display = 'none';
+      btnAutoClip.style.display = 'none';
       utrInput.disabled = true;
-      btnPaste.disabled = true;
     }
 
     // 3. Verify UTR
     async function verifyPayment() {
       const utr = utrInput.value.trim();
       if (!utr) {
-        showStatus('error', 'UTR Required', 'Please enter the 12-digit UTR from your UPI payment confirmation.');
+        showStatus('error', 'UTR Required', 'Please enter or paste the 12-digit UTR from your UPI payment confirmation.');
         utrInput.focus();
         return;
       }
@@ -736,25 +440,58 @@
       }
     }
 
-    // 4. Clipboard helper
-    async function pasteFromClipboard() {
+    // 4. Smart System Target (SST) & Clipboard Auto-Detection
+    async function tryAutoReadClipboard(userTriggered = false) {
+      if (!navigator.clipboard || !navigator.clipboard.readText) {
+        if (userTriggered) {
+          showStatus('processing', 'Clipboard Not Available', 'Please type the 12-digit UTR manually.');
+        }
+        return;
+      }
       try {
         const text = await navigator.clipboard.readText();
+        if (!text) return;
         const match = text.match(/\b(\d{12})\b/);
         if (match) {
-          utrInput.value = match[1];
-          showStatus('processing', 'UTR Detected', `Pasted UTR: ${match[1]}. Click Verify to complete.`);
-        } else {
-          utrInput.value = text.replace(/\D/g, '').slice(0, 12);
+          const detected = match[1];
+          if (utrInput.value !== detected) {
+            utrInput.value = detected;
+            autoClipText.textContent = `✅ UTR Auto-Detected: ${detected}`;
+            showStatus('processing', 'UTR Detected from Clipboard', `Auto-filled UTR: ${detected}. Click "Verify Payment" to confirm.`);
+          }
+        } else if (userTriggered) {
+          const digits = text.replace(/\D/g, '');
+          if (digits.length >= 12) {
+            utrInput.value = digits.slice(0, 12);
+            showStatus('processing', 'UTR Extracted', `Extracted 12 digits: ${utrInput.value}. Click Verify to complete.`);
+          } else {
+            showStatus('processing', 'No 12-Digit UTR Found', 'No 12-digit UTR found on clipboard. Please enter it manually.');
+          }
         }
       } catch (e) {
-        utrInput.focus();
+        // Silent fail if permission not granted on background event
+        if (userTriggered) {
+          utrInput.focus();
+        }
       }
     }
 
     // Event Listeners
-    btnPaste.addEventListener('click', pasteFromClipboard);
+    btnAutoClip.addEventListener('click', () => tryAutoReadClipboard(true));
     btnVerify.addEventListener('click', verifyPayment);
+    btnRetrySession.addEventListener('click', initSession);
+
+    // Auto-detect UTR on window focus or visibility change (returning from UPI app)
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'visible') {
+        tryAutoReadClipboard(false);
+      }
+    });
+    window.addEventListener('focus', () => {
+      tryAutoReadClipboard(false);
+    });
+
+    // Payee VPA copy
     vpaPill.addEventListener('click', () => {
       if (currentSession && currentSession.vpaAddress) {
         navigator.clipboard.writeText(currentSession.vpaAddress).then(() => {
@@ -765,10 +502,10 @@
       }
     });
 
+    // Sanitization on input
     utrInput.addEventListener('input', () => {
       utrInput.value = utrInput.value.replace(/\D/g, '').slice(0, 12);
     });
-
     utrInput.addEventListener('keydown', (e) => {
       if (e.key === 'Enter') {
         e.preventDefault();
