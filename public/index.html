@@ -168,7 +168,7 @@
 
         <!-- Slide 02 — Pay -->
         <div class="cover-slide-item opacity-0 pointer-events-none z-0">
-          <img alt="Secure Instant UPI Checkout" class="w-full h-full object-cover object-center" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBJmh26rgeUOkSL0-kEJaVieIgWginxK14X1KazpKIHoBXGRkG8SNBZ11uUPuIjJOlmdh2HMOXw9bcBrXO4nc2WUVRVUjS8RWeyHtQMvcB5NBsHZB0z96DQ7mmRLY4-quqKfc-RKcDaoCPCgPx9E5MvTMeBrkAG5cBurLCOhdxNFqAQjtNY4YXiYKn1KqZdZ32dYaYUVkqbzplPQe1PZtXQgwxCubmCf-Q9FQMpkUpkDLoa0TKP-7g">
+          <img alt="Secure Instant UPI Checkout" class="w-full h-full object-cover object-center" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBJmh26rgeUOkSL0-kEJaVieIgWginxK14X1KazpKIHoBXGRkG8SNBZ11uUPuIjJOlmdh2HMOXw9bcBrXO4nc2WUVRVUjS8RWeyHtQMvcB5NBsHZB0z96DQ7mmRLY4-quqKfc-RKcDaoCPCgPx9E5MvTMeBrkAG5cBurLCOhdxNFqAQjtNY4YXiYKn1KqZdZ32dYaYUVkqkZqbzplPQe1PZtXQgwxCubmCf-Q9FQMpnUpkDLoa0TKP-7g">
           <div class="absolute inset-0 bg-gradient-to-t from-slate-950/95 via-slate-950/25 to-slate-950/50 pointer-events-none"></div>
           <div class="absolute bottom-20 sm:bottom-24 left-6 sm:left-14 max-w-2xl pointer-events-none">
             <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-blue-500/20 border border-blue-400/30 text-blue-300 text-[11px] font-mono uppercase tracking-wider mb-4 backdrop-blur-md">
@@ -241,6 +241,8 @@
     ═══════════════════════════════════════════════════════════════════════ -->
     <section class="w-full animated-gradient-bg py-16 lg:py-24 border-b border-slate-200/70 relative overflow-hidden" id="main-content">
       <div class="absolute inset-0 bg-[radial-gradient(#cbd5e1_1px,transparent_1px)] [background-size:24px_24px] opacity-40 pointer-events-none"></div>
+      <!-- Floating Mathematical Equations Background -->
+      <canvas id="hero-math-canvas" class="absolute inset-0 w-full h-full pointer-events-none opacity-25 z-0"></canvas>
 
       <div class="max-w-[1200px] mx-auto px-6 sm:px-8 relative z-10">
         <div class="grid grid-cols-1 lg:grid-cols-12 gap-12 lg:gap-10 items-center">
@@ -613,8 +615,8 @@
 
         <!-- Architecture Visual -->
         <div class="w-full bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-sm mb-8">
-          <div class="relative w-full bg-slate-50">
-            <img src="https://lh3.googleusercontent.com/aida-public/AB6AXuCAzr6zal-1Tdnqh9MIoWHruLM8zxr_EtszzDz8OhPjcH-88d07xyltCendxRjz9Q-XeC7SWtt5fGWq94q13WUgJ9_pRhGlq2TeHP5mmCzAQgq34YSgHdaMXGWLsZQ3-ADFGDKo1z1kc9A8bvRIbtZy5sY5Pwo3vbdox2eNKRKFvUO75cinoa0S2EoinElpV5xCDo0E7HBXNdX_IGRDCQ6uA5R0qWC51jX_gzEV5tZX" alt="3D isometric architecture — 9 non-custodial modules of DISHA 8.2" class="w-full h-auto max-h-[560px] object-cover object-center">
+          <div class="relative w-full bg-slate-50 flex items-center justify-center p-2 sm:p-4">
+            <img src="https://lh3.googleusercontent.com/aida-public/AB6AXuCAzr6zal-1Tdnqh9MIoWHruLM8zxr_EtszzDz8OhPjcH-88d07xyltCendxRjz9Q-XeC7SWtt5fGWq94q13WUgJ9_pRhGlq2TeHP5mmCzAQgq34YSgHdaMXGWLsZQ3-ADFGDKo1z1kc9A8bvRIbtZy5sY5Pwo3vbdox2eNKRKFvUO75cinoa0S2EoinElpV5xCDo0E7HBXNdX_IGRDCQ6uA5R0qWC51jX_gzEV5tZX" alt="3D isometric architecture — 9 non-custodial modules of DISHA 8.2" class="w-full h-auto max-h-[580px] object-contain object-center mx-auto" style="image-rendering: -webkit-optimize-contrast;">
             <div class="absolute bottom-3 right-3 hidden sm:inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-white/90 backdrop-blur-md border border-slate-200 text-slate-800 text-[11px] font-semibold shadow-xs">
               <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>System Architecture &amp; Capability Topology — 9 Core Non-Custodial Modules
             </div>
@@ -705,8 +707,8 @@
 
           <!-- Illustration -->
           <div class="relative w-full mb-8">
-            <div class="relative w-full rounded-2xl overflow-hidden border border-slate-200 bg-white shadow-sm">
-              <img alt="3D cartoon: Customer, NPCI Switch shaking hands with DISHA Merchant, direct interbank clearing bypassing middleman gateways" class="w-full h-auto max-h-[560px] object-cover object-center" src="https://lh3.googleusercontent.com/aida-public/AB6AXuAaWcwqJHMtBQwkCpWKrb5-Ndv207D1ON4VVpiTCI8X9cDpHRlIEmvrUCS1Iv4qqNHNiZ3CXKcCknkbIRH63HOw5ZX1faM-tXU6_zloFJlq3oCjmD2rPM6xH3uoz8-3TgXo8lTJTSW9IVMZmMoTWE-7U9arYtBeqYmzbawqlPnWPfFBdrUB0twOCyjSI38VM7kXsxzcoYA9cRsGe7a3llL47mODAqstQS1YEcM9IYf-">
+            <div class="relative w-full rounded-2xl overflow-hidden border border-slate-200 bg-slate-50 flex items-center justify-center p-2 sm:p-4 shadow-sm">
+              <img alt="3D cartoon: Customer, NPCI Switch shaking hands with DISHA Merchant, direct interbank clearing bypassing middleman gateways" class="w-full h-auto max-h-[580px] object-contain object-center mx-auto" src="https://lh3.googleusercontent.com/aida-public/AB6AXuAaWcwqJHMtBQwkCpWKrb5-Ndv207D1ON4VVpiTCI8X9cDpHRlIEmvrUCS1Iv4qqNHNiZ3CXKcCknkbIRH63HOw5ZX1faM-tXU6_zloFJlq3oCjmD2rPM6xH3uoz8-3TgXo8lTJTSW9IVMZmMoTWE-7U9arYtBeqYmzbawqlPnWPfFBdrUB0twOCyjSI38VM7kXsxzcoYA9cRsGe7a3llL47mODAqstQS1YEcM9IYf-" style="image-rendering: -webkit-optimize-contrast;">
               <div class="absolute bottom-3 right-3 hidden sm:inline-flex items-center gap-1.5 px-3 py-1 rounded-md bg-white/90 backdrop-blur-md border border-slate-200 text-slate-800 text-[11px] font-semibold shadow-xs">
                 <span class="material-symbols-outlined text-emerald-600 text-[16px]">verified</span>Direct Interbank Clearing Rail (T+0)
               </div>
@@ -1171,6 +1173,89 @@
   }
 
   setInterval(tick, 2800);
+
+  // ── Floating Mathematical Equations in Hero ──
+  (function () {
+    const canvas = document.getElementById('hero-math-canvas');
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    const EQ = [
+      'P(fraud) → 0',
+      'MDR = 0%',
+      'ΔT = 0 (Instant IMPS)',
+      'H(UTR) = SHA-256',
+      'VPA · sig ≡ NPCI',
+      'Σ Savings = Gross × 1.8%',
+      'ε < 10⁻⁹',
+      'Anti-Replay: Nonce ∪ Timestamp',
+      'T+0 ∀ Settlement',
+      'Fee = ₹0',
+      'PAN ⊕ VPA → Bank Vault',
+      'ROI = ∞ (Zero Commission)'
+    ];
+
+    let parts = [];
+    function resize() {
+      const parent = canvas.parentElement;
+      canvas.width = parent ? parent.clientWidth : window.innerWidth;
+      canvas.height = parent ? parent.clientHeight : 600;
+    }
+
+    function spawn() {
+      return {
+        x: Math.random() * canvas.width,
+        y: canvas.height + 15,
+        text: EQ[Math.floor(Math.random() * EQ.length)],
+        speed: 0.3 + Math.random() * 0.4,
+        opacity: 0,
+        maxOpacity: 0.35 + Math.random() * 0.35,
+        size: 12 + Math.floor(Math.random() * 5),
+        drift: (Math.random() - 0.5) * 0.2,
+        life: 0,
+        maxLife: 260 + Math.random() * 150,
+        color: Math.random() > 0.5 ? '#059669' : '#2563eb'
+      };
+    }
+
+    function init() {
+      resize();
+      for (let i = 0; i < 16; i++) {
+        const p = spawn();
+        p.y = Math.random() * canvas.height;
+        p.life = Math.random() * p.maxLife;
+        p.opacity = p.maxOpacity * 0.6;
+        parts.push(p);
+      }
+    }
+
+    function loop() {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      if (parts.length < 20 && Math.random() < 0.04) parts.push(spawn());
+
+      parts = parts.filter(p => {
+        p.life++;
+        p.y -= p.speed;
+        p.x += p.drift;
+        if (p.life < 35) p.opacity = (p.life / 35) * p.maxOpacity;
+        else if (p.life > p.maxLife - 35) p.opacity = ((p.maxLife - p.life) / 35) * p.maxOpacity;
+        else p.opacity = p.maxOpacity;
+
+        if (p.opacity <= 0 || p.y < -20) return false;
+        ctx.save();
+        ctx.globalAlpha = p.opacity;
+        ctx.font = `${p.size}px "JetBrains Mono", monospace`;
+        ctx.fillStyle = p.color;
+        ctx.fillText(p.text, p.x, p.y);
+        ctx.restore();
+        return true;
+      });
+      requestAnimationFrame(loop);
+    }
+
+    window.addEventListener('resize', resize);
+    init();
+    loop();
+  })();
 })();
 </script>
 

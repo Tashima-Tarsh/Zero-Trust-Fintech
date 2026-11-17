@@ -87,18 +87,151 @@
     @keyframes spin {
       to { transform: rotate(360deg); }
     }
+
+    /* Floating Math Canvas */
+    #math-canvas {
+      position: fixed;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      pointer-events: none;
+      z-index: 2;
+      opacity: 0.35;
+    }
   </style>
 </head>
 <body>
   <div class="bg-gradient"></div>
   <div class="grid-lines"></div>
+  <canvas id="math-canvas"></canvas>
 
   <main class="auth-container">
-    <a href="/"><img class="brand-logo" src="/assets/disha-8-2-wordmark.png" alt="DISHA 8.2"></a>
+    <a href="/"><img class="brand-logo" src="/assets/disha-8-2-wordmark-cropped.png" alt="DISHA 8.2"></a>
     <div id="sign-in">
       <div class="loading-pulse" id="authSpinner"></div>
     </div>
   </main>
+
+  <!-- Floating Mathematical Equations Background -->
+  <script>
+    (function () {
+      const canvas = document.getElementById('math-canvas');
+      const ctx = canvas.getContext('2d');
+
+      // Financial / cryptographic math equations for DISHA context
+      const EQUATIONS = [
+        'P(fraud) → 0',
+        'ΔT = T_settle − T_pay = 0',
+        'MDR = 0%',
+        'ΣFee = ₹0',
+        'H(UTR) = SHA-256',
+        'VPA · sig ≡ NPCI',
+        'ε < 10⁻⁹',
+        'Σ_savings = R × (MDR_avg − 0)',
+        'T+0 ∀ txn',
+        '∫ revenue dt ↑',
+        'Anti-Replay: nonce ∪ timestamp',
+        'f(x) = Revenue × 0.98',
+        'λ_fraud = 0',
+        'PAN ⊕ VPA → bank',
+        '∂P/∂fee = −1',
+        'UPI ≡ Direct IMPS',
+        'HMAC-SHA512(payload)',
+        'AES-256-GCM(data)',
+        'μ_latency < 800ms',
+        'Net = Gross − 0',
+        'ROI = ∞ (zero fee)',
+        'Cryptographic nonce N',
+        'P(intercept) ≈ 0',
+        'Σ MDR saved / month',
+        'BIC · IFSC → vault',
+        'sign(txn) → verified',
+        '∀ merchant: fee = 0',
+        'replay_window = 30s',
+        'idempotency_key = uuid4()',
+        'k = ₹1Cr × 1% = ₹1L/mo',
+      ];
+
+      let particles = [];
+
+      function resize() {
+        canvas.width = window.innerWidth;
+        canvas.height = window.innerHeight;
+      }
+
+      function spawn() {
+        return {
+          x: Math.random() * canvas.width,
+          y: canvas.height + 20,
+          text: EQUATIONS[Math.floor(Math.random() * EQUATIONS.length)],
+          speed: 0.3 + Math.random() * 0.5,
+          opacity: 0,
+          maxOpacity: 0.5 + Math.random() * 0.5,
+          size: 11 + Math.floor(Math.random() * 7),
+          drift: (Math.random() - 0.5) * 0.25,
+          fade: 'in',
+          life: 0,
+          maxLife: 220 + Math.random() * 180,
+          color: Math.random() > 0.6
+            ? `rgba(16,185,129,1)`   // emerald
+            : Math.random() > 0.5
+              ? `rgba(99,102,241,1)` // indigo
+              : `rgba(6,182,212,1)`  // cyan
+        };
+      }
+
+      function init() {
+        resize();
+        for (let i = 0; i < 18; i++) {
+          const p = spawn();
+          p.y = Math.random() * canvas.height;
+          p.life = Math.random() * p.maxLife;
+          p.opacity = p.maxOpacity * 0.6;
+          particles.push(p);
+        }
+      }
+
+      function tick() {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+        // Spawn new particles
+        if (particles.length < 28 && Math.random() < 0.04) {
+          particles.push(spawn());
+        }
+
+        particles = particles.filter(p => {
+          p.life++;
+          p.y -= p.speed;
+          p.x += p.drift;
+
+          // Fade in / hold / fade out
+          if (p.life < 40) {
+            p.opacity = (p.life / 40) * p.maxOpacity;
+          } else if (p.life > p.maxLife - 40) {
+            p.opacity = ((p.maxLife - p.life) / 40) * p.maxOpacity;
+          } else {
+            p.opacity = p.maxOpacity;
+          }
+
+          if (p.opacity <= 0 || p.y < -30) return false;
+
+          ctx.save();
+          ctx.globalAlpha = p.opacity;
+          ctx.font = `${p.size}px "JetBrains Mono", "Courier New", monospace`;
+          ctx.fillStyle = p.color;
+          ctx.fillText(p.text, p.x, p.y);
+          ctx.restore();
+          return true;
+        });
+
+        requestAnimationFrame(tick);
+      }
+
+      window.addEventListener('resize', resize);
+      init();
+      tick();
+    })();
+  </script>
 
   <script src="/auth-config.js"></script>
   <script>
