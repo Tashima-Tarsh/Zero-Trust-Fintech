@@ -626,6 +626,8 @@ async function generateSession(baseAmount = 100, description = '', customVpa = n
     state: 'WAITING',
     utr: null
   };
+  // Reject invalid UPI intents before consuming a session or velocity slot.
+  generateUPILink(session);
   await db.saveSession(session);
   // Velocity control: increment hourly count for the selected VPA
   await db.incrementVpaVelocity(vpaAddress);
@@ -635,40 +637,27 @@ async function generateSession(baseAmount = 100, description = '', customVpa = n
 // TASK 4: NPCI-COMPLIANT UPI DEEP LINK GENERATOR (v3.2 Spec & upi-intent)
 // ═══════════════════════════════════════════════════════════════════
 function generateUPILink(session) {
-  // P2P NPCI Specification: upi://pay?pa=&pn=&am=&tn=&cu=INR
-  // mc and tr are strictly forbidden for personal VPAs to avoid bank decline before PIN
-  // Metadata Shield: conversational P2P-style tn to avoid bank AI flagging commercial keywords
-  const blockedWords = ['order', 'purchase', 'buy', 'invoice', 'shop', 'cart', 'payment for', 'pay'];
-  const rawTn = session.orderId || session.description || 'Payment';
-  let safeTn = 'Payment for services'; // default conversational P2P note
-  const tnLower = rawTn.toLowerCase();
-  const hasBlocked = blockedWords.some(w => tnLower.includes(w));
-  if (!hasBlocked && rawTn.length > 0 && rawTn.length <= 40) {
-    safeTn = rawTn; // use existing if it's clean and short enough
-  }
-  const isMerchantP2M = session.merchantType === 'MERCHANT' && session.mcc && /^\d{4}$/.test(session.mcc) && session.mcc !== '0000';
-  if (isMerchantP2M) {
+  // Never silently downgrade a merchant (P2M) account into a personal UPI
+  // transfer, or manufacture bank/acquirer merchant classification.
+  const account=String(session.merchantType||'PERSONAL').toUpperCase();
+  const isMerchant=account==='MERCHANT'||account==='P2M';
+  const pa=session.vpaAddress||MERCHANT_UPI_ID;
+  // Use the actual payment purpose, not artificial notes intended to bypass
+  // banking risk screening or obscure a merchant payment.
+  const note=String(session.description||'DISHA payment').trim().slice(0,50);
+  const common={pa,pn:MERCHANT_NAME,am:session.challengeAmount,tn:note};
+  if(isMerchant){
+    const mcc=String(session.mcc||'');
+    if(!/^\d{4}$/.test(mcc)||mcc==='0000')
+      throw new Error('BANK_VERIFIED_MCC_REQUIRED_FOR_P2M');
     return buildUpiUri({
-      kind: 'P2M',
-      pa: session.vpaAddress || MERCHANT_UPI_ID,
-      pn: MERCHANT_NAME,
-      am: session.challengeAmount,
-      tn: safeTn,
-      mc: session.mcc,
-      tr: String(session.txnRef || '').replace(/[^A-Za-z0-9]/g, '').substring(0, 35)
-    });
-  } else {
-    if (session.mcc && /^\d{4}$/.test(session.mcc)) {
-      console.warn(`[UPI Link] Stripping merchant MCC ${session.mcc} from personal VPA ${session.vpaAddress} to prevent pre-PIN bank decline`);
-    }
-    return buildUpiUri({
-      kind: 'P2P',
-      pa: session.vpaAddress || MERCHANT_UPI_ID,
-      pn: MERCHANT_NAME,
-      am: session.challengeAmount,
-      tn: safeTn
+      ...common,kind:'P2M',mc:mcc,
+      tr:String(session.txnRef||session.orderId||'').replace(/[^A-Za-z0-9]/g,'').slice(0,35)
     });
   }
+  if(!['PERSONAL','P2P'].includes(account))
+    throw new Error('UNKNOWN_UPI_ACCOUNT_CLASSIFICATION');
+  return buildUpiUri({...common,kind:'P2P'});
 }
 // ═══════════════════════════════════════════════════════════════════
 // REST API ENDPOINTS
@@ -689,10 +678,11 @@ app.get('/api/session/new', checkoutLimiter, async (req, res) => {
     let validatedVpa = null;
     const requestedVpa = (req.query.vpa || req.query.pa || req.query.vpaAddress || '').trim();
     if (requestedVpa) {
-      const activeVpas = (typeof db.getAllActiveVPAs === 'function' ? (await db.getAllActiveVPAs()).map(v => v.vpa_address.toLowerCase()) : []);
+      // Public checkout can only target the configured owner receiving VPA.
+      // Tenant payment links use the separate token-bound merchant route.
       const primaryVpa = (process.env.MERCHANT_UPI_ID || MERCHANT_UPI_ID || '').toLowerCase();
-      if (activeVpas.includes(requestedVpa.toLowerCase()) || requestedVpa.toLowerCase() === primaryVpa) {
-        validatedVpa = requestedVpa;
+      if (primaryVpa && requestedVpa.toLowerCase() === primaryVpa) {
+        validatedVpa = primaryVpa;
       } else {
         return res.status(400).json({
           success: false,
