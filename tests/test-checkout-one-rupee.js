@@ -8,5 +8,6 @@ assert.ok(!js.includes("query.get('amount')||'500'"),'₹500 default must never 
 const index=read('public/index.html');
 assert.ok((index.match(/href="\/checkout\?amount=1"/g)||[]).length>=3,'Public Try Checkout and footer must link to ₹1');
 const server=read('server.js');
-assert.ok(server.includes("baseAmount===1")&&server.includes("process.env.MERCHANT_UPI_ID"),'₹1 public test must use configured owner payee');
+assert.ok(server.includes("if(!requestedVpa){")&&server.includes("process.env.MERCHANT_UPI_ID"),'All public checkout requests must use the configured owner receiving VPA');
+assert.ok(server.includes("RECEIVING_UPI_NOT_CONFIGURED"),'Missing owner payee must fail closed');
 console.log('ONE_RUPEE_CHECKOUT_PASS: public default, saved session, entry links and recipient contract');
