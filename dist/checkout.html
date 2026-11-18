@@ -11,13 +11,13 @@
 
 <link rel="preload" href="/assets/disha-8-2-wordmark-cropped.png" as="image">
 <link rel="preload" href="/assets/disha-vault-sculpture.svg" as="image">
-<link rel="stylesheet" href="/cosmic-checkout.css?v=viewport3-20261118">
+<link rel="stylesheet" href="/cosmic-checkout.css?v=diag-visible-20261119">
 <link rel="stylesheet" href="/checkout-moonlight.css?v=moonlight1">
 <script defer src="/vendor/qrcode.min.js"></script>
 <script defer src="/vendor/simplewebauthn.umd.js"></script>
 <script defer src="/one-touch-vault.js?v=upi-trace-20261119"></script>
 <script defer src="/cosmic-checkout-model.js?v=prepin-diag-20261119"></script>
-<script defer src="/cosmic-checkout.js?v=upi-trace-20261119"></script>
+<script defer src="/cosmic-checkout.js?v=diag-visible-20261119"></script>
 </head>
 <body data-checkout="generic">
 <div class="universe" aria-hidden="true">
@@ -99,6 +99,12 @@
     <button id="shareReceipt" type="button" class="action-secondary">Share receipt <span class="action-arrow" aria-hidden="true">→</span></button>
    </div>
   </section>
+  <aside id="checkoutDebugPanel" class="checkout-debug-panel" hidden aria-live="polite">
+   <strong>DIAGNOSTICS ON · CHECKOUT TEST</strong>
+   <span id="checkoutDebugStage">Awaiting diagnostic steps</span>
+   <button id="checkoutDebugCopy" type="button">Copy step history</button>
+   <small>Only stage/error codes are stored. No UPI PIN or passkey content.</small>
+  </aside>
   <div id="checkoutStatus" role="status" aria-live="polite" class="checkout-status" hidden></div>
  </article>
  <footer class="checkout-footer"><span class="footer-pin" aria-hidden="true">✦</span> DISHA 8.2 <span aria-hidden="true">·</span> Made for direct payments</footer>

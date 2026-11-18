@@ -16,6 +16,23 @@
  const userAgent=navigator.userAgent||'';
  const orderId=()=>session?.orderId||null;
  const debug=query.get('debug')==='1';
+ const debugHistory=[];
+ function debugStatus(phase,server=''){
+  if(!debug)return;
+  const status=get('checkoutDebugStage');
+  if(status)status.textContent=phase+(server?' · '+server:'');
+ }
+ function copyDebugReport(){
+  if(!debug)return;
+  const report='DISHA checkout diagnostic v2\n'+
+   'Order: '+(orderId()||'not-created')+'\n'+
+   'Device: '+device+'\n'+
+   debugHistory.map(x=>x.time+' '+x.event+' '+x.code+' '+x.app).join('\n');
+  if(navigator.clipboard?.writeText){
+   navigator.clipboard.writeText(report).then(()=>debugStatus('Trace copied')).catch(()=>debugStatus('Copy not permitted'));
+  }else debugStatus('Clipboard unavailable');
+ }
+
  const device=/Android/i.test(userAgent)?'android':/iPhone|iPad|iPod/i.test(userAgent)?'ios':/Windows|Macintosh|Linux/i.test(userAgent)?'desktop':'other';
  function debugCode(error){
   const status=Number(error?.status);
@@ -34,13 +51,23 @@
  // response, device identifier or transaction data are collected.
  function trace(event,code='OK',app='none'){
   if(!debug||!session?.token||!session?.orderId)return;
+  const selected=['gpay','phonepe','paytm','cred','generic'].includes(app)?app:'none';
+  try{
+   debugHistory.push({time:new Date().toISOString(),event,code,app:selected});
+   if(debugHistory.length>45)debugHistory.shift();
+   sessionStorage.setItem('disha82:diag:'+session.orderId,JSON.stringify(debugHistory));
+  }catch(_){}
+  debugStatus(event+' / '+code,'sending');
   try{
    void fetch('/api/checkout/trace',{method:'POST',cache:'no-store',keepalive:true,
     credentials:'same-origin',headers:{'Content-Type':'application/json','X-CSRF-Token':session.token},
     body:JSON.stringify({orderId:session.orderId,token:session.token,event,code,
-     app:['gpay','phonepe','paytm','cred','generic'].includes(app)?app:'none',device})
-   }).catch(()=>{});
-  }catch(_){}
+     app:selected,device})
+   }).then(response=>{if(debugHistory.at(-1)?.event===event)
+     debugStatus(event+' / '+code,response.ok?'saved':'upload failed')})
+     .catch(()=>{if(debugHistory.at(-1)?.event===event)
+       debugStatus(event+' / '+code,'offline')});
+  }catch(_){debugStatus(event+' / '+code,'unavailable')}
  }
 
  function showStage(stage){
@@ -347,6 +374,12 @@
   void pollLedger();
  }
  function setEventHandlers(){
+  const diag=get('checkoutDebugPanel');
+  if(diag&&debug){
+   diag.hidden=false;
+   debugStatus('Debugger active · waiting for checkout');
+   get('checkoutDebugCopy').addEventListener('click',copyDebugReport);
+  }
   get('btnOneTouch').addEventListener('click',authorize);
   document.querySelectorAll('[data-app]').forEach(el=>
    el.addEventListener('click',()=>openApp(el.dataset.app)));
@@ -380,6 +413,14 @@
   showStage('initial');
   try{
    session=await getSession();
+   if(debug){
+    try{
+     const prior=JSON.parse(sessionStorage.getItem('disha82:diag:'+session.orderId)||'[]');
+     if(Array.isArray(prior))for(const e of prior.slice(-45)){
+       if(typeof e.time==='string'&&typeof e.event==='string'&&typeof e.code==='string'&&typeof e.app==='string')debugHistory.push(e);
+     }
+    }catch(_){}
+   }
    trace('ORDER_READY');
    setMoney(session.amount);
    setPaymentKind();

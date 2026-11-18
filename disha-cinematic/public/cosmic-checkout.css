@@ -323,3 +323,10 @@ body{background:#040817}
  @media(max-height:510px){.checkout-footer{display:none}.checkout-brand{padding:3px 8px 0}.checkout-brand .logo{max-height:24px}.stage h1{font-size:19px}.stage-copy{margin-bottom:5px}.vault-scene{width:min(100%,17dvh,125px)!important;max-height:17dvh}.stage-initial .action-primary{min-height:38px}.stage-initial .button-help{display:none}.app-choice{min-height:45px}.app-icon{width:25px;height:25px}.qr-visual{width:min(100%,24dvh,160px)}}
  @media(min-width:700px){.checkout-shell{width:min(100%,620px)}.checkout-panel{border-radius:27px}}
 }
+
+/* Explicit opt-in checkout diagnostics: never visible on ordinary customer links. */
+.checkout-debug-panel{display:flex;flex-direction:column;gap:5px;margin-top:14px;padding:12px 14px;border:1px solid rgba(125,209,242,.3);border-radius:10px;background:rgba(4,24,37,.9);color:#ecf8ff;font:12px/1.5 system-ui,sans-serif;overflow-wrap:anywhere}
+.checkout-debug-panel[hidden]{display:none!important}
+.checkout-debug-panel strong{font-size:11px;letter-spacing:.1em;color:#7ce6cc}
+.checkout-debug-panel button{align-self:flex-start;border:1px solid rgba(255,255,255,.35);background:transparent;color:inherit;border-radius:6px;padding:6px 10px;cursor:pointer}
+.checkout-debug-panel small{opacity:.8}

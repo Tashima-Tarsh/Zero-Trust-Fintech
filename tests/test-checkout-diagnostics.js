@@ -5,6 +5,17 @@ const {createCheckoutDiagnostics,validEvent}=require('../financial/checkout-diag
 const token='a'.repeat(48),orderId='ORD_TRACE_TEST_123';
 const valid={orderId,token,event:'VAULT_AUTH_PROMPT',code:'OK',app:'phonepe',device:'android'};
 assert.ok(validEvent(valid));
+const fs=require('node:fs'),path=require('node:path');
+const checkoutScript=fs.readFileSync(path.join(__dirname,'../public/cosmic-checkout.js'),'utf8');
+for(const p of ['checkout.html','merchant-checkout.html']){
+ const html=fs.readFileSync(path.join(__dirname,'../public',p),'utf8');
+ assert.match(html,/id="checkoutDebugPanel"/,'Debug banner must be present on test checkout');
+ assert.match(html,/id="checkoutDebugCopy"/,'Debug history must be copyable');
+ assert.match(html,/diag-visible-20261119/,'Visible diagnostic JS must be cache-versioned');
+}
+assert.match(checkoutScript,/diag\.hidden=false/,'Diagnostic panel visible only with opt-in');
+assert.match(checkoutScript,/if\(!debug\|\|!session\?\.token/,'No default customer telemetry');
+assert.match(checkoutScript,/navigator\.clipboard\?\.writeText/,'Safe local report can be copied');
 assert.equal(validEvent({...valid,pin:'1234'}),null,'PIN fields may never enter a diagnostic event');
 assert.equal(validEvent({...valid,rawError:'private browser response'}),null,'Never accept raw error strings');
 assert.equal(validEvent({...valid,event:'BANK_PAYMENT_SUCCESS'}),null,'A trace cannot assert financial success');
