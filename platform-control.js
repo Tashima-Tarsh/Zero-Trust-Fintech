@@ -23,6 +23,7 @@ function createPlatformControl({db,getAuth,clerkEmailResolver=getClerkVerifiedEm
    [id('aud_'),actor,action,target,JSON.stringify(details),Date.now()]);
  async function init(){
    if(!pool)throw Error('Platform control requires PostgreSQL');
+   if(process.env.DISHA_INVITE_ONLY_ENABLED==='true'&&!ownerId())throw Error('DISHA_OWNER_CLERK_USER_ID must be set before enabling invite-only mode');
    await pool.query(
     "CREATE TABLE IF NOT EXISTS disha_access_requests ("+
     "id TEXT PRIMARY KEY,business_name TEXT NOT NULL,contact_name TEXT NOT NULL,email TEXT NOT NULL,"+
@@ -89,7 +90,8 @@ function createPlatformControl({db,getAuth,clerkEmailResolver=getClerkVerifiedEm
  router.post('/public/request-access',wrap(async(req,res)=>{
    // Public request endpoint is intentionally independent of Clerk sign-in.
    const origin=req.get('origin');if(origin){let url;try{url=new URL(origin)}catch{throw err(403,'Invalid request origin')}
-      if(url.host!==req.get('host')||!['https:','http:'].includes(url.protocol))throw err(403,'Request origin not permitted');}
+      const allowed=new Set([req.get('host'),new URL(process.env.PUBLIC_BASE_URL||'https://disha8-2.thenitishkr.in').host]);
+      if(!allowed.has(url.host)||!['https:','http:'].includes(url.protocol))throw err(403,'Request origin not permitted');}
    const key=String(req.ip||req.socket.remoteAddress||'unknown');const ts=Date.now();
    const history=(limiter.get(key)||[]).filter(t=>ts-t<3600000);
    if(history.length>=5)throw err(429,'Too many requests. Please try again later.');
@@ -192,6 +194,7 @@ function createPlatformControl({db,getAuth,clerkEmailResolver=getClerkVerifiedEm
    const r=await pool.query("SELECT id,actor_id,action,target_id,created_at FROM disha_platform_audit ORDER BY created_at DESC LIMIT 200");
    res.set('Cache-Control','no-store').json({success:true,events:r.rows});
  }));
+ router.use((error,req,res,next)=>{if(res.headersSent)return next(error);if(!error.status||error.status>=500)console.error('[Platform Control]',error.message);res.status(error.status||500).set('Cache-Control','no-store').json({success:false,error:error.status?error.message:'Platform service unavailable'});});
  return {router,init,verifyMerchant,isOwner,active};
 }
 module.exports={createPlatformControl};
