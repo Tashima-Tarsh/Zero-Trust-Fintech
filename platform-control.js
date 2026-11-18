@@ -23,12 +23,16 @@ function createPlatformControl({db,getAuth,clerkEmailResolver=getClerkVerifiedEm
  const companyVpa=()=>val(process.env.DISHA_COMPANY_P2M_VPA||'',150).toLowerCase();
  async function verifiedOwner(userId){
    if(!active()||!userId)return false;
-   if(ownerId())return userId===ownerId();
+   if(ownerId()&&userId===ownerId())return true;
+   // Verified Clerk email is an independent configured owner identity, so
+   // an outdated Clerk user ID cannot accidentally lock out the real owner.
    if(!EMAIL.test(ownerEmail()))return false;
    return (await clerkEmailResolver(userId))===ownerEmail();
  }
- async function ensureOwnerTestTenant(){
-   if(!active()||!EMAIL.test(ownerEmail()))return null;
+ async function ensureOwnerTestTenant(userId){
+   const email=EMAIL.test(ownerEmail())?ownerEmail():
+     (userId&&userId===ownerId()?await clerkEmailResolver(userId):null);
+   if(!active()||!EMAIL.test(email||''))return null;
    const now=Date.now(),ownerName=val(process.env.DISHA_OWNER_DISPLAY_NAME||'',150);
    const phone=val(process.env.DISHA_OWNER_PHONE||'',30);
    const business=val(process.env.DISHA_OWNER_BUSINESS||'',150)||'DISHA Internal Testing';
@@ -38,13 +42,13 @@ function createPlatformControl({db,getAuth,clerkEmailResolver=getClerkVerifiedEm
     "VALUES($1,$2,$3,$4,$5,TRUE,'ACTIVE',TRUE,$2,$6,$6,$6) "+
     "ON CONFLICT(id) DO UPDATE SET business_name=EXCLUDED.business_name,email=EXCLUDED.email,"+
     "contact_phone=EXCLUDED.contact_phone,setup_completed=TRUE,access_status='ACTIVE',is_internal_test=TRUE,updated_at=EXCLUDED.updated_at",
-    [ownerTenantId(),alias,business,ownerEmail(),phone,now]);
+    [ownerTenantId(),alias,business,email,phone,now]);
    await pool.query(
     "INSERT INTO disha_owner_profile(owner_key,display_name,email,phone,business_name,professional_title,updated_at) "+
     "VALUES($1,$2,$3,$4,$5,$6,$7) ON CONFLICT(owner_key) DO UPDATE SET "+
     "display_name=EXCLUDED.display_name,email=EXCLUDED.email,phone=EXCLUDED.phone,"+
     "business_name=EXCLUDED.business_name,professional_title=EXCLUDED.professional_title,updated_at=EXCLUDED.updated_at",
-    [ownerKey(),ownerName,ownerEmail(),phone,business,val(process.env.DISHA_OWNER_TITLE||'',100),now]);
+    [ownerKey(),ownerName,email,phone,business,val(process.env.DISHA_OWNER_TITLE||'',100),now]);
    const accounts=String(process.env.DISHA_OWNER_P2P_VPAS||'').split(',').map(x=>x.trim().toLowerCase()).filter(x=>/^[a-z0-9._-]{2,100}@[a-z0-9._-]{2,40}$/.test(x));
    for(const [i,account] of [...new Set(accounts)].entries()){
      const primary=i===0;
@@ -113,33 +117,54 @@ function createPlatformControl({db,getAuth,clerkEmailResolver=getClerkVerifiedEm
    console.log('[Platform Control] initialized; controlled access '+(active()?'ENABLED':'not yet activated'));
  }
  function isOwner(userId){return active()&&Boolean(ownerId())&&userId===ownerId();}
+ const accessError=(code,message)=>Object.assign(err(403,message),{code});
  async function verifyMerchant(userId,auth){
    if(!active())return null;
    if(await verifiedOwner(userId)){
-     const r=await ensureOwnerTestTenant();
-     if(!r)throw err(503,'Owner test tenant is not ready');
+     const r=await ensureOwnerTestTenant(userId);
+     if(!r)throw err(503,'Platform owner workspace is not configured');
      return r;
    }
-   let r=await pool.query("SELECT * FROM saas_merchants WHERE clerk_user_id=$1",[userId]);
-   if(r.rowCount){
-     if(r.rows[0].access_status!=='ACTIVE')throw err(403,'Merchant account is not active');
-     return r.rows[0];
-   }
+   const current=await pool.query('SELECT * FROM saas_merchants WHERE clerk_user_id=$1',[userId]);
+   if(current.rowCount&&current.rows[0].access_status==='ACTIVE')return current.rows[0];
+   if(current.rowCount&&current.rows[0].access_status==='SUSPENDED')
+     throw accessError('MERCHANT_SUSPENDED','Merchant access is suspended. Contact the platform owner.');
+   if(current.rowCount&&current.rows[0].access_status==='PENDING')
+     throw accessError('MERCHANT_APPROVAL_PENDING','Your merchant account is awaiting owner approval. Request access if you have not applied.');
    const verifiedEmail=await clerkEmailResolver(userId);
-   if(!verifiedEmail)throw err(403,'An approved invitation is required');
-   // Binding cannot accept a browser-supplied email. The server fetches the verified
-   // identity directly from Clerk. Atomic conditional claim defeats concurrent bindings.
+   if(!verifiedEmail)throw accessError('MERCHANT_EMAIL_NOT_VERIFIED','Verify your Clerk email before merchant activation.');
    const c=await pool.connect();
    try{
      await c.query('BEGIN');
-     r=await c.query("SELECT * FROM saas_merchants WHERE lower(approved_email)=lower($1) AND access_status IN ('APPROVED','INVITED','ACTIVE') FOR UPDATE",[verifiedEmail]);
-     if(r.rowCount!==1)throw err(403,'Your approved merchant invitation was not found');
-     if(r.rows[0].clerk_user_id&&r.rows[0].clerk_user_id!==userId)throw err(403,'Invitation is already bound to another account');
-     const upd=await c.query("UPDATE saas_merchants SET clerk_user_id=$2,access_status='ACTIVE',updated_at=$3 WHERE id=$1 AND (clerk_user_id IS NULL OR clerk_user_id=$2) RETURNING *",
-       [r.rows[0].id,userId,Date.now()]);
-     if(!upd.rowCount)throw err(403,'Merchant invitation could not be activated');
-     await audit(c,userId,'MERCHANT_IDENTITY_BOUND',r.rows[0].id);
-     await c.query('COMMIT');return upd.rows[0];
+     const r=current.rowCount
+       ?await c.query('SELECT * FROM saas_merchants WHERE id=$1 FOR UPDATE',[current.rows[0].id])
+       :await c.query("SELECT * FROM saas_merchants WHERE lower(approved_email)=lower($1) AND access_status IN ('APPROVED','INVITED','ACTIVE') FOR UPDATE",[verifiedEmail]);
+     if(!r.rowCount)
+       throw accessError('MERCHANT_APPROVAL_REQUIRED','Your business is not yet approved. Submit a merchant access request.');
+     const merchant=r.rows[0];
+     if(merchant.access_status==='SUSPENDED')
+       throw accessError('MERCHANT_SUSPENDED','Merchant access is suspended. Contact the platform owner.');
+     if(merchant.access_status==='ACTIVE'){
+       if(merchant.clerk_user_id!==userId)
+         throw accessError('MERCHANT_IDENTITY_CONFLICT','This merchant workspace belongs to another signed-in identity.');
+       await c.query('COMMIT');
+       return merchant;
+     }
+     if(!['APPROVED','INVITED'].includes(merchant.access_status))
+       throw accessError('MERCHANT_APPROVAL_PENDING','This merchant requires owner approval.');
+     if(String(merchant.approved_email||'').toLowerCase()!==verifiedEmail)
+       throw accessError('MERCHANT_EMAIL_MISMATCH','Your verified sign-in email must match the approved merchant email.');
+     if(merchant.clerk_user_id&&merchant.clerk_user_id!==userId)
+       throw accessError('MERCHANT_IDENTITY_CONFLICT','Approved merchant is bound to another signed-in identity.');
+     const updated=await c.query(
+       "UPDATE saas_merchants SET clerk_user_id=$2,access_status='ACTIVE',updated_at=$3 "+
+       "WHERE id=$1 AND access_status IN ('APPROVED','INVITED') "+
+       "AND (clerk_user_id IS NULL OR clerk_user_id=$2) RETURNING *",
+       [merchant.id,userId,Date.now()]);
+     if(updated.rowCount!==1)throw err(409,'Merchant activation needs owner review.');
+     await audit(c,userId,'MERCHANT_IDENTITY_BOUND',merchant.id);
+     await c.query('COMMIT');
+     return updated.rows[0];
    }catch(e){await c.query('ROLLBACK');throw e}finally{c.release()}
  }
  router.post('/public/request-access',wrap(async(req,res)=>{
@@ -332,7 +357,7 @@ function createPlatformControl({db,getAuth,clerkEmailResolver=getClerkVerifiedEm
    const r=await pool.query("SELECT id,actor_id,action,target_id,created_at FROM disha_platform_audit ORDER BY created_at DESC LIMIT 200");
    res.set('Cache-Control','no-store').json({success:true,events:r.rows});
  }));
- router.use((error,req,res,next)=>{if(res.headersSent)return next(error);if(!error.status||error.status>=500)console.error('[Platform Control]',error.message);res.status(error.status||500).set('Cache-Control','no-store').json({success:false,error:error.status?error.message:'Platform service unavailable'});});
+ router.use((error,req,res,next)=>{if(res.headersSent)return next(error);if(!error.status||error.status>=500)console.error('[Platform Control]',error.message);res.status(error.status||500).set('Cache-Control','no-store').json({success:false,error:error.status?error.message:'Platform service unavailable',code:error.code||null});});
  return {router,init,verifyMerchant,isOwner,active};
 }
 module.exports={createPlatformControl};
