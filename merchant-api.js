@@ -132,7 +132,7 @@ const publicOrder = o => ({
   vault_utr_candidate:o.vault_utr_candidate||null,
   vault_correlation:o.vault_correlation ? (typeof o.vault_correlation === 'string' ? JSON.parse(o.vault_correlation) : o.vault_correlation) : null
 });
-function createMerchantApi({db,getAuth,buildUpiUri}) {
+function createMerchantApi({db,getAuth,buildUpiUri,platformControl}) {
   const router=express.Router();
   const wrap=fn=>(req,res,next)=>Promise.resolve().then(()=>fn(req,res)).catch(next);
   async function init() {
@@ -222,14 +222,21 @@ function createMerchantApi({db,getAuth,buildUpiUri}) {
       const auth=getAuth(req);
       if(!auth||!auth.userId)throw fail(401,'Please sign in to your merchant account');
       const merchantUserId=auth.userId;
-      // No client-supplied merchant IDs. Tenant identity always comes from Clerk.
-      const email=val(auth.sessionClaims?.email||auth.sessionClaims?.email_address,254);
-      await db.pgPool.query(
-        'INSERT INTO saas_merchants(id,clerk_user_id,email,created_at,updated_at) VALUES($1,$2,$3,$4,$4) ON CONFLICT(clerk_user_id) DO NOTHING',
-        [id('mer_'),merchantUserId,email,now()]);
-      const r=await db.pgPool.query('SELECT * FROM saas_merchants WHERE clerk_user_id=$1',[merchantUserId]);
-      if(!r.rowCount)throw fail(503,'Merchant account unavailable');
-      req.merchant=r.rows[0];
+      // Invite-only mode: Clerk authentication is identity, NEVER tenant approval.
+      // Bootstrap owner/test merchant is provisioned by Platform Control at startup.
+      if(platformControl?.active()){
+        req.merchant=await platformControl.verifyMerchant(merchantUserId,auth);
+      }else{
+        // Backward-compatibility during a controlled rollout. Disable via
+        // DISHA_INVITE_ONLY_ENABLED=true + DISHA_OWNER_CLERK_USER_ID.
+        const email=val(auth.sessionClaims?.email||auth.sessionClaims?.email_address,254);
+        await db.pgPool.query(
+          'INSERT INTO saas_merchants(id,clerk_user_id,email,created_at,updated_at) VALUES($1,$2,$3,$4,$4) ON CONFLICT(clerk_user_id) DO NOTHING',
+          [id('mer_'),merchantUserId,email,now()]);
+        const r=await db.pgPool.query('SELECT * FROM saas_merchants WHERE clerk_user_id=$1',[merchantUserId]);
+        if(!r.rowCount)throw fail(503,'Merchant account unavailable');
+        req.merchant=r.rows[0];
+      }
       next();
     }catch(e){next(e);}
   });
