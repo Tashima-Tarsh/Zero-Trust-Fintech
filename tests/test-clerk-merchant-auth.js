@@ -111,21 +111,21 @@ async function testBrowserMount(file,method){
   assert.match(html,/class="auth-logo-stage"/);
   assert.match(html,/src="\/assets\/disha-8-2-wordmark-cropped\.png"/);
   assert.match(html,/alt="DISHA 8\.2"/);
-  assert.match(html,/class="auth-network-art"/,'Licensed galaxy photography region must exist');
+  assert.doesNotMatch(html,/class="auth-network-art"/,'No empty artwork placeholder');
  }
  assert.ok(fs.statSync(path.join(root,'public/assets/disha-8-2-wordmark-cropped.png')).size>10000,
    'Real metallic logo must be present in the public asset directory');
  // Merchant sign-in and signup use real Clerk widgets and a separately licensed photo.
  for(const page of ['merchant-login.html','merchant-signup.html']){
   const html=read('public/'+page);
-  assert.match(html,/class="auth-network-art"/);
+  assert.doesNotMatch(html,/class="auth-network-art"/,'No empty artwork placeholder');
   assert.doesNotMatch(html,/src="\/assets\/merchant-direct-3d\.webp"/);
   assert.match(html,/id="auth-slot"/);
   assert.match(html,/class="auth-content"/);
   assert.doesNotMatch(html,/class="auth-footnote"/,'Clerk owns auth navigation');
   assert.match(html,/window\.Clerk\.mountSign/);
  }
- assert.match(styles,/merchant-network-galaxy\.jpg/,'Photo is provided as licensed optional asset');
+ assert.match(styles,/disha-universe-background\.svg/,'Background must use bundled photographic asset');
  assert.match(styles,/height:100dvh/,'Viewport-height layout required');
  assert.match(styles,/\.auth-content\{[^}]*background:transparent/s,'Do not frame Clerk in an outer white card');
  assert.match(styles,/\.auth-action\{[^}]*background:#fff/s,'Right surface should remain a seamless white column');
