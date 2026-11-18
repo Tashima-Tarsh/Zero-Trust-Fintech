@@ -10,27 +10,30 @@
 <body>
 <main class="auth-shell" data-mode="signin" aria-label="Merchant authentication">
  <aside class="auth-story" aria-label="DISHA merchant platform">
-  <div class="auth-brand-wrap"><a class="auth-brand" href="/" aria-label="DISHA 8.2 home"><span class="auth-logo-stage"><img class="auth-logo" src="/assets/disha-8-2-wordmark-cropped.png" alt="DISHA 8.2" width="320" height="58" fetchpriority="high"><span class="auth-logo-shine" aria-hidden="true"></span></span></a><span class="brand-rule" aria-hidden="true"></span></div>
+  <div class="auth-brand-wrap">
+   <a class="auth-brand" href="/" aria-label="DISHA 8.2 home"><span class="auth-logo-stage"><img class="auth-logo" src="/assets/disha-8-2-wordmark-cropped.png" alt="DISHA 8.2" width="320" height="58" fetchpriority="high"><span class="auth-logo-shine" aria-hidden="true"></span></span></a>
+  </div>
   <div class="auth-story-middle">
-   <div class="auth-eyebrow">DISHA / Merchant workspace</div>
-   <h2>Everything<br>in its <em>right place.</em></h2>
-   <p>A clearer view of your business, your receiving accounts and your payment activity. Protected access, without the noise.</p>
-   <div class="payment-journey" aria-label="Customer pays the merchant directly by UPI, bypassing an aggregator"><div class="journey-flow"><img class="journey-image" src="/assets/merchant-direct-scene.svg" alt="3D-style merchant and customer connected by direct UPI payment, with aggregator excluded" width="800" height="436" loading="eager"></div><div class="journey-features"><span>Direct merchant payments</span><span>No aggregator in the flow</span><span>One private workspace</span></div></div>
+   <div class="auth-eyebrow">DISHA / DIRECT MERCHANT PAYMENTS</div>
+   <h2>Your payments,<br>in its <em>right place.</em></h2>
+   <p class="auth-story-description">A clearer view of your business, receiving accounts and payment activity. Your operations, under your control.</p>
+   <div class="payment-journey" aria-label="Customer and merchant connected by direct UPI">
+    <div class="journey-flow"><img class="journey-image" src="/assets/merchant-direct-3d.webp" alt="Detailed 3D cartoon merchant with laptop and customer with phone, connected by a direct UPI payment path that bypasses an aggregator" width="640" height="278" fetchpriority="high"></div>
+    <div class="journey-features" aria-label="Product capabilities"><span>Direct merchant payments</span><span>No aggregator in the flow</span><span>One private workspace</span></div>
+   </div>
   </div>
   <div class="auth-story-footer"><span><span class="status-dot"></span>Independent merchant infrastructure</span><span>DISHA / 8.2</span></div>
  </aside>
- <section class="auth-action">
-  <nav class="auth-top" aria-label="Account options"><a href="/login" aria-current="page">Sign in</a><a href="/signup">Create account</a></nav>
+ <section class="auth-action" aria-label="Merchant sign in">
   <div class="auth-content">
-   <div class="auth-kicker">Secure merchant access</div>
-   <h1>Welcome back</h1>
-   <p class="auth-description">Sign in with your merchant account to manage your workspace, payment requests and receiving UPI addresses.</p>
-   <div class="auth-divider" role="presentation"></div>
-   <div class="auth-slot-wrap"><div id="auth-slot" aria-live="polite"><div class="status" id="auth-status">Connecting to secure authentication…</div></div></div>
+   <div class="auth-right-brand" aria-hidden="true"><img src="/assets/disha-8-2-wordmark-cropped.png" alt="" width="230" height="56"></div>
+   <div class="auth-kicker">MERCHANT IDENTITY</div>
+   <h1>Sign in to your merchant account</h1>
+   <p class="auth-description">Access your payment requests, receiving UPI accounts and business operations.</p>
+   <div class="auth-slot-wrap"><div id="auth-slot" aria-live="polite"><div class="status" id="auth-status">Connecting securely to Clerk…</div></div></div>
    
-   <p class="auth-footnote">New to DISHA? <a href="/signup">Create your merchant account</a></p>
   </div>
-  <div class="auth-bottom"><span>© 2026 DISHA 8.2</span><span>Authentication by Clerk · Private workspace</span></div>
+  <div class="auth-bottom"><span>© 2026 DISHA 8.2</span><span>Merchant authentication by Clerk</span></div>
  </section>
 </main>
 <script src="/auth-config.js"></script>
@@ -57,26 +60,7 @@ await window.Clerk.load({ui:{ClerkUI:window.__internal_ClerkUICtor}});
 if(window.Clerk.isSignedIn){location.replace('/dashboard');return}
 status.remove();
 window.Clerk.mountSignIn(document.getElementById('auth-slot'),{
-routing:'hash',forceRedirectUrl:'/dashboard',fallbackRedirectUrl:'/dashboard',signUpUrl:'/signup',
-appearance:{
-variables:{
- colorPrimary:'#215ec3',colorText:'#18263d',colorTextSecondary:'#66758c',
- colorBackground:'#ffffff',colorInputBackground:'#fbfcfe',colorInputText:'#17243a',
- borderRadius:'10px',fontFamily:'Inter,Segoe UI,Arial,sans-serif',
- fontSize:'13px'
-},
-elements:{
- rootBox:{width:'100%',maxWidth:'100%'},
- cardBox:{width:'100%',boxShadow:'none'},
- card:{width:'100%',padding:'0',boxShadow:'none',border:'0',background:'transparent'},
- header:{display:'none'},
- formFieldLabel:{fontWeight:'650',fontSize:'12px',color:'#334259'},
- formFieldInput:{minHeight:'46px',border:'1px solid #dce4ed',background:'#fbfcfe'},
- formButtonPrimary:{minHeight:'46px',fontWeight:'700',boxShadow:'none'},
- socialButtonsBlockButton:{minHeight:'43px',background:'#fff',border:'1px solid #dce4ed'},
- footerActionLink:{color:'#215ec3'}
-}
-}
+routing:'hash',forceRedirectUrl:'/dashboard',fallbackRedirectUrl:'/dashboard',signUpUrl:'/signup'
 });
 }catch(err){console.error('[Merchant authentication] Startup failed:',err);status.textContent=err.message||'Unable to start authentication';status.style.color='#ba3749';}
 })();
