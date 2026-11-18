@@ -231,6 +231,16 @@ body{background:#040817}
  0%,100%{transform:translateY(2px) rotate(-2deg)}
  50%{transform:translateY(-8px) rotate(2deg)}
 }
+@media(max-width:560px){
+ .checkout-shell{padding:10px 11px 15px}
+ .checkout-brand{padding:15px 10px 3px}
+ .checkout-brand .logo{width:190px}
+ .stage-initial{min-height:436px;padding:6px 25px 23px}
+ .stage-initial .eyebrow{margin-top:6px}
+ .stage-initial .amount{font-size:50px}
+ .vault-scene{width:min(100%,263px);margin:5px auto 8px}
+ .stage-initial .action-primary{min-height:54px}
+}
 @media(max-width:420px){
  .checkout-shell{padding:10px 10px 14px}
  .checkout-panel{border-radius:21px}
