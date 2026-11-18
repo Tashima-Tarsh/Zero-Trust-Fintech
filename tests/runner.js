@@ -27,6 +27,7 @@ const UNIT_TESTS = [
   'test-checkout-moonlight-ui.js', // NASA moon and compact Pay controls
   'test-cosmic-checkout.js', // unified Touch -> app/QR -> ledger receipt
   'test-checkout-production.js', // checkout routing, passkey and browser JS syntax
+  'test-ip-auth-security.js', // deterministic auth, proxy spoofing and whitelist checks
   'test-frontend-parity.js', // all canonical assets and binary files must match deployment copies
   'test-checkout-edge-gateway.js', // Pages checkout HTML must remain independent from Railway 502
   'test-financial-money.js',
