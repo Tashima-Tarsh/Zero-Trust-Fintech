@@ -11,9 +11,12 @@ node tests/android/fixture-server.js > test-results/android/fixture-server.log 2
 FIXTURE_PID=$!
 cleanup() {
   result=$?
-  adb logcat -d -v threadtime > test-results/android/full-logcat.txt 2>&1 || true
-  adb shell dumpsys activity activities > test-results/android/activity-state.txt 2>&1 || true
-  adb shell dumpsys package ai.disha.testupi > test-results/android/test-app-package.txt 2>&1 || true
+  # An offline emulator must not prevent failure artifacts from being uploaded.
+  timeout 12s adb logcat -d -v threadtime > test-results/android/full-logcat.txt 2>&1 || true
+  timeout 12s adb shell dumpsys activity activities > test-results/android/activity-state.txt 2>&1 || true
+  timeout 12s adb shell dumpsys package ai.disha.testupi > test-results/android/test-app-package.txt 2>&1 || true
+  timeout 12s adb shell dumpsys webviewupdate > test-results/android/webview-provider.txt 2>&1 || true
+  timeout 12s adb devices -l > test-results/android/adb-devices.txt 2>&1 || true
   curl --silent --max-time 5 http://127.0.0.1:8765/health > test-results/android/fixture-health.json || true
   kill "$FIXTURE_PID" 2>/dev/null || true
   exit "$result"
