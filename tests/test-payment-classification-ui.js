@@ -16,4 +16,10 @@ assert.ok(merchant.includes('payment_type:String(payee.account_type)'),'Merchant
 assert.ok(server.includes('paymentType:String(session.merchantType)'),'Owner test checkout must expose P2P/P2M type');
 assert.ok(owner.includes('reconciliationConfigured')&&owner.includes('NO_GO_UNTIL_BANK_EVIDENCE'),'Owner settings cannot claim bank acceptance without evidence');
 assert.ok(ownerUI.includes('Merchant release gate')&&ownerUI.includes('Credit reconciliation'),'Owner dashboard must display production blockers');
+assert.ok(owner.includes('LEFT JOIN saas_merchant_orders o ON o.id=s.order_id'),
+ 'Super Admin Vault must include direct P2P sessions that lack merchant order records');
+assert.ok(owner.includes('publicCheckout:{receivingVpa:publicVpa'),
+ 'Super Admin configuration must reveal the actual public checkout receiving VPA');
+assert.ok(ownerUI.includes('Public ₹1 P2P receiving account'),
+ 'Owner settings must distinguish direct P2P checkout from the merchant tenant UPI pool');
 console.log('PAYMENT_IDENTITY_PASS: immutable receiving account, visible P2P/P2M classification, expiry and owner release gate');
