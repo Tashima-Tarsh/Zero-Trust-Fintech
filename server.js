@@ -239,7 +239,7 @@ app.get(['/checkout', '/checkout/', '/pay', '/pay/'], (req, res) => {
 });
 // Serve the browser bundle matching the installed @simplewebauthn package.
 app.get('/vendor/simplewebauthn.umd.js', (req, res) => {
-  res.sendFile(require.resolve('@simplewebauthn/browser/dist/bundle/index.umd.min.js'));
+  res.sendFile(path.join(__dirname, 'node_modules', '@simplewebauthn', 'browser', 'dist', 'bundle', 'index.umd.min.js'));
 });
 app.use(express.static(path.join(__dirname, 'public'), {
   etag: true,
