@@ -14,7 +14,7 @@ const safeName=s=>val(s,160).replace(/[\u0000-\u001f]/g,'');
 function createPlatformControl({db,getAuth,clerkEmailResolver=getClerkVerifiedEmail}){
  const router=express.Router();
  const pool=db.pgPool;
- const active=()=>process.env.DISHA_INVITE_ONLY_ENABLED==='true'&&Boolean(process.env.DISHA_OWNER_CLERK_USER_ID);
+ const active=()=>process.env.DISHA_INVITE_ONLY_ENABLED==='true';
  const ownerId=()=>process.env.DISHA_OWNER_CLERK_USER_ID||'';
  const limiter=new Map();
  const wrap=f=>(req,res,next)=>Promise.resolve().then(()=>f(req,res)).catch(next);
@@ -23,7 +23,7 @@ function createPlatformControl({db,getAuth,clerkEmailResolver=getClerkVerifiedEm
    [id('aud_'),actor,action,target,JSON.stringify(details),Date.now()]);
  async function init(){
    if(!pool)throw Error('Platform control requires PostgreSQL');
-   if(process.env.DISHA_INVITE_ONLY_ENABLED==='true'&&!ownerId())throw Error('DISHA_OWNER_CLERK_USER_ID must be set before enabling invite-only mode');
+   // Do not break public checkout startup for missing owner bootstrap configuration.\n   // Invite-only remains enabled: no user may access or auto-provision a merchant.\n   if(active()&&!ownerId())console.error('[Platform Control] OWNER CLERK USER ID MISSING — merchant access denied until configured');
    await pool.query(
     "CREATE TABLE IF NOT EXISTS disha_access_requests ("+
     "id TEXT PRIMARY KEY,business_name TEXT NOT NULL,contact_name TEXT NOT NULL,email TEXT NOT NULL,"+
@@ -50,7 +50,7 @@ function createPlatformControl({db,getAuth,clerkEmailResolver=getClerkVerifiedEm
     "CREATE UNIQUE INDEX IF NOT EXISTS uq_disha_approved_email ON saas_merchants(lower(approved_email)) WHERE approved_email IS NOT NULL;"
    );
    // Never manufacture a platform owner identity: it must be configured out-of-band.
-   if(active()){
+   if(active()&&ownerId()){
      await pool.query("INSERT INTO saas_merchants(id,clerk_user_id,business_name,email,access_status,is_internal_test,approved_by,approved_at,created_at,updated_at) "+
        "VALUES($1,$2,'DISHA Internal Testing','', 'ACTIVE',TRUE,$2,$3,$3,$3) "+
        "ON CONFLICT(clerk_user_id) DO UPDATE SET access_status='ACTIVE',is_internal_test=TRUE,approved_by=$2,approved_at=$3",
