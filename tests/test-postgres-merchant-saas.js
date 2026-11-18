@@ -90,6 +90,11 @@ const {buildUpiUri}=require('../utils/upi-intent');
   assert.equal(r.status,200);
   assert.equal(r.data.vpas[0].holder_name,'Acme Treasury');
   assert.equal(r.data.vpas[0].bank_name,'SBI');
+  assert.ok(Number(r.data.vpas[0].health_score)>=0,'Routing screen must receive real internal health data');
+  assert.ok(Number.isFinite(Number(r.data.vpas[0].daily_tx_count)));
+  assert.ok(Number.isFinite(Number(r.data.vpas[0].daily_tx_limit)));
+  assert.ok(Number.isFinite(Number(r.data.vpas[0].cooldown_until)));
+
   r=await call('/api/merchant/vpas/import',alice,'POST',{accounts:[
     {vpaAddress:'finance'+nonce+'@oksbi',holderName:'Finance Desk',bankName:'State Bank',accountType:'PERSONAL'},
     {vpaAddress:'counter'+nonce+'@ybl',holderName:'Counter Team',bankName:'Other Bank',accountType:'MERCHANT',mcc:'5411'}
