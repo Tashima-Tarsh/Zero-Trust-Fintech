@@ -76,7 +76,7 @@ async function api(path,options={}){
 function view(name,replaceHistory=false){
  if(!views[name])name='overview';
  $$('.view').forEach(el=>el.classList.toggle('active',el.id==='view-'+name));
- $$('#appSide [data-view]').forEach(el=>{
+ $$$('#appSide [data-view]').forEach(el=>{
   el.classList.toggle('active',el.dataset.view===name);
   if(el.dataset.view===name)el.setAttribute('aria-current','page');
   else el.removeAttribute('aria-current');
@@ -101,8 +101,8 @@ function closeMenu(){
  $('#sideToggle')?.setAttribute('aria-expanded','false');
 }
 function setupBindings(){
- $('#appSide [data-view]').forEach(button=>button.addEventListener('click',()=>view(button.dataset.view)));
- $('.merchant-tabbar [data-smart-tab]').forEach(button=>button.addEventListener('click',()=>{
+ $$('#appSide [data-view]').forEach(button=>button.addEventListener('click',()=>view(button.dataset.view)));
+ $$('.merchant-tabbar [data-smart-tab]').forEach(button=>button.addEventListener('click',()=>{
    const area=button.closest('.module');area.querySelectorAll('[data-smart-tab]').forEach(b=>b.classList.toggle('active',b===button));
    area.querySelectorAll('.smart-pane').forEach(p=>p.classList.toggle('active',p.id===button.dataset.smartTab));
  }));
