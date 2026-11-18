@@ -439,7 +439,7 @@ function createMerchantApi({db,getAuth,buildUpiUri,platformControl}) {
     const c=await db.pgPool.connect();
     const orderId=id('ORD_'),sessionId=crypto.randomBytes(24).toString('hex');
     const createdAt=now(),expiresAt=createdAt+180000;
-    let receiving;
+    let receiving,checkoutUri;
     try{
       await c.query('BEGIN');
       const requestedVpa = val(req.body.vpaAddress,150).toLowerCase();
@@ -459,7 +459,7 @@ function createMerchantApi({db,getAuth,buildUpiUri,platformControl}) {
         : val(receiving.holder_name||req.merchant.business_name,100);
       // Validate exact P2P/P2M URI before persisting the order.
       const payee={vpa_address:receiving.vpa_address,account_type:accountType,mcc:receiving.mcc};
-      const checkoutUri=upi(payee,payeeName,amount,description,orderId);
+      checkoutUri=upi(payee,payeeName,amount,description,orderId);
       const txnRef=id('TXN_');
       await c.query(
         'INSERT INTO sessions(session_id,order_id,challenge_amount,base_amount,txn_ref,vpa_address,status,state,created_at,expires_at,qr_refresh_at) '+
