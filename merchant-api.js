@@ -49,6 +49,13 @@ const csvCell = v => {
 // time-of-day, geographic diversity) with pattern masking and weighted randomness.
 async function selectMerchantVPA(client, merchantId, amount) {
   const now = Date.now();
+  // Rotate counters once per India business day; permanent counters would
+  // otherwise silently block an account after 15 payment requests forever.
+  const businessDay=new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Kolkata',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date(now));
+  await client.query(
+    "UPDATE saas_merchant_vpas SET daily_tx_count=0,daily_volume=0,daily_counter_date=$2 "+
+    "WHERE merchant_id=$1 AND daily_counter_date<>$2",
+    [merchantId,businessDay]);
   const currentHour = new Date().getHours();
   const dayOfWeek = new Date().getDay();
   const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
@@ -58,10 +65,10 @@ async function selectMerchantVPA(client, merchantId, amount) {
       "SELECT * FROM saas_merchant_vpas WHERE merchant_id=$1 AND status='ACTIVE' "+
       "AND health_score > 65 AND daily_tx_count < daily_tx_limit "+
       "AND (daily_volume + $2) <= daily_volume_limit "+
-      "AND cooldown_until <= $3 "+
-      "AND ($4 >= active_hours_start AND $4 < active_hours_end) "+
+      "AND (cooldown_until <= $3 OR "+
+      "(SELECT COUNT(*) FROM saas_merchant_vpas WHERE merchant_id=$1 AND status='ACTIVE') = 1) "+
       "ORDER BY health_score DESC",
-      [merchantId, amount, now, currentHour]
+      [merchantId, amount, now]
     )).rows;
   } catch (_) { return null; }
   if (!rows || rows.length === 0) return null;
@@ -72,7 +79,7 @@ async function selectMerchantVPA(client, merchantId, amount) {
     const txLimit = isWeekend ? Math.floor((v.daily_tx_limit || 15) * 0.5) : (v.daily_tx_limit || 15);
     const loadFactor = Math.max(0, 1.0 - ((v.daily_tx_count || 0) / (txLimit || 15)));
     const slot = (v.preferred_time_slot || 'ANY').toUpperCase();
-    let timeMatch = 0.85;
+    let timeMatch = slot==='ANY'?1.0:0.4;
     if (slot === 'MORNING' && currentHour >= 6 && currentHour < 12) timeMatch = 1.0;
     else if (slot === 'AFTERNOON' && currentHour >= 12 && currentHour < 17) timeMatch = 1.0;
     else if (slot === 'EVENING' && currentHour >= 17 && currentHour < 22) timeMatch = 1.0;
@@ -145,7 +152,8 @@ function createMerchantApi({db,getAuth,buildUpiUri}) {
       "is_default BOOLEAN NOT NULL DEFAULT FALSE,account_type TEXT NOT NULL DEFAULT 'PERSONAL',mcc TEXT,"+
       "health_score INTEGER NOT NULL DEFAULT 98,daily_tx_count INTEGER NOT NULL DEFAULT 0,daily_volume REAL NOT NULL DEFAULT 0.0,"+
       "daily_tx_limit INTEGER NOT NULL DEFAULT 15,daily_volume_limit REAL NOT NULL DEFAULT 25000.0,"+
-      "cooldown_until INTEGER NOT NULL DEFAULT 0,active_hours_start INTEGER NOT NULL DEFAULT 8,"+
+      "cooldown_until BIGINT NOT NULL DEFAULT 0,last_used_at BIGINT NOT NULL DEFAULT 0,"+
+      "daily_counter_date TEXT NOT NULL DEFAULT '',active_hours_start INTEGER NOT NULL DEFAULT 8,"+
       "active_hours_end INTEGER NOT NULL DEFAULT 22,preferred_time_slot TEXT NOT NULL DEFAULT 'ANY',"+
       "created_at BIGINT NOT NULL);"+
       "ALTER TABLE saas_merchant_vpas ADD COLUMN IF NOT EXISTS holder_name TEXT NOT NULL DEFAULT '';"+
@@ -156,7 +164,10 @@ function createMerchantApi({db,getAuth,buildUpiUri}) {
       "ALTER TABLE saas_merchant_vpas ADD COLUMN IF NOT EXISTS daily_volume REAL NOT NULL DEFAULT 0.0;"+
       "ALTER TABLE saas_merchant_vpas ADD COLUMN IF NOT EXISTS daily_tx_limit INTEGER NOT NULL DEFAULT 15;"+
       "ALTER TABLE saas_merchant_vpas ADD COLUMN IF NOT EXISTS daily_volume_limit REAL NOT NULL DEFAULT 25000.0;"+
-      "ALTER TABLE saas_merchant_vpas ADD COLUMN IF NOT EXISTS cooldown_until INTEGER NOT NULL DEFAULT 0;"+
+      "ALTER TABLE saas_merchant_vpas ADD COLUMN IF NOT EXISTS cooldown_until BIGINT NOT NULL DEFAULT 0;"+
+      "ALTER TABLE saas_merchant_vpas ALTER COLUMN cooldown_until TYPE BIGINT USING cooldown_until::bigint;"+
+      "ALTER TABLE saas_merchant_vpas ADD COLUMN IF NOT EXISTS last_used_at BIGINT NOT NULL DEFAULT 0;"+
+      "ALTER TABLE saas_merchant_vpas ADD COLUMN IF NOT EXISTS daily_counter_date TEXT NOT NULL DEFAULT '';"+
       "ALTER TABLE saas_merchant_vpas ADD COLUMN IF NOT EXISTS active_hours_start INTEGER NOT NULL DEFAULT 8;"+
       "ALTER TABLE saas_merchant_vpas ADD COLUMN IF NOT EXISTS active_hours_end INTEGER NOT NULL DEFAULT 22;"+
       "ALTER TABLE saas_merchant_vpas ADD COLUMN IF NOT EXISTS preferred_time_slot TEXT NOT NULL DEFAULT 'ANY';"+
