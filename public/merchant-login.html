@@ -24,11 +24,11 @@
  <section class="auth-action" aria-label="Merchant sign in">
   <div class="auth-content">
    <div class="auth-right-brand" aria-hidden="true"><img src="/assets/disha-8-2-wordmark-cropped.png" alt="" width="230" height="56"></div>
-   <div class="auth-kicker">MERCHANT IDENTITY</div>
+   <div class="auth-kicker">APPROVED MERCHANT IDENTITY</div><p style="color:#b8b5c1;font-size:12px;line-height:1.5;margin:4px 0 15px">Private access for approved merchants. <a href="/request-access" style="color:#f6aa81;text-decoration:underline">Request access</a> if your business is new.</p>
    <div class="auth-slot-wrap"><div id="auth-slot" aria-live="polite"><div class="status" id="auth-status">Connecting securely to Clerk…</div></div></div>
    
   </div>
-  <div class="auth-bottom"><span>© 2026 DISHA 8.2</span><span>Merchant authentication by Clerk</span></div>
+  <div class="auth-bottom"><span>© 2026 DISHA 8.2</span><span>Approved access · Clerk authentication</span></div>
  </section>
 </main>
 <script src="/auth-config.js"></script>
@@ -55,7 +55,7 @@ await window.Clerk.load({ui:{ClerkUI:window.__internal_ClerkUICtor}});
 if(window.Clerk.isSignedIn){location.replace('/dashboard');return}
 status.remove();
 window.Clerk.mountSignIn(document.getElementById('auth-slot'),{
-routing:'hash',forceRedirectUrl:'/dashboard',fallbackRedirectUrl:'/dashboard',signUpUrl:'/signup'
+routing:'hash',forceRedirectUrl:'/dashboard',fallbackRedirectUrl:'/dashboard',signUpUrl:'/request-access'
 });
 }catch(err){console.error('[Merchant authentication] Startup failed:',err);status.textContent=err.message||'Unable to start authentication';status.style.color='#ba3749';}
 })();
