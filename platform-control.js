@@ -386,9 +386,9 @@ function createPlatformControl({db,getAuth,clerkEmailResolver=getClerkVerifiedEm
  router.get('/owner/evidence',wrap(async(req,res)=>{
    const present=await pool.query("SELECT to_regclass('public.disha_vault_evidence') IS NOT NULL AS ready");
    if(!present.rows[0].ready)return res.set('Cache-Control','no-store').json({success:true,connected:false,evidence:[]});
-   const r=await pool.query("SELECT o.id AS order_id,m.business_name,v.outcome,v.utr_candidate,v.created_at,s.status "+
+   const r=await pool.query("SELECT o.id AS order_id,m.business_name,v.outcome,v.utr_candidate,v.created_at,s.status,v.correlation->>'selectedApp' AS selected_app,v.correlation->>'browserAppReturnMs' AS return_ms "+
       "FROM saas_merchant_orders o JOIN saas_merchants m ON m.id=o.merchant_id JOIN sessions s ON s.session_id=o.session_id "+
-      "JOIN LATERAL(SELECT outcome,utr_candidate,created_at FROM disha_vault_evidence WHERE order_id=o.id ORDER BY created_at DESC LIMIT 1) v ON TRUE "+
+      "JOIN LATERAL(SELECT outcome,utr_candidate,created_at,correlation FROM disha_vault_evidence WHERE order_id=o.id ORDER BY created_at DESC LIMIT 1) v ON TRUE "+
       "ORDER BY v.created_at DESC LIMIT 150");
    res.set('Cache-Control','no-store').json({success:true,connected:true,evidence:r.rows});
  }));
