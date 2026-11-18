@@ -11,6 +11,7 @@
   <link rel="stylesheet" href="/saas-white.css?v=20261118-premium2">
 <link rel="stylesheet" href="/merchant-mars.css?v=1">
   <link rel="stylesheet" href="/merchant-celestial.css?v=moonlight-20261118-1">
+  <link rel="stylesheet" href="/merchant-reference.css?v=reference-20261118-2">
   <script src="/vendor/qrcode.min.js" defer></script>
   <script src="/auth-config.js"></script>
   <script src="/merchant-vpa-import.js" defer></script>
@@ -327,16 +328,16 @@
       <!-- VIEW 4: VPAs / ACCOUNTS -->
       <section id="view-vpas" class="view">
         <div class="stat-grid">
-          <div class="stat"><small>Total Accounts</small><strong id="vpaTotal">0</strong></div>
-          <div class="stat"><small>Active Receiving</small><strong id="vpaActive" style="color:var(--emerald-light);">0</strong></div>
-          <div class="stat"><small>Paused</small><strong id="vpaPaused">0</strong></div>
-          <div class="stat"><small>Primary UPI ID</small><strong id="vpaDefault">0</strong></div>
+          <div class="stat"><span class="stat-portrait" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="m12 2 9 5-9 5-9-5 9-5Zm-9 9 9 5 9-5M3 16l9 5 9-5"/></svg></span><small>Total Accounts</small><strong id="vpaTotal">0</strong></div>
+          <div class="stat"><span class="stat-portrait" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 8h12l2 12H4L6 8zM9 8V4h6v4"/><path d="m12 11-2 4h3l-1 3 4-5h-3l1-2"/></svg></span><small>Active Receiving</small><strong id="vpaActive" style="color:var(--emerald-light);">0</strong></div>
+          <div class="stat"><span class="stat-portrait" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M9 8v8m6-8v8"/></svg></span><small>Paused</small><strong id="vpaPaused">0</strong></div>
+          <div class="stat"><span class="stat-portrait" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="8" height="8" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><path d="M15 15h2v2h-2m5-3v3m-5 4h6"/></svg></span><small>Primary UPI ID</small><strong id="vpaDefault">0</strong></div>
         </div>
 
         <div class="module">
           <div class="module-head">
             <h2>Your receiving UPI accounts</h2>
-            <button type="button" class="btn small" id="refreshVpas">Refresh ↻</button>
+            <button type="button" class="btn small" id="refreshVpas"><span aria-hidden="true">⟳</span> Refresh</button>
           </div>
           <div class="table-scroller">
             <table>
@@ -376,12 +377,12 @@
               <input id="vpaMcc" maxlength="4" inputmode="numeric" placeholder="Four digits from your bank QR">
             </label>
             <div class="form-actions" style="grid-column:1/-1;">
-              <button class="btn primary" type="submit">Add receiving account</button>
+              <button class="btn primary" type="submit"><span aria-hidden="true">⊕</span> Add receiving account</button>
             </div>
           </form>
         </div>
         <div class="module import-module" style="margin-top:20px;">
-          <div class="module-head"><div><div class="overline">BULK IMPORT</div><h2>Upload UPI accounts</h2></div><button type="button" class="btn ghost small" id="downloadVpaTemplate">Download CSV template</button></div>
+          <div class="module-head"><div><div class="overline">BULK IMPORT</div><h2>Upload UPI accounts</h2></div><button type="button" class="btn ghost small" id="downloadVpaTemplate"><span aria-hidden="true">↓</span> Download CSV template</button></div>
           <p class="module-intro">Import up to 50 UPI accounts in one CSV, including holder name, bank, account type and MCC. A duplicate or invalid record cancels the entire import.</p>
           <div class="import-actions"><label for="vpaCsvFile" class="file-picker"><span class="file-icon" aria-hidden="true">⇪</span><span><strong>Choose CSV file</strong><small>50 accounts maximum · 256 KB</small></span><input id="vpaCsvFile" type="file" accept=".csv,text/csv"></label><button type="button" id="importVpaCsv" class="btn primary">Import accounts</button></div>
           <p class="fine" id="importVpaStatus" role="status" aria-live="polite">Expected columns: upi_id, account_holder, bank_name, account_type, mcc.</p>
