@@ -15,6 +15,7 @@ vm.runInNewContext(functionSrc+'\nthis.build=generateUPILink;',context);
 const session={vpaAddress:'owner@oksbi',merchantType:'PERSONAL',description:'DISHA checkout',challengeAmount:1,txnRef:'TXN_ABC123'};
 const personal=new URL(context.build(session));
 assert.equal(personal.searchParams.get('pa'),'owner@oksbi');
+assert.match(context.build(session),/pa=owner@oksbi(?:&|$)/,'Keep raw VPA @ in Android intent payload');
 assert.throws(()=>buildUpiUri({kind:'P2P',pa:'not-a-vpa',pn:'Bank Payee',am:1,tn:'Payment'}),/valid receiving UPI ID/,'Invalid payee must be blocked before app handoff');
 assert.throws(()=>buildUpiUri({kind:'P2M',pa:'',pn:'Bank Payee',am:1,mc:'5411',tr:'X123'}),/valid receiving UPI ID/);
 assert.equal(personal.searchParams.get('am'),'1.00');
@@ -28,6 +29,7 @@ assert.match(appLinks(personal.toString()).ios.phonepe,/^phonepe:\/\/upi\/pay\?/
 assert.match(appLinks(personal.toString()).android.gpay,/^intent:\/\/pay\?[^#]+#Intent;scheme=upi;package=com\.google\.android\.apps\.nbu\.paisa\.user;end$/);
 assert.equal(merchant.searchParams.get('tr'),'TXNABC123');
 assert.equal(merchant.searchParams.get('pa'),'company@ypbiz');
+assert.match(context.build({...session,vpaAddress:'company@ypbiz',merchantType:'MERCHANT',mcc:'4705',txnRef:'TXN_ABC123'}),/pa=company@ypbiz(?:&|$)/);
 assert.equal(merchant.searchParams.get('am'),'1.00');
 assert.throws(()=>context.build({...session,merchantType:'MERCHANT',mcc:'0000'}),/BANK_VERIFIED_MCC_REQUIRED/);
 assert.throws(()=>context.build({...session,merchantType:'MERCHANT',mcc:null}),/BANK_VERIFIED_MCC_REQUIRED/);

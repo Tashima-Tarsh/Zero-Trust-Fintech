@@ -48,13 +48,16 @@ jobs:
       matrix:
         include:
           - api-level: '35'
-            target: google_apis
+            # Automated Test Device image is optimized for headless CI WebView tests.
+            target: google_atd
             profile: pixel_2
             ram: 2048M
+            gpu: software
           - api-level: '37.0'
             target: google_apis_ps16k
             profile: pixel_6
             ram: 4096M
+            gpu: swiftshader_indirect
     steps:
       - name: Checkout application and test harness
         uses: actions/checkout@v4
@@ -86,7 +89,7 @@ jobs:
           # Use a smaller AVD to stay within the hosted runner's RAM budget.
           profile: ${{ matrix.profile }}
           ram-size: ${{ matrix.ram }}
-          emulator-options: -no-snapshot -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
+          emulator-options: -no-snapshot -no-window -gpu ${{ matrix.gpu }} -noaudio -no-boot-anim -camera-back none
           disable-animations: true
           script: bash tests/android/run-emulator-tests.sh
 

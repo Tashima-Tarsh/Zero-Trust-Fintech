@@ -15,7 +15,7 @@ function harness(userAgent,initialPreferred){
  const state={qr:null,opened:null,beginCount:0,verified:false};
  const document={body:{dataset:{checkout:'merchant'}},visibilityState:'visible',getElementById:node,
   querySelectorAll:s=>s==='[data-stage]'?stages:apps,addEventListener(k,fn){cb[k]=fn}};
- const location={search:'?orderId='+order+'&token='+token,assign(url){state.opened=url}};
+ const location={href:'https://checkout.example/merchant-checkout.html?orderId='+order+'&token='+token,search:'?orderId='+order+'&token='+token,assign(url){state.opened=url}};
  const vault={getPendingOrderId:()=>state.beginCount?order:null,requestEvidence:()=>null,authorize:async()=>{state.verified=true;return {sessionId}},
   beginHandoff:()=>{state.beginCount++},launchUPI:url=>{state.opened=url}};
  const window={DISHACosmicCheckoutModel:model,DISHAOneTouchVault:vault,
@@ -50,11 +50,25 @@ async function flush(){for(let i=0;i<30;i++)await Promise.resolve()}
  assert.match(android.state.opened,/^intent:\/\/pay\?/);
  assert.equal(android.state.beginCount,1);
  assert.equal(android.stages.find(x=>!x.hidden).dataset.stage,'methods');
+ const fb=android.state.opened.match(/;S\.browser_fallback_url=([^;]+);end$/)?.[1];
+ assert.ok(fb,'Chrome requires a fallback for an unresolvable app intent');
+ const fallback=new URL(decodeURIComponent(fb));
+ assert.equal(fallback.searchParams.get('orderId'),'ORD_INTENT_TEST_11');
+ assert.equal(fallback.searchParams.get('token'),'a'.repeat(48));
+ assert.equal(fallback.searchParams.get('upi_intent_fallback'),'1');
  android.state.opened=null;
  // A foreground-only intent rejection must NOT falsely imply payment failed
  // or imply the bank accepted payment. It must preserve app selection.
  android.windowFocus();
  assert.equal(android.stages.find(x=>!x.hidden).dataset.stage,'methods','Focus alone must not move into checking');
+ android.apps.find(x=>x.dataset.app==='gpay').events.click();
+ assert.equal(android.state.beginCount,2,'A fresh GPay retry must get a new Vault handoff event');
+ assert.match(android.state.opened,/package=com\.google\.android\.apps\.nbu\.paisa\.user/);
+ let prevented=false;
+ android.nodes.oneTouchFallback.events.click({preventDefault(){prevented=true}});
+ assert.equal(prevented,true,'Generic fallback must use the tested click handler');
+ assert.equal(android.state.beginCount,3,'A generic fallback tap must create its own Vault event');
+ assert.equal(android.state.opened,uri,'Generic retry must preserve the exact UPI payee and amount');
 
  assert.equal(android.nodes.oneTouchFallback.href,uri,'Unresolved targeted intent must offer generic UPI fallback');
  const desktop=harness('Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/157','gpay');
