@@ -21,14 +21,11 @@ const {
   NPCI_RESPONSE_CODES
 } = require('./npci-intent');
 const {
-  verifyAuthenticationResponse,
+  generateRegistrationOptions,
+  generateAuthenticationOptions,
   verifyRegistrationResponse,
-  generateRegistrationChallenge,
-  generateAuthenticationChallenge,
-  registerUser,
-  authenticateUser
+  verifyAuthenticationResponse
 } = require('@simplewebauthn/server');
-const { base64urlToBuffer, bufferToBase64Url } = require('@simplewebauthn/server');
 const { scoreEvidence, suggestAction, WEIGHTS, TIERS } = require('./utils/trust-score');
 const { buildUpiUri, appLinks } = require('./utils/upi-intent');
 const { getClientIP } = require('./utils/ip-utils');
@@ -234,6 +231,16 @@ app.use(idempotencyMiddleware);
 // 1. Static Assets: Serve PhonePe marketing styles, console styles, scripts, videos, and icons
 // One canonical merchant dashboard; checkout and its APIs remain public.
 app.get('/merchant-console.html', (req, res) => res.redirect(302, '/dashboard'));
+// Canonical checkout must run before static middleware, which otherwise serves
+// the obsolete public/checkout/index.html at /checkout/.
+app.get(['/checkout', '/checkout/', '/pay', '/pay/'], (req, res) => {
+  res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+  res.sendFile(path.join(__dirname, 'public', 'checkout.html'));
+});
+// Serve the browser bundle matching the installed @simplewebauthn package.
+app.get('/vendor/simplewebauthn.umd.js', (req, res) => {
+  res.sendFile(require.resolve('@simplewebauthn/browser/dist/bundle/index.umd.min.js'));
+});
 app.use(express.static(path.join(__dirname, 'public'), {
   etag: true,
   maxAge: 0,
@@ -258,9 +265,6 @@ app.get(['/health', '/api/health'], (req, res) => {
 // Customer-facing product page and checkout routes
 app.get(['/', '/home'], (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'index.html'));
-});
-app.get(['/checkout', '/pay'], (req, res) => {
-  res.sendFile(path.join(__dirname, 'public', 'checkout.html'));
 });
 app.get('/auth-config.js', (req, res) => {
   res.type('application/javascript').send(`window.DISHA_CLERK_PUBLISHABLE_KEY=${JSON.stringify(process.env.CLERK_PUBLISHABLE_KEY || '')};`);
@@ -1130,9 +1134,14 @@ app.post('/api/cfc/cancel', verifyLimiter, async (req, res) => {
 // TASK 13: WEBAUTHN / PASSKEYS — HARDWARE VAULT AUTHENTICATION
 // Android Titan M2 / Apple Secure Enclave via W3C WebAuthn standard
 // ═════════════════════════════════════════════════════════════════════
-const RP_ID = process.env.WEBAUTHN_RP_ID || 'localhost';
 const RP_NAME = 'DISHA 8.2 Checkout';
-const RP_ORIGIN = process.env.WEBAUTHN_RP_ORIGIN || 'http://localhost:3000';
+// WebAuthn RP ID and origin must match the browser's HTTPS hostname.
+const RP_ORIGIN = new URL(
+  process.env.WEBAUTHN_RP_ORIGIN ||
+  process.env.APP_URL ||
+  (process.env.NODE_ENV === 'production' ? 'https://disha8-2.thenitishkr.in' : 'http://localhost:3000')
+).origin;
+const RP_ID = process.env.WEBAUTHN_RP_ID || new URL(RP_ORIGIN).hostname;
 
 // In-memory challenge store (use Redis/DB in production)
 const authChallenges = new Map(); // sessionId -> { challenge, orderId, amount, expiresAt }
@@ -1145,24 +1154,22 @@ function generateSessionId() {
 app.post('/api/webauthn/register/start', async (req, res) => {
   try {
     const { userId, userName, orderId } = req.body || {};
-    if (!userId || !userName) {
-      return res.status(400).json({ success: false, error: 'userId and userName required' });
+    if (!userId || !userName || !orderId) {
+      return res.status(400).json({ success: false, error: 'userId, userName and orderId required' });
     }
-
-    // Check if user already has passkeys
+    if (!db.findSessionByOrderId(orderId)) {
+      return res.status(404).json({ success: false, error: 'SESSION_NOT_FOUND' });
+    }
     const existingKeys = db.findPasskeysByUserId(userId);
-
-    const challenge = generateRegistrationChallenge({
+    const options = await generateRegistrationOptions({
       rpName: RP_NAME,
-      rpId: RP_ID,
-      user: {
-        id: Buffer.from(userId, 'utf8'),
-        name: userName,
-        displayName: userName
-      },
-      credentials: existingKeys.map(k => ({
-        id: base64urlToBuffer(k.credential_id),
-        publicKey: base64urlToBuffer(k.public_key),
+      rpID: RP_ID,
+      userID: new Uint8Array(Buffer.from(userId, 'utf8')),
+      userName,
+      userDisplayName: userName,
+      attestationType: 'none',
+      excludeCredentials: existingKeys.map(k => ({
+        id: k.credential_id,
         transports: k.transports ? JSON.parse(k.transports) : undefined
       })),
       authenticatorSelection: {
@@ -1171,29 +1178,14 @@ app.post('/api/webauthn/register/start', async (req, res) => {
         residentKey: 'preferred'
       }
     });
-
-    // Store challenge temporarily
-    authChallenges.set(challenge.sessionId, {
+    const sessionId = generateSessionId();
+    authChallenges.set(sessionId, {
       type: 'registration',
-      userId,
-      userName,
-      orderId: orderId || null,
-      challenge: challenge.challenge,
-      expiresAt: Date.now() + 60 * 1000
+      userId, userName, orderId,
+      challenge: options.challenge,
+      expiresAt: Date.now() + 60000
     });
-
-    res.json({
-      sessionId: challenge.sessionId,
-      challenge: challenge.publicKey.challenge,
-      rpName: RP_NAME,
-      rpId: RP_ID,
-      user: {
-        id: Buffer.from(userId, 'utf8').toString('base64url'),
-        name: userName,
-        displayName: userName
-      },
-      publicKey: challenge.publicKey
-    });
+    res.json({ success: true, sessionId, publicKey: options });
   } catch (err) {
     console.error('WebAuthn register start error:', err);
     res.status(500).json({ success: false, error: 'INTERNAL_SERVER_ERROR' });
@@ -1207,97 +1199,81 @@ app.post('/api/webauthn/register/finish', async (req, res) => {
     if (!sessionId || !credential) {
       return res.status(400).json({ success: false, error: 'sessionId and credential required' });
     }
-
     const stored = authChallenges.get(sessionId);
-    if (!stored || stored.type !== 'registration') {
+    if (!stored || stored.type !== 'registration' || Date.now() > stored.expiresAt) {
+      authChallenges.delete(sessionId);
       return res.status(400).json({ success: false, error: 'Invalid or expired session' });
     }
-    if (Date.now() > stored.expiresAt) {
-      authChallenges.delete(sessionId);
-      return res.status(400).json({ success: false, error: 'Session expired' });
-    }
-
     const verification = await verifyRegistrationResponse({
-      credential,
+      response: credential,
       expectedChallenge: stored.challenge,
       expectedOrigin: RP_ORIGIN,
-      expectedRPId: RP_ID,
+      expectedRPID: RP_ID,
       requireUserVerification: true
     });
-
-    if (verification.verified) {
-      const { credentialPublicKey, credentialId, counter } = verification.registrationInfo;
-      const result = db.savePasskey(
-        stored.userId,
-        bufferToBase64Url(credentialId),
-        bufferToBase64Url(credentialPublicKey),
-        counter,
-        'platform',
-        1,
-        JSON.stringify(['internal'])
-      );
-
-      authChallenges.delete(sessionId);
-
-      return res.json({
-        success: true,
-        message: 'Passkey registered successfully',
-        credentialId: bufferToBase64Url(credentialId),
-        userId: stored.userId,
-        orderId: stored.orderId
-      });
+    if (!verification.verified || !verification.registrationInfo?.credential) {
+      return res.status(401).json({ success: false, error: 'Registration verification failed' });
     }
-
+    const info = verification.registrationInfo;
+    const verifiedCredential = info.credential;
+    const saved = db.savePasskey(
+      stored.userId,
+      verifiedCredential.id,
+      Buffer.from(verifiedCredential.publicKey).toString('base64url'),
+      verifiedCredential.counter,
+      info.credentialDeviceType,
+      Number(Boolean(info.credentialBackedUp)),
+      JSON.stringify(verifiedCredential.transports || [])
+    );
+    if (!saved) {
+      return res.status(409).json({ success: false, error: 'Could not store credential' });
+    }
     authChallenges.delete(sessionId);
-    return res.status(401).json({ success: false, error: 'Registration verification failed' });
+    return res.json({
+      success: true, credentialId: verifiedCredential.id,
+      userId: stored.userId, orderId: stored.orderId
+    });
   } catch (err) {
     console.error('WebAuthn register finish error:', err);
-    res.status(500).json({ success: false, error: 'INTERNAL_SERVER_ERROR' });
+    res.status(400).json({ success: false, error: 'Registration verification failed' });
   }
 });
 
 // ── WebAuthn Authentication: Start ──
 app.post('/api/webauthn/authenticate/start', async (req, res) => {
   try {
-    const { userId, orderId, amount } = req.body || {};
+    const { userId, orderId } = req.body || {};
     if (!userId || !orderId) {
       return res.status(400).json({ success: false, error: 'userId and orderId required' });
     }
-
+    const checkoutSession = db.findSessionByOrderId(orderId);
+    if (!checkoutSession) {
+      return res.status(404).json({ success: false, error: 'SESSION_NOT_FOUND' });
+    }
     const existingKeys = db.findPasskeysByUserId(userId);
-    if (!existingKeys || existingKeys.length === 0) {
+    if (!existingKeys.length) {
       return res.status(400).json({
         success: false,
         error: 'No passkey registered for this user. Register first.',
         needsRegistration: true
       });
     }
-
-    const challenge = generateAuthenticationChallenge({
-      rpId: RP_ID,
+    const options = await generateAuthenticationOptions({
+      rpID: RP_ID,
       allowCredentials: existingKeys.map(k => ({
-        id: base64urlToBuffer(k.credential_id),
+        id: k.credential_id,
         transports: k.transports ? JSON.parse(k.transports) : undefined
       })),
       userVerification: 'required'
     });
-
     const sessionId = generateSessionId();
     authChallenges.set(sessionId, {
-      type: 'authentication',
-      userId,
-      orderId,
-      amount: amount || 0,
-      challenge: challenge.challenge,
-      expiresAt: Date.now() + 60 * 1000
+      type: 'authentication', userId, orderId,
+      amount: checkoutSession.challengeAmount,
+      challenge: options.challenge,
+      expiresAt: Date.now() + 60000
     });
-
-    res.json({
-      sessionId,
-      challenge: challenge.publicKey.challenge,
-      rpId: RP_ID,
-      allowCredentials: challenge.publicKey.allowCredentials
-    });
+    res.json({ success: true, sessionId, publicKey: options });
   } catch (err) {
     console.error('WebAuthn authenticate start error:', err);
     res.status(500).json({ success: false, error: 'INTERNAL_SERVER_ERROR' });
@@ -1308,62 +1284,48 @@ app.post('/api/webauthn/authenticate/start', async (req, res) => {
 app.post('/api/webauthn/authenticate/finish', async (req, res) => {
   try {
     const { sessionId, credential } = req.body || {};
-    if (!sessionId || !credential) {
+    if (!sessionId || !credential?.id) {
       return res.status(400).json({ success: false, error: 'sessionId and credential required' });
     }
-
     const stored = authChallenges.get(sessionId);
-    if (!stored || stored.type !== 'authentication') {
+    if (!stored || stored.type !== 'authentication' || Date.now() > stored.expiresAt) {
+      authChallenges.delete(sessionId);
       return res.status(400).json({ success: false, error: 'Invalid or expired session' });
     }
-    if (Date.now() > stored.expiresAt) {
-      authChallenges.delete(sessionId);
-      return res.status(400).json({ success: false, error: 'Session expired' });
-    }
-
-    const existingKey = db.findPasskeyByCredentialId(credential.rawId);
-    if (!existingKey) {
+    const existingKey = db.findPasskeyByCredentialId(credential.id);
+    if (!existingKey || existingKey.user_id !== stored.userId) {
       return res.status(401).json({ success: false, error: 'Unknown credential' });
     }
-
     const verification = await verifyAuthenticationResponse({
-      credential,
+      response: credential,
       expectedChallenge: stored.challenge,
       expectedOrigin: RP_ORIGIN,
-      expectedRPId: RP_ID,
-      authenticator: {
-        credentialPublicKey: base64urlToBuffer(existingKey.public_key),
-        credentialId: base64urlToBuffer(existingKey.credential_id),
+      expectedRPID: RP_ID,
+      credential: {
+        id: existingKey.credential_id,
+        publicKey: new Uint8Array(Buffer.from(existingKey.public_key, 'base64url')),
         counter: existingKey.sign_count || 0,
         transports: existingKey.transports ? JSON.parse(existingKey.transports) : undefined
       },
       requireUserVerification: true
     });
-
-    if (verification.verified) {
-      db.updatePasskeyCounter(existingKey.credential_id, verification.newCounter || 0);
-
-      // Mark session as vault-verified
-      authChallenges.set(sessionId, {
-        ...stored,
-        status: 'VAULT_VERIFIED_AWAITING_UPI',
-        verifiedAt: Date.now()
-      });
-
-      return res.json({
-        success: true,
-        sessionId,
-        orderId: stored.orderId,
-        amount: stored.amount,
-        message: 'Hardware vault verified. Order locked. Proceed to UPI.'
-      });
+    if (!verification.verified) {
+      return res.status(401).json({ success: false, error: 'Vault signature rejected' });
     }
-
-    authChallenges.delete(sessionId);
-    return res.status(401).json({ success: false, error: 'Vault signature rejected' });
+    db.updatePasskeyCounter(existingKey.credential_id, verification.authenticationInfo.newCounter);
+    authChallenges.set(sessionId, {
+      ...stored,
+      status: 'VAULT_VERIFIED_AWAITING_UPI',
+      verifiedAt: Date.now(),
+      expiresAt: Date.now() + 5 * 60 * 1000
+    });
+    return res.json({
+      success: true, sessionId, orderId: stored.orderId,
+      amount: stored.amount, message: 'Hardware vault verified. Proceed to UPI.'
+    });
   } catch (err) {
     console.error('WebAuthn authenticate finish error:', err);
-    res.status(500).json({ success: false, error: 'INTERNAL_SERVER_ERROR' });
+    res.status(400).json({ success: false, error: 'Vault verification failed' });
   }
 });
 
@@ -1378,6 +1340,10 @@ app.post('/api/checkout/finalize-upi', verifyLimiter, async (req, res) => {
     const stored = authChallenges.get(sessionId);
     if (!stored || stored.orderId !== orderId) {
       return res.status(400).json({ success: false, error: 'Invalid session or Order ID mismatch' });
+    }
+    if (Date.now() > stored.expiresAt) {
+      authChallenges.delete(sessionId);
+      return res.status(403).json({ success: false, error: 'VAULT_SESSION_EXPIRED' });
     }
     if (stored.status !== 'VAULT_VERIFIED_AWAITING_UPI') {
       return res.status(403).json({
