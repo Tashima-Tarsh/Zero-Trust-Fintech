@@ -118,8 +118,6 @@ function createPlatformControl({db,getAuth,clerkEmailResolver=getClerkVerifiedEm
    if(active()&&EMAIL.test(ownerEmail()))await ensureOwnerTestTenant();
    console.log('[Platform Control] initialized; controlled access '+(active()?'ENABLED':'not yet activated'));
  }
- // Legacy synchronous shortcut must never bypass verified Clerk identity.
- function isOwner(userId){return false;}
  const accessError=(code,message)=>Object.assign(err(403,message),{code});
  async function verifyMerchant(userId,auth){
    if(await verifiedOwner(userId)){
@@ -201,7 +199,9 @@ function createPlatformControl({db,getAuth,clerkEmailResolver=getClerkVerifiedEm
  });
  router.get('/owner/me',wrap(async(req,res)=>{
    const t=await pool.query("SELECT id,business_name,is_internal_test FROM saas_merchants WHERE id=$1 AND is_internal_test=TRUE",[ownerTenantId()]);
-   res.set('Cache-Control','no-store').json({success:true,role:'PLATFORM_OWNER',testTenant:t.rows[0]||null});
+   res.set('Cache-Control','no-store').json({success:true,role:'PLATFORM_OWNER',superAdmin:true,ownerEmail:SUPER_ADMIN_EMAIL,
+      permissions:['MERCHANT_APPROVAL','MERCHANT_INVITATION','TENANT_STATUS','TRANSACTION_OVERSIGHT','VAULT_EVIDENCE','FINANCIAL_LEDGER','INCIDENT_MANAGEMENT','PLATFORM_AUDIT'],
+      testTenant:t.rows[0]||null});
  }));
  router.get('/owner/configuration',wrap(async(req,res)=>{
    const [profile,personal,company,companyAccounts]=await Promise.all([
@@ -413,6 +413,6 @@ function createPlatformControl({db,getAuth,clerkEmailResolver=getClerkVerifiedEm
    res.set('Cache-Control','no-store').json({success:true,events:r.rows});
  }));
  router.use((error,req,res,next)=>{if(res.headersSent)return next(error);if(!error.status||error.status>=500)console.error('[Platform Control]',error.message);res.status(error.status||500).set('Cache-Control','no-store').json({success:false,error:error.status?error.message:'Platform service unavailable',code:error.code||null});});
- return {router,init,verifyMerchant,verifiedOwner,isOwner,active};
+ return {router,init,verifyMerchant,verifiedOwner,active};
 }
 module.exports={createPlatformControl};
