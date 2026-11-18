@@ -312,40 +312,72 @@
   </div>
 
   <script>
-    // Extract query parameters
     const params = new URLSearchParams(window.location.search);
-    const utr = params.get('utr') || '631902' + Math.floor(100000 + Math.random() * 900000);
-    const amount = parseFloat(params.get('amount') || '250.34');
-    const orderId = params.get('orderId') || 'ORD_' + Math.random().toString(36).substring(2, 9).toUpperCase();
-    const txId = params.get('txId') || 'TX_' + Math.random().toString(36).substring(2, 10).toUpperCase();
-    const sender = params.get('sender') || 'customer@okhdfcbank';
-    const vpa = params.get('vpa') || 'ramesh.kirana@okhdfcbank';
-    const rawTime = params.get('time');
+    const orderId = params.get('orderId');
+    const token = params.get('token');
+    const statusMsg = params.get('status');
 
-    const paymentDate = rawTime ? new Date(parseInt(rawTime, 10) || rawTime) : new Date();
-    const formattedDate = new Intl.DateTimeFormat('en-IN', {
-      dateStyle: 'medium',
-      timeStyle: 'medium',
-      timeZone: 'Asia/Kolkata'
-    }).format(paymentDate);
+    if (!orderId || !token) {
+      document.body.innerHTML = '<div style="text-align:center;padding:40px;font-family:Inter,sans-serif;color:#dc2626;"><h2>Invalid receipt link</h2><p>Order ID and session token are required to view a verified receipt.</p><a href="/" style="color:#2563eb;">Create another payment</a></div>';
+    } else {
+      fetch('/api/ledger/' + encodeURIComponent(orderId) + '?token=' + encodeURIComponent(token))
+        .then(async (r) => {
+          const data = await r.json();
+          if (!r.ok || !data.success) {
+            throw new Error(data.error || 'Receipt not found');
+          }
+          return data;
+        })
+        .then((data) => {
+          const settled = data.status === 'SUCCESS' && Boolean(data.utr);
+          const amount = settled ? Number(data.baseAmount || data.challengeAmount) : 0;
+          const utr = settled ? data.utr : '—';
+          const txId = settled ? ('TX_' + orderId.slice(-8)) : '—';
+          const vpa = data.vpaAddress || '—';
 
-    document.getElementById('successAmount').textContent = '₹' + amount.toFixed(2);
-    document.getElementById('payerVpaVal').textContent = sender;
-    document.getElementById('merchantVpaVal').textContent = vpa;
-    document.getElementById('paymentTimestampVal').textContent = formattedDate + ' IST';
-    document.getElementById('successUtr').textContent = utr;
-    document.getElementById('successOrderId').textContent = orderId;
-    document.getElementById('successTxId').textContent = txId;
-    document.getElementById('ledgerDebit').textContent = '+₹' + amount.toFixed(2);
-    document.getElementById('ledgerCredit').textContent = '+₹' + amount.toFixed(2);
+          document.getElementById('successAmount').textContent = settled ? '₹' + amount.toFixed(2) : '₹0.00';
+          document.getElementById('merchantVpaVal').textContent = vpa;
+          document.getElementById('successUtr').textContent = utr;
+          document.getElementById('successOrderId').textContent = orderId;
+          document.getElementById('successTxId').textContent = txId;
+          document.getElementById('ledgerDebit').textContent = settled ? '+₹' + amount.toFixed(2) : '—';
+          document.getElementById('ledgerCredit').textContent = settled ? '+₹' + amount.toFixed(2) : '—';
+
+          const label = document.querySelector('.section-label');
+          const heading = document.querySelector('h1');
+          const sub = document.querySelector('.success-container p');
+          if (settled) {
+            label.textContent = 'INSTANT DIRECT SETTLEMENT CONFIRMED';
+            heading.textContent = 'Payment Successfully Verified!';
+            sub.textContent = 'Direct bank credit confirmed via DISHA 7-Layer Zero-Trust cryptographic engine.';
+          } else {
+            label.textContent = 'PAYMENT PENDING VERIFICATION';
+            heading.textContent = 'Payment Not Yet Settled';
+            sub.textContent = 'This order has not been confirmed as settled. The receipt reflects observed state only, not bank-confirmed funds.';
+            document.querySelectorAll('.security-check-row strong').forEach((s) => { s.textContent = 'PENDING'; s.style.color = '#b45309'; });
+            document.querySelector('.security-badge-section span[style*="color: #059669"]').textContent = '0/7 PASSED';
+            document.querySelector('.security-badge-section span[style*="color: #059669"]').style.color = '#b45309';
+          }
+        })
+        .catch((err) => {
+          document.body.innerHTML = '<div style="text-align:center;padding:40px;font-family:Inter,sans-serif;color:#dc2626;"><h2>Receipt unavailable</h2><p>' + err.message + '</p><a href="/" style="color:#2563eb;">Create another payment</a></div>';
+        });
+    }
 
     window.copyUtr = function() {
-      navigator.clipboard.writeText(utr);
-      alert('Bank UTR copied: ' + utr);
+      const el = document.getElementById('successUtr');
+      const val = el ? el.textContent : '';
+      if (val && val !== '—') {
+        navigator.clipboard.writeText(val);
+        alert('Bank UTR copied: ' + val);
+      }
     };
 
     window.shareReceipt = function() {
-      const text = `DISHA 8.2 Payment Confirmation\nOrder: ${orderId}\nAmount: ₹${amount.toFixed(2)}\nUTR: ${utr}\nStatus: Confirmed & Settled`;
+      const el = document.getElementById('successUtr');
+      const amt = document.getElementById('successAmount');
+      const val = el ? el.textContent : '—';
+      const text = `DISHA 8.2 Payment Confirmation\nOrder: ${orderId}\nAmount: ${amt ? amt.textContent : '₹0.00'}\nUTR: ${val}\nStatus: ${document.querySelector('.section-label') ? document.querySelector('.section-label').textContent : 'Unknown'}`;
       if (navigator.share) {
         navigator.share({ title: 'DISHA Payment Receipt', text, url: window.location.href }).catch(() => {});
       } else {
