@@ -88,6 +88,22 @@ async function testBrowserMount(file,method){
  assert.deepEqual(mounts,[method],'Clerk must mount the merchant auth form');
 }
 (async()=>{
+ // Premium layout is shared while Clerk owns the complete auth lifecycle.
+ for(const [page,mode] of [['merchant-login.html','signin'],['merchant-signup.html','signup']]){
+  const html=read('public/'+page);
+  assert.match(html,/href="\/merchant-auth\.css"/,'Use shared production auth design');
+  assert.match(html,/class="auth-shell"/,'Use accessible split-screen layout');
+  assert.match(html,/data-mode="/,'Expose the selected auth mode');
+  assert.match(html,new RegExp('data-mode="'+mode+'"'),'Page must have correct mode');
+  assert.match(html,/aria-label="Merchant authentication"/);
+  assert.match(html,/forceRedirectUrl:'\/dashboard'/);
+  assert.match(html,/window\.Clerk\.mountSign/,'Clerk must own sign-in and signup');
+ }
+ const policy=require('../public/merchant-password-policy.js');
+ assert.equal(policy.MIN_PASSWORD_LENGTH,10);
+ assert.equal(policy.isAllowedPassword('123456789'),false,'Reject 9 characters');
+ assert.equal(policy.isAllowedPassword('1234567890'),true,'Accept exactly 10 characters');
+ assert.equal(policy.isAllowedPassword('12345678901234567890'),true,'Accept longer passwords');
  await testBrowserMount('merchant-login.html','SignIn');
  await testBrowserMount('merchant-signup.html','SignUp');
  console.log('CLERK_MERCHANT_AUTH_PASS: valid Clerk keys, CSP, CDN bootstrap and merchant forms.');
