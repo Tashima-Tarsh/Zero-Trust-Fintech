@@ -169,7 +169,7 @@ async function setupMerchant(event){
  try{
   const d=await api('/api/merchant/setup',{method:'POST',
    body:JSON.stringify({businessName:plain($('#setupBusinessName').value),
-     primaryVpa:plain($('#setupPrimaryVpa').value)})});
+     primaryVpa:plain($('#setupPrimaryVpa').value),accountType:$('#setupAccountType').value,mcc:$('#setupMcc').value.trim()})});
   merchant=d.merchant;merchantHeader();await loadVpas();await loadOverview();toast('Workspace activated');
  }catch(error){toast(error.message)}finally{busy(button,false)}
 }
@@ -189,6 +189,7 @@ async function loadOverview(){
   $('#metricVolume').textContent=money(metrics.totalVolume);
   $('#metricCompleted').textContent=num(metrics.completedTransactions);
   $('#metricPending').textContent=num(metrics.pendingTransactions);
+  $('#metricOrders').textContent=num(metrics.totalTransactions);
   $('#recentTable').innerHTML=orderTable(orders.slice(0,7),true);
   const pct=Number(metrics.successRate)||0;
   $('#completionRate').textContent=pct+'%';
@@ -243,9 +244,9 @@ async function loadVpas(){
   $('#vpaTotal').textContent=num(vpas.length);
   $('#vpaActive').textContent=num(vpas.filter(v=>v.status==='ACTIVE').length);
   $('#vpaPaused').textContent=num(vpas.filter(v=>v.status==='PAUSED').length);
-  $('#vpaCooldown').textContent='0';
+  $('#vpaDefault').textContent=num(vpas.filter(v=>v.is_default).length);
   $('#vpaTable').innerHTML=vpas.length?vpas.map(v=>
-   '<tr><td><strong>'+esc(v.vpa_address)+'</strong></td><td>'+esc(v.bank_name||'—')+'</td>'+
+   '<tr><td><strong>'+esc(v.vpa_address)+'</strong></td><td>'+esc((v.bank_name||'—')+' · '+(v.account_type==='MERCHANT'?'P2M':'P2P'))+'</td>'+
    '<td><span class="state '+(v.status==='ACTIVE'?'active':'paused')+'">'+esc(v.status)+'</span></td>'+
    '<td>'+(v.is_default?'Primary':'—')+'</td><td>'+
    (v.is_default?'':'<button type="button" class="btn-inline" data-vpa-action="set_default" data-vpa-id="'+esc(v.id)+'">Make primary</button>')+
@@ -269,7 +270,7 @@ async function addVpa(e){
  e.preventDefault();busy(e.submitter,true);
  try{
   await api('/api/merchant/vpas',{method:'POST',body:JSON.stringify({
-   vpaAddress:$('#vpaAddress').value.trim(),bankName:$('#vpaBank').value.trim()
+   vpaAddress:$('#vpaAddress').value.trim(),bankName:$('#vpaBank').value.trim(),accountType:$('#vpaAccountType').value,mcc:$('#vpaMcc').value.trim()
   })});
   $('#addVpaForm').reset();await loadVpas();toast('Receiving UPI ID added');
  }catch(error){toast(error.message)}finally{busy(e.submitter,false)}
