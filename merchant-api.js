@@ -21,9 +21,21 @@ const accountConfig = input => {
   return {type,mcc};
 };
 function upi(o,holder,amount,description,orderId){
-  const base={pa:o.vpa_address,pn:holder,am:amount,tn:description.slice(0,40),maxAmount:maxPayment()};
-  if(o.account_type==='MERCHANT')return require('./utils/upi-intent').buildUpiUri({...base,kind:'P2M',mc:o.mcc,tr:orderId.replace(/[^A-Za-z0-9]/g,'').slice(0,35)});
-  return require('./utils/upi-intent').buildUpiUri({...base,kind:'P2P'});
+  const type=String(o.account_type||'').toUpperCase();
+  if(!['PERSONAL','MERCHANT'].includes(type))
+    throw fail(409,'UPI_ACCOUNT_TYPE_UNVERIFIED');
+  const payeeName=val(holder||o.holder_name,40);
+  if(payeeName.length<2)throw fail(409,'UPI_PAYEE_NAME_REQUIRED');
+  const base={pa:vpa(o.vpa_address),pn:payeeName,am:amount,
+    tn:val(description||'Payment',50),maxAmount:maxPayment()};
+  const {buildUpiUri}=require('./utils/upi-intent');
+  if(type==='MERCHANT'){
+    if(!/^\d{4}$/.test(String(o.mcc||''))||o.mcc==='0000')
+      throw fail(409,'BANK_ISSUED_MCC_REQUIRED_FOR_P2M');
+    return buildUpiUri({...base,kind:'P2M',mc:o.mcc,
+      tr:orderId.replace(/[^A-Za-z0-9]/g,'').slice(0,35)});
+  }
+  return buildUpiUri({...base,kind:'P2P'});
 }
 const merchantHolder = v => {
   const name=val(v,100);
@@ -175,6 +187,9 @@ function createMerchantApi({db,getAuth,buildUpiUri,platformControl}) {
       "amount_paise BIGINT NOT NULL CHECK(amount_paise>0),description TEXT NOT NULL DEFAULT '',"+
       "external_reference TEXT NOT NULL DEFAULT '',vpa_address TEXT NOT NULL,"+
       "created_at BIGINT NOT NULL,expires_at BIGINT NOT NULL);"+
+       "ALTER TABLE saas_merchant_orders ADD COLUMN IF NOT EXISTS payee_name TEXT;"+
+       "ALTER TABLE saas_merchant_orders ADD COLUMN IF NOT EXISTS payee_account_type TEXT;"+
+       "ALTER TABLE saas_merchant_orders ADD COLUMN IF NOT EXISTS payee_mcc TEXT;"+
       "CREATE INDEX IF NOT EXISTS idx_saas_orders_tenant ON saas_merchant_orders(merchant_id,created_at DESC);"+
       "CREATE TABLE IF NOT EXISTS saas_merchant_notifications ("+
       "id TEXT PRIMARY KEY,merchant_id TEXT NOT NULL REFERENCES saas_merchants(id),"+
@@ -205,9 +220,22 @@ function createMerchantApi({db,getAuth,buildUpiUri,platformControl}) {
       [req.params.orderId,token]);
     if(!r.rowCount)throw fail(404,'Payment request not found');
     const o=r.rows[0],amount=Number(o.amount_paise)/100;
-    const setting=await db.pgPool.query('SELECT account_type,mcc FROM saas_merchant_vpas WHERE merchant_id=$1 AND vpa_address=$2',
-      [o.merchant_id,o.vpa_address]);
-    const uri=upi({...o,...(setting.rows[0]||{})},o.business_name,amount,o.description||'Payment',o.id);
+    // Prefer the immutable payee snapshot stored with this payment session.
+    // Never change an issued payment's account type or MCC on later VPA edits.
+    let payee={vpa_address:o.vpa_address,
+      account_type:o.payee_account_type,mcc:o.payee_mcc,
+      holder_name:o.payee_name};
+    if(!payee.account_type){
+      // Backward compatibility for orders created before snapshot migration:
+      // no silent P2P fallback if the historical merchant account is missing.
+      const prior=await db.pgPool.query(
+        'SELECT account_type,mcc,holder_name FROM saas_merchant_vpas WHERE merchant_id=$1 AND vpa_address=$2',
+        [o.merchant_id,o.vpa_address]);
+      if(!prior.rowCount)throw fail(409,'PAYEE_CONFIG_UNAVAILABLE');
+      payee={...payee,...prior.rows[0]};
+    }
+    const uri=upi(payee,payee.holder_name||o.business_name,
+      amount,o.description||'Payment',o.id);
     res.set('Cache-Control','no-store').json({success:true,order:{
       id:o.id,amount,business_name:o.business_name,vpa_address:o.vpa_address,
       description:o.description,status:invoiceStatus(o),expires_at:Number(o.expires_at),
@@ -425,19 +453,26 @@ function createMerchantApi({db,getAuth,buildUpiUri,platformControl}) {
         receiving = await selectMerchantVPA(c, req.merchant.id, amount);
         if(!receiving)throw fail(409,'No healthy receiving UPI ID available');
       }
+      const accountType=String(receiving.account_type||'').toUpperCase();
+      const payeeName=accountType==='MERCHANT'
+        ? val(req.merchant.business_name,100)
+        : val(receiving.holder_name||req.merchant.business_name,100);
+      // Validate exact P2P/P2M URI before persisting the order.
+      const payee={vpa_address:receiving.vpa_address,account_type:accountType,mcc:receiving.mcc};
+      const checkoutUri=upi(payee,payeeName,amount,description,orderId);
       const txnRef=id('TXN_');
       await c.query(
         'INSERT INTO sessions(session_id,order_id,challenge_amount,base_amount,txn_ref,vpa_address,status,state,created_at,expires_at,qr_refresh_at) '+
         "VALUES($1,$2,$3,$3,$4,$5,'PENDING','WAITING',$6,$7,$8)",
         [sessionId,orderId,amount,txnRef,receiving.vpa_address,createdAt,expiresAt,createdAt+15000]);
       await c.query(
-        'INSERT INTO saas_merchant_orders(id,merchant_id,session_id,amount_paise,description,external_reference,vpa_address,created_at,expires_at) '+
-        'VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9)',
-        [orderId,req.merchant.id,sessionId,paise,description,externalReference,receiving.vpa_address,createdAt,expiresAt]);
+        'INSERT INTO saas_merchant_orders(id,merchant_id,session_id,amount_paise,description,external_reference,vpa_address,created_at,expires_at,payee_name,payee_account_type,payee_mcc) '+
+        'VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)',
+        [orderId,req.merchant.id,sessionId,paise,description,externalReference,receiving.vpa_address,createdAt,expiresAt,payeeName,accountType,accountType==='MERCHANT'?receiving.mcc:null]);
       await notify(c,req.merchant.id,'Payment request created','Request '+orderId+' created for ₹'+amount.toFixed(2));
       await c.query('COMMIT');
     }catch(e){await c.query('ROLLBACK');throw e;}finally{c.release();}
-    const uri=upi(receiving,req.merchant.business_name,amount,description,orderId);
+    const uri=checkoutUri;
     res.status(201).json({success:true,order:{
       id:orderId,amount,description,vpa_address:receiving.vpa_address,
       status:'PENDING',expires_at:expiresAt,
