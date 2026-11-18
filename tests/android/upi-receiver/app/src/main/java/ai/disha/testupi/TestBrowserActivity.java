@@ -45,7 +45,9 @@ public final class TestBrowserActivity extends Activity {
                 return false;
             }
             @Override public void onPageFinished(WebView view, String url) {
-                Log.i(TAG, "WEBVIEW_PAGE_FINISHED " + url);
+                Uri page = Uri.parse(url);
+                // Never write bearer query parameters to public CI artifacts.
+                Log.i(TAG, "WEBVIEW_PAGE_FINISHED " + page.getPath());
                 snapshot();
             }
             @Override public void onReceivedError(WebView view, WebResourceRequest request,
@@ -81,7 +83,15 @@ public final class TestBrowserActivity extends Activity {
             setContentView(blocked);
             return;
         }
-        Log.i(TAG,"OPEN_CHECKOUT_FIXTURE");
+        String token = Uri.parse(url).getQueryParameter("token");
+        if (token == null || token.length() != 48) {
+            Log.e(TAG, "CHECKOUT_FIXTURE_TOKEN_MISSING");
+            TextView blocked = new TextView(this);
+            blocked.setText("INVALID TEST CHECKOUT TOKEN");
+            setContentView(blocked);
+            return;
+        }
+        Log.i(TAG,"OPEN_CHECKOUT_FIXTURE_TOKEN_PRESENT");
         webView.loadUrl(url);
     }
 
