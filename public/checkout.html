@@ -17,7 +17,7 @@
 <script defer src="/vendor/simplewebauthn.umd.js"></script>
 <script defer src="/one-touch-vault.js"></script>
 <script defer src="/cosmic-checkout-model.js?v=intent-gesture2"></script>
-<script defer src="/cosmic-checkout.js?v=production-timer3"></script>
+<script defer src="/cosmic-checkout.js?v=account-kind4"></script>
 </head>
 <body data-checkout="generic">
 <div class="universe" aria-hidden="true">
@@ -34,6 +34,7 @@
   <section data-stage="initial" class="stage stage-initial" aria-label="Begin payment">
    <p class="eyebrow">PAYMENT</p>
    <div id="payAmount" class="amount" aria-label="Amount to pay">—</div>
+   <p id="paymentKind" class="checkout-payment-kind" aria-live="polite">Checking receiving account…</p>
    <div class="vault-scene" aria-hidden="true">
     <div class="vault-atmosphere"></div>
     <img class="vault-art" src="/assets/disha-vault-sculpture.svg" width="320" height="320" alt="" decoding="async">
