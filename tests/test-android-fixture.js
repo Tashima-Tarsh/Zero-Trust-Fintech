@@ -17,6 +17,13 @@ assert.match(activity,/snapshotHandler\.postDelayed\(this, 1200\)/,
   'WebView must emit periodic DOM snapshots itself');
 assert.match(activity,/WEBVIEW_RENDER_PROCESS_GONE/,
   'WebView renderer failures must be visible in CI');
+assert.match(harness,/shlex\.quote\(CHECKOUT\)/,
+  'ADB shell must quote ampersands so the checkout bearer token is not stripped');
+assert.match(activity,/CHECKOUT_FIXTURE_TOKEN_MISSING/,
+  'An incomplete Activity URL must fail before silently loading checkout');
+const runner=fs.readFileSync(path.join(__dirname,'android','run-emulator-tests.sh'),'utf8');
+assert.match(runner,/intent-logcat-live\.txt/,
+  'Android test must stream logcat instead of repeatedly reconnecting ADB');
 (async()=>{
  const child=spawn(process.execPath,[path.join(__dirname,'android','fixture-server.js')],{
   cwd:path.join(__dirname,'..'),
