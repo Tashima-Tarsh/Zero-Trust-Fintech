@@ -9,6 +9,7 @@
         <!-- Instrumented WebView client; not shipped in the merchant product. -->
         <activity
             android:name=".TestBrowserActivity"
+            android:launchMode="singleTop"
             android:exported="true"
             android:label="DISHA Browser Test"/>
         <!-- Receives ACTION_VIEW upi://pay intents without contacting a bank. -->
