@@ -20,7 +20,7 @@ const document={body:{dataset:{checkout:'merchant'}},visibilityState:'visible',
  getElementById:element,addEventListener(key,fn){callbacks[key]=fn}};
 const location={search:'?orderId='+id+'&token='+token,assign(link){location.opened=link}};
 const state={ledger:'PENDING',utr:null,authorized:0,handoff:false,hidden:0,posted:0,qr:null,failAuth:true};
-let preferred=null;
+let preferred='phonepe'; // Returning user's preference must NOT auto-launch after async WebAuthn
 const vault={getPendingOrderId:()=>state.handoff?id:null,
  authorize:async()=>{state.authorized++;
   if(state.failAuth){
@@ -70,6 +70,7 @@ async function flush(){for(let i=0;i<20;i++)await Promise.resolve()}
  await nodes.btnOneTouch.events.click();
  assert.equal(state.authorized,2);
  assert.equal(active(),'methods');
+ assert.equal(location.opened,undefined,'No Android intent without a fresh post-passkey app tap');
  nodes.showQr.events.click();
  assert.equal(active(),'qr');
  assert.equal(state.qr,uri);
