@@ -250,6 +250,23 @@ function setupSqliteTables() {
     );
     CREATE INDEX IF NOT EXISTS idx_utr_order_bindings_order ON utr_order_bindings(order_id);
 
+    -- Velocity control: per-VPA hourly transaction count (anti-ban drip-feed)
+    CREATE TABLE IF NOT EXISTS vpa_hourly_txns (
+      vpa_address TEXT NOT NULL,
+      hour_bucket INTEGER NOT NULL,
+      count INTEGER NOT NULL DEFAULT 0,
+      PRIMARY KEY (vpa_address, hour_bucket)
+    );
+    CREATE INDEX IF NOT EXISTS idx_vpa_hourly_txns_vpa ON vpa_hourly_txns(vpa_address);
+
+    -- Cancellation cooldown tracking per session
+    CREATE TABLE IF NOT EXISTS session_cooldowns (
+      order_id TEXT PRIMARY KEY,
+      last_cancel_at INTEGER NOT NULL,
+      cooldown_until INTEGER NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS idx_session_cooldowns_order ON session_cooldowns(order_id);
+
     CREATE TABLE IF NOT EXISTS image_hashes (
       id TEXT PRIMARY KEY,
       image_hash TEXT UNIQUE NOT NULL,
@@ -675,6 +692,80 @@ function bindUtrToOrder(utr, orderId) {
 }
 
 /**
+ * Velocity Control: per-VPA hourly transaction count.
+ * Returns true if the VPA is under the hourly limit (safe to use).
+ * Returns false if the VPA has hit the limit (should route elsewhere).
+ */
+function checkVpaVelocity(vpaAddress, maxPerHour = 15) {
+  if (!vpaAddress || !sqliteDb) return true;
+  try {
+    const hourBucket = Math.floor(Date.now() / (60 * 60 * 1000));
+    const row = sqliteDb.prepare(
+      `SELECT count FROM vpa_hourly_txns WHERE vpa_address = ? AND hour_bucket = ?`
+    ).get(vpaAddress, hourBucket);
+    const current = row ? row.count : 0;
+    return current < maxPerHour;
+  } catch (e) {
+    return true; // fail-open: if DB fails, don't block transactions
+  }
+}
+
+/**
+ * Increment the hourly transaction count for a VPA.
+ * Call after a successful session creation (not after payment).
+ */
+function incrementVpaVelocity(vpaAddress) {
+  if (!vpaAddress || !sqliteDb) return;
+  try {
+    const hourBucket = Math.floor(Date.now() / (60 * 60 * 1000));
+    sqliteDb.prepare(`
+      INSERT INTO vpa_hourly_txns (vpa_address, hour_bucket, count) VALUES (?, ?, 1)
+      ON CONFLICT(vpa_address, hour_bucket) DO UPDATE SET count = count + 1
+    `).run(vpaAddress, hourBucket);
+  } catch (e) {
+    // fail silently
+  }
+}
+
+/**
+ * Check if a session is in cancellation cooldown.
+ * Returns { inCooldown: true, secondsRemaining } or { inCooldown: false }.
+ */
+function checkSessionCooldown(orderId) {
+  if (!orderId || !sqliteDb) return { inCooldown: false };
+  try {
+    const row = sqliteDb.prepare(
+      `SELECT cooldown_until FROM session_cooldowns WHERE order_id = ? LIMIT 1`
+    ).get(orderId);
+    if (!row) return { inCooldown: false };
+    const now = Date.now();
+    if (now >= row.cooldown_until) {
+      return { inCooldown: false };
+    }
+    return { inCooldown: true, secondsRemaining: Math.ceil((row.cooldown_until - now) / 1000) };
+  } catch (e) {
+    return { inCooldown: false };
+  }
+}
+
+/**
+ * Set a cancellation cooldown on a session (2 minutes default).
+ */
+function setSessionCooldown(orderId, cooldownMs = 120 * 1000) {
+  if (!orderId || !sqliteDb) return;
+  try {
+    const now = Date.now();
+    const cooldownUntil = now + cooldownMs;
+    sqliteDb.prepare(`
+      INSERT INTO session_cooldowns (order_id, last_cancel_at, cooldown_until) VALUES (?, ?, ?)
+      ON CONFLICT(order_id) DO UPDATE SET last_cancel_at = ?, cooldown_until = ?
+    `).run(orderId, now, cooldownUntil, now, cooldownUntil);
+  } catch (e) {
+    // fail silently
+  }
+}
+
+/**
  * Passkey / WebAuthn credential storage
  */
 function savePasskey(userId, credentialId, publicKey, counter = 0, deviceType = null, backedUp = 0, transports = null) {
@@ -998,5 +1089,9 @@ module.exports = {
   savePasskey,
   findPasskeyByCredentialId,
   findPasskeysByUserId,
-  updatePasskeyCounter
+  updatePasskeyCounter,
+  checkVpaVelocity,
+  incrementVpaVelocity,
+  checkSessionCooldown,
+  setSessionCooldown
 };

@@ -189,6 +189,23 @@
             <p class="text-[11px] font-mono text-emerald-700 mb-2">✅ Vault verified — order locked.</p>
             <p class="text-[11px] font-sans text-slate-700 mb-3">Tap your UPI app to complete payment.</p>
           </div>
+
+          <!-- P2P Merchant Prompt Guidance -->
+          <div class="w-full mb-3 p-3 rounded-xl bg-amber-50 border border-amber-200 text-amber-900 text-xs">
+            <p class="font-bold mb-1">📋 Important — When your UPI app asks:</p>
+            <p class="mb-2">Select <strong>"Pay to Friend"</strong> or <strong>"Personal Payment"</strong>. <br>
+            Do <strong>not</strong> select "Merchant Payment" — your VPA is personal, not a registered merchant terminal.</p>
+          </div>
+
+          <!-- Cancellation Cooldown UI -->
+          <div id="cooldownBanner" class="w-full mb-3 p-3 rounded-xl bg-rose-50 border border-rose-200 text-rose-900 text-xs hidden">
+            <p class="font-bold mb-1">⏳ Cooldown Active</p>
+            <p id="cooldownText" class="mb-2">Please wait <span id="cooldownSeconds">120</span>s before retrying.</p>
+            <button type="button" id="btnRetryAfterCooldown" class="w-full h-10 rounded-xl bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs shadow-sm transition-all active:scale-[0.99]">
+              Check if Cooldown Expired
+            </button>
+          </div>
+
           <div class="w-full grid grid-cols-4 gap-2 mb-3">
             <button type="button" id="btnLaunchGPay" class="h-11 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-sm shadow-sm transition-all active:scale-[0.99]" title="Google Pay">
               <span class="text-lg">💳</span>
@@ -317,6 +334,11 @@
     const btnLaunchPaytm = document.getElementById('btnLaunchPaytm');
     const btnLaunchGeneric = document.getElementById('btnLaunchGeneric');
 
+    // Cooldown UI elements
+    const cooldownBanner = document.getElementById('cooldownBanner');
+    const cooldownSeconds = document.getElementById('cooldownSeconds');
+    const btnRetryAfterCooldown = document.getElementById('btnRetryAfterCooldown');
+
     const statusCard = document.getElementById('statusCard');
     const statusTitle = document.getElementById('statusTitle');
     const statusDesc = document.getElementById('statusDesc');
@@ -328,6 +350,8 @@
     let currentSession = null;
     let currentUpIUri = null;
     let vaultSessionId = null;
+    let cooldownUntil = 0;
+    let cooldownTimer = null;
 
     /* ========================================================================
        UTILITIES
@@ -357,6 +381,47 @@
       btn.textContent = isLoading ? loadingText : normalText;
       btn.classList.toggle('opacity-70', isLoading);
       btn.classList.toggle('cursor-not-allowed', isLoading);
+    }
+
+    /* ========================================================================
+       COOLDOWN UTILITIES
+       ======================================================================== */
+    function startCooldown(seconds) {
+      cooldownUntil = Date.now() + seconds * 1000;
+      cooldownBanner.classList.remove('hidden');
+      // Disable all launch buttons
+      [btnLaunchGPay, btnLaunchPhonePe, btnLaunchPaytm, btnLaunchGeneric].forEach(btn => {
+        btn.disabled = true;
+        btn.classList.add('opacity-50', 'cursor-not-allowed');
+      });
+      if (cooldownTimer) clearInterval(cooldownTimer);
+      cooldownTimer = setInterval(() => {
+        const remaining = Math.ceil((cooldownUntil - Date.now()) / 1000);
+        if (remaining <= 0) {
+          endCooldown();
+        } else {
+          cooldownSeconds.textContent = remaining;
+        }
+      }, 1000);
+    }
+
+    function endCooldown() {
+      if (cooldownTimer) {
+        clearInterval(cooldownTimer);
+        cooldownTimer = null;
+      }
+      cooldownBanner.classList.add('hidden');
+      cooldownUntil = 0;
+      [btnLaunchGPay, btnLaunchPhonePe, btnLaunchPaytm, btnLaunchGeneric].forEach(btn => {
+        btn.disabled = false;
+        btn.classList.remove('opacity-50', 'cursor-not-allowed');
+      });
+    }
+
+    async function checkCooldownFromServer(orderId) {
+      // Cooldown is enforced client-side via cooldownUntil timestamp.
+      // Server-side cooldown is checked in /api/cfc/cancel and CFC endpoint.
+    }
     }
 
     /* ========================================================================
@@ -559,7 +624,15 @@
     /* ========================================================================
        4. LAUNCH UPI INTENT (after vault verify)
        ======================================================================== */
+    /* ========================================================================
+       4. LAUNCH UPI INTENT (after vault verify)
+       ======================================================================== */
     function launchUPIIntent(app) {
+      // Cooldown check: block if cancellation cooldown is active
+      if (Date.now() < cooldownUntil) {
+        showStatus('error', 'Cooldown Active', `Please wait ${Math.ceil((cooldownUntil - Date.now()) / 1000)}s before retrying.`);
+        return;
+      }
       if (!vaultSessionId) {
         showStatus('error', 'Vault Not Verified', 'Please verify the device vault first.');
         return;
@@ -581,6 +654,15 @@
     btnLaunchPhonePe.addEventListener('click', () => launchUPIIntent('phonepe'));
     btnLaunchPaytm.addEventListener('click', () => launchUPIIntent('paytm'));
     btnLaunchGeneric.addEventListener('click', () => launchUPIIntent('generic'));
+
+    btnRetryAfterCooldown.addEventListener('click', () => {
+      // Check if cooldown has expired
+      if (Date.now() >= cooldownUntil) {
+        endCooldown();
+      } else {
+        showStatus('error', 'Still in Cooldown', `Please wait ${Math.ceil((cooldownUntil - Date.now()) / 1000)}s.`);
+      }
+    });
 
     /* ========================================================================
        5. UPI RETURN / FINALIZE
@@ -654,6 +736,41 @@
     });
 
     btnRetrySession.addEventListener('click', initSession);
+
+    // When user returns from UPI app without completing payment, set cancellation cooldown
+    window.addEventListener('pagehide', async () => {
+      if (currentSession && currentSession.orderId) {
+        try {
+          await fetch('/api/cfc/cancel', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ orderId: currentSession.orderId })
+          });
+        } catch (e) {
+          // ignore
+        }
+      }
+    });
+
+    document.addEventListener('visibilitychange', async () => {
+      if (document.visibilityState === 'visible' && currentSession && currentSession.orderId) {
+        // User returned to tab — check if they cancelled (no SUCCESS status in URL)
+        const urlParams = new URLSearchParams(window.location.search);
+        const status = urlParams.get('Status');
+        if (!status || status !== 'SUCCESS') {
+          // Likely cancelled — set cooldown via server endpoint
+          try {
+            await fetch('/api/cfc/cancel', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ orderId: currentSession.orderId })
+            });
+          } catch (e) {
+            // ignore
+          }
+        }
+      }
+    });
 
     // Start
     initSession();

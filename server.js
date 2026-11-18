@@ -460,6 +460,12 @@ function generateSession(baseAmount = 100, description = '', customVpa = null) {
   let vpaAddress = (customVpa && String(customVpa).trim()) ? String(customVpa).trim() : null;
   let merchantType = 'P2P';
   let vpaMcc = null;
+
+  // Velocity control: if custom VPA is at hourly limit, reject
+  if (vpaAddress && !db.checkVpaVelocity(vpaAddress)) {
+    throw new Error('VPA_VELOCITY_LIMIT');
+  }
+
   if (!vpaAddress) {
     let route = null;
     try {
@@ -468,9 +474,22 @@ function generateSession(baseAmount = 100, description = '', customVpa = null) {
       route = null;
     }
     const routeObj = route || {};
-    vpaAddress = routeObj.vpaAddress || process.env.MERCHANT_UPI_ID || 'merchant@upi';
-    merchantType = routeObj.merchantType || 'P2P';
-    vpaMcc = routeObj.mcc || null;
+    // Check velocity on routed VPA; if at limit, find another active VPA under limit
+    if (routeObj.vpaAddress && !db.checkVpaVelocity(routeObj.vpaAddress)) {
+      const activeVPAs = db.getAllActiveVPAs ? db.getAllActiveVPAs() : [];
+      const underLimit = activeVPAs.find(v => db.checkVpaVelocity(v.vpa_address));
+      if (underLimit) {
+        vpaAddress = underLimit.vpa_address;
+        merchantType = underLimit.account_type || 'PERSONAL';
+        vpaMcc = underLimit.mcc || null;
+      } else {
+        throw new Error('ALL_VPAS_AT_VELOCITY_LIMIT');
+      }
+    } else {
+      vpaAddress = routeObj.vpaAddress || process.env.MERCHANT_UPI_ID || 'merchant@upi';
+      merchantType = routeObj.merchantType || 'P2P';
+      vpaMcc = routeObj.mcc || null;
+    }
   } else {
     const mt = db.getVpaMerchantType(vpaAddress);
     merchantType = mt.accountType;
@@ -509,6 +528,8 @@ function generateSession(baseAmount = 100, description = '', customVpa = null) {
     };
     try {
       db.saveSession(session);
+      // Velocity control: increment hourly count for the selected VPA
+      db.incrementVpaVelocity(vpaAddress);
       saved = true;
     } catch (e) {
       lastErr = e;
@@ -523,6 +544,15 @@ function generateSession(baseAmount = 100, description = '', customVpa = null) {
 function generateUPILink(session) {
   // P2P NPCI Specification: upi://pay?pa=&pn=&am=&tn=&cu=INR
   // mc and tr are strictly forbidden for personal VPAs to avoid bank decline before PIN
+  // Metadata Shield: conversational P2P-style tn to avoid bank AI flagging commercial keywords
+  const blockedWords = ['order', 'purchase', 'buy', 'invoice', 'shop', 'cart', 'payment for', 'pay'];
+  const rawTn = session.orderId || session.description || 'Payment';
+  let safeTn = 'Payment for services'; // default conversational P2P note
+  const tnLower = rawTn.toLowerCase();
+  const hasBlocked = blockedWords.some(w => tnLower.includes(w));
+  if (!hasBlocked && rawTn.length > 0 && rawTn.length <= 40) {
+    safeTn = rawTn; // use existing if it's clean and short enough
+  }
   const isMerchantP2M = session.merchantType === 'MERCHANT' && session.mcc && /^\d{4}$/.test(session.mcc) && session.mcc !== '0000';
   if (isMerchantP2M) {
     return buildUpiUri({
@@ -530,7 +560,7 @@ function generateUPILink(session) {
       pa: session.vpaAddress || MERCHANT_UPI_ID,
       pn: MERCHANT_NAME,
       am: session.challengeAmount,
-      tn: session.orderId || session.description || 'Payment',
+      tn: safeTn,
       mc: session.mcc,
       tr: String(session.txnRef || '').replace(/[^A-Za-z0-9]/g, '').substring(0, 35)
     });
@@ -543,7 +573,7 @@ function generateUPILink(session) {
       pa: session.vpaAddress || MERCHANT_UPI_ID,
       pn: MERCHANT_NAME,
       am: session.challengeAmount,
-      tn: session.orderId || session.description || 'Payment'
+      tn: safeTn
     });
   }
 }
@@ -1001,6 +1031,17 @@ app.post('/api/verify-cfc', verifyLimiter, async (req, res) => {
         reason: 'This session has already been settled.'
       });
     }
+    // Cancellation cooldown: reject CFC if user recently cancelled a UPI prompt
+    const cooldown = db.checkSessionCooldown(session.orderId);
+    if (cooldown.inCooldown) {
+      return res.status(400).json({
+        success: false,
+        state: 'COOLDOWN',
+        error: 'CANCELLATION_COOLDOWN',
+        reason: `Please wait ${cooldown.secondsRemaining}s before trying again.`,
+        secondsRemaining: cooldown.secondsRemaining
+      });
+    }
     const timeElapsedMs = now - session.createdAt;
     if (timeElapsedMs < T_MIN_MS) {
       return res.status(200).json({
@@ -1077,6 +1118,29 @@ app.post('/api/verify-cfc', verifyLimiter, async (req, res) => {
     });
   } catch (err) {
     console.error('CFC verification error:', err);
+    res.status(500).json({ success: false, error: 'INTERNAL_SERVER_ERROR' });
+  }
+});
+// ═════════════════════════════════════════════════════════════════════
+// TASK 14: CFC CANCELLATION COOLDOWN — Prevent UPI prompt spam
+// When user cancels the native UPI app (GPay/PhonePe/PayTap), frontend calls
+// this endpoint to set a 2-minute cooldown before they can retry.
+// ═════════════════════════════════════════════════════════════════════
+app.post('/api/cfc/cancel', verifyLimiter, async (req, res) => {
+  try {
+    const { orderId } = req.body || {};
+    if (!orderId) {
+      return res.status(400).json({ success: false, error: 'orderId required' });
+    }
+    db.setSessionCooldown(orderId, 120 * 1000); // 2-minute cooldown
+    db.updateSessionState(orderId, 'CANCELLED');
+    return res.json({
+      success: true,
+      cooldownSeconds: 120,
+      message: 'Cancellation cooldown set. Please wait before retrying.'
+    });
+  } catch (err) {
+    console.error('CFC cancel error:', err);
     res.status(500).json({ success: false, error: 'INTERNAL_SERVER_ERROR' });
   }
 });
