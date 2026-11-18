@@ -1,42 +1,90 @@
-# PostgreSQL authority migration: financial correctness first
+# DISHA 8.2 PostgreSQL authority: tested migration, controlled cutover
 
-## Decision
+## Status
+The repository now implements a **feature-gated** PostgreSQL checkout state store:
+`financial/postgres-store.js` and the existing PostgreSQL ledger.
+`DB_BACKEND=postgres` skips SQLite completely and requires a verified
+`disha_migration_control` marker in PostgreSQL. Without that marker,
+the application refuses to start rather than silently issuing new payment
+sessions against an empty database.
 
-Make the existing Railway PostgreSQL service the **single authoritative store** for merchant payments. Do not declare the migration complete by setting DATABASE_URL: current db.js still initializes SQLite first and writes sessions, passkeys, UTR bindings, and journals there.
+**Do not claim a production migration just because CI passes.**
+CI exercises a disposable PostgreSQL 16 database, not the live Railway volume.
+No automatic production migration or remote backup was performed.
 
-This change introduces a new **additive, not yet live** PostgreSQL financial journal with transactional invariants and real-Postgres CI. Its SQL is under `migrations/001_financial_core.sql`, its private application API under `financial/postgres-ledger.js`. Existing checkout and ledger remain unchanged until full migration.
+## Proof obligations
+- Exact amount representation: `rupeesToPaise("500.01") === "50001"`.
+- Posted journals must contain one debit and one credit, each for exactly
+  the journal amount, and must be immutable thereafter.
+- A UTR, payment order and idempotency key cannot create duplicate journals.
+- Ledger, session state, UTR and optional receipt hash commit or roll back together.
+- Existing sessions, UTR bindings, passkeys and account records must be preserved.
+- Checkout must be exercised with the new PostgreSQL backend, including HTTP,
+  WebSocket, passkeys, fraud checks and restore/restart.
 
-## Mathematical invariants implemented
+These invariants demonstrate **internal financial record integrity**, not
+independent evidence that an external UPI payment has been received.
 
-For each posted journal `j`:
+## Prerequisites before the live switch
+1. Stop new production checkout writes in a controlled maintenance window.
+2. Obtain and verify an **independent off-Railway backup** of
+   `/data/disha82.db` plus any SQLite WAL. Also preserve the existing
+   Railway volume snapshot. Do not delete the source.
+3. Inspect current source SQLite row counts and pending sessions. Confirm the
+   previous `/app/disha82.db` history was not lost on an earlier redeploy.
+4. Confirm sufficient disk space in `/data` for the migration snapshot.
+5. Confirm `DATABASE_URL` is the intended PostgreSQL service; do not paste
+   credentials into GitHub or a public terminal.
 
-1. **Exact representation:** `amount_paise(j)` is a strictly positive 64-bit integer. Input decimal amounts are parsed as strings, never binary floating point; `rupeesToPaise("500.01") = "50001"`.
-2. **Conservation:** `sum(DEBIT.amount_paise) = sum(CREDIT.amount_paise) = j.amount_paise`. This version requires exactly two postings: one debit and one credit. The database enforces this at transaction commit using a deferred constraint trigger.
-3. **Non-duplication:** `UNIQUE(utr)`, `UNIQUE(idempotency_key)`, `UNIQUE(merchant_id, order_id)` prevent replay of a payment reference or order.
-4. **Atomicity:** a `SERIALIZABLE` transaction inserts a journal and its postings and marks the journal posted. An error, a concurrent collision, or an unbalanced journal rolls the transaction back entirely.
-5. **Immutability:** once a journal is posted, its fields and posting rows cannot be changed.
-6. **Isolation:** both postings must reference accounts belonging to the journal's merchant.
+## On the existing service container (Railway SSH)
+Use a Railway CLI authenticated to your account:
 
-These are enforceable **accounting consistency guarantees**. They do not cryptographically prove an external UPI transfer: a passkey signature attests to a device/user action, while an internal ledger entry attests to the application writing a balanced journal. Keeping the two meanings separate is essential to an auditable system.
-
-## Migration sequence before production cutover
-
-**Safety gate:** the current Railway service has a volume at `/data`, but the live SQLite file is under `/app/disha82.db`. A new deployment may replace that ephemeral file. Obtain a consistent SQLite backup from the running container and take an independent protected backup before any cutover. Confirm recovery by opening the backup read-only and checking `PRAGMA integrity_check` and table counts. If the old container has already been replaced, investigate recoverability rather than inventing missing history.
-
-1. **Inventory:** count rows and SHA-256 canonicalized exports for `sessions`, `passkeys`, `utr_order_bindings`, `transactions`, `ledger_entries`, `vpa_pool`, and fraud/audit tables. Resolve duplicates, foreign key discrepancies and money rounding *before* import.
-2. **Stage:** run migrations only against a backup/restored staging PostgreSQL, never the production instance as an unreviewed command. Import records with stable IDs and exact integer paise, verify counts, sums, duplicates, orphaned references and passkey counters. Do not mark legacy records POSTED without provenance and a balanced journal.
-3. **Replace all synchronous SQLite clients:** refactor `db.js`, `server.js`, `vpa-router.js`, `vpa-importer.js`, IP-whitelist/admin routes, and downstream tests to fully asynchronous PostgreSQL queries. Do not leave SQLite as an implicit fallthrough. Explicitly reject unavailable PostgreSQL at startup when `DB_BACKEND=postgres`.
-4. **Guarantee checkout semantics:** authenticated registration/access to passkeys, per-order ownership, session token restrictions, replay-resistant UTR binding, and no update that can bypass posted-journal immutability. Commit related ledger and state mutations in one transaction.
-5. **Rehearse:** test checkout, passkey registration and authentication, duplicate UTR and concurrent callbacks, bank-app cancellation, anti-replay, power loss/redeploy, rollback, and restore against staging. Run PostgreSQL integration CI on every change.
-6. **Cut over:** schedule a write freeze, make final delta export, verify source/target parity, point the app at PostgreSQL under an explicit `DB_BACKEND=postgres` feature gate, and verify runtime logs plus historical state. Keep the SQLite backup unchanged for rollback/forensics.
-
-**Do not merge or deploy this branch to production merely because CI is green.** The core is intentionally not wired to public checkout endpoints and is not a completed SQLite-to-PostgreSQL data migration.
-
-## Running tests
-
-```bash
-node tests/test-financial-money.js
-TEST_DATABASE_URL=postgresql://disha_test:test_only_not_production@127.0.0.1:5432/disha_financial_ci node tests/test-postgres-financial-core.js
+```powershell
+railway ssh --project 62335465-abaa-4269-ba72-e87ddbba908c --service a487c30e-0424-4bc9-af3a-0ccc9943cf70 --environment production
 ```
 
-The integration test explicitly rejects non-local database hosts. The GitHub workflow `.github/workflows/postgres-financial-core.yml` creates an isolated PostgreSQL 16 instance and executes the SQL constraints against a real database.
+**Read-only inventory:**
+```bash
+node scripts/migrate-sqlite-to-postgres.js
+```
+
+**Only after your independent backup is verified and writes are frozen:**
+```bash
+MIGRATION_ACK=BACKUP_VERIFIED node scripts/migrate-sqlite-to-postgres.js --apply
+```
+
+The script opens SQLite read-only, performs `PRAGMA integrity_check`,
+takes an online snapshot in the mounted volume, creates and imports PostgreSQL
+tables inside a `SERIALIZABLE` transaction, compares every original field,
+and commits the `disha_migration_control` marker only after successful parity.
+Any conflict causes a rollback; the SQLite source remains.
+
+Check for `POSTGRES_MIGRATION_VERIFIED` and independently validate the
+source and target counts, ledger sums, UTR uniqueness and passkey counters.
+If the script fails, do not enable PostgreSQL authority.
+
+## Controlled production cutover
+After verification, set the Railway environment variable
+`DB_BACKEND=postgres` on the **Zero-Trust-Fintech** application service
+and deploy the tested commit. The runtime must report:
+`PostgreSQL is the sole checkout authority (DB_BACKEND=postgres)`.
+
+Perform a no-money checkout smoke test and a real end-to-end audit before
+enabling transaction traffic. Check historical sessions/passkeys and ledger
+in PostgreSQL after restarting the service. Keep backup and maintenance
+recovery procedures available.
+
+**Rollback warning:** changing `DB_BACKEND` back to SQLite after new
+PostgreSQL writes would strand those new records. Freeze writes and perform
+a verified reverse migration or replay before rollback.
+
+## CI coverage
+`tests/test-financial-money.js`: exact integer paise.
+`tests/test-postgres-financial-core.js`: atomic journal, concurrency,
+immutability and FK isolation.
+`tests/test-postgres-checkout-store.js`: sessions, passkeys, UTR and
+ledger.
+`tests/test-postgres-migration.js`: SQLite snapshot, seeded-row
+reconciliation and PostgreSQL import parity.
+`tests/test-postgres-switch.js`: required migration marker, no SQLite.
+`tests/test-postgres-http.js`: Express HTTP checkout and session flow.
