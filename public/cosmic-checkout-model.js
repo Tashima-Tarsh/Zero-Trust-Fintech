@@ -31,13 +31,25 @@
  function isSettled(record){
   return Boolean(record&&record.status==='SUCCESS'&&typeof record.utr==='string'&&/^[0-9]{12}$/.test(record.utr));
  }
+ function userFacingError(error,context){
+  // WebAuthn NotAllowedError deliberately combines cancel, timeout and
+  // browser-policy cases for privacy. Never render error.message, the DOM
+  // exception name, diagnostic URLs or upstream response bodies in customer UI.
+  if(context==='load')
+   return 'Error — Checkout could not load. Refresh or request a new payment link.';
+  if(error && (error.name==='TypeError'||error.name==='NetworkError'))
+   return 'Error — Connection unavailable. Please check your internet and try again.';
+  if(context==='app')
+   return 'Error — Could not open the UPI app. Choose another app or use QR.';
+  return 'Error — Device verification could not be completed. Please try again.';
+ }
  function stageAfterAuthorization(){return 'methods'}
  function formatINR(value){
   const n=Number(value);
   if(!Number.isFinite(n)||n<=0)throw Error('Invalid payment amount');
   return new Intl.NumberFormat('en-IN',{style:'currency',currency:'INR',maximumFractionDigits:2,minimumFractionDigits:2}).format(n);
  }
- const api=Object.freeze({safeApp,qrPayload,buildAppUrl,isSettled,stageAfterAuthorization,formatINR});
+ const api=Object.freeze({safeApp,qrPayload,buildAppUrl,isSettled,stageAfterAuthorization,formatINR,userFacingError});
  if(typeof module!=='undefined'&&module.exports)module.exports=api;
  root.DISHACosmicCheckoutModel=api;
 })(typeof window!=='undefined'?window:globalThis);
