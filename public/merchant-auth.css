@@ -206,3 +206,71 @@ button,input{font:inherit}
  .auth-logo-stage{opacity:1!important;transform:none!important}
  .auth-logo-shine{display:none}
 }
+
+/* DISHA merchant authentication: licensed network artwork + unmodified Clerk UI */
+@media screen{
+ html,body{width:100%;height:100%;overflow:hidden;overscroll-behavior:none}
+ body{min-height:0}
+ .auth-shell{width:100%;max-width:none;min-height:0;height:100vh;height:100dvh;overflow:hidden}
+ .auth-story,.auth-action{min-height:0;height:100%;overflow:hidden}
+ .auth-story{padding:clamp(12px,2.6dvh,32px) clamp(15px,3vw,58px) clamp(10px,2dvh,24px);
+   background-image:linear-gradient(90deg,#08132bcc 0%,#091b4a86 52%,#111e5b66 100%),url('/assets/merchant-network-galaxy.jpg'),
+   radial-gradient(ellipse at 76% 36%,#4640a3 0%,transparent 62%),linear-gradient(130deg,#061332,#0e2557);
+   background-position:center,center,center,center;background-repeat:no-repeat;background-size:cover,cover,cover,cover}
+ .auth-story:before{opacity:.25}
+ .auth-story-middle{min-height:0;padding:clamp(7px,1.8dvh,22px) 0;justify-content:center}
+ .auth-story h2{font-size:clamp(30px,min(4.15vw,7dvh),68px);margin:clamp(5px,1.4dvh,14px) 0}
+ .auth-story-description{font-size:clamp(11px,1.45dvh,17px);line-height:1.5;max-width:610px;text-shadow:0 1px 5px #031332}
+ .auth-network-art{flex:1;min-height:clamp(35px,13dvh,155px);max-height:29dvh;margin-top:clamp(6px,1.4dvh,15px);
+   border-radius:17px;background:linear-gradient(135deg,#0716310a,#16296713);
+   border:1px solid #c1ddff24}
+ .auth-story-footer{font-size:clamp(9px,1.4dvh,12px)}
+ .auth-action{padding:clamp(12px,3dvh,40px) clamp(14px,3vw,54px);background:#fff}
+ .auth-content{margin:auto;min-height:0;max-height:100%;display:flex;flex-direction:column;align-items:stretch}
+ .auth-kicker{margin:0 0 clamp(6px,1.5dvh,15px);font-size:11px}
+ .auth-right-brand{display:none}
+ .auth-slot-wrap{min-height:0;flex:0 1 auto;overflow:auto;overscroll-behavior:contain;scrollbar-width:thin}
+ #auth-slot{min-height:0;align-items:flex-start}
+ #auth-slot .cl-header{display:flex!important}
+ #auth-slot :is(.cl-rootBox,.cl-cardBox,.cl-card,.cl-main){max-width:100%!important}
+ #auth-slot .cl-cardBox,#auth-slot .cl-card{background:transparent!important;border:0!important;box-shadow:none!important}
+ .auth-bottom{flex-shrink:0;margin-top:clamp(5px,1dvh,14px);padding:0;gap:6px;font-size:10px}
+ .auth-logo-stage{animation:none;filter:none}
+ .auth-logo-shine{display:none}
+}
+@media(max-width:800px) and (min-width:601px){
+ .auth-shell{display:grid;grid-template-columns:minmax(0,45fr) minmax(0,55fr)}
+ .auth-story{padding:clamp(10px,2dvh,22px) 19px}
+ .auth-story-middle{display:flex;flex-direction:column}
+ .auth-story h2{font-size:clamp(27px,4.2vw,38px)}
+ .auth-story-description{font-size:12px}
+ .auth-network-art{min-height:70px;max-height:26dvh}
+ .auth-action{padding:15px 19px}
+}
+@media(max-width:600px){
+ .auth-shell{display:grid;grid-template-rows:minmax(0,29fr) minmax(0,71fr);grid-template-columns:1fr}
+ .auth-story,.auth-action{height:100%;min-height:0}
+ .auth-story{padding:clamp(6px,1dvh,12px) 17px}
+ .auth-brand{width:clamp(124px,30vw,168px);min-height:0}
+ .auth-story-middle{display:flex;flex-direction:column;justify-content:center;padding:2px 0}
+ .auth-eyebrow{display:none}
+ .auth-story h2{font-size:clamp(22px,6vw,33px);margin:2px 0 5px;line-height:1.03}
+ .auth-story-description{font-size:11px;line-height:1.25;max-width:100%}
+ .auth-network-art{display:none}
+ .auth-story-footer{display:none}
+ .auth-action{padding:clamp(8px,2dvh,18px) clamp(14px,5vw,26px)}
+ .auth-kicker{margin-bottom:5px;font-size:9px}
+ .auth-bottom{padding:5px 0 0;font-size:9px}
+}
+@media(max-height:620px) and (min-width:601px){
+ .auth-network-art{min-height:30px;max-height:13dvh}
+ .auth-story h2{font-size:clamp(26px,6dvh,44px)}
+ .auth-story-description{font-size:11px}
+ .auth-brand{width:170px;min-height:0}
+}
+@media(max-height:550px) and (max-width:600px){
+ .auth-shell{grid-template-rows:minmax(0,18fr) minmax(0,82fr)}
+ .auth-story-description{display:none}
+ .auth-story h2{font-size:clamp(18px,5vw,25px);margin:0}
+ .auth-bottom{display:none}
+}
