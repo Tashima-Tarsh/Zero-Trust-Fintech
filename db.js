@@ -70,6 +70,10 @@ async function initDb() {
       if (usePostgresAuthority) {
         // DO NOT automatically run data migrations on production startup.
         // The migration scripts are run and verified separately before cutover.
+        const verified = await pgPool.query("SELECT payload FROM disha_migration_control WHERE name='sqlite_to_postgres_verified'");
+        if (verified.rowCount !== 1 || verified.rows[0]?.payload?.sourceIntegrity !== 'ok') {
+          throw new Error('PostgreSQL migration verification marker missing: refusing cutover');
+        }
         const { buildStore } = require('./financial/postgres-store');
         pgStore = buildStore(pgPool, vpaRouter);
       }
