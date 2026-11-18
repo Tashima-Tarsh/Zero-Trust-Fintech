@@ -9,9 +9,12 @@
     let cached='';
     try {cached=localStorage.getItem(STORAGE_KEY)||'';} catch(_){}
     if(ID_PATTERN.test(cached))return cached;
-    if(!root.crypto || typeof root.crypto.randomUUID!=='function')
-      throw Error('Secure device identity is unavailable. Use a supported HTTPS browser.');
-    const generated='vault_'+root.crypto.randomUUID();
+    if(!root.crypto || typeof root.crypto.getRandomValues!=='function')
+      throw Error('Secure device identity is unavailable. Use a supported browser.');
+    const id = typeof root.crypto.randomUUID === 'function'
+      ? root.crypto.randomUUID()
+      : Array.from(root.crypto.getRandomValues(new Uint8Array(16)),b=>b.toString(16).padStart(2,'0')).join('');
+    const generated='vault_'+id;
     try {localStorage.setItem(STORAGE_KEY,generated);} catch(_){
       throw Error('Device storage is unavailable. Allow site storage to register your vault.');
     }
