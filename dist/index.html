@@ -120,6 +120,34 @@ html,body{overflow-x:clip}
 @media(min-width:741px){.hero-planet-photography .mars-photo{max-height:92%;width:auto;height:92%;right:-1%;top:3%}.hero-planet-photography .earth-photo{right:40%;top:14%}}
 @media(max-width:740px){.hero-planet-photography .mars-photo{height:auto;width:80vw;right:-35vw;top:23%}}
 </style>
+
+<style id="business-rail-design">
+.business-rail{position:relative;background:linear-gradient(145deg,#141015 0%,#0b0e14 52%,#1c1010 100%);padding:clamp(34px,4vw,58px) clamp(18px,6vw,95px);border-bottom:1px solid #ffffff22}
+.business-rail .wrap{max-width:1280px;margin:auto}
+.rail-heading{display:grid;grid-template-columns:1.2fr .8fr;gap:30px;align-items:end;margin-bottom:26px}
+.rail-heading .eyebrow{margin-bottom:10px}
+.rail-heading h2{font-size:clamp(30px,3.35vw,49px);line-height:1.09;margin:0}
+.rail-heading h2 em{font-style:normal;color:#f69b72}
+.rail-heading>p{font-size:14px;color:#c8babc;line-height:1.65;max-width:440px;margin:0 0 3px}
+.rail-journey{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px}
+.rail-stage{position:relative;background:linear-gradient(148deg,#241920,#121117 72%);border:1px solid #f3a77538;border-radius:15px;padding:19px 19px 17px;min-width:0;display:flex;flex-direction:column}
+.rail-stage:not(:last-child):after{content:"›";position:absolute;z-index:2;right:-11px;top:43%;height:23px;width:21px;background:#1d171a;border:1px solid #f1a57967;border-radius:50%;text-align:center;line-height:19px;color:#f2ac84;font-weight:700}
+.rail-top{display:flex;justify-content:space-between;gap:8px;align-items:center;color:#c9b1a7;font-size:10px;font-family:"Space Grotesk",sans-serif;letter-spacing:.09em;font-weight:700}
+.rail-index{font-size:15px;color:#faab7c}
+.rail-glyph{width:56px;height:56px;color:#e7d0ca;margin:15px 0 10px}
+.rail-glyph svg{height:100%;width:100%}
+.rail-stage h3{font-size:clamp(18px,1.6vw,22px);margin:0 0 8px;letter-spacing:-.045em}
+.rail-stage p{font-size:12.5px;color:#c8bfc1;line-height:1.6;margin:0 0 17px}
+.rail-state{margin-top:auto;align-self:flex-start;padding:6px 9px;background:#e5835020;border:1px solid #f5a5764c;border-radius:20px;color:#ffc6a3;font-size:10px;letter-spacing:.015em}
+.rail-summary{display:flex;align-items:center;gap:22px;justify-content:space-between;border-top:1px solid #ffffff23;margin-top:22px;padding-top:18px}
+.rail-summary p{flex:1;max-width:590px;color:#bdb1b3;font-size:12px;line-height:1.5;margin:0}
+.rail-summary>a{color:#ffc09a;font-size:13px;font-weight:700;white-space:nowrap}
+.rail-signal{font-size:12px;color:#f0d6c9;font-weight:700;display:flex;align-items:center;gap:9px}
+.rail-dot{width:7px;height:7px;border-radius:50%;background:#f7a675;box-shadow:0 0 12px #ff9d6a}
+@media(max-width:1050px){.rail-journey{grid-template-columns:repeat(2,minmax(0,1fr))}.rail-stage:nth-child(2):after{display:none}.rail-stage{min-height:226px}}
+@media(max-width:740px){.business-rail{padding:34px 18px}.rail-heading{grid-template-columns:1fr;gap:13px;margin-bottom:22px}.rail-heading>p{font-size:13px}.rail-journey{gap:9px}.rail-stage{padding:15px;min-height:236px}.rail-stage h3{font-size:18px}.rail-top{font-size:9px}.rail-glyph{height:45px;width:45px;margin:12px 0 8px}.rail-stage p{font-size:12px}.rail-summary{align-items:flex-start;flex-direction:column;gap:10px}}
+@media(max-width:430px){.rail-journey{grid-template-columns:1fr}.rail-stage{min-height:0}.rail-stage:not(:last-child):after{content:"⌄";right:calc(50% - 11px);top:auto;bottom:-12px}.rail-stage:nth-child(2):after{display:block}.rail-glyph{margin:8px 0}.rail-stage p{margin-bottom:12px}}
+</style>
 </head>
 <body>
 <header class="site-header">
@@ -136,7 +164,18 @@ html,body{overflow-x:clip}
  </div><div class="orbit-label">MARS / EARTH<br>IN ORBIT • NOT TO SCALE</div>
 </section>
 <div class="visit-strip" id="visit-panel" aria-live="polite"><div class="visit-main"><strong id="visit-greeting">Welcome to DISHA 8.2.</strong><p id="visit-message">Take a closer look at a different approach to merchant payments.</p></div><div class="visit-details"><span><b id="visit-count">01</b>Visit on this device</span><span><b id="last-visit">First arrival</b>Previously here</span><span><b id="visit-reward">Explore</b>Your journey</span></div></div>
-<section class="photo-interlude" aria-label="Real NASA space imagery"><div class="wrap"><article class="photo-card"><img src="https://assets.science.nasa.gov/dynamicimage/assets/science/psd/mars/downloadable_items/3/7/37983_mars-globe-valles-marineris-enhanced.jpg" alt="Mars, NASA Viking Orbiter imagery" loading="lazy" decoding="async"><span class="photo-label">Clarity, not guesswork.<small>Mars / NASA JPL</small></span></article><article class="photo-card"><img src="https://astro4edu.org/media/multimedia/The_Blue_Marble_remastered.jpg" alt="Earth photographed by the Apollo 17 crew" loading="lazy" decoding="async"><span class="photo-label">Built for business here.<small>Earth / NASA Apollo 17</small></span></article><article class="photo-card"><img src="https://assets.science.nasa.gov/dynamicimage/assets/science/psd/solar/2023/06/edu_distance_to_the_moon.png" alt="The Moon, NASA lunar imagery" loading="lazy" decoding="async"><span class="photo-label">A better perspective.<small>Moon / NASA</small></span></article></div><p class="photo-caption">Space photographs: <a href="https://science.nasa.gov/resource/mars-planet-globe/" rel="noopener noreferrer" target="_blank">NASA/JPL Mars</a> · <a href="https://science.nasa.gov/solar-system/moon/" rel="noopener noreferrer" target="_blank">NASA Moon</a> · Apollo 17 Earth image. Photography is illustrative, not evidence of a NASA partnership.</p></section>
+<section class="business-rail" id="business-flow" aria-labelledby="business-flow-title">
+ <div class="wrap">
+  <div class="rail-heading"><div><p class="eyebrow">DISHA 8.2 / Business operating flow</p><h2 id="business-flow-title">From payment request<br>to a <em>defensible record.</em></h2></div><p>One journey connects your customer, your receiving UPI account, and your merchant workspace. Every stage has a distinct purpose—and a distinct level of evidence.</p></div>
+  <div class="rail-journey" aria-label="Four stages of a DISHA merchant payment">
+   <article class="rail-stage"><div class="rail-top"><span class="rail-index">01</span><span class="rail-owner">MERCHANT</span></div><div class="rail-glyph" aria-hidden="true"><svg viewBox="0 0 64 64" fill="none"><rect x="10" y="11" width="44" height="42" rx="8" stroke="currentColor" stroke-width="2"/><path d="M20 23h24M20 33h16M20 43h10" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><circle cx="46" cy="43" r="9" fill="#272021" stroke="#f8ac7d" stroke-width="2"/><path d="M46 38v10m-5-5h10" stroke="#f8ac7d" stroke-width="2"/></svg></div><h3>Create the request.</h3><p>Set the amount, order and receiving UPI address. DISHA generates the customer's checkout link.</p><span class="rail-state">Order created</span></article>
+   <article class="rail-stage"><div class="rail-top"><span class="rail-index">02</span><span class="rail-owner">CUSTOMER</span></div><div class="rail-glyph" aria-hidden="true"><svg viewBox="0 0 64 64" fill="none"><rect x="19" y="7" width="27" height="49" rx="7" stroke="currentColor" stroke-width="2"/><path d="M28 13h9M28 49h9" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><path d="m25 32 6 6 11-13" stroke="#f8ac7d" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg></div><h3>Pay through UPI.</h3><p>The customer checks the payee and amount, then opens their chosen UPI app or scans the QR.</p><span class="rail-state">Payment attempted</span></article>
+   <article class="rail-stage"><div class="rail-top"><span class="rail-index">03</span><span class="rail-owner">DISHA VAULT</span></div><div class="rail-glyph" aria-hidden="true"><svg viewBox="0 0 64 64" fill="none"><rect x="12" y="11" width="40" height="43" rx="9" stroke="currentColor" stroke-width="2"/><circle cx="32" cy="31" r="12" stroke="#f8ac7d" stroke-width="2"/><circle cx="32" cy="31" r="3" fill="#f8ac7d"/><path d="M32 19v7m0 10v7m-12-12h7m10 0h7" stroke="#f8ac7d" stroke-width="2"/></svg></div><h3>Examine the evidence.</h3><p>The Vault stores available return observations. DISHA checks order, UTR candidate, payee, amount, timing and replay conflicts.</p><span class="rail-state">Evidence evaluated</span></article>
+   <article class="rail-stage"><div class="rail-top"><span class="rail-index">04</span><span class="rail-owner">MERCHANT WORKSPACE</span></div><div class="rail-glyph" aria-hidden="true"><svg viewBox="0 0 64 64" fill="none"><rect x="10" y="12" width="44" height="37" rx="6" stroke="currentColor" stroke-width="2"/><path d="M19 40V30m10 10V23m10 17V34m7 6V19" stroke="#f8ac7d" stroke-width="4" stroke-linecap="round"/><path d="M24 55h16" stroke="currentColor" stroke-width="2"/></svg></div><h3>Reconcile and record.</h3><p>Where a qualified credit record is available, DISHA matches it to the order, controls duplicates and posts balanced ledger entries.</p><span class="rail-state">Qualified credit posted</span></article>
+  </div>
+  <div class="rail-summary"><span class="rail-signal"><span class="rail-dot"></span>Evidence is not a settlement claim.</span><p>Unresolved payments remain unresolved. The workspace keeps the order history, available observations and confirmed financial records separate.</p><a href="/checkout">Experience checkout <span aria-hidden="true">↗</span></a></div>
+ </div>
+</section>
 <section id="the-problem" class="section"><div class="wrap"><div class="section-intro reveal"><p class="eyebrow">Why we built it</p><h2>Sending ₹500 is easy.<br><em>Explaining what happened</em> should be, too.</h2><p class="lead">A customer returns with a reference number. Was it the right amount? The right order? Has that reference appeared before? And what is the actual status of the funds? Those questions shouldn't require a chain of screenshots and assumptions.</p></div><div class="grid3">
 <article class="feature reveal"><span class="num">01 / CONTEXT</span><h3>Start with the order.</h3><p>Keep the intended payee, amount, reference and session together from the first payment request.</p></article>
 <article class="feature reveal"><span class="num">02 / EVIDENCE</span><h3>Observe. Don't assume.</h3><p>Record the authorized browser handoff and available return signals without pretending they are bank-credit confirmation.</p></article>
