@@ -376,10 +376,13 @@ window.submitManualReceipt = async function() {
     });
     const data = await res.json();
 
-    if (data.success) {
+    if (res.status === 200 && data.verified === true && data.state === 'VERIFIED') {
       handlePaymentSuccess(data);
+    } else if (res.status === 202 && data.state === 'UTR_OBSERVED') {
+      alert('UPI reference recorded. Bank credit has not been independently confirmed. The order remains pending.');
+      if (btn) { btn.disabled = false; btn.textContent = 'Verify Receipt'; }
     } else {
-      alert(`⚠️ Payment Verification Rejected:\nLayer ${data.layer || ''}: ${data.reason}`);
+      alert(`⚠️ Payment Verification Rejected:\nLayer ${data.layer || ''}: ${data.reason || data.error || ''}`);
       if (btn) {
         btn.disabled = false;
         btn.textContent = 'Verify Receipt';
