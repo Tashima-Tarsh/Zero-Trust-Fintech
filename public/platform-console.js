@@ -49,6 +49,11 @@ async function load(screen){
    for(const msg of c.warnings||[])output.push('<div><b>Attention</b><span>'+esc(msg)+'</span></div>');
    output.push('<div><b>Access policy</b><span>'+esc(c.settings?.inviteOnly?'Invite-only':'Not activated')+'</span></div>');
    output.push('<div><b>Checkout simulation</b><span>'+esc(c.settings?.simulationDisabled?'Disabled':'Check configuration')+'</span></div>');
+   output.push('<div><b>Merchant release gate</b><span>'+esc(c.release?.decision==='NO_GO_UNTIL_BANK_EVIDENCE'?'NO-GO — bank acceptance and verified credit required':'Review required')+'</span></div>');
+   output.push('<div><b>Credit reconciliation</b><span>'+esc(c.release?.checks?.financialCreditSource||'NOT_CONFIGURED')+'</span></div>');
+   output.push('<div><b>P2P real bank test</b><span>'+esc(c.release?.checks?.bankP2pAcceptance||'NOT_YET_VERIFIED')+'</span></div>');
+   output.push('<div><b>P2M bank acceptance</b><span>'+esc(c.release?.checks?.bankP2mAcceptance||'NOT_YET_VERIFIED')+'</span></div>');
+   output.push('<div><b>Company P2M activation</b><span>'+esc(c.release?.checks?.p2mCompanyAccount||'PENDING_APPROVAL')+'</span></div>');
    $('#owner-configuration').innerHTML=output.join('');
  }
  if(screen==='settings'){const r=await api('/owner/audit');$('#audit-body').innerHTML=(r.events||[]).slice(0,35).map(e=>'<div><b>'+esc(e.action)+'</b><span>'+esc(e.target_id)+' · '+when(e.created_at)+'</span></div>').join('')||'No audit events recorded yet.';}
