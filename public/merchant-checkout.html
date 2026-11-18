@@ -117,19 +117,31 @@ $('openUpi').addEventListener('click',async event=>{
 });
 $('copy').onclick=async()=>{if(!uri)return;try{await navigator.clipboard.writeText(uri);status('UPI payment URI copied.')}catch{status('Your browser blocked clipboard access.','error')}};
 $('refresh').onclick=load;
-// Vault observation is delivered automatically upon browser return.
-// This is not an assertion that the payer app completed a payment.
+// The browser explicitly requests session-bound event evidence from the
+// Vault, then submits the returned packet, then acknowledges storage.
+let vaultEvidenceSending=false;
 async function submitVaultReturn(){
+ if(vaultEvidenceSending)return;
+ const vault=window.DISHAOneTouchVault;
+ const packet=vault.requestEvidence(orderId);
+ if(!packet)return;
+ vaultEvidenceSending=true;
  try{
-  const receipt=await window.DISHAOneTouchVault.submitReturnEvidence(orderId);
-  if(!receipt)return;
+  const response=await fetch('/api/vault/evidence',{
+   method:'POST',credentials:'same-origin',cache:'no-store',
+   headers:{'Content-Type':'application/json','X-CSRF-Token':packet.token},
+   body:JSON.stringify(packet)
+  });
+  const result=await response.json().catch(()=>({}));
+  if(!response.ok||!result.success)throw Error(result.error||'VAULT_EVIDENCE_NOT_STORED');
+  const receipt=vault.acknowledgeEvidence(orderId,packet.eventId,result);
   $('vaultHelp').textContent=receipt.utrCandidate
-    ? 'Vault captured a UPI reference and submitted evidence to the browser.'
-    : 'Vault submitted browser-return evidence automatically.';
-  status('Evidence submitted. Payment is pending until independently established.','');
+   ? 'Vault provided the UPI reference evidence to your browser.'
+   : 'Vault provided the browser-return event evidence.';
+  status('Vault evidence received and recorded. Payment remains pending.','');
  }catch(err){
-  $('vaultHelp').textContent='Evidence delivery will retry when you return to this page.';
- }
+  $('vaultHelp').textContent='Evidence submission will retry when the browser resumes.';
+ }finally{vaultEvidenceSending=false}
 }
 load();timer=setInterval(load,5000);
 document.addEventListener('visibilitychange',()=>{

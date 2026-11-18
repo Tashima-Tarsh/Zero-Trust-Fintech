@@ -13,12 +13,19 @@ unrelated UPI app, and it cannot independently prove funds were credited.
    authorization in PostgreSQL (disha_vault_authorizations).
 3. Checkout JS creates a cryptographically random event ID and saves one
    handoff record in sessionStorage, then invokes upi://pay.
-4. pagehide/visibilitychange records browser backgrounding. Browser resume,
-   pageshow, focus, or explicitly provided URL return parameters cause
-   automatic submission from the DISHAOneTouchVault helper.
-5. POST /api/vault/evidence uses the original checkout session token in both
-   request JSON and X-CSRF-Token. Server verifies that token and short-lived
-   Vault authorization belong to the same order. No second passkey is asked.
+4. pagehide/visibilitychange records browser backgrounding. On resume,
+   pageshow, or focus, the checkout browser requests the specific order-bound
+   event packet from the Vault via DISHAOneTouchVault.requestEvidence(orderId).
+   The Vault returns the immutable observed event and any explicitly exposed
+   UTR candidate to the browser, but does not perform a network write.
+5. The checkout browser itself sends the returned Vault packet using
+   POST /api/vault/evidence, with the original checkout session token in
+   both JSON and X-CSRF-Token. The server verifies that the token and
+   short-lived Vault authorization belong to the same order.
+   Only after successful storage does the browser call
+   DISHAOneTouchVault.acknowledgeEvidence(orderId,eventId,response).
+   Failed requests reuse the original frozen packet and event ID for retry.
+   No second passkey is asked.
 6. Whitelisted browser-return fields (if exposed) are captured as *untrusted
    claims*. UTR candidates must be exactly 12 digits. A status claim of
    SUCCESS never produces a payment SUCCESS or settlement journal.

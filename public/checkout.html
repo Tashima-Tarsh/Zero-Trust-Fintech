@@ -718,19 +718,33 @@
     /* ========================================================================
        5. UPI RETURN / FINALIZE
        ======================================================================== */
-    // Vault -> browser: a return is evidence, not a payment confirmation.
+    // Browser asks the Vault for the event evidence, receives an immutable
+    // handoff packet, submits it to DISHA, and acknowledges persisted receipt.
+    let vaultEvidenceSending=false;
     async function submitVaultReturn(){
+      if(vaultEvidenceSending)return;
+      const vault=window.DISHAOneTouchVault;
+      const packet=vault.requestEvidence();
+      if(!packet)return;
+      vaultEvidenceSending=true;
       try{
-        const receipt=await window.DISHAOneTouchVault.submitReturnEvidence();
-        if(!receipt)return;
+        const response=await fetch('/api/vault/evidence',{
+          method:'POST',credentials:'same-origin',cache:'no-store',
+          headers:{'Content-Type':'application/json','X-CSRF-Token':packet.token},
+          body:JSON.stringify(packet)
+        });
+        const result=await response.json().catch(()=>({}));
+        if(!response.ok||!result.success)
+          throw Error(result.error||'VAULT_EVIDENCE_NOT_STORED');
+        const receipt=vault.acknowledgeEvidence(packet.orderId,packet.eventId,result);
         oneTouchHelp.textContent=receipt.utrCandidate?
-          'Vault captured a UPI reference and submitted it to DISHA.':
-          'Vault submitted browser-return evidence to DISHA.';
-        showStatus('processing','Vault evidence recorded',
-          'The device handoff was correlated. Payment remains pending.');
+          'Vault supplied UPI reference evidence to your browser.':
+          'Vault supplied the browser-return event evidence.';
+        showStatus('processing','Vault evidence received',
+          'Evidence was recorded against this order. Payment remains pending.');
       }catch(err){
-        oneTouchHelp.textContent='Vault evidence will retry when this page resumes.';
-      }
+        oneTouchHelp.textContent='Vault evidence delivery will retry on browser resume.';
+      }finally{vaultEvidenceSending=false}
     }
     window.addEventListener('load',()=>{void submitVaultReturn()});
     window.addEventListener('pageshow',()=>{void submitVaultReturn()});
