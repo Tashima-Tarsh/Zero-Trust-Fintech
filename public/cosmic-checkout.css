@@ -5,11 +5,11 @@ html{min-height:100%}body{margin:0;min-width:320px;min-height:100svh;background:
 button,a{font:inherit}button{cursor:pointer}button:disabled{opacity:.48;cursor:wait}
 [hidden]{display:none!important}
 :focus-visible{outline:3px solid #a9afff;outline-offset:4px}
-.universe{position:fixed;z-index:-1;inset:0;overflow:hidden;pointer-events:none;background:radial-gradient(ellipse at 52% 12%,#1d275a 0%,transparent 55%),radial-gradient(ellipse at 4% 90%,#17244a,transparent 55%),#070d1e}
-.starfield{position:absolute;inset:-20%;background-repeat:repeat;opacity:.48;will-change:transform}
+.universe{position:fixed;z-index:-1;inset:0;overflow:hidden;pointer-events:none;background-color:#070d1e;background-image:linear-gradient(90deg,#060b1cc9 0%,#060b1c4f 32%,#060b1c4f 68%,#060b1cc9 100%),url('/assets/disha-universe-background.svg');background-position:center,center;background-size:cover,cover;background-repeat:no-repeat}
+.starfield{position:absolute;inset:-20%;background-repeat:repeat;opacity:.16;will-change:transform}
 .starfield-a{background-image:radial-gradient(#d8e0ff 1px,transparent 1.7px),radial-gradient(#a5c8ff 1px,transparent 1.7px);background-size:121px 113px,199px 223px;background-position:31px 49px,87px 106px;animation:starDrift 70s linear infinite}
-.starfield-b{background-image:radial-gradient(#e8ebff .65px,transparent 1px);background-size:69px 71px;opacity:.22;animation:starDrift 120s linear infinite reverse}
-.nebula{position:absolute;border-radius:50%;filter:blur(55px);opacity:.35}
+.starfield-b{background-image:radial-gradient(#e8ebff .65px,transparent 1px);background-size:69px 71px;opacity:.08;animation:starDrift 120s linear infinite reverse}
+.nebula{position:absolute;border-radius:50%;filter:blur(55px);opacity:.15}
 .nebula-one{width:58vw;height:45vh;max-width:760px;left:-20%;top:-15%;background:#3934a9}
 .nebula-two{width:60vw;height:49vh;max-width:720px;right:-23%;bottom:-22%;background:#1463aa}
 .horizon{position:absolute;width:130vw;height:50vh;bottom:-43vh;left:-16vw;border:1px solid #4c73c64f;border-radius:50%;box-shadow:0 0 0 85px #355ba209,0 0 0 170px #355ba20c;transform:perspective(900px) rotateX(58deg)}

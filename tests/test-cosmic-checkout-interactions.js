@@ -19,10 +19,17 @@ const document={body:{dataset:{checkout:'merchant'}},visibilityState:'visible',
  querySelectorAll(key){return key==='[data-stage]'?stages:apps},
  getElementById:element,addEventListener(key,fn){callbacks[key]=fn}};
 const location={search:'?orderId='+id+'&token='+token,assign(link){location.opened=link}};
-const state={ledger:'PENDING',utr:null,authorized:0,handoff:false,hidden:0,posted:0,qr:null};
+const state={ledger:'PENDING',utr:null,authorized:0,handoff:false,hidden:0,posted:0,qr:null,failAuth:true};
 let preferred=null;
 const vault={getPendingOrderId:()=>state.handoff?id:null,
- authorize:async()=>{state.authorized++;return {sessionId:'f'.repeat(32)}},
+ authorize:async()=>{state.authorized++;
+  if(state.failAuth){
+   const error=new Error('The operation either timed out or was not allowed. See: https://www.w3.org/TR/webauthn-2/#sctn-privacy-considerations-client.');
+   error.name='NotAllowedError';
+   throw error;
+  }
+  return {sessionId:'f'.repeat(32)}
+ },
  beginHandoff:(order,session,checkoutToken)=>{assert.equal(order,id);assert.equal(checkoutToken,token);state.handoff=true},
  requestEvidence:()=>state.handoff&&state.hidden?{eventId:'evt_test',token,orderId:id,evidence:{}}:null,
  markBackgrounded:()=>state.hidden++,
@@ -54,6 +61,14 @@ async function flush(){for(let i=0;i<20;i++)await Promise.resolve()}
  assert.equal(active(),'initial','QR cannot bypass Vault');
  await nodes.btnOneTouch.events.click();
  assert.equal(state.authorized,1);
+ assert.equal(active(),'initial','Rejected device authorization must never advance checkout');
+ assert.match(nodes.checkoutStatus.textContent,/^Error\b/,'Customer should see short Error message');
+ assert.doesNotMatch(nodes.checkoutStatus.textContent,/The operation|timed out|w3\.org|WebAuthn|NotAllowedError/i,
+  'Internal WebAuthn privacy errors must not appear in checkout UI');
+ assert.equal(nodes.btnOneTouch.disabled,false,'Customer should be able to retry');
+ state.failAuth=false;
+ await nodes.btnOneTouch.events.click();
+ assert.equal(state.authorized,2);
  assert.equal(active(),'methods');
  nodes.showQr.events.click();
  assert.equal(active(),'qr');

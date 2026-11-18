@@ -145,7 +145,7 @@
   if(qrUri!==session.upiUri){
    container.replaceChildren();
    if(typeof window.QRCode!=='function'){
-    message('QR is unavailable in this browser. Choose a UPI app.','error');
+    message('Error — QR is unavailable. Choose a UPI app.','error');
     return;
    }
    // Dark QR modules and white quiet zone maximize scan reliability.
@@ -163,24 +163,24 @@
  }
  function openApp(app){
   if(!authorized||!session||expired()){
-   message('This payment request is no longer active.','error');return;
+   message('Error — This payment request is no longer active.','error');return;
   }
-  const chosen=model.safeApp(app);
-  const target=model.buildAppUrl(session.upiUri,chosen,userAgent);
-  savePreferred(chosen);
-  // A clickable fallback must exist before a post-WebAuthn async app launch.
-  bindFallback(target);
-  if(!handoffStarted){
-   vault.beginHandoff(orderId(),vaultSessionId,session.token);
-   handoffStarted=true;
-  }
-  showStage('methods');
-  bindFallback(target);
-  try{
+  try {
+   const chosen=model.safeApp(app);
+   const target=model.buildAppUrl(session.upiUri,chosen,userAgent);
+   // The customer can always tap this link if a browser blocks async launch.
+   bindFallback(target);
+   if(!handoffStarted){
+    vault.beginHandoff(orderId(),vaultSessionId,session.token);
+    handoffStarted=true;
+   }
+   savePreferred(chosen);
+   showStage('methods');
+   bindFallback(target);
    if(target===session.upiUri)vault.launchUPI(target);
    else location.assign(target);
-  }catch(_){
-   message('Tap Open UPI app to continue.');
+  }catch(error){
+   message(model.userFacingError(error,'app'),'error');
   }
  }
  async function authorize(){
@@ -200,7 +200,7 @@
    // if an operating system blocks post-passkey auto-launch.
    if(app!=='generic')openApp(app);
   }catch(err){
-   message(err?.message||'Device confirmation was not completed. Please retry.','error');
+   message(model.userFacingError(err,'device'),'error');
   }finally{button.disabled=false;loading=false}
  }
  async function submitReturnEvidence(){
@@ -295,7 +295,7 @@
    }
    ledgerTicker=setInterval(()=>{void pollLedger()},3500);
    expiryTicker=setInterval(handleQrExpiry,1000);
-  }catch(err){locked(err?.message||'Could not load the payment link.')}
+  }catch(err){locked(model.userFacingError(err,'load'))}
  }
  start();
 })();
