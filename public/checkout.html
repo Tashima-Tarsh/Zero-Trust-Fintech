@@ -682,10 +682,12 @@
         });
         const data = await res.json();
 
-        if (res.status === 200 && data.success) {
-          showStatus('success', '✅ Payment Settled (T+0)', `Transaction verified via hardware vault + UPI. UTR: ${txnRef}. Settled directly to merchant bank account at 0% fee.`);
+        if (res.status === 200 && data.verified === true && data.state === 'VERIFIED') {
+          showStatus('success', 'Payment Confirmed', 'Payment confirmation was recorded by the backend.');
+        } else if (res.status === 202 && data.state === 'UTR_OBSERVED') {
+          showStatus('processing', 'UPI Reference Recorded', 'The app reference was matched, but a credited-payment confirmation is not available. This order is still pending.');
         } else {
-          showStatus('error', 'Settlement Failed', data.reason || data.error || 'Final verification failed.');
+          showStatus('error', 'Reference Not Accepted', data.reason || data.error || 'Unable to record this UPI reference.');
         }
       } catch (err) {
         console.error('Finalize error:', err);
