@@ -707,16 +707,17 @@ function extractReceiptEvidence(receiptText, sessionContext) {
   }
   // 2. Status text extraction
   let foundStatusText = null;
-  if (/\b(successful|success|completed|paid|debited)\b/i.test(text)) {
-    foundStatusText = 'SUCCESS';
-  } else if (/\b(failed|declined|reversed|rejected|cancelled|canceled|expired)\b/i.test(text)) {
+  // Explicit unsuccessful/pending terms take precedence over any claimed SUCCESS.
+  if (/\b(failed|declined|reversed|rejected|cancelled|canceled|expired)\b/i.test(text)) {
     foundStatusText = 'FAILED';
   } else if (/\b(pending|processing|in progress|awaiting)\b/i.test(text)) {
     foundStatusText = 'PENDING';
+  } else if (/\b(successful|success|completed|paid|debited)\b/i.test(text)) {
+    foundStatusText = 'SUCCESS';
   }
   // Shown time is never accepted from the client; authentic receipts carry
   // their own time and this parser does not extract it from image text.
-  foundShownTime = null;
+  const foundShownTime = null;
   // 4. Layout fields presence check (4 standard UPI layout fields)
   let layoutFieldsFound = 0;
   if (foundPayeeVpa || foundPayeeName || (sessionContext && lower.includes((sessionContext.payeeVpa || '').toLowerCase()))) {
@@ -929,69 +930,21 @@ app.post('/api/verify', verifyLimiter, async (req, res) => {
         reason: 'This session has already been settled and closed.'
       });
     }
-    // Only HIGH tier settles instantly; MEDIUM/LOW/PENDING/REJECT are rejected
-    if (trustResult.tier !== 'HIGH') {
-      return res.status(400).json({
-        success: false,
-        layer: 6,
-        code: 'CONFIDENCE_INSUFFICIENT',
-        reason: 'Instant settlement requires HIGH confidence tier.'
-      });
-    }
-    // ─────────────────────────────────────────────────────────────
-    // LAYER 7: DOUBLE-ENTRY LEDGER POSTING & BALANCE ASSERTION
-    // HIGH tier: Instant settlement & double-entry ledger posting
-    // ─────────────────────────────────────────────────────────────
-    const { txId, verification } = await db.atomicSettle(
-      session.orderId,
-      parsedUtr,
-      session.challengeAmount,
-      session.vpaAddress,
-      req.body.imageHash || null
-    );
-    if (!verification.balanced) {
-      return res.status(500).json({
-        success: false,
-        layer: 7,
-        code: 'LEDGER_ASSERTION_FAILED',
-        reason: 'Critical: Double-entry ledger imbalance detected.'
-      });
-    }
-    // Update session status
-    await db.updateSessionStatus(session.orderId, 'SUCCESS', parsedUtr);
-    await db.updateSessionState(session.orderId, 'VERIFIED');
-    // Notify connected browser via WebSocket (TASK 11)
-    const successPayload = {
-      orderId: session.orderId,
-      utr: parsedUtr,
-      amount: session.challengeAmount,
-      baseAmount: session.baseAmount,
-      vpaAddress: session.vpaAddress,
-      senderVpa: req.body.senderVpa || 'customer@okhdfcbank',
-      txId,
-      timestamp: now,
-      message: 'Settlement confirmed via DISHA Zero-Trust Verification'
-    };
-    broadcastOrderSuccess(session.orderId, successPayload);
-    return res.json({
+    // No customer-origin receipt or UTR can authorize ledger SUCCESS.
+    // Retain the order/UTR mapping for future correlation without granting funds.
+    await db.updateSessionState(session.orderId, 'UTR_OBSERVED');
+    return res.status(202).json({
       success: true,
-      state: 'VERIFIED',
-      layer: 7,
+      verified: false,
+      state: 'UTR_OBSERVED',
+      code: 'CUSTOMER_REFERENCE_NOT_BANK_CONFIRMED',
       orderId: session.orderId,
       utr: parsedUtr,
-      amount: session.challengeAmount,
-      baseAmount: session.baseAmount,
-      vpaAddress: session.vpaAddress,
-      senderVpa: req.body.senderVpa || 'customer@okhdfcbank',
-      txId,
-      successToken: txId,
-      timestamp: now,
-      ledgerVerification: verification,
-      reconciliationState: 'CLAIM_VERIFIED_PENDING_BANK_RECONCILIATION'
+      message: 'Reference recorded for this order; no credited-payment confirmation available.'
     });
   } catch (err) {
-    console.error('Verification error:', err);
-    res.status(500).json({ success: false, error: 'INTERNAL_SERVER_ERROR' });
+    console.error('[UTR Verification] Error:', err);
+    return res.status(500).json({success:false,error:'VERIFICATION_UNAVAILABLE'});
   }
 });
 // ═══════════════════════════════════════════════════════════════════
@@ -1091,46 +1044,17 @@ app.post('/api/verify-cfc', verifyLimiter, async (req, res) => {
         reason: 'Could not bind UTR to order. Please try again.'
       });
     }
-    await db.updateSessionState(session.orderId, 'VERIFY_WINDOW');
-    const { txId, verification } = await db.atomicSettle(
-      session.orderId,
-      cleanUtr,
-      session.challengeAmount,
-      session.vpaAddress,
-      null
-    );
-    await db.updateSessionStatus(session.orderId, 'SUCCESS', cleanUtr);
-    await db.updateSessionState(session.orderId, 'VERIFIED');
-    const successPayload = {
-      orderId: session.orderId,
-      utr: cleanUtr,
-      amount: session.challengeAmount,
-      baseAmount: session.baseAmount,
-      vpaAddress: session.vpaAddress,
-      senderVpa: req.body.senderVpa || 'customer@upi',
-      txId,
-      timestamp: now,
-      settlementSource: 'CFC_UTR_ONLY',
-      message: 'Settlement confirmed via CFC (Confirm from Customer)'
-    };
-    broadcastOrderSuccess(session.orderId, successPayload);
-    return res.json({
-      success: true,
-      state: 'VERIFIED',
-      orderId: session.orderId,
-      utr: cleanUtr,
-      amount: session.challengeAmount,
-      baseAmount: session.baseAmount,
-      vpaAddress: session.vpaAddress,
-      txId,
-      successToken: txId,
-      timestamp: now,
-      ledgerVerification: verification,
-      reconciliationState: 'CLAIM_VERIFIED_PENDING_BANK_RECONCILIATION'
+    // A customer-entered UTR may be correlated to the order but cannot itself
+    // establish funds credited. Do not manufacture a ledger credit.
+    await db.updateSessionState(session.orderId, 'UTR_OBSERVED');
+    return res.status(202).json({
+      success: true, verified: false, state: 'UTR_OBSERVED',
+      orderId: session.orderId, utr: cleanUtr,
+      code: 'CUSTOMER_REFERENCE_NOT_BANK_CONFIRMED'
     });
   } catch (err) {
-    console.error('CFC verification error:', err);
-    res.status(500).json({ success: false, error: 'INTERNAL_SERVER_ERROR' });
+    console.error('[CFC UTR] Error:', err);
+    return res.status(500).json({success:false,error:'UTR_RECORDING_UNAVAILABLE'});
   }
 });
 // ═════════════════════════════════════════════════════════════════════
@@ -1396,50 +1320,18 @@ app.post('/api/checkout/finalize-upi', verifyLimiter, async (req, res) => {
       });
     }
 
-    // Settle via atomic ledger
-    await db.updateSessionState(orderId, 'VERIFY_WINDOW');
-    const { txId, verification } = await db.atomicSettle(
-      orderId,
-      txnRef,
-      session.challengeAmount,
-      session.vpaAddress,
-      null
-    );
-    await db.updateSessionStatus(orderId, 'SUCCESS', txnRef);
-    await db.updateSessionState(orderId, 'VERIFIED');
-
-    const successPayload = {
-      orderId,
-      utr: txnRef,
-      amount: session.challengeAmount,
-      baseAmount: session.baseAmount,
-      vpaAddress: session.vpaAddress,
-      senderVpa: 'customer@upi',
-      txId,
-      timestamp: Date.now(),
-      settlementSource: 'WEBAUTHN_UPI',
-      message: 'Settlement confirmed via WebAuthn + UPI'
-    };
-    broadcastOrderSuccess(orderId, successPayload);
-
+    // A WebAuthn assertion authenticates the user/device, NOT a bank credit.
+    // Preserve the UTR correlation; do not post SUCCESS or financial entries.
+    await db.updateSessionState(orderId, 'UTR_OBSERVED');
     authChallenges.delete(sessionId);
-
-    return res.json({
-      success: true,
-      settled: true,
-      orderId,
-      utr: txnRef,
-      amount: session.challengeAmount,
-      baseAmount: session.baseAmount,
-      vpaAddress: session.vpaAddress,
-      txId,
-      timestamp: Date.now(),
-      ledgerVerification: verification,
-      reconciliationState: 'CLAIM_VERIFIED_PENDING_BANK_RECONCILIATION'
+    return res.status(202).json({
+      success:true,verified:false,settled:false,
+      orderId,utr:txnRef,state:'UTR_OBSERVED',
+      code:'APP_RETURN_NOT_BANK_CONFIRMATION'
     });
   } catch (err) {
-    console.error('Finalize UPI error:', err);
-    res.status(500).json({ success: false, error: 'INTERNAL_SERVER_ERROR' });
+    console.error('[UPI Finalize] Error:',err);
+    return res.status(500).json({success:false,error:'FINALIZE_UNAVAILABLE'});
   }
 });
 // ═════════════════════════════════════════════════════════════════════
@@ -1684,52 +1576,22 @@ app.post('/handle-share', shareLimiter, async (req, res) => {
       }
       return res.redirect(`/failed.html?reason=${encodeURIComponent('Automated settlement requires HIGH confidence tier.')}`);
     }
-    // Ledger posting & anti-replay — instant settlement (DISHA never holds funds)
-    const { txId, verification } = await db.atomicSettle(
-      session.orderId,
-      parsedUtr,
-      session.challengeAmount,
-      session.vpaAddress,
-      req.body.imageHash || null
-    );
-    // Update session status in DB
-    await db.updateSessionStatus(session.orderId, 'SUCCESS', parsedUtr);
-    await db.updateSessionState(session.orderId, 'VERIFIED');
-    // ⚡ CRITICAL: INSTANT WEBSOCKET DISPATCH TO WAITING CHECKOUT (LAPTOP/DESKTOP/MOBILE)
-    const successPayload = {
-      orderId: session.orderId,
-      utr: parsedUtr,
-      amount: session.challengeAmount,
-      baseAmount: session.baseAmount,
-      vpaAddress: session.vpaAddress,
-      senderVpa: req.body.senderVpa || 'customer@upi',
-      txId,
-      timestamp: now,
-      settlementSource: 'ANDROID_SHARE_SHEET_SST',
-      message: 'Settlement confirmed via Android Share Sheet Single Source of Truth (SST)'
-    };
-    broadcastOrderSuccess(session.orderId, successPayload);
-    console.log(`✅ [Android Share Target SST] Successfully settled order ${session.orderId} and notified checkout client via WebSocket`);
+    // Web Share Target text is untrusted, even when its layout looks genuine.
+    // It may update the order's reference-observed state, never the money ledger.
+    await db.updateSessionState(session.orderId, 'UTR_OBSERVED');
     if (req.accepts('json') && !req.accepts('html')) {
-      return res.json({
-        success: true,
-        state: 'VERIFIED',
-        settled: true,
-        orderId: session.orderId,
-        utr: parsedUtr,
-        amount: session.challengeAmount,
-        ledgerTxId: txId,
-        successToken: txId
+      return res.status(202).json({
+        success:true,verified:false,state:'UTR_OBSERVED',
+        orderId:session.orderId,utr:parsedUtr,
+        code:'SHARED_RECEIPT_NOT_BANK_CONFIRMATION'
       });
     }
-    // Redirect to success page without exposing UTR in URL
-    res.redirect(`/success.html?token=${encodeURIComponent(txId)}&order_id=${encodeURIComponent(session.orderId)}`);
-  } catch (err) {
-    console.error('[Android Share Target] Error:', err);
-    if (req.accepts('json') && !req.accepts('html')) {
-      return res.status(500).json({ success: false, error: 'INTERNAL_SERVER_ERROR' });
-    }
-    res.redirect('/failed.html?reason=verification_error');
+    return res.redirect('/checkout/?status=reference_observed');
+  } catch(err) {
+    console.error('[Android Share Target] Error:',err);
+    if (req.accepts('json') && !req.accepts('html'))
+      return res.status(500).json({success:false,error:'SHARED_RECEIPT_UNAVAILABLE'});
+    return res.redirect('/failed.html?reason=verification_unavailable');
   }
 });
 // Official NPCI Intent Callback / Webhook Endpoint
@@ -1762,10 +1624,12 @@ app.post('/api/npci-callback', (req, res) => {
         reason: 'Required UTR (txnId) or amount missing in callback'
       });
     }
-    return res.json({
-      success: true,
-      status: 'SUCCESS',
-      responseCode: '00',
+    // This public endpoint has no authenticated NPCI delivery signature.
+    // Even responseCode=00 is a customer-origin claim, not a confirmed credit.
+    return res.status(202).json({
+      success: true, verified: false,
+      status: 'UTR_OBSERVED',
+      responseCode: parsed.responseCode || '00',
       utr: parsed.txnId,
       amount: parsed.amount,
       orderId: parsed.orderId
@@ -1922,109 +1786,13 @@ app.post('/api/vpa/health-check', requireAdminAuth, async (req, res) => {
 // ═══════════════════════════════════════════════════════════════════
 // GAMING ENTERPRISE VERIFICATION API (IP WHITELIST PROTECTED)
 // ═══════════════════════════════════════════════════════════════════
-app.post('/api/gaming/verify-payment', async (req, res) => {
-  try {
-    const { utr, amount, sessionId, orderId } = req.body;
-    const company = req.company;
-    const clientIP = req.clientIP;
-    if (!utr || !/^\d{12}$/.test(String(utr).trim())) {
-      return res.status(400).json({
-        success: false,
-        error: 'INVALID_UTR_FORMAT',
-        message: 'Valid 12-digit transaction UTR is required'
-      });
-    }
-    // Look up session
-    let session = null;
-    if (sessionId) session = await db.findSessionByTxnRef(sessionId);
-    if (!session && orderId) session = await db.findSessionByOrderId(orderId);
-    if (session) {
-      const amt = Number(amount || session.challengeAmount);
-      if (Math.abs(amt - session.challengeAmount) > 0.001) {
-        return res.status(400).json({
-          success: false,
-          error: 'AMOUNT_MISMATCH',
-          expectedAmount: session.challengeAmount,
-          receivedAmount: amt
-        });
-      }
-      if (await db.isUtrBlacklisted(utr)) {
-        return res.status(400).json({
-          success: false,
-          error: 'UTR_ALREADY_USED',
-          message: 'This UTR has already been claimed and settled'
-        });
-      }
-      const { txId, verification } = await db.recordTransactionAndLedger(
-        session.orderId,
-        utr,
-        session.challengeAmount,
-        session.vpaAddress
-      );
-      await db.blacklistUtr(utr, session.orderId, session.challengeAmount, `Gaming verification: ${company.company_name}`);
-      await db.updateSessionStatus(session.orderId, 'SUCCESS', utr);
-      return res.json({
-        success: true,
-        status: 'VERIFIED',
-        orderId: session.orderId,
-        utr,
-        amount: session.challengeAmount,
-        company: company.company_name,
-        clientIP,
-        verifiedAt: Date.now(),
-        ledgerTxId: txId,
-        ledgerVerification: verification
-      });
-    }
-    // If explicit session or order ID was provided but not found
-    if (sessionId || orderId) {
-      return res.status(404).json({
-        success: false,
-        error: 'SESSION_NOT_FOUND',
-        message: 'No active payment session found for the provided sessionId or orderId.'
-      });
-    }
-    // Direct enterprise settlement for authorized IP-whitelisted gaming partners
-    if (await db.isUtrBlacklisted(utr)) {
-      return res.status(400).json({
-        success: false,
-        error: 'UTR_ALREADY_USED',
-        message: 'This UTR has already been claimed and settled'
-      });
-    }
-    const assignedVpa = 'gaming@okaxis';
-    const numAmount = parseFloat(amount || 0);
-    if (!numAmount || isNaN(numAmount) || numAmount <= 0) {
-      return res.status(400).json({
-        success: false,
-        error: 'INVALID_AMOUNT',
-        message: 'A positive amount is required'
-      });
-    }
-    const generatedOrderId = `ORD_GAME_${Date.now()}_${crypto.randomBytes(3).toString('hex').toUpperCase()}`;
-    const { txId, verification } = await db.recordTransactionAndLedger(
-      generatedOrderId,
-      utr,
-      numAmount,
-      assignedVpa
-    );
-    await db.blacklistUtr(utr, generatedOrderId, numAmount, `Gaming direct settlement: ${company.company_name}`);
-    return res.json({
-      success: true,
-      status: 'VERIFIED',
-      orderId: generatedOrderId,
-      utr,
-      amount: numAmount,
-      company: company.company_name,
-      clientIP,
-      verifiedAt: Date.now(),
-      ledgerTxId: txId,
-      ledgerVerification: verification
-    });
-  } catch (err) {
-    console.error('[Gaming API] Error:', err);
-    res.status(500).json({ success: false, error: 'INTERNAL_SERVER_ERROR' });
-  }
+app.post('/api/gaming/verify-payment', (req,res) => {
+  // Disabled financial posting from unauthenticated UTR claims.
+  // No bank API is introduced: merchants retain P2P UTR order matching.
+  return res.status(409).json({
+    success:false, verified:false, state:'UNVERIFIED_UTR',
+    error:'UTR_CLAIM_NOT_CREDIT_CONFIRMATION'
+  });
 });
 // Route fallbacks
 app.get('/success', (req, res) => res.sendFile(path.join(__dirname, 'public', 'success.html')));
