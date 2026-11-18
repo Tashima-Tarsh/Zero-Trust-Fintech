@@ -297,7 +297,7 @@ function evidenceTable(rows,mode){
  const heading=mode==='vault'?'<th>Order</th><th>Vault outcome</th><th>Reference candidate</th><th>Payment status</th>':'<th>Order</th><th>Amount</th><th>UTR</th><th>Observed evidence</th><th>Recorded status</th>';
  const cells=rows.map(o=>{
   const outcome=o.vault_outcome||'No Vault observation';
-  if(mode==='vault')return '<tr><td>'+esc(o.id)+'</td><td>'+esc(outcome)+'</td><td>'+esc(o.vault_utr_candidate||'Not provided')+'</td><td>'+esc(o.status)+'</td></tr>';
+  if(mode==='vault')return '<tr><td>'+esc(o.id)+'</td><td>'+esc(outcome)+(o.vault_correlation?.selectedApp?'<small class="sub"> · App: '+esc(o.vault_correlation.selectedApp)+' · Return: '+esc(o.vault_correlation.browserAppReturnMs??'—')+'ms</small>':'')+'</td><td>'+esc(o.vault_utr_candidate||'Not provided')+'</td><td>'+esc(o.status)+'</td></tr>';
   return '<tr><td>'+esc(o.id)+'<small>'+esc(o.vpa_address)+'</small></td><td>'+esc(money(o.amount))+'</td><td>'+esc(o.utr||'Not recorded')+'</td><td>'+esc(outcome)+'</td><td>'+esc(o.status)+'</td></tr>';
  }).join('');
  return '<table class="merchant-op-table"><thead><tr>'+heading+'</tr></thead><tbody>'+cells+'</tbody></table>';
