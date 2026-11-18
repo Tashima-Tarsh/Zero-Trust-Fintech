@@ -64,7 +64,7 @@ assert.match(read('cosmic-checkout.css'),/\/assets\/disha-universe-background\.s
 // not disappear under an opaque panel and negative stacking context.
 for(const name of ['checkout.html','merchant-checkout.html']){
  const page=read(name);
- assert.match(page,/cosmic-checkout\.css\?v=cosmos2-20261118/);
+ assert.match(page,/cosmic-checkout\.css\?v=[a-zA-Z0-9._-]+/,'Checkout stylesheet must be cache-versioned');
  assert.match(page,/class="vault-art" src="\/assets\/disha-vault-sculpture\.svg"/);
  const card=page.indexOf('class="checkout-panel"');
  const logo=page.indexOf('class="checkout-brand"');
