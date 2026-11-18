@@ -15,6 +15,7 @@ const db = require('./db');
 const { createMerchantApi } = require('./merchant-api');
 const {createReconciliationRouter,initializeReconciliationSchema} = require('./financial/reconciliation-webhook');
 const {createVaultEvidenceRouter,initializeVaultEvidenceSchema,rememberVaultAuthorization} = require('./financial/vault-evidence');
+const {initializeClaimObserver,observeClaim} = require('./financial/untrusted-utr-claims');
 const {
   buildNPCIIntentUri,
   sanitizeTransactionNote,
@@ -41,9 +42,9 @@ const CLERK_ENABLED = Boolean(process.env.CLERK_PUBLISHABLE_KEY && process.env.C
 // Trust proxy only when explicitly opted in (e.g. behind Render/Cloudflare).
 // Never on by default: X-Forwarded-For is trivially spoofable otherwise.
 
-// Mathematical time window for verification (pony tail: 15s min, 180s max)
-const T_MIN_MS = 15 * 1000;   // 15 seconds minimum - covers 99.7% of legitimate payments
-const T_MAX_MS = 180 * 1000;  // 180 seconds maximum - prevents old UTR reuse attacks
+// Pony-tail observation window: policy limits, not a payment-success proof.
+// Timing alone cannot establish credit or prevent reuse of a supplied UTR.
+const {T_MIN_MS,T_MAX_MS,evaluateTemporalGate}=require('./utils/pony-tail-window');
 app.set('trust proxy', process.env.TRUST_PROXY === 'true');
 const server = http.createServer(app);
 const wss = new WebSocketServer({ server, path: '/ws' });
@@ -767,7 +768,7 @@ function extractReceiptEvidence(receiptText, sessionContext) {
 // ═══════════════════════════════════════════════════════════════════
 app.post('/api/verify', verifyLimiter, async (req, res) => {
   try {
-    const { utr, amount, receipt, orderId, txnRef } = req.body;
+    const { utr, amount, receipt, orderId, txnRef, token } = req.body || {};
     const now = Date.now();
     // Use NPCI Intent Parser for raw receipt or callback data
     let parsedUtr = utr;
@@ -794,25 +795,23 @@ app.post('/api/verify', verifyLimiter, async (req, res) => {
       });
     }
 
-    const bindingResult = await db.bindUtrToOrder(parsedUtr, session.orderId);
-    if (bindingResult === 'BOUND_TO_OTHER_ORDER') {
-      await db.updateSessionState(session.orderId, 'REJECTED');
-      return res.status(400).json({
-        success: false,
-        state: 'REJECTED',
-        layer: 4,
-        code: 'UTR_BOUND_TO_OTHER_ORDER',
-        reason: 'This UTR was already submitted for a different order. Cross-order UTR reuse is impossible.'
-      });
-    }
-
+    // Checkout bearer and CSRF proof are required before any mutable step.
+    // Untrusted receipts never acquire an exclusive UTR-to-order binding.
+    if(!safeCompareKeys(token,session.sessionId) ||
+       !safeCompareKeys(req.headers['x-csrf-token'],token))
+      return res.status(401).json({success:false,code:'CHECKOUT_TOKEN_REQUIRED'});
+    if(session.status!=='PENDING')
+      return res.status(409).json({success:false,code:'ORDER_NOT_PENDING'});
     // ─────────────────────────────────────────────────────────────
     // LAYER 1.5: TIME WINDOW CHECK (Mathematical: 15s min, 180s max)
     // ─────────────────────────────────────────────────────────────
-    const timeElapsedMs = now - session.createdAt;
+    const temporal=evaluateTemporalGate(session,now);
+    if(temporal.state==='INVALID_SESSION_CLOCK'||temporal.state==='CLOCK_SKEW')
+      return res.status(400).json({success:false,code:temporal.state});
+    const timeElapsedMs=temporal.elapsedMs;
 
-    // State 1: Too early (0 < t < 15s)
-    if (timeElapsedMs < T_MIN_MS) {
+    // State 1: Too early (0 <= t < 15s)
+    if (temporal.state==='WAITING') {
       await db.updateSessionState(session.orderId, 'WAITING');
       return res.status(200).json({
         success: true,
@@ -824,7 +823,7 @@ app.post('/api/verify', verifyLimiter, async (req, res) => {
     }
 
     // State 4: Too late (t > 180s)
-    if (timeElapsedMs > T_MAX_MS) {
+    if (temporal.state==='EXPIRED') {
       await db.updateSessionState(session.orderId, 'EXPIRED');
       await db.updateSessionStatus(session.orderId, 'EXPIRED');
       return res.status(400).json({
@@ -943,8 +942,12 @@ app.post('/api/verify', verifyLimiter, async (req, res) => {
         reason: 'This session has already been settled and closed.'
       });
     }
-    // No customer-origin receipt or UTR can authorize ledger SUCCESS.
-    // Retain the order/UTR mapping for future correlation without granting funds.
+    // Observational UTR candidate — never an authoritative reservation.
+    const claim=await observeClaim(db.pgPool,session.orderId,parsedUtr,'LEGACY_VERIFY');
+    if(claim.error)return res.status(503).json({success:false,code:claim.error});
+    if(claim.conflict)return res.status(409).json({
+      success:false,verified:false,state:'CONFLICTING_EVIDENCE',code:'UTR_CLAIM_REPLAY'
+    });
     await db.updateSessionState(session.orderId, 'VERIFY_WINDOW');
     return res.status(202).json({
       success: true,
@@ -995,13 +998,9 @@ app.post('/api/verify-cfc', verifyLimiter, async (req, res) => {
         reason: 'No active checkout session for this order ID.'
       });
     }
-    if (token !== session.sessionId) {
-      return res.status(401).json({
-        success: false,
-        error: 'SESSION_TOKEN_REQUIRED',
-        reason: 'Invalid or missing session token.'
-      });
-    }
+    if(!safeCompareKeys(token,session.sessionId) ||
+       !safeCompareKeys(req.headers['x-csrf-token'],token))
+      return res.status(401).json({success:false,error:'SESSION_TOKEN_REQUIRED'});
     if (session.status === 'SUCCESS') {
       return res.status(400).json({
         success: false,
@@ -1020,8 +1019,11 @@ app.post('/api/verify-cfc', verifyLimiter, async (req, res) => {
         secondsRemaining: cooldown.secondsRemaining
       });
     }
-    const timeElapsedMs = now - session.createdAt;
-    if (timeElapsedMs < T_MIN_MS) {
+    const temporal=evaluateTemporalGate(session,now);
+    if(temporal.state==='INVALID_SESSION_CLOCK'||temporal.state==='CLOCK_SKEW')
+      return res.status(400).json({success:false,error:temporal.state});
+    const timeElapsedMs=temporal.elapsedMs;
+    if (temporal.state==='WAITING') {
       return res.status(200).json({
         success: true,
         state: 'WAITING',
@@ -1030,7 +1032,7 @@ app.post('/api/verify-cfc', verifyLimiter, async (req, res) => {
         message: `Please wait ${Math.ceil((T_MIN_MS - timeElapsedMs) / 1000)}s before CFC verification`
       });
     }
-    if (timeElapsedMs > T_MAX_MS) {
+    if (temporal.state==='EXPIRED') {
       await db.updateSessionStatus(session.orderId, 'EXPIRED');
       await db.updateSessionState(session.orderId, 'EXPIRED');
       return res.status(400).json({
@@ -1040,23 +1042,11 @@ app.post('/api/verify-cfc', verifyLimiter, async (req, res) => {
         reason: 'Order timeout (>3 minutes). Please create a new order.'
       });
     }
-    const bindingResult = await db.bindUtrToOrder(cleanUtr, session.orderId);
-    if (bindingResult === 'BOUND_TO_OTHER_ORDER') {
-      await db.updateSessionState(session.orderId, 'REJECTED');
-      return res.status(400).json({
-        success: false,
-        state: 'REJECTED',
-        error: 'UTR_BOUND_TO_OTHER_ORDER',
-        reason: 'This UTR was already used for a different order. Cross-order UTR reuse is impossible.'
-      });
-    }
-    if (bindingResult === false) {
-      return res.status(400).json({
-        success: false,
-        error: 'UTR_BIND_FAILED',
-        reason: 'Could not bind UTR to order. Please try again.'
-      });
-    }
+    const claim=await observeClaim(db.pgPool,session.orderId,cleanUtr,'CFC');
+    if(claim.error)return res.status(503).json({success:false,error:claim.error});
+    if(claim.conflict)return res.status(409).json({
+      success:false,verified:false,state:'CONFLICTING_EVIDENCE',error:'UTR_CLAIM_REPLAY'
+    });
     // A customer-entered UTR may be correlated to the order but cannot itself
     // establish funds credited. Do not manufacture a ledger credit.
     await db.updateSessionState(session.orderId, 'VERIFY_WINDOW');
@@ -1077,10 +1067,15 @@ app.post('/api/verify-cfc', verifyLimiter, async (req, res) => {
 // ═════════════════════════════════════════════════════════════════════
 app.post('/api/cfc/cancel', verifyLimiter, async (req, res) => {
   try {
-    const { orderId } = req.body || {};
-    if (!orderId) {
-      return res.status(400).json({ success: false, error: 'orderId required' });
-    }
+    const {orderId,token}=req.body||{};
+    if(!orderId)return res.status(400).json({success:false,error:'ORDER_ID_REQUIRED'});
+    const session=await db.findSessionByOrderId(orderId);
+    if(!session)return res.status(404).json({success:false,error:'SESSION_NOT_FOUND'});
+    if(!safeCompareKeys(token,session.sessionId) ||
+       !safeCompareKeys(req.headers['x-csrf-token'],token))
+      return res.status(401).json({success:false,error:'CHECKOUT_TOKEN_REQUIRED'});
+    if(session.status!=='PENDING'||Date.now()>session.expiresAt)
+      return res.status(409).json({success:false,error:'ORDER_NOT_ACTIVE'});
     await db.setSessionCooldown(orderId, 120 * 1000); // 2-minute cooldown
     await db.updateSessionState(orderId, 'CANCELLED');
     return res.json({
@@ -1344,17 +1339,13 @@ app.post('/api/checkout/finalize-upi', verifyLimiter, async (req, res) => {
       return res.status(404).json({ success: false, error: 'SESSION_NOT_FOUND' });
     }
 
-    // Anti-reuse: bind UTR to this order
-    const bindingResult = await db.bindUtrToOrder(txnRef, orderId);
-    if (bindingResult === 'BOUND_TO_OTHER_ORDER') {
-      await db.updateSessionState(orderId, 'REJECTED');
-      return res.status(400).json({
-        success: false,
-        error: 'UTR_BOUND_TO_OTHER_ORDER',
-        reason: 'This UTR was already used for a different order.'
-      });
-    }
-
+    if(session.status!=='PENDING'||Date.now()>session.expiresAt)
+      return res.status(409).json({success:false,error:'ORDER_NOT_ACTIVE'});
+    const claim=await observeClaim(db.pgPool,orderId,txnRef,'VAULT_FINALIZE');
+    if(claim.error)return res.status(400).json({success:false,error:claim.error});
+    if(claim.conflict)return res.status(409).json({
+      success:false,verified:false,state:'CONFLICTING_EVIDENCE',error:'UTR_CLAIM_REPLAY'
+    });
     // A WebAuthn assertion authenticates the user/device, NOT a bank credit.
     // Preserve the UTR correlation; do not post SUCCESS or financial entries.
     await db.updateSessionState(orderId, 'VERIFY_WINDOW');
@@ -1517,9 +1508,14 @@ app.post('/handle-share', shareLimiter, async (req, res) => {
       customerId: session.customerId
     };
     // Time window check for share flow
-    const shareTimeElapsedMs = now - session.createdAt;
-    if (shareTimeElapsedMs < T_MIN_MS) {
-      await db.updateSessionState(session.orderId, 'WAITING');
+    const temporal=evaluateTemporalGate(session,now);
+    if(temporal.state==='INVALID_SESSION_CLOCK'||temporal.state==='CLOCK_SKEW'){
+      if(req.accepts('json')&&!req.accepts('html'))
+        return res.status(400).json({success:false,error:temporal.state});
+      return res.redirect('/failed.html?reason=invalid_session_clock');
+    }
+    const shareTimeElapsedMs=temporal.elapsedMs;
+    if (temporal.state==='WAITING') {
       if (req.accepts('json') && !req.accepts('html')) {
         return res.status(200).json({
           success: true,
@@ -1531,9 +1527,7 @@ app.post('/handle-share', shareLimiter, async (req, res) => {
       }
       return res.redirect(`/failed.html?reason=${encodeURIComponent('Please wait before verifying payment')}`);
     }
-    if (shareTimeElapsedMs > T_MAX_MS) {
-      await db.updateSessionState(session.orderId, 'EXPIRED');
-      await db.updateSessionStatus(session.orderId, 'EXPIRED');
+    if (temporal.state==='EXPIRED') {
       if (req.accepts('json') && !req.accepts('html')) {
         return res.status(400).json({
           success: false,
@@ -1545,7 +1539,6 @@ app.post('/handle-share', shareLimiter, async (req, res) => {
       }
       return res.redirect(`/failed.html?reason=${encodeURIComponent('Order timeout (>3 minutes)')}`);
     }
-    await db.updateSessionState(session.orderId, 'VERIFY_WINDOW');
     // Extract server-side verified evidence (NO lenient client defaults)
     const ev = extractReceiptEvidence(rawReceipt, sessionContext);
     ev.amount = parsedAmount;
@@ -1561,20 +1554,8 @@ app.post('/handle-share', shareLimiter, async (req, res) => {
     // ────────────────────────────────────────────────────────────
     // LAYER 4: CUSTOMER / ORDER IDENTITY BINDING (Cross-Order UTR Reuse Prevention)
     // ───────────────────────────────────────────────────────────
-    const bindingResult = await db.bindUtrToOrder(parsedUtr, session.orderId);
-    if (bindingResult === 'BOUND_TO_OTHER_ORDER') {
-      await db.updateSessionState(session.orderId, 'REJECTED');
-      if (req.accepts('json') && !req.accepts('html')) {
-        return res.status(400).json({
-          success: false,
-          state: 'REJECTED',
-          layer: 4,
-          code: 'UTR_BOUND_TO_OTHER_ORDER',
-          reason: 'This UTR was already submitted for a different order. Cross-order UTR reuse is impossible.'
-        });
-      }
-      return res.redirect(`/failed.html?reason=${encodeURIComponent('This UTR was already used for a different order. Cross-order reuse is impossible.')}`);
-    }
+    // Client-supplied shared receipt text must never reserve a bank reference
+    // against another person's order or change financial state.
     const trustResult = scoreEvidence(sessionContext, ev, hist, {
       now,
       graceMs: 60 * 1000,
@@ -1600,9 +1581,20 @@ app.post('/handle-share', shareLimiter, async (req, res) => {
       }
       return res.redirect(`/failed.html?reason=${encodeURIComponent('Evidence confidence score too low. Authentic receipt required.')}`);
     }
-    // Web Share Target text is untrusted, even when its layout looks genuine.
-    // It may update the order's reference-observed state, never the money ledger.
-    await db.updateSessionState(session.orderId, 'VERIFY_WINDOW');
+    const claim=await observeClaim(db.pgPool,session.orderId,parsedUtr,'WEB_SHARE');
+    if(claim.error) {
+      if(req.accepts('json')&&!req.accepts('html'))
+        return res.status(503).json({success:false,error:claim.error});
+      return res.redirect('/failed.html?reason=observation_storage_unavailable');
+    }
+    if(claim.conflict) {
+      if(req.accepts('json')&&!req.accepts('html'))
+        return res.status(409).json({
+          success:false,verified:false,state:'CONFLICTING_EVIDENCE',code:'UTR_CLAIM_REPLAY'
+        });
+      return res.redirect('/checkout/?status=reference_conflict');
+    }
+    // Observations do not mutate an order into a financial success.
     if (req.accepts('json') && !req.accepts('html')) {
       return res.status(202).json({
         success:true,verified:false,state:'UTR_OBSERVED',
@@ -1825,7 +1817,10 @@ app.get('/failed', (req, res) => res.sendFile(path.join(__dirname, 'public', 'fa
 (async () => {
   await db.initDb();
   if (db.pgPool && CLERK_ENABLED) await merchantApi.init();
-  if(db.pgPool) await initializeVaultEvidenceSchema(db.pgPool);
+  if(db.pgPool) {
+    await initializeVaultEvidenceSchema(db.pgPool);
+    await initializeClaimObserver(db.pgPool);
+  }
   if(process.env.RECONCILIATION_WEBHOOK_SECRET && process.env.RECONCILIATION_SOURCE_ID){
     if(!db.pgPool || !CLERK_ENABLED)throw new Error('Reconciliation requires PostgreSQL and merchant tenant tables');
     await initializeReconciliationSchema(db.pgPool);

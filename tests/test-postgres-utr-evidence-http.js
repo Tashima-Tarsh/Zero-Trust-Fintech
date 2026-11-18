@@ -62,7 +62,11 @@ const {Pool}=require('pg');
   assert.ok(ready,'Express not ready: '+serverLog.slice(-3500));
   const receiptCase=await createCase();
   const fakeReceipt='UPI Payment Successful\nDISHA QA Merchant\nTo: qa-receiver@oksbi\nAmount INR 499.01\nUTR: '+receiptCase.utr+'\nDate: Today';
-  const rec=await send('/api/verify',{utr:receiptCase.utr,amount:'499.01',orderId:receiptCase.id,receipt:fakeReceipt});
+  const unauth=await send('/api/verify',{utr:receiptCase.utr,amount:'499.01',orderId:receiptCase.id,receipt:fakeReceipt});
+  assert.equal(unauth.status,401,'Unauthenticated forged receipt cannot reserve a UTR or mutate a session');
+  const rec=await send('/api/verify',{utr:receiptCase.utr,amount:'499.01',
+    orderId:receiptCase.id,receipt:fakeReceipt,token:receiptCase.token},
+    {headers:{'X-CSRF-Token':receiptCase.token}});
   assert.equal(rec.status,202,'Fake 95-point receipt must not authorize payment: '+JSON.stringify(rec));
   assert.equal(rec.data.verified,false);
   assert.equal(rec.data.state,'UTR_OBSERVED');
@@ -79,9 +83,19 @@ const {Pool}=require('pg');
   const other=await createCase();
   const replay=await send('/api/verify-cfc',{utr:cfc.utr,orderId:other.id,token:other.token},
     {headers:{'X-CSRF-Token':other.token}});
-  assert.equal(replay.status,400);
-  assert.equal(replay.data.error,'UTR_BOUND_TO_OTHER_ORDER');
-  console.log('PASS cross-order UTR replay rejected');
+  assert.equal(replay.status,409);
+  assert.equal(replay.data.error,'UTR_CLAIM_REPLAY');
+  assert.equal(replay.data.state,'CONFLICTING_EVIDENCE');
+  console.log('PASS cross-order UTR claim flagged without an authoritative UTR binding');
+
+  const cancel=await createCase();
+  const untrustedCancel=await send('/api/cfc/cancel',{orderId:cancel.id});
+  assert.equal(untrustedCancel.status,401,'Unauthenticated cancel cannot freeze checkout');
+  const validCancel=await send('/api/cfc/cancel',{orderId:cancel.id,token:cancel.token},
+    {headers:{'X-CSRF-Token':cancel.token}});
+  assert.equal(validCancel.status,200);
+  assert.equal(validCancel.data.cooldownSeconds,120);
+  console.log('PASS cancellation requires correct checkout token and CSRF header');
 
   const share=await createCase();
   const shared='UPI Payment Successful\nTo: qa-receiver@oksbi\nAmount INR 499.01\nUTR: '+
@@ -104,6 +118,14 @@ const {Pool}=require('pg');
   if(gaming.status===409)assert.equal(gaming.data.verified,false);
   console.log('PASS legacy direct UTR gaming claim blocked (HTTP '+gaming.status+')');
 
+  for(const c of [receiptCase,cfc,other,share]){
+    const authoritative=await pool.query(
+      'SELECT count(*)::int n FROM utr_order_bindings WHERE utr=$1',[c.utr]);
+    assert.equal(authoritative.rows[0].n,0,'Untrusted receipt must not reserve UTR '+c.utr);
+  }
+  const suspicious=await pool.query(
+    'SELECT source,order_id FROM disha_untrusted_utr_claims WHERE utr=$1',[cfc.utr]);
+  assert.equal(suspicious.rowCount,2,'Both conflicting claims remain observable');
   await assertNoMoney(cases);
   console.log('UTR_POSTGRES_E2E_SECURITY_PASS: no sessions SUCCESS, no journals, no transactions.');
  }finally{

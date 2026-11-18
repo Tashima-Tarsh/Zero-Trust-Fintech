@@ -104,11 +104,14 @@ test('P0 regression: CFC route records UTR only without ledger posting',()=>{
   const b=server.indexOf("app.post(",a+20);
   const route=server.slice(a,b===-1?undefined:b);
   assert.ok(a>=0 && route.includes('const { utr, orderId, token } = req.body'));
-  assert.ok(route.includes('db.bindUtrToOrder(cleanUtr, session.orderId)'));
+  assert.ok(!route.includes('db.bindUtrToOrder('),
+    'Customer claims must never reserve the authoritative UTR binding');
+  assert.ok(route.includes("observeClaim(db.pgPool,session.orderId,cleanUtr,'CFC')"),
+    'An untrusted reference must go into the non-authoritative claim store');
   assert.ok(!route.includes('db.atomicSettle('));
   assert.ok(!route.includes("await db.updateSessionStatus(session.orderId, 'SUCCESS', cleanUtr)"));
   assert.ok(route.includes("state: 'UTR_OBSERVED'"));
-  console.log('  FIX_VERIFIED: anti-replay correlates references without posting money.');
+  console.log('  FIX_VERIFIED: untrusted references are observed without authoritative UTR reservation or money posting.');
 });
 
 console.log('UTR_HYPOTHESIS_DIAGNOSTIC_PASS '+checks+' checks.');
