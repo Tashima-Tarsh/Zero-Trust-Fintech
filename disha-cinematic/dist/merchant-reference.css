@@ -304,3 +304,35 @@ body.app-page .side-nav button:focus-visible,body.app-page :is(button,a):focus-v
  .celestial-earth{animation:none!important}
  body.app-page .side-nav button{transition:none!important}
 }
+
+
+/* FINISHING FIX — form glyphs must be singular, never tiled.
+   The base form skin applies a background shorthand with !important.
+   Every layer property here must therefore override it explicitly. */
+body.app-page #vpaAddress,
+body.app-page #vpaHolder,
+body.app-page #vpaBank,
+body.app-page #vpaMcc,
+body.app-page #vpaAccountType {
+  background-repeat:no-repeat,no-repeat!important;
+  background-attachment:scroll,scroll!important;
+}
+body.app-page #vpaAddress {
+  background-size:43px 21px,100% 100%!important;
+  background-position:11px center,center!important;
+}
+body.app-page #vpaHolder,
+body.app-page #vpaBank,
+body.app-page #vpaMcc,
+body.app-page #vpaAccountType {
+  background-size:22px 22px,100% 100%!important;
+  background-position:11px center,center!important;
+}
+/* Consistent canvas contrast: no accidental washed-out inputs, no fake gloss. */
+body.app-page .field :is(input,select,textarea){background-color:#152741!important}
+body.app-page #vpaTable td.empty::before{display:none!important}
+body.app-page #vpaTable td.empty{padding:18px 12px!important;text-align:center;line-height:1.6}
+body.app-page #view-vpas .module{overflow:hidden}
+body.app-page .table-scroller{max-width:100%;overflow-x:auto}
+body.app-page .form-grid > .field{min-width:0}
+body.app-page .field :is(input,select,textarea){max-width:100%;min-width:0}
