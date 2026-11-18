@@ -10,6 +10,11 @@ const html=read('merchant-console.html'),js=read('premium-dashboard.js'),css=rea
 assert.match(html,/merchant-reference\.css\?v=reference-/);
 assert.ok(html.indexOf('merchant-reference.css')>html.indexOf('merchant-celestial.css'),'Reference styles load LAST');
 assert.ok(html.includes('assets/disha-8-2-wordmark-cropped.png'),'Original wordmark retained');
+assert.ok(html.includes('https://eoimages.gsfc.nasa.gov/images/imagerecords/79000/79793/city_lights_africa_8k.jpg'),'Dashboard must use verified NASA Black Marble observational Earth image');
+assert.ok(html.includes('class="celestial-earth-photo"'),'NASA image must exist in live DOM, not be a CSS illustration');
+assert.ok(!css.includes('earth-night-horizon.svg'),'Polygon earth must never be rendered by the final stylesheet');
+assert.ok(css.includes('disha-nasa-earth-float'),'Actual Earth image requires optional restrained motion');
+assert.ok(css.includes('prefers-reduced-motion:reduce'),'Animation must respect reduced motion');
 assert.equal((html.match(/class="stat-portrait"/g)||[]).length,4,'All receiving UPI summary cards need premium icons');
 assert.ok(html.includes('id="vpaTotal"')&&html.includes('id="vpaActive"')&&html.includes('id="vpaPaused"')&&html.includes('id="vpaDefault"'),'Real KPI data hooks unchanged');
 for(const name of ['vpaTable','addVpaForm','vpaAddress','vpaHolder','vpaBank','vpaAccountType','vpaMcc','refreshVpas','downloadVpaTemplate','importVpaCsv','vpaCsvFile']){
