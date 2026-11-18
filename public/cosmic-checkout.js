@@ -273,7 +273,10 @@
    await pollLedger();
    if(receiptShown)return;
    if(session.initialStatus==='EXPIRED'||session.initialStatus==='FAILED'){
-    locked('This payment request is no longer active.');return;
+    locked(session.initialStatus==='EXPIRED'?
+      'This payment request has expired. Request a new link.':
+      'This payment request did not complete. Request a new link.');
+    return;
    }
    if(expired()){locked('This payment request has expired.');return}
    get('btnOneTouch').disabled=false;
