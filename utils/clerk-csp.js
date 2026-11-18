@@ -12,7 +12,7 @@ function clerkFrontendApiOrigin(publishableKey) {
   if (!match) return null;
   let host;
   try {
-    host = Buffer.from(match[1], 'base64url').toString('utf8').replace(/\0+$/, '').toLowerCase();
+    host = Buffer.from(match[1], 'base64url').toString('utf8').replace(/(?:\$|\0+)$/, '').toLowerCase();
   } catch (_) {
     return null;
   }
