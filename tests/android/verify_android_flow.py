@@ -7,6 +7,7 @@ Android 15/17 headless UIAutomator dumps are unreliable on GitHub runners.
 """
 import json
 import re
+import shlex
 import subprocess
 import time
 import urllib.parse
@@ -32,7 +33,10 @@ def adb(*args,timeout=35):
     return run(["adb",*args],timeout=timeout)
 
 def log():
-    return adb("logcat","-d","-s","DISHA_UPI_TEST:I","*:S")
+    # A single background logcat stream is captured by run-emulator-tests.sh.
+    # Repeated adb logcat -d connections can stall or lose the emulator in CI.
+    path=OUT/"intent-logcat-live.txt"
+    return path.read_text(encoding="utf-8",errors="replace") if path.exists() else ""
 
 def command(name):
     # Command-only transitions (e.g. refresh) never wait for launch completion.
@@ -106,8 +110,10 @@ def tap_native(target):
 
 def test():
     print("A01: DISHA payment opens with only amount and Touch to Pay",flush=True)
-    adb("shell","am","start","-n","ai.disha.testupi/.TestBrowserActivity",
-        "--es","url",CHECKOUT,timeout=15)
+    # adb shell invokes a remote POSIX shell. Without shell quoting, '&token'
+    # becomes a background operator and the Activity receives only orderId.
+    adb("shell","am start -n ai.disha.testupi/.TestBrowserActivity --es url "+
+        shlex.quote(CHECKOUT),timeout=15)
     page=wait_state(lambda s:s["stage"]=="initial" and "499.01" in s["amount"]
         and not s["disabled"] and not s["qr"],
         "Touch-first stage shows server amount, without premature QR")
