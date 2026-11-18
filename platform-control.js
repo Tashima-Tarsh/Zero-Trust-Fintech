@@ -253,11 +253,24 @@ function createPlatformControl({db,getAuth,clerkEmailResolver=getClerkVerifiedEm
      if(choice==='APPROVE'){
        // Invite issuance is a separate explicit action so an external API error
        // cannot roll back the local approval or create inconsistent duplicate tenants.
-       const prior=await c.query('SELECT id FROM saas_merchants WHERE lower(approved_email)=lower($1)',[request.email]);
-       if(prior.rowCount)throw err(409,'An approved merchant already uses this email');
-       merchantId=id('mer_');
-       await c.query("INSERT INTO saas_merchants(id,clerk_user_id,business_name,email,approved_email,access_status,approved_by,approved_at,created_at,updated_at) VALUES($1,NULL,$2,$3,$3,'APPROVED',$4,$5,$5,$5)",
-         [merchantId,request.business_name,request.email,req.ownerUserId,Date.now()]);
+       const prior=await c.query(
+         "SELECT id,clerk_user_id,access_status FROM saas_merchants "+
+         "WHERE lower(approved_email)=lower($1) OR (lower(email)=lower($1) AND access_status='PENDING') FOR UPDATE",
+         [request.email]);
+       if(prior.rowCount>1)throw err(409,'Multiple merchant records use this email; please review ownership');
+       if(prior.rowCount){
+         const old=prior.rows[0];
+         if(old.access_status!=='PENDING')throw err(409,'An approved merchant already uses this email');
+         if(old.clerk_user_id&&(await clerkEmailResolver(old.clerk_user_id))!==request.email)
+           throw err(409,'Existing Clerk identity email does not match the application');
+         merchantId=old.id;
+         await c.query("UPDATE saas_merchants SET approved_email=$2,access_status='APPROVED',approved_by=$3,approved_at=$4,updated_at=$4 WHERE id=$1",
+           [merchantId,request.email,req.ownerUserId,Date.now()]);
+       }else{
+         merchantId=id('mer_');
+         await c.query("INSERT INTO saas_merchants(id,clerk_user_id,business_name,email,approved_email,access_status,approved_by,approved_at,created_at,updated_at) VALUES($1,NULL,$2,$3,$3,'APPROVED',$4,$5,$5,$5)",
+           [merchantId,request.business_name,request.email,req.ownerUserId,Date.now()]);
+       }
      }
      await c.query("UPDATE disha_access_requests SET status=$2,reviewed_by=$3,reviewed_at=$4,updated_at=$4,merchant_id=$5 WHERE id=$1",
        [request.id,status,req.ownerUserId,Date.now(),merchantId||null]);
@@ -274,17 +287,56 @@ function createPlatformControl({db,getAuth,clerkEmailResolver=getClerkVerifiedEm
    const c=await pool.connect();let tenantId;
    try{
      await c.query('BEGIN');
-     const existing=await c.query("SELECT id FROM saas_merchants WHERE lower(approved_email)=lower($1) FOR UPDATE",[email]);
-     if(existing.rowCount)throw err(409,'This email already has an approved merchant invitation');
-     tenantId=id('mer_');
-     await c.query("INSERT INTO saas_merchants(id,clerk_user_id,business_name,email,approved_email,access_status,approved_by,approved_at,created_at,updated_at) "+
-       "VALUES($1,NULL,$2,$3,$3,'APPROVED',$4,$5,$5,$5)",
-       [tenantId,business,email,req.ownerUserId,Date.now()]);
+     const existing=await c.query(
+       "SELECT id,clerk_user_id,access_status FROM saas_merchants "+
+       "WHERE lower(approved_email)=lower($1) OR (lower(email)=lower($1) AND access_status='PENDING') FOR UPDATE",
+       [email]);
+     if(existing.rowCount>1)throw err(409,'Multiple merchant records use this email; please review ownership');
+     if(existing.rowCount){
+       const old=existing.rows[0];
+       if(old.access_status!=='PENDING')throw err(409,'This email already has an approved merchant invitation');
+       if(old.clerk_user_id&&(await clerkEmailResolver(old.clerk_user_id))!==email)
+         throw err(409,'Existing Clerk identity email does not match');
+       tenantId=old.id;
+       await c.query("UPDATE saas_merchants SET approved_email=$2,access_status='APPROVED',approved_by=$3,approved_at=$4,updated_at=$4 WHERE id=$1",
+         [tenantId,email,req.ownerUserId,Date.now()]);
+     }else{
+       tenantId=id('mer_');
+       await c.query("INSERT INTO saas_merchants(id,clerk_user_id,business_name,email,approved_email,access_status,approved_by,approved_at,created_at,updated_at) "+
+         "VALUES($1,NULL,$2,$3,$3,'APPROVED',$4,$5,$5,$5)",
+         [tenantId,business,email,req.ownerUserId,Date.now()]);
+     }
      await audit(c,req.ownerUserId,'MERCHANT_DIRECT_APPROVAL',tenantId,{email});
      await c.query('COMMIT');
    }catch(e){await c.query('ROLLBACK');throw e}finally{c.release()}
    // External delivery stays an explicit second step, allowing safe retries.
    res.status(201).json({success:true,merchantId:tenantId,status:'APPROVED',next:'Send Clerk invite from Tenant Management'});
+ }));
+ // Owner action for pending merchant rows, including pre-existing Clerk accounts.
+ router.post('/owner/tenants/:id/approve',wrap(async(req,res)=>{
+   const c=await pool.connect();
+   try{
+     await c.query('BEGIN');
+     const r=await c.query(
+       "SELECT id,email,clerk_user_id,access_status FROM saas_merchants WHERE id=$1 AND is_internal_test=FALSE FOR UPDATE",
+       [req.params.id]);
+     if(!r.rowCount)throw err(404,'Merchant not found');
+     const merchant=r.rows[0];
+     if(merchant.access_status!=='PENDING')throw err(409,'Only pending merchants may be approved');
+     const email=String(merchant.email||'').trim().toLowerCase();
+     if(!EMAIL.test(email))throw err(409,'A valid merchant email is required');
+     if(merchant.clerk_user_id&&(await clerkEmailResolver(merchant.clerk_user_id))!==email)
+       throw err(409,'Signed-in merchant email does not match its Clerk verified email');
+     const duplicate=await c.query(
+       'SELECT id FROM saas_merchants WHERE lower(approved_email)=lower($1) AND id<>$2',[email,merchant.id]);
+     if(duplicate.rowCount)throw err(409,'Another merchant already uses this approved email');
+     await c.query(
+       "UPDATE saas_merchants SET approved_email=$2,access_status='APPROVED',approved_by=$3,approved_at=$4,updated_at=$4 WHERE id=$1",
+       [merchant.id,email,req.ownerUserId,Date.now()]);
+     await audit(c,req.ownerUserId,'MERCHANT_APPROVED',merchant.id,{email});
+     await c.query('COMMIT');
+     res.json({success:true,merchantId:merchant.id,status:'APPROVED'});
+   }catch(e){await c.query('ROLLBACK');throw e}finally{c.release()}
  }));
  router.post('/owner/tenants/:id/invite',wrap(async(req,res)=>{
    const target=await pool.query("SELECT id,approved_email,access_status FROM saas_merchants WHERE id=$1 AND is_internal_test=FALSE",[req.params.id]);
@@ -299,7 +351,7 @@ function createPlatformControl({db,getAuth,clerkEmailResolver=getClerkVerifiedEm
    res.json({success:true,status:'INVITED'});
  }));
  router.get('/owner/tenants',wrap(async(req,res)=>{
-   const r=await pool.query("SELECT id,business_name,email,access_status,is_internal_test,setup_completed,created_at,approved_at FROM saas_merchants ORDER BY is_internal_test DESC,created_at DESC LIMIT 200");
+   const r=await pool.query("SELECT id,business_name,email,access_status,is_internal_test,setup_completed,created_at,approved_at,(clerk_user_id IS NOT NULL) AS identity_connected FROM saas_merchants ORDER BY is_internal_test DESC,created_at DESC LIMIT 200");
    res.set('Cache-Control','no-store').json({success:true,tenants:r.rows});
  }));
  router.post('/owner/tenants/:id/status',wrap(async(req,res)=>{
