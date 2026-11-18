@@ -27,14 +27,14 @@ const csvCell = v => {
   return '"'+s.replace(/"/g,'""')+'"';
 };
 const sqlOrders = "SELECT o.id,o.merchant_id,o.amount_paise,o.description,o.external_reference,"+
-  "o.vpa_address,o.created_at,o.expires_at,s.status,s.utr,s.session_id,s.state "+
-  "FROM saas_merchant_orders o JOIN sessions s ON s.session_id=o.session_id "+
+  "o.vpa_address,o.created_at,o.expires_at,s.status,s.utr,s.session_id,s.state,t.created_at AS settled_at "+
+  "FROM saas_merchant_orders o JOIN sessions s ON s.session_id=o.session_id LEFT JOIN LATERAL (SELECT created_at FROM transactions WHERE order_id=o.id ORDER BY created_at DESC LIMIT 1) t ON TRUE "+
   "WHERE o.merchant_id=$1 AND o.created_at >= $2 ORDER BY o.created_at DESC LIMIT $3";
 const publicOrder = o => ({
   id:o.id, amount:Number(o.amount_paise)/100,description:o.description,
   external_reference:o.external_reference,vpa_address:o.vpa_address,
   created_at:Number(o.created_at),expires_at:Number(o.expires_at),utr:o.utr,
-  status:invoiceStatus(o),settled_at:o.status==='SUCCESS'?Number(o.created_at):null
+  status:invoiceStatus(o),settled_at:o.settled_at?Number(o.settled_at):null
 });
 function createMerchantApi({db,getAuth,buildUpiUri}) {
   const router=express.Router();
@@ -231,7 +231,7 @@ function createMerchantApi({db,getAuth,buildUpiUri}) {
     if(!req.merchant.setup_completed)throw fail(409,'Complete merchant setup before creating payment requests');
     let paise;
     try{paise=rupeesToPaise(String(req.body.amount));}catch(e){throw fail(400,'Invalid payment amount');}
-    if(BigInt(paise)<100n||BigInt(paise)>100000000000n)throw fail(400,'Amount must be between ₹1 and ₹100 crore');
+    if(BigInt(paise)<100n||BigInt(paise)>9999999999n)throw fail(400,'Amount must be between ₹1 and ₹9.99 crore');
     const amount=Number(paise)/100;
     const description=val(req.body.description||'Payment',100);
     const externalReference=val(req.body.orderId,100);
