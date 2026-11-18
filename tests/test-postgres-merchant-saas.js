@@ -53,7 +53,7 @@ const {buildUpiUri}=require('../utils/upi-intent');
   assert.notEqual(result.data.merchant.id,b.data.merchant.id);
   let r=await call('/api/merchant/payments',alice,'POST',{amount:'500.01'});
   assert.equal(r.status,409,'Cannot create a payment without merchant onboarding');
-  r=await call('/api/merchant/setup',alice,'POST',{businessName:'Acme '+nonce,primaryVpa:'acme'+nonce+'@oksbi'});
+  r=await call('/api/merchant/setup',alice,'POST',{businessName:'Acme '+nonce,primaryVpa:'acme'+nonce+'@oksbi',primaryHolderName:'Acme Treasury',primaryBankName:'SBI'});
   assert.equal(r.status,200);
   assert.equal(r.data.merchant.setup_completed,true);
   r=await call('/api/merchant/setup',bob,'POST',{businessName:'Other '+nonce,primaryVpa:'bob'+nonce+'@ybl'});
@@ -73,6 +73,50 @@ const {buildUpiUri}=require('../utils/upi-intent');
   assert.ok(order.checkout_url.includes('/merchant-checkout.html?'));
   assert.ok(order.upi_uri_dynamic.startsWith('upi://pay?'));
   assert.ok(order.upi_uri_dynamic.includes('pa=acme'));
+  // 24/7 single-account merchant must not get blocked by routing-hours or
+  // arbitrary per-request cooldown while creating consecutive requests.
+  await pg.query('UPDATE saas_merchant_vpas SET active_hours_start=0,active_hours_end=1 WHERE vpa_address=$1',
+    ['acme'+nonce+'@oksbi']);
+  r=await call('/api/merchant/payments',alice,'POST',{
+    amount:'125.00',description:'Second real request'});
+  assert.equal(r.status,201,'One-account merchant must create repeated payment links without cooldown blocking');
+  assert.ok(r.data.order.upi_uri_dynamic.includes('pa=acme'));
+  const vpaStorage=await pg.query('SELECT daily_counter_date,last_used_at,cooldown_until FROM saas_merchant_vpas WHERE vpa_address=$1',
+    ['acme'+nonce+'@oksbi']);
+  assert.equal(typeof vpaStorage.rows[0].daily_counter_date,'string');
+  assert.ok(Number(vpaStorage.rows[0].last_used_at)>0);
+  assert.ok(Number(vpaStorage.rows[0].cooldown_until)>0);
+  r=await call('/api/merchant/vpas',alice);
+  assert.equal(r.status,200);
+  assert.equal(r.data.vpas[0].holder_name,'Acme Treasury');
+  assert.equal(r.data.vpas[0].bank_name,'SBI');
+  assert.ok(Number(r.data.vpas[0].health_score)>=0,'Routing screen must receive real internal health data');
+  assert.ok(Number.isFinite(Number(r.data.vpas[0].daily_tx_count)));
+  assert.ok(Number.isFinite(Number(r.data.vpas[0].daily_tx_limit)));
+  assert.ok(Number.isFinite(Number(r.data.vpas[0].cooldown_until)));
+
+  r=await call('/api/merchant/vpas/import',alice,'POST',{accounts:[
+    {vpaAddress:'finance'+nonce+'@oksbi',holderName:'Finance Desk',bankName:'State Bank',accountType:'PERSONAL'},
+    {vpaAddress:'counter'+nonce+'@ybl',holderName:'Counter Team',bankName:'Other Bank',accountType:'MERCHANT',mcc:'5411'}
+  ]});
+  assert.equal(r.status,201,'Bulk account import must accept validated UPI IDs');
+  assert.equal(r.data.imported,2);
+  r=await call('/api/merchant/vpas',alice);
+  assert.equal(r.data.vpas.length,3);
+  assert.equal(r.data.vpas.find(v=>v.holder_name==='Counter Team').mcc,'5411');
+  r=await call('/api/merchant/vpas',bob);
+  assert.equal(r.data.vpas.length,1,'Other merchant must not see imported VPAs');
+  r=await call('/api/merchant/vpas/import',bob,'POST',{accounts:[
+    {vpaAddress:'new'+nonce+'@oksbi',holderName:'Other Shop'},
+    {vpaAddress:'finance'+nonce+'@oksbi',holderName:'Hijack Attempt'}
+  ]});
+  assert.equal(r.status,409,'Cross-tenant conflicts must reject the entire import');
+  r=await call('/api/merchant/vpas',bob);
+  assert.equal(r.data.vpas.length,1,'Rejected import must roll back all rows');
+  r=await call('/api/merchant/vpas/import',alice,'POST',{accounts:[
+    {vpaAddress:'broken',holderName:'Bad Account'}
+  ]});
+  assert.equal(r.status,400);
   const target=new URL(order.checkout_url,base);
   const token=target.searchParams.get('token');
   r=await call('/api/merchant/public/order/'+encodeURIComponent(order.id)+'?token='+encodeURIComponent(token));
@@ -83,13 +127,15 @@ const {buildUpiUri}=require('../utils/upi-intent');
   r=await call('/api/merchant/payments',bob);
   assert.equal(r.data.orders.length,0,'Tenant B must not see tenant A payment');
   r=await call('/api/merchant/payments',alice);
-  assert.equal(r.data.orders.length,1);
-  assert.equal(r.data.orders[0].id,order.id);
+  assert.equal(r.data.orders.length,2);
+  assert.equal(r.data.orders[0].status,'PENDING');
   r=await call('/api/merchant/dashboard',alice);
   assert.equal(r.data.metrics.completedTransactions,0,'No fake settlement');
-  assert.equal(r.data.metrics.pendingTransactions,1);
+  assert.equal(r.data.metrics.pendingTransactions,2);
+  assert.ok(Array.isArray(r.data.trend),'Dashboard must provide real daily volume series');
+  assert.equal(r.data.trend.length,0,'No fake completed volume points');
   r=await call('/api/merchant/risk',alice);
-  assert.equal(r.data.risk.open,1);
+  assert.equal(r.data.risk.open,2);
   r=await call('/api/merchant/ip-whitelist',alice,'POST',{ip_address:'192.0.2.10',description:'Office egress'});
   assert.equal(r.status,201);
   const ipId=r.data.id;
@@ -112,6 +158,7 @@ const {buildUpiUri}=require('../utils/upi-intent');
   r=await call('/api/merchant/dashboard',alice);
   assert.equal(r.data.metrics.completedTransactions,1);
   assert.equal(r.data.metrics.totalVolume,500.01);
+  assert.equal(r.data.trend.reduce((total,point)=>total+point.volume,0),500.01);
   r=await call('/api/merchant/public/order/'+encodeURIComponent(order.id)+'?token='+encodeURIComponent(token));
   assert.equal(r.data.order.status,'COMPLETED');
   console.log('Merchant integration: Clerk boundary, onboarding, VPA, payment QR, tenant isolation, metrics, risk, IP, CSV and state PASS');

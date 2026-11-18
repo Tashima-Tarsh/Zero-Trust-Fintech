@@ -25,6 +25,11 @@ function upi(o,holder,amount,description,orderId){
   if(o.account_type==='MERCHANT')return require('./utils/upi-intent').buildUpiUri({...base,kind:'P2M',mc:o.mcc,tr:orderId.replace(/[^A-Za-z0-9]/g,'').slice(0,35)});
   return require('./utils/upi-intent').buildUpiUri({...base,kind:'P2P'});
 }
+const merchantHolder = v => {
+  const name=val(v,100);
+  if(name && name.length<2)throw fail(400,'Account holder name must contain at least two characters');
+  return name;
+};
 const vpa = v => {
   const result=val(v,150).toLowerCase();
   if(!vpaPattern.test(result))throw fail(400,'Enter a valid receiving UPI ID');
@@ -44,6 +49,13 @@ const csvCell = v => {
 // time-of-day, geographic diversity) with pattern masking and weighted randomness.
 async function selectMerchantVPA(client, merchantId, amount) {
   const now = Date.now();
+  // Rotate counters once per India business day; permanent counters would
+  // otherwise silently block an account after 15 payment requests forever.
+  const businessDay=new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Kolkata',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date(now));
+  await client.query(
+    "UPDATE saas_merchant_vpas SET daily_tx_count=0,daily_volume=0,daily_counter_date=$2 "+
+    "WHERE merchant_id=$1 AND daily_counter_date<>$2",
+    [merchantId,businessDay]);
   const currentHour = new Date().getHours();
   const dayOfWeek = new Date().getDay();
   const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
@@ -53,10 +65,10 @@ async function selectMerchantVPA(client, merchantId, amount) {
       "SELECT * FROM saas_merchant_vpas WHERE merchant_id=$1 AND status='ACTIVE' "+
       "AND health_score > 65 AND daily_tx_count < daily_tx_limit "+
       "AND (daily_volume + $2) <= daily_volume_limit "+
-      "AND cooldown_until <= $3 "+
-      "AND ($4 >= active_hours_start AND $4 < active_hours_end) "+
+      "AND (cooldown_until <= $3 OR "+
+      "(SELECT COUNT(*) FROM saas_merchant_vpas WHERE merchant_id=$1 AND status='ACTIVE') = 1) "+
       "ORDER BY health_score DESC",
-      [merchantId, amount, now, currentHour]
+      [merchantId, amount, now]
     )).rows;
   } catch (_) { return null; }
   if (!rows || rows.length === 0) return null;
@@ -67,7 +79,7 @@ async function selectMerchantVPA(client, merchantId, amount) {
     const txLimit = isWeekend ? Math.floor((v.daily_tx_limit || 15) * 0.5) : (v.daily_tx_limit || 15);
     const loadFactor = Math.max(0, 1.0 - ((v.daily_tx_count || 0) / (txLimit || 15)));
     const slot = (v.preferred_time_slot || 'ANY').toUpperCase();
-    let timeMatch = 0.85;
+    let timeMatch = slot==='ANY'?1.0:0.4;
     if (slot === 'MORNING' && currentHour >= 6 && currentHour < 12) timeMatch = 1.0;
     else if (slot === 'AFTERNOON' && currentHour >= 12 && currentHour < 17) timeMatch = 1.0;
     else if (slot === 'EVENING' && currentHour >= 17 && currentHour < 22) timeMatch = 1.0;
@@ -77,14 +89,13 @@ async function selectMerchantVPA(client, merchantId, amount) {
     score = Math.max(0.01, score * (0.95 + Math.random() * 0.20));
     return { ...v, score };
   });
-  let recent = [];
-  try {
-    recent = (await client.query(
-      "SELECT vpa_address FROM vpa_usage_log WHERE merchant_id=$1 ORDER BY used_at DESC LIMIT 10",
-      [merchantId]
-    )).rows.map(r => r.vpa_address);
-  } catch (_) {}
-  scored.forEach(v => { if (recent.includes(v.vpa_address)) v.score *= 0.3; });
+  // Usage log stores vpa_id, not vpa_address. SQL errors must not be swallowed
+  // inside BEGIN: PostgreSQL would mark the entire payment transaction aborted.
+  const recent = (await client.query(
+    "SELECT vpa_id FROM vpa_usage_log WHERE merchant_id=$1 ORDER BY used_at DESC LIMIT 10",
+    [merchantId]
+  )).rows.map(r => r.vpa_id);
+  scored.forEach(v => { if (recent.includes(v.id)) v.score *= 0.3; });
   const topN = scored.sort((a, b) => b.score - a.score).slice(0, Math.min(10, scored.length));
   const totalWeight = topN.reduce((s, i) => s + Math.max(0.01, i.score || 1), 0);
   let random = Math.random() * totalWeight;
@@ -95,16 +106,14 @@ async function selectMerchantVPA(client, merchantId, amount) {
   }
   const cooldownMinutes = 8 + Math.floor(Math.random() * 7);
   const cooldownUntil = now + cooldownMinutes * 60 * 1000;
-  try {
-    await client.query(
-      "UPDATE saas_merchant_vpas SET daily_tx_count = daily_tx_count + 1, daily_volume = daily_volume + $1, last_used_at = $2, cooldown_until = $3 WHERE id = $4",
-      [amount, now, cooldownUntil, selected.id]
-    );
-    await client.query(
-      "INSERT INTO vpa_usage_log (id, vpa_id, merchant_id, amount, customer_region, time_slot, used_at) VALUES ($1,$2,$3,$4,$5,$6,$7)",
-      ['log_'+crypto.randomBytes(8).toString('hex'), selected.id, merchantId, amount, 'MH', new Date(now).getHours() < 12 ? 'MORNING' : (new Date(now).getHours() < 17 ? 'AFTERNOON' : 'EVENING'), now]
-    );
-  } catch (_) {}
+  await client.query(
+    "UPDATE saas_merchant_vpas SET daily_tx_count = daily_tx_count + 1, daily_volume = daily_volume + $1, last_used_at = $2, cooldown_until = $3 WHERE id = $4",
+    [amount, now, cooldownUntil, selected.id]
+  );
+  await client.query(
+    "INSERT INTO vpa_usage_log (id, vpa_id, merchant_id, amount, customer_region, time_slot, used_at) VALUES ($1,$2,$3,$4,$5,$6,$7)",
+    ['log_'+crypto.randomBytes(8).toString('hex'), selected.id, merchantId, amount, 'MH', new Date(now).getHours() < 12 ? 'MORNING' : (new Date(now).getHours() < 17 ? 'AFTERNOON' : 'EVENING'), now]
+  );
   return selected;
 }
 const sqlOrders = "SELECT o.id,o.merchant_id,o.amount_paise,o.description,o.external_reference,"+
@@ -135,14 +144,16 @@ function createMerchantApi({db,getAuth,buildUpiUri}) {
       "setup_completed BOOLEAN NOT NULL DEFAULT FALSE,created_at BIGINT NOT NULL,updated_at BIGINT NOT NULL);"+
       "CREATE TABLE IF NOT EXISTS saas_merchant_vpas ("+
       "id TEXT PRIMARY KEY,merchant_id TEXT NOT NULL REFERENCES saas_merchants(id),"+
-      "vpa_address TEXT NOT NULL UNIQUE,bank_name TEXT NOT NULL DEFAULT '',"+
+      "vpa_address TEXT NOT NULL UNIQUE,bank_name TEXT NOT NULL DEFAULT '',holder_name TEXT NOT NULL DEFAULT '',"+
       "status TEXT NOT NULL DEFAULT 'ACTIVE' CHECK(status IN ('ACTIVE','PAUSED')),"+
       "is_default BOOLEAN NOT NULL DEFAULT FALSE,account_type TEXT NOT NULL DEFAULT 'PERSONAL',mcc TEXT,"+
       "health_score INTEGER NOT NULL DEFAULT 98,daily_tx_count INTEGER NOT NULL DEFAULT 0,daily_volume REAL NOT NULL DEFAULT 0.0,"+
       "daily_tx_limit INTEGER NOT NULL DEFAULT 15,daily_volume_limit REAL NOT NULL DEFAULT 25000.0,"+
-      "cooldown_until INTEGER NOT NULL DEFAULT 0,active_hours_start INTEGER NOT NULL DEFAULT 8,"+
+      "cooldown_until BIGINT NOT NULL DEFAULT 0,last_used_at BIGINT NOT NULL DEFAULT 0,"+
+      "daily_counter_date TEXT NOT NULL DEFAULT '',active_hours_start INTEGER NOT NULL DEFAULT 8,"+
       "active_hours_end INTEGER NOT NULL DEFAULT 22,preferred_time_slot TEXT NOT NULL DEFAULT 'ANY',"+
       "created_at BIGINT NOT NULL);"+
+      "ALTER TABLE saas_merchant_vpas ADD COLUMN IF NOT EXISTS holder_name TEXT NOT NULL DEFAULT '';"+
       "ALTER TABLE saas_merchant_vpas ADD COLUMN IF NOT EXISTS account_type TEXT NOT NULL DEFAULT 'PERSONAL';"+
       "ALTER TABLE saas_merchant_vpas ADD COLUMN IF NOT EXISTS mcc TEXT;"+
       "ALTER TABLE saas_merchant_vpas ADD COLUMN IF NOT EXISTS health_score INTEGER NOT NULL DEFAULT 98;"+
@@ -150,7 +161,10 @@ function createMerchantApi({db,getAuth,buildUpiUri}) {
       "ALTER TABLE saas_merchant_vpas ADD COLUMN IF NOT EXISTS daily_volume REAL NOT NULL DEFAULT 0.0;"+
       "ALTER TABLE saas_merchant_vpas ADD COLUMN IF NOT EXISTS daily_tx_limit INTEGER NOT NULL DEFAULT 15;"+
       "ALTER TABLE saas_merchant_vpas ADD COLUMN IF NOT EXISTS daily_volume_limit REAL NOT NULL DEFAULT 25000.0;"+
-      "ALTER TABLE saas_merchant_vpas ADD COLUMN IF NOT EXISTS cooldown_until INTEGER NOT NULL DEFAULT 0;"+
+      "ALTER TABLE saas_merchant_vpas ADD COLUMN IF NOT EXISTS cooldown_until BIGINT NOT NULL DEFAULT 0;"+
+      "ALTER TABLE saas_merchant_vpas ALTER COLUMN cooldown_until TYPE BIGINT USING cooldown_until::bigint;"+
+      "ALTER TABLE saas_merchant_vpas ADD COLUMN IF NOT EXISTS last_used_at BIGINT NOT NULL DEFAULT 0;"+
+      "ALTER TABLE saas_merchant_vpas ADD COLUMN IF NOT EXISTS daily_counter_date TEXT NOT NULL DEFAULT '';"+
       "ALTER TABLE saas_merchant_vpas ADD COLUMN IF NOT EXISTS active_hours_start INTEGER NOT NULL DEFAULT 8;"+
       "ALTER TABLE saas_merchant_vpas ADD COLUMN IF NOT EXISTS active_hours_end INTEGER NOT NULL DEFAULT 22;"+
       "ALTER TABLE saas_merchant_vpas ADD COLUMN IF NOT EXISTS preferred_time_slot TEXT NOT NULL DEFAULT 'ANY';"+
@@ -226,6 +240,7 @@ function createMerchantApi({db,getAuth,buildUpiUri}) {
   router.post('/merchant/setup',wrap(async(req,res)=>{
     const name=val(req.body.businessName,150),account=vpa(req.body.primaryVpa);
     const type=accountConfig(req.body);
+    const holder=merchantHolder(req.body.primaryHolderName),bank=val(req.body.primaryBankName,100);
     if(name.length<3)throw fail(400,'Business name must be at least three characters');
     const c=await db.pgPool.connect();
     try{
@@ -233,15 +248,17 @@ function createMerchantApi({db,getAuth,buildUpiUri}) {
       await c.query("UPDATE saas_merchants SET business_name=$2,setup_completed=TRUE,updated_at=$3 WHERE id=$1",
         [req.merchant.id,name,now()]);
       await c.query(
-        "INSERT INTO saas_merchant_vpas(id,merchant_id,vpa_address,is_default,account_type,mcc,created_at) "+
-        "VALUES($1,$2,$3,TRUE,$4,$5,$6) ON CONFLICT(vpa_address) DO NOTHING", 
-        [id('vpa_'),req.merchant.id,account,type.type,type.mcc,now()]);
+        "INSERT INTO saas_merchant_vpas(id,merchant_id,vpa_address,bank_name,holder_name,is_default,account_type,mcc,created_at) "+
+        "VALUES($1,$2,$3,$4,$5,TRUE,$6,$7,$8) ON CONFLICT(vpa_address) DO NOTHING",
+        [id('vpa_'),req.merchant.id,account,bank,holder,type.type,type.mcc,now()]);
       const owner=await c.query(
         'SELECT id FROM saas_merchant_vpas WHERE merchant_id=$1 AND vpa_address=$2',
         [req.merchant.id,account]);
       if(!owner.rowCount)throw fail(409,'This UPI ID belongs to another merchant workspace');
       await c.query('UPDATE saas_merchant_vpas SET is_default=(id=$2) WHERE merchant_id=$1',
         [req.merchant.id,owner.rows[0].id]);
+      await c.query('UPDATE saas_merchant_vpas SET holder_name=$3,bank_name=$4 WHERE merchant_id=$1 AND id=$2',
+        [req.merchant.id,owner.rows[0].id,holder,bank]);
       await notify(c,req.merchant.id,'Workspace activated','Receiving UPI ID configured. Your workspace is ready.');
       await c.query('COMMIT');
     }catch(e){await c.query('ROLLBACK');throw e;}finally{c.release();}
@@ -260,7 +277,7 @@ function createMerchantApi({db,getAuth,buildUpiUri}) {
 
   router.get('/merchant/vpas',wrap(async(req,res)=>{
     const rows=await db.pgPool.query(
-      'SELECT id,vpa_address,bank_name,status,is_default,account_type,mcc,created_at FROM saas_merchant_vpas WHERE merchant_id=$1 ORDER BY is_default DESC,created_at ASC',
+      'SELECT id,vpa_address,holder_name,bank_name,status,is_default,account_type,mcc,health_score,daily_tx_count,daily_tx_limit,daily_volume,daily_volume_limit,cooldown_until,created_at FROM saas_merchant_vpas WHERE merchant_id=$1 ORDER BY is_default DESC,created_at ASC',
       [req.merchant.id]);
     res.json({success:true,vpas:rows.rows});
   }));
@@ -268,13 +285,47 @@ function createMerchantApi({db,getAuth,buildUpiUri}) {
     if(!req.merchant.setup_completed)throw fail(409,'Complete merchant setup first');
     const account=vpa(req.body.vpaAddress);
     const type=accountConfig(req.body);
+    const holder=merchantHolder(req.body.holderName);
     const first=await db.pgPool.query('SELECT 1 FROM saas_merchant_vpas WHERE merchant_id=$1 LIMIT 1',[req.merchant.id]);
     const r=await db.pgPool.query(
-      "INSERT INTO saas_merchant_vpas(id,merchant_id,vpa_address,bank_name,status,is_default,account_type,mcc,created_at) "+
-      "VALUES($1,$2,$3,$4,'ACTIVE',$5,$6,$7,$8) ON CONFLICT(vpa_address) DO NOTHING RETURNING id",
-      [id('vpa_'),req.merchant.id,account,val(req.body.bankName,100),!first.rowCount,type.type,type.mcc,now()]);
+      "INSERT INTO saas_merchant_vpas(id,merchant_id,vpa_address,bank_name,holder_name,status,is_default,account_type,mcc,created_at) "+
+      "VALUES($1,$2,$3,$4,$5,'ACTIVE',$6,$7,$8,$9) ON CONFLICT(vpa_address) DO NOTHING RETURNING id",
+      [id('vpa_'),req.merchant.id,account,val(req.body.bankName,100),holder,!first.rowCount,type.type,type.mcc,now()]);
     if(!r.rowCount)throw fail(409,'UPI ID already registered');
     res.status(201).json({success:true,id:r.rows[0].id});
+  }));
+  // Authenticated tenant-scoped bulk account import; all-or-nothing on conflicts.
+  router.post('/merchant/vpas/import',wrap(async(req,res)=>{
+    if(!req.merchant.setup_completed)throw fail(409,'Complete merchant setup first');
+    const input=req.body.accounts;
+    if(!Array.isArray(input)||input.length<1||input.length>50)
+      throw fail(400,'Supply between 1 and 50 UPI accounts');
+    const seen=new Set();
+    const accounts=input.map((raw,index)=>{
+      if(!raw||typeof raw!=='object'||Array.isArray(raw))
+        throw fail(400,'Invalid UPI account on row '+(index+1));
+      const vpaAddress=vpa(raw.vpaAddress);
+      const holderName=merchantHolder(raw.holderName);
+      if(!holderName)throw fail(400,'Account holder name is required on row '+(index+1));
+      if(seen.has(vpaAddress))throw fail(400,'Duplicate UPI ID in import: '+vpaAddress);
+      seen.add(vpaAddress);
+      const {type,mcc}=accountConfig(raw);
+      return {vpaAddress,holderName,bankName:val(raw.bankName,100),type,mcc};
+    });
+    const c=await db.pgPool.connect();
+    try{
+      await c.query('BEGIN');
+      for(const item of accounts){
+        const row=await c.query(
+          "INSERT INTO saas_merchant_vpas(id,merchant_id,vpa_address,holder_name,bank_name,status,is_default,account_type,mcc,created_at) "+
+          "VALUES($1,$2,$3,$4,$5,'ACTIVE',FALSE,$6,$7,$8) ON CONFLICT(vpa_address) DO NOTHING RETURNING id",
+          [id('vpa_'),req.merchant.id,item.vpaAddress,item.holderName,item.bankName,item.type,item.mcc,now()]);
+        if(!row.rowCount)throw fail(409,'UPI ID already registered: '+item.vpaAddress);
+      }
+      await notify(c,req.merchant.id,'UPI accounts imported',accounts.length+' receiving account(s) added');
+      await c.query('COMMIT');
+    }catch(error){await c.query('ROLLBACK');throw error;}finally{c.release();}
+    res.status(201).json({success:true,imported:accounts.length});
   }));
   router.patch('/merchant/vpas/:id',wrap(async(req,res)=>{
     const action=req.body.action;
@@ -316,12 +367,21 @@ function createMerchantApi({db,getAuth,buildUpiUri}) {
   }
   router.get('/merchant/dashboard',wrap(async(req,res)=>{
     const dateFilter=String(req.query.dateFilter||'30d');
-    const [m,orders,vpas,notifications]=await Promise.all([
+    const [m,orders,vpas,notifications,volumeTrend]=await Promise.all([
       metrics(req.merchant.id,dateFilter),getOrders(req.merchant.id,dateFilter,20),
-      db.pgPool.query('SELECT id,vpa_address,bank_name,status,is_default,account_type,mcc FROM saas_merchant_vpas WHERE merchant_id=$1 ORDER BY is_default DESC',[req.merchant.id]),
-      db.pgPool.query('SELECT id,title,message,created_at,read_at FROM saas_merchant_notifications WHERE merchant_id=$1 ORDER BY created_at DESC LIMIT 10',[req.merchant.id])
+      db.pgPool.query('SELECT id,vpa_address,holder_name,bank_name,status,is_default,account_type,mcc,health_score,daily_tx_count,daily_tx_limit,daily_volume,daily_volume_limit,cooldown_until FROM saas_merchant_vpas WHERE merchant_id=$1 ORDER BY is_default DESC',[req.merchant.id]),
+      db.pgPool.query('SELECT id,title,message,created_at,read_at FROM saas_merchant_notifications WHERE merchant_id=$1 ORDER BY created_at DESC LIMIT 10',[req.merchant.id]),
+      db.pgPool.query(
+        "SELECT (o.created_at / 86400000)*86400000 AS day,SUM(o.amount_paise) AS volume_paise,COUNT(*)::int AS orders "+
+        "FROM saas_merchant_orders o JOIN sessions s ON s.session_id=o.session_id "+
+        "WHERE o.merchant_id=$1 AND o.created_at >= $2 AND s.status='SUCCESS' "+
+        "GROUP BY (o.created_at / 86400000) ORDER BY day DESC LIMIT 366",
+        [req.merchant.id,cutoff(dateFilter)])
     ]);
-    res.json({success:true,metrics:m,recentTransactions:orders,vpas:vpas.rows,notifications:notifications.rows});
+    const trend=volumeTrend.rows.reverse().map(row=>({
+      day:Number(row.day),volume:Number(row.volume_paise)/100,orders:row.orders
+    }));
+    res.json({success:true,metrics:m,recentTransactions:orders,vpas:vpas.rows,notifications:notifications.rows,trend});
   }));
   router.get('/merchant/payments',wrap(async(req,res)=>{
     const limit=Math.min(Math.max(parseInt(req.query.limit,10)||100,1),200);
