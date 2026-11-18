@@ -13,6 +13,7 @@ const QRCode = require('qrcode');
 const { clerkMiddleware, getAuth } = require('@clerk/express');
 const db = require('./db');
 const { createMerchantApi } = require('./merchant-api');
+const { createPlatformControl } = require('./platform-control');
 const {createReconciliationRouter,initializeReconciliationSchema,reconcileCredit} = require('./financial/reconciliation-webhook');
 const {createVaultEvidenceRouter,initializeVaultEvidenceSchema,rememberVaultAuthorization} = require('./financial/vault-evidence');
 const {initializeClaimObserver,observeClaim} = require('./financial/untrusted-utr-claims');
@@ -247,7 +248,10 @@ if (process.env.NODE_ENV === 'production') {
     next();
   });
 }
-const merchantApi = createMerchantApi({db, getAuth, buildUpiUri});
+const platformControl = createPlatformControl({db,getAuth});
+const merchantApi = createMerchantApi({db, getAuth, buildUpiUri,platformControl});
+// Public application and strictly owner-authorized control endpoints.
+app.use('/api/platform',platformControl.router);
 // Merchant API is isolated: do NOT intercept public checkout APIs.
 app.use('/api', (req,res,next) =>
   (/^\/(?:merchant(?:\/|$)|auth\/me(?:\/|$))/.test(req.path))
@@ -303,8 +307,12 @@ app.get('/auth-config.js', (req, res) => {
 app.get('/login', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'merchant-login.html'));
 });
-app.get('/signup', (req,res) => {
-  res.sendFile(path.join(__dirname, 'public', 'merchant-signup.html'));
+app.get('/signup', (req,res) => res.redirect(302,'/request-access'));
+app.get('/request-access',(req,res)=>res.sendFile(path.join(__dirname,'public','request-access.html')));
+app.get('/owner',(req,res)=>{
+  if(!CLERK_ENABLED)return res.redirect('/login');
+  res.setHeader('Cache-Control','no-store');
+  res.sendFile(path.join(__dirname,'public','owner-console.html'));
 });
 app.get(['/dashboard', '/payments', '/analytics'], (req, res) => {
   if (!CLERK_ENABLED) return res.redirect('/login');
@@ -1898,7 +1906,7 @@ app.get('/failed', (req, res) => res.sendFile(path.join(__dirname, 'public', 'fa
 (async () => {
   await db.initDb();
   await initializeChallengeStore(db.pgPool);
-  if (db.pgPool && CLERK_ENABLED) await merchantApi.init();
+  if (db.pgPool && CLERK_ENABLED){ await merchantApi.init(); await platformControl.init(); }
   if(db.pgPool) {
     await initializeVaultEvidenceSchema(db.pgPool);
     await initializeClaimObserver(db.pgPool);
