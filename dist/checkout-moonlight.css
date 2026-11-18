@@ -193,3 +193,14 @@ body{isolation:isolate;overflow:hidden}
  [data-stage="methods"] .app-icon{width:38px;height:38px;border-radius:12px}
  [data-stage="methods"] .app-icon img{width:25px;height:25px}
 }
+
+/* Backend-authoritative session TTL, visible on every stage without adding a card. */
+.checkout-timer{
+ align-self:center;flex:0 0 auto;margin:0 auto 5px!important;
+ color:#d9edff;font:700 11px/1.4 system-ui,sans-serif;
+ text-align:center;letter-spacing:.06em;
+ text-shadow:0 2px 9px #000a,0 0 13px #77bfff8a;
+ padding:2px 0;min-height:21px;
+}
+.checkout-timer[data-expired="true"]{color:#ffb8ae;text-shadow:0 0 12px #e6565766}
+@media(max-height:620px){.checkout-timer{font-size:10px;min-height:17px;margin-bottom:2px!important}}

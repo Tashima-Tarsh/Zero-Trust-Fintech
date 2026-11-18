@@ -132,6 +132,26 @@
    // No false failure on a transient network interruption. Poll again.
   }finally{polling=false}
  }
+ function tickSessionTimer(){
+  const node=get('checkoutTimer');
+  if(!node||!session)return;
+  if(receiptShown){node.textContent='Payment confirmed';return}
+  const remaining=Math.max(0,Math.ceil((session.expiresAt-Date.now())/1000));
+  const mm=String(Math.floor(remaining/60)).padStart(2,'0');
+  const ss=String(remaining%60).padStart(2,'0');
+  node.textContent=remaining?'Session expires in '+mm+':'+ss:'Session expired · Request a new payment link';
+  node.dataset.expired=String(remaining===0);
+  if(remaining===0){
+   get('btnOneTouch').disabled=true;
+   document.querySelectorAll('[data-app]').forEach(button=>{button.disabled=true});
+   const qrButton=get('showQr');if(qrButton)qrButton.disabled=true;
+   if(lastStage==='initial'||lastStage==='methods')
+     message('This payment session has expired. Start a new checkout.','error');
+   if(lastStage==='checking')
+     get('checkingHelp').textContent='The payment window ended. A recorded credit can still be reconciled.';
+  }
+  if(lastStage==='qr')handleQrExpiry();
+ }
  function handleQrExpiry(){
   if(!session||lastStage!=='qr')return;
   const left=Math.max(0,Math.ceil((session.expiresAt-Date.now())/1000));
@@ -232,6 +252,7 @@
  }
  function onReturn(){
   if(document.visibilityState==='hidden'||receiptShown)return;
+  tickSessionTimer();
   // Returning to a cancelled/expired checkout cannot resurrect its
   // one-touch authorization or expose native app / QR controls.
   if(session&&(session.initialStatus==='EXPIRED'||
@@ -239,10 +260,13 @@
    void pollLedger(); // A previously established ledger credit still wins.
    return;
   }
-  if(session&&vault.getPendingOrderId()===orderId()){
+  // A focus/pageshow event alone does not establish that Android actually
+  // opened a UPI app. Some apps reject the intent before their PIN screen.
+  // Require a browser-observed background/return event (or explicit return
+  // parameters, as captured by the Vault) before entering checking.
+  const observed=typeof vault.requestEvidence==='function'?vault.requestEvidence(orderId()):null;
+  if(session&&vault.getPendingOrderId()===orderId()&&observed){
    authorized=true;handoffStarted=true;
-   // Even when an app returns no callback fields, show a neutral checking
-   // state and keep polling the authoritative ledger; do not claim success.
    if(lastStage!=='receipt'&&lastStage!=='checking')showStage('checking');
    void submitReturnEvidence();
   }
@@ -283,6 +307,7 @@
   try{
    session=await getSession();
    setMoney(session.amount);
+   tickSessionTimer();
    // Resolve a verified recorded credit even after the original checkout TTL.
    await pollLedger();
    if(receiptShown)return;
@@ -295,13 +320,14 @@
    if(expired()){locked('This payment request has expired.');return}
    get('btnOneTouch').disabled=false;
    // A returning browser can recover its own existing Vault handoff.
-   if(vault.getPendingOrderId()===orderId()){
+   const returnEvidence=typeof vault.requestEvidence==='function'?vault.requestEvidence(orderId()):null;
+   if(vault.getPendingOrderId()===orderId()&&returnEvidence){
     authorized=true;handoffStarted=true;
     showStage('checking');
     void submitReturnEvidence();
    }
    ledgerTicker=setInterval(()=>{void pollLedger()},3500);
-   expiryTicker=setInterval(handleQrExpiry,1000);
+   expiryTicker=setInterval(tickSessionTimer,1000);
   }catch(err){locked(model.userFacingError(err,'load'))}
  }
  start();

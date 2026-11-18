@@ -17,7 +17,7 @@
 <script defer src="/vendor/simplewebauthn.umd.js"></script>
 <script defer src="/one-touch-vault.js"></script>
 <script defer src="/cosmic-checkout-model.js?v=intent-gesture2"></script>
-<script defer src="/cosmic-checkout.js?v=intent-gesture2"></script>
+<script defer src="/cosmic-checkout.js?v=production-timer3"></script>
 </head>
 <body data-checkout="merchant">
 <div class="universe" aria-hidden="true">
@@ -30,6 +30,7 @@
   <header class="checkout-brand">
    <img src="/assets/disha-8-2-wordmark-cropped.png" width="240" height="60" alt="DISHA 8.2" class="logo">
   </header>
+  <p id="checkoutTimer" class="checkout-timer" role="timer" aria-live="off">Preparing secure session…</p>
   <section data-stage="initial" class="stage stage-initial" aria-label="Begin payment">
    <p class="eyebrow">PAYMENT</p>
    <div id="payAmount" class="amount" aria-label="Amount to pay">—</div>
