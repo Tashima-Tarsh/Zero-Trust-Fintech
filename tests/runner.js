@@ -19,6 +19,7 @@ const TESTS_DIR = path.join(__dirname);
 
 const UNIT_TESTS = [
   'test-disha.js',        // challenge math, session, NPCI link, double-entry ledger
+  'test-live-upi-contract.js', // authentic P2P/P2M URI fields, strict MCC and payee isolation
   'test-npci-intent.js',  // NPCI URI builder / parser / timestamp
   'test-upi-intent-handoff.js', // Android user gesture + desktop QR + generic fallback
   'test-cosmic-checkout-interactions.js', // Stage transitions and ledger receipt authority
