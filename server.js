@@ -691,12 +691,15 @@ app.get('/api/session/new', checkoutLimiter, async (req, res) => {
         });
       }
     }
-    // DISHA public ₹1 Try Checkout must always target the explicitly configured
-    // owner receiving account, never select another tenant's rotating VPA.
-    // This changes only the dedicated demo-trial intent, not merchant orders.
-    if(!requestedVpa && baseAmount===1 && description==='DISHA checkout' &&
-       process.env.DISHA_INVITE_ONLY_ENABLED==='true'){
-      validatedVpa=process.env.MERCHANT_UPI_ID||null;
+    // The generic checkout is exclusively the platform-owner P2P receiver.
+    // Merchant P2P and P2M orders use their own tenant-token-bound checkout.
+    // Never fall through to the legacy shared VPA pool for public payments.
+    if(!requestedVpa){
+      validatedVpa=(process.env.MERCHANT_UPI_ID||MERCHANT_UPI_ID||'').trim();
+      if(!validatedVpa) return res.status(503).json({
+        success:false,error:'RECEIVING_UPI_NOT_CONFIGURED',
+        message:'Public checkout receiving account is not configured.'
+      });
     }
     const session = await generateSession(baseAmount, description, validatedVpa);
     const upiLink = generateUPILink(session);
