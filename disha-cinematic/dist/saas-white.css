@@ -1,0 +1,344 @@
+/* DISHA 8.2 — Merchant UI / editorial white design system
+   Applies only to app-page; customer checkout and public website unchanged. */
+:root{
+ color-scheme:light;
+ --bg:#f7f9fc;
+ --bg-surface:#fff;
+ --bg-elevated:#fff;
+ --panel:#fff;
+ --panel-solid:#fff;
+ --panel-hover:#f7faff;
+ --border:#e7ebf2;
+ --border-subtle:#eef1f6;
+ --border-bright:#c8d6f1;
+ --border-focus:#2a62d2;
+ --text:#172136;
+ --text-secondary:#435168;
+ --muted:#7f8a9e;
+ --muted-dark:#9aa6b8;
+ --emerald:#1a775c;
+ --emerald-light:#187054;
+ --emerald-glow:transparent;
+ --cyan:#286cba;
+ --violet:#6172c1;
+ --indigo:#2c60c7;
+ --amber:#b6781d;
+ --rose:#b83b4e;
+ --shadow-sm:0 1px 2px #14233d09,0 5px 22px #12233e05;
+ --shadow-md:0 18px 44px #1629400c;
+ --shadow-lg:0 28px 70px #172c4f14;
+ --font:-apple-system,BlinkMacSystemFont,"Inter","Segoe UI",sans-serif;
+ --display:var(--font);
+ --mono:"JetBrains Mono",ui-monospace,monospace;
+ --radius-sm:10px;
+ --radius-md:14px;
+ --radius-lg:18px;
+ --radius-xl:24px
+}
+html{background:#f7f9fc;scroll-behavior:smooth}
+body.app-page{
+ color:#172136;
+ font-family:var(--font);
+ font-size:14px;
+ background:#f7f9fc;
+ -webkit-font-smoothing:antialiased;
+ line-height:1.6;
+}
+body.app-page::before{display:none}
+body.app-page .mesh{display:none}
+body.app-page h1,body.app-page h2,body.app-page h3,body.app-page h4{
+ font-family:var(--font);color:#182338;letter-spacing:-.035em;font-weight:680
+}
+body.app-page p{color:#647187}
+body.app-page a{text-decoration:none}
+body.app-page button,body.app-page a,body.app-page input,body.app-page select{
+ transition:background-color .17s ease,border-color .17s ease,color .17s ease,box-shadow .17s ease,transform .17s ease;
+}
+body.app-page :is(button,a,input,select):focus-visible{
+ outline:3px solid #bad0ff;outline-offset:2px;
+}
+body.app-page .app-layout{
+ min-height:100svh;display:flex;align-items:stretch;
+}
+body.app-page .side{
+ width:268px;flex:0 0 268px;height:100svh;position:sticky;top:0;
+ background:#fff;color:#243044;border-right:1px solid #e9edf3;
+ padding:25px 16px 18px;box-shadow:none;scrollbar-width:thin;
+}
+body.app-page .side .brand{
+ display:flex;align-items:center;gap:10px;padding:2px 12px 22px;
+ min-height:54px;font-size:21px;font-weight:780;letter-spacing:-1px;color:#1b2840;
+}
+body.app-page .wordmark-symbol{
+ display:grid;place-items:center;flex:none;width:36px;height:36px;
+ border-radius:11px;background:#233b70;color:white;font-weight:750;letter-spacing:0;
+ box-shadow:0 8px 17px #213c7022;
+}
+body.app-page .wordmark-sub{font-weight:550;color:#8a98ad}
+body.app-page .merchant-chip{
+ border:1px solid #e7ebf2;background:#f8fafe;border-radius:14px;
+ padding:11px 12px;margin:8px 4px 23px;gap:11px;
+}
+body.app-page .merchant-chip b{color:#243148;font-weight:690;font-size:12.5px}
+body.app-page .merchant-chip small{color:#8792a4;font-size:11px}
+body.app-page .merchant-avatar{
+ border-radius:11px;color:#fff;
+ background:linear-gradient(150deg,#526ee0,#294884);
+ box-shadow:none;font-weight:700
+}
+body.app-page .side-group-label{
+ margin:18px 12px 8px;font-size:9.5px;color:#9ba6b6;
+ font-weight:800;letter-spacing:.12em;text-transform:uppercase;
+}
+body.app-page .side-nav{gap:2px}
+body.app-page .side-nav button{
+ min-height:40px;border-radius:11px;padding:10px 12px;color:#56647a;
+ border:1px solid transparent;background:transparent;
+ font-size:12.5px;font-weight:560;gap:12px;
+}
+body.app-page .side-nav button svg{opacity:.75;flex:none}
+body.app-page .side-nav button:hover{
+ background:#f4f7fc;color:#243e71;border-color:#edf1fa;transform:none
+}
+body.app-page .side-nav button.active{
+ background:#edf3ff;border:1px solid #dfe9ff;color:#2752aa;
+ font-weight:730;box-shadow:none
+}
+body.app-page .side-nav button.active svg{opacity:1}
+body.app-page .side-end{
+ margin-top:auto;padding:20px 12px 0;
+ border-top:1px solid #ebeff5;color:#75849a;
+ line-height:1.6;font-size:11px;
+}
+body.app-page .side-end [style*="emerald"]{color:#285ebf!important}
+body.app-page .side-end .btn{margin-top:8px}
+body.app-page .app-main{
+ padding:22px clamp(24px,3.7vw,58px) 56px;
+ max-width:1620px;width:100%;background:transparent
+}
+body.app-page .app-top{
+ min-height:57px;display:flex;align-items:center;
+ border-bottom:1px solid #e9edf3;padding-bottom:20px;margin-bottom:35px;
+}
+body.app-page .app-top .search{background:#fff;max-width:360px;min-height:40px}
+body.app-page .search-wrap{flex:1;max-width:400px}
+body.app-page .app-top-right{gap:13px}
+body.app-page .env{
+ border:1px solid #e2eadf;background:#f1f8f2;color:#32714b;
+ font-size:10.5px;padding:7px 11px;font-weight:650;letter-spacing:.01em;
+}
+body.app-page .env .dot{background:#2ca86f;box-shadow:none}
+body.app-page .app-title-row{margin-bottom:25px;align-items:flex-end;gap:16px}
+body.app-page .app-title-row h1{
+ font-size:clamp(27px,2.8vw,35px);letter-spacing:-.055em;
+ font-weight:730;line-height:1.14;margin:8px 0 5px;
+}
+body.app-page .app-title-row p{font-size:13px;color:#7b879a}
+body.app-page .overline{
+ color:#7988a1;letter-spacing:.14em;font-size:10px;font-weight:780;
+}
+body.app-page .app-title-actions{display:flex;align-items:center;gap:10px}
+body.app-page .stat-grid{gap:16px;margin-bottom:20px}
+body.app-page .stat{
+ padding:22px 23px;border:1px solid #e9edf3;
+ background:#fff;border-radius:17px;
+ box-shadow:0 1px 2px #1c345307,0 9px 30px #1e335208;transform:none;
+}
+body.app-page .stat:hover{transform:translateY(-1px);box-shadow:0 12px 36px #1e33520c}
+body.app-page .stat::before{display:none}
+body.app-page .stat small{
+ color:#7d889b;font-size:11px;font-weight:590;
+ letter-spacing:.005em;
+}
+body.app-page .stat strong{
+ color:#1c2a44;font-size:clamp(23px,2.3vw,30px);
+ letter-spacing:-.05em;font-weight:740;
+}
+body.app-page .stat .note{color:#9ca8b8;font-size:10.5px}
+body.app-page .dash-grid{gap:18px;margin-bottom:19px}
+body.app-page .module{
+ background:#fff;border:1px solid #e8edf3;
+ border-radius:18px;box-shadow:0 1px 2px #1c345307,0 9px 29px #1c355106;
+ padding:24px;backdrop-filter:none;
+}
+body.app-page .module-head{margin-bottom:20px;gap:12px}
+body.app-page .module-head h2,body.app-page .module h2{
+ font-size:16px;letter-spacing:-.035em;line-height:1.4;font-weight:680
+}
+body.app-page .module-head small,body.app-page .module .fine{color:#8692a5;font-size:11.5px}
+body.app-page .module > p{font-size:12.5px;line-height:1.7}
+body.app-page .btn{
+ border:1px solid #dfe5ef;background:#fff;color:#465674;
+ border-radius:11px;padding:11px 15px;font-size:12px;min-height:39px;
+ font-weight:670;box-shadow:none;
+}
+body.app-page .btn:hover{
+ background:#f4f7fc;color:#203d74;border-color:#ced9e9;
+ transform:translateY(-1px);box-shadow:0 3px 10px #122b4e0a
+}
+body.app-page .btn:active{transform:translateY(0)}
+body.app-page .btn.primary{
+ background:#213f7a;color:white;border:1px solid #213f7a;
+ box-shadow:0 3px 10px #203e7922;font-weight:670;
+}
+body.app-page .btn.primary:hover{
+ background:#2d56a0;color:white;border-color:#2d56a0;
+ transform:translateY(-1px);box-shadow:0 7px 17px #203f7827;
+}
+body.app-page .btn.ghost{
+ background:#fff;color:#57667e;border-color:#e0e6f0
+}
+body.app-page .btn.linkish,body.app-page .btn-inline{
+ background:transparent;border:none;color:#3263bb;font-weight:690;
+ box-shadow:none;padding:6px 8px;min-height:auto;font-size:11.5px;
+ cursor:pointer;border-radius:8px
+}
+body.app-page .btn.linkish:hover,body.app-page .btn-inline:hover{
+ color:#234b92;background:#edf3ff
+}
+body.app-page .icon-button{
+ background:white;border:1px solid #e0e5ee;border-radius:11px;color:#647389;
+ box-shadow:0 1px 2px #172b4405
+}
+body.app-page .icon-button:hover{background:#f4f7fb;color:#244478}
+body.app-page .search,body.app-page .field input,body.app-page .field select,
+body.app-page .field textarea{
+ border:1px solid #dfe5ed;border-radius:11px;background:#fff;color:#23314a;
+ padding:11px 13px;box-shadow:0 1px 2px #12233d04;
+ min-height:43px;outline:none;font-size:12.5px
+}
+body.app-page .search::placeholder,body.app-page .field input::placeholder{color:#a0abb9}
+body.app-page :is(.search,.field input,.field select,.field textarea):focus{
+ border-color:#7199ed;box-shadow:0 0 0 3px #dce8ff;
+}
+body.app-page .field{color:#56667e;font-size:11.7px;font-weight:670;gap:7px}
+body.app-page .tab{
+ background:#f4f6fa;color:#78859a;border:1px solid #e9edf3;
+ border-radius:10px;font-size:11.5px;font-weight:660;
+}
+body.app-page .tab:hover{color:#3c5f9c;background:#eef3fb}
+body.app-page .tab.active{
+ background:#eaf1ff;color:#2459b2;border:1px solid #d8e6ff;box-shadow:none
+}
+body.app-page .toolbar{gap:12px;margin-bottom:18px}
+body.app-page table{border-collapse:collapse;text-align:left}
+body.app-page thead{background:#f8fafd;border-bottom:1px solid #ebeff4;color:#8895a6}
+body.app-page th{
+ font-size:10px;letter-spacing:.055em;font-weight:780;color:#8591a3;
+ text-transform:uppercase;padding:13px 15px;
+}
+body.app-page td{
+ border-bottom:1px solid #eff2f6;color:#5e6c82;
+ padding:15px;font-size:12px
+}
+body.app-page tbody tr:last-child td{border-bottom:none}
+body.app-page tbody tr:hover{background:#fafdff}
+body.app-page td strong{font-weight:680;color:#26354c}
+body.app-page .empty{color:#93a1b2;font-size:12px;padding:23px;text-align:center;line-height:1.7}
+body.app-page .state{
+ font-size:10px;letter-spacing:.025em;border-radius:100px;
+ border:1px solid #e3e7ee;background:#f5f7fa;color:#69778a;
+ font-weight:690;padding:5px 11px;
+}
+body.app-page .state.completed,body.app-page .state.active{
+ background:#e8f7f0;border-color:#c9eedd;color:#1f8060
+}
+body.app-page .state.pending{
+ background:#fff7e9;border-color:#ffe8bd;color:#aa7120
+}
+body.app-page .state.expired,body.app-page .state.failed{
+ background:#fff1f2;border-color:#ffdde2;color:#bc4252
+}
+body.app-page .progress-circle{
+ background:conic-gradient(#316de0 0%,#e7edf8 0%);
+ box-shadow:none;border:5px solid #f4f7fc;
+}
+body.app-page .progress-circle b{color:#233750;font-size:16px}
+body.app-page .mini-list span{color:#8190a3;font-size:11.5px}
+body.app-page .mini-list strong{color:#223855}
+body.app-page .activity-item{border-bottom:1px solid #eef1f6;padding:12px 0;gap:11px}
+body.app-page .activity-item:last-child{border-bottom:none}
+body.app-page .activity-item .n-icon{
+ background:#eef4ff;color:#4872bd;border-radius:10px;box-shadow:none
+}
+body.app-page .activity-item b{color:#30405a;font-weight:670;font-size:12px}
+body.app-page .activity-item small{color:#8a97a9;font-size:11px}
+body.app-page .qr-shell{
+ padding:18px;background:#fff;border:1px solid #e5eaf2;border-radius:16px;
+ box-shadow:0 8px 20px #122a490d
+}
+body.app-page .qr-result{gap:20px;align-items:center}
+body.app-page .qr-copy{min-width:0}
+body.app-page .qr-copy p{overflow-wrap:anywhere;color:#758196;font-size:12px}
+body.app-page .pay-amount{color:#1e3150;font-weight:730;letter-spacing:-.045em}
+body.app-page .form-actions{gap:10px;display:flex;flex-wrap:wrap;align-items:center}
+body.app-page .alert-bar{
+ padding:15px 18px;border-radius:13px;background:#edf3ff;
+ border:1px solid #d9e5fd;color:#385ca0;margin-bottom:22px;
+ font-size:12.5px;line-height:1.65;
+}
+body.app-page .code-preview{
+ background:#f6f8fd!important;color:#2c436e!important;
+ border:1px solid #e0e7f2!important;border-radius:13px!important;
+ box-shadow:none!important;white-space:pre-wrap;overflow-wrap:anywhere;
+ font-size:11.5px!important;padding:20px!important;
+}
+body.app-page #apiExplorerResult{
+ white-space:pre-wrap;overflow-wrap:anywhere;border:1px solid #e5ebf5;
+ border-radius:13px;background:#f8faff;color:#4f607c;
+ max-height:360px;overflow-y:auto;padding:15px;font-size:11px;
+}
+body.app-page .risk-facts{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-top:18px}
+body.app-page .risk-facts >div{background:#f7f9fe;border:1px solid #e6ecf7;border-radius:13px;padding:16px}
+body.app-page .risk-facts b{display:block;font-size:26px;letter-spacing:-.04em;color:#2d4165}
+body.app-page .risk-facts small{display:block;color:#78879e;font-size:10.5px}
+body.app-page .toast{
+ background:#172a4d;color:white;border-radius:12px;
+ padding:13px 19px;box-shadow:0 14px 45px #192e5340;
+ border:1px solid #314b79;font-size:12px;max-width:min(400px,calc(100vw - 30px))
+}
+body.app-page .pill{background:#eaf5ef!important;color:#1d805f!important;border:1px solid #c8eadb!important}
+body.app-page .mobile-brand{display:none}
+@media(max-width:1180px){
+ body.app-page .side{width:235px;flex-basis:235px}
+ body.app-page .app-main{padding-inline:24px}
+}
+@media(max-width:900px){
+ body.app-page .side{
+  position:fixed;left:0;top:0;height:100svh;width:280px;
+  transform:translateX(-103%);box-shadow:0 20px 80px #1a2e4a20;
+  z-index:150;padding:22px 17px
+ }
+ body.app-page .side.open{transform:translateX(0)}
+ body.app-page .app-main{width:100%;padding:20px 20px 45px}
+ body.app-page .app-top{margin-bottom:26px}
+ body.app-page .mobile-brand{display:flex}
+ body.app-page .mobile-brand .brand-logo{display:none}
+ body.app-page .mobile-brand::after{content:"DISHA 8.2";font-size:15px;color:#263954;font-weight:750;letter-spacing:-.04em}
+ body.app-page .mobile-side-backdrop.open{background:#16233d78;z-index:145}
+ body.app-page .stat-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+ body.app-page .app-title-row{align-items:flex-start;flex-wrap:wrap}
+}
+@media(max-width:620px){
+ body.app-page .app-main{padding:16px 13px 40px}
+ body.app-page .app-top{gap:7px}
+ body.app-page .app-top .search-wrap{display:none}
+ body.app-page .env{font-size:10px;padding:6px 8px}
+ body.app-page .app-title-row h1{font-size:27px}
+ body.app-page .stat-grid{gap:10px}
+ body.app-page .stat{padding:17px}
+ body.app-page .module{padding:17px}
+ body.app-page .two-cols{grid-template-columns:1fr!important}
+ body.app-page .risk-facts{grid-template-columns:1fr}
+ body.app-page .qr-result{flex-direction:column;align-items:stretch}
+ body.app-page .form-actions > *{max-width:100%}
+ body.app-page .app-top-right{gap:7px}
+ body.app-page .module-head{flex-wrap:wrap;align-items:start}
+ body.app-page .app-title-actions{width:100%}
+ body.app-page .app-title-actions .btn{flex:1}
+}
+@media(prefers-reduced-motion:reduce){
+ body.app-page *,body.app-page *::before,body.app-page *::after{
+  animation-duration:.01ms!important;transition-duration:.01ms!important
+ }
+}

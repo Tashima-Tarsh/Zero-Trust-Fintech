@@ -1,81 +1,435 @@
-/* DISHA 8.2 premium merchant console — frontend adapter only.
-   Existing merchant endpoints, auth service, and deployment settings stay untouched. */
-(()=>{'use strict';
-const $=s=>document.querySelector(s), $$=s=>[...document.querySelectorAll(s)], esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-const money=v=>new Intl.NumberFormat('en-IN',{style:'currency',currency:'INR',maximumFractionDigits:2}).format(Number(v)||0),int=v=>new Intl.NumberFormat('en-IN').format(Number(v)||0),dt=v=>v?new Date(typeof v==='number'?v:Number(v)||v).toLocaleString('en-IN',{dateStyle:'medium',timeStyle:'short'}):'—';
-const isPreview=new URLSearchParams(location.search).get('preview')==='1';
-const clerkEnabled=Boolean(window.DISHA_CLERK_PUBLISHABLE_KEY);
-let user=null,metrics={},orders=[],vpas=[],notifications=[],statusFilter='ALL',createdOrder=null;
-const previewOrders=[{id:'SAMPLE-2401',created_at:Date.now()-3600000,amount:2499,vpa_address:'store@example',utr:'—',status:'COMPLETED'},{id:'SAMPLE-2402',created_at:Date.now()-7200000,amount:1299,vpa_address:'store@example',utr:'—',status:'PENDING'},{id:'SAMPLE-2403',created_at:Date.now()-86000000,amount:899,vpa_address:'store@example',utr:'—',status:'COMPLETED'}];
-const previewVpas=[{id:'s1',vpa_address:'store@example',bank_name:'Example Bank',status:'ACTIVE',is_default:1},{id:'s2',vpa_address:'backup@example',bank_name:'Example Bank',status:'PAUSED',is_default:0}];
-function toast(message){let t=$('#toast');if(!t)return;t.textContent=message;t.classList.remove('hidden');clearTimeout(toast.timer);toast.timer=setTimeout(()=>t.classList.add('hidden'),4500)}
-function notice(msg){const n=$('#appNotice');if(n){n.style.display=msg?'block':'none';n.textContent=msg||''}}
-function token(){return sessionStorage.getItem('disha_token')||''}
-async function api(path,options={}){if(isPreview)throw Error('Preview mode: no live API requests are sent.');const headers={...(options.headers||{})};if(!clerkEnabled&&token())headers.Authorization='Bearer '+token();if(options.body&&!headers['Content-Type'])headers['Content-Type']='application/json';let res=await fetch(path,{credentials:'same-origin',...options,headers});let data;try{data=await res.json()}catch{data={}}if(!res.ok){const error=new Error(data.error||data.message||`Request failed (${res.status})`);error.status=res.status;throw error}return data}
-function getView(){return location.hash.slice(1)||'overview'}
-const titles={overview:['Your business, in one clear view.','Manage payment requests and recorded activity.'],payments:['Transactions','Every order, reference and recorded payment state.'],create:['Create a payment','Prepare a payment request and share it with your customer.'],vpas:['UPI accounts','Control your receiving UPI IDs.'],routing:['Routing & health','Understand which receiving accounts are available.'],risk:['Risk & review','Test supported safeguards; do not confuse demos with live incidents.'],access:['Allowed server IPs','Manage access for supported integrations.'],reports:['Reports & exports','Recorded payment activity, ready for review.'],notifications:['Notifications','Account activity and updates in one place.'],soundbox:['Voice announcements','A familiar sound when you need an audible reminder.'],api:['Developer API','Your existing supported integration endpoints.'],settings:['Business settings','Keep the workspace aligned with your business.']};
-function switchView(view){if(!titles[view])view='overview';$$('.view').forEach(e=>e.classList.toggle('active',e.id==='view-'+view));$$('[data-view]').forEach(b=>b.classList.toggle('active',b.dataset.view===view));$('#viewHeading').textContent=titles[view][0];$('#viewSubtitle').textContent=titles[view][1];location.hash=view;closeSide();if(view==='payments')loadPayments();if(view==='vpas'||view==='routing'||view==='create')loadVpas();if(view==='notifications')loadNotifications();if(view==='access')loadAccess();if(view==='reports')loadReports();if(view==='create')populateSelect();if(view==='overview')loadOverview()}
-function openSide(){let side=$('#appSide'),back=$('#sideBackdrop');side.classList.add('open');back.classList.add('open');$('#sideToggle')?.setAttribute('aria-expanded','true')}
-function closeSide(){let side=$('#appSide'),back=$('#sideBackdrop');side.classList.remove('open');back.classList.remove('open');$('#sideToggle')?.setAttribute('aria-expanded','false')}
-async function init(){ $$('#appSide [data-view]').forEach(b=>b.addEventListener('click',()=>switchView(b.dataset.view))); $$('[data-switch]').forEach(b=>b.addEventListener('click',()=>switchView(b.dataset.switch)));$('#sideToggle')?.addEventListener('click',openSide);$('#sideBackdrop')?.addEventListener('click',closeSide);document.addEventListener('keydown',e=>{if(e.key==='Escape')closeSide()});
- $('#periodSelect')?.addEventListener('change',()=>{loadOverview();if($('#view-reports').classList.contains('active'))loadReports()}); $('#globalSearch')?.addEventListener('keydown',e=>{if(e.key==='Enter'){switchView('payments');$('#paymentsSearch').value=e.target.value;loadPayments()}});$('#paymentsSearch')?.addEventListener('input',debounce(loadPayments,240));$$('#paymentFilter [data-status]').forEach(b=>b.addEventListener('click',()=>{statusFilter=b.dataset.status;$$('#paymentFilter [data-status]').forEach(x=>x.classList.toggle('active',x===b));loadPayments()}));
- $('#exportTop')?.addEventListener('click',exportCsv);$('#exportReport')?.addEventListener('click',exportCsv);$('#createPaymentForm')?.addEventListener('submit',createPayment);$('#addVpaForm')?.addEventListener('submit',addVpa);$('#refreshVpas')?.addEventListener('click',loadVpas);$('#markRead')?.addEventListener('click',markRead);$('#refreshAccess')?.addEventListener('click',loadAccess);$('#addAccessForm')?.addEventListener('submit',addAccess);$('#accessTable')?.addEventListener('click',e=>{const b=e.target.closest('[data-remove-access]');if(b)removeAccess(b.dataset.removeAccess)});$('#runApiExplorer')?.addEventListener('click',runApiExplorer);$('#runRiskTest')?.addEventListener('click',runRiskTest);$('#settingsForm')?.addEventListener('submit',saveProfile);$('#setupMerchantForm')?.addEventListener('submit',completeMerchantSetup);$('#copyEndpoints')?.addEventListener('click',()=>copyText('GET /api/auth/me\nGET /api/merchant/dashboard\nGET /api/merchant/payments\nPOST /api/merchant/payments\nGET /api/merchant/vpas\nPOST /api/merchant/vpas\nGET /api/merchant/reports\nGET /api/merchant/notifications'));$('#testHealth')?.addEventListener('click',async()=>{try{const d=await api('/health');$('#healthResult').textContent='Service responded: '+String(d.status||d.service||'OK')}catch(e){$('#healthResult').textContent=e.message}});$('#playVoice')?.addEventListener('click',testVoice);$('#signOut')?.addEventListener('click',logout);$('#settingsLogout')?.addEventListener('click',logout);
- $('#vpaTable')?.addEventListener('click',e=>{let b=e.target.closest('[data-vpa-action]');if(b)updateVpa(b.dataset.vpaId,b.dataset.vpaAction)});$('#paymentsTable')?.addEventListener('click',e=>{let b=e.target.closest('[data-order-id]');if(b)showOrder(b.dataset.orderId)});$('#createResult')?.addEventListener('click',e=>{let b=e.target.closest('[data-copy]');if(b)copyText(b.dataset.copy)});
- if(isPreview){user={business_name:'Example Merchant',email:'preview@example.com',setup_completed:1};metrics={totalVolume:'4697',completedTransactions:2,pendingTransactions:1,totalTransactions:3,successRate:66.7};orders=previewOrders;vpas=previewVpas;notifications=[{id:'s',title:'Design preview',message:'These are sample records, not real payments.',created_at:Date.now()}];$('#environmentLabel').textContent='VISUAL PREVIEW';notice('VISUAL PREVIEW · Every number, order and UPI ID displayed here is sample data. No live payment API is called.');}
- else{try{const d=await api('/api/auth/me');user=d.merchant;if(!user){location.replace('/login');return}}catch(e){if(e.status===401){location.replace('/login');return}notice('Merchant account needs attention: '+e.message);return}}
- $('#merchantSideName').textContent=user.business_name||user.email||'Merchant';$('#merchantInitial').textContent=(user.business_name||user.email||'D8').trim().slice(0,2).toUpperCase();$('#merchantSideSub').textContent=user.email||'Merchant Admin';$('#settingsName').value=user.business_name||'';$('#settingsPhone').value=user.contact_phone||'';$('#settingsCity').value=user.city||'';
- if(!isPreview&&!user.setup_completed){$('#merchantSetup').style.display='block';$('#setupBusinessName').value=user.business_name||'';notice('Complete your merchant setup to create payment requests.');}
- await Promise.allSettled([loadOverview(),loadVpas(),loadNotifications()]);switchView(titles[getView()]?getView():'overview');}
-async function completeMerchantSetup(e){e.preventDefault();if(isPreview)return;try{const data=await api('/api/merchant/setup',{method:'POST',body:JSON.stringify({businessName:$('#setupBusinessName').value.trim(),primaryVpa:$('#setupPrimaryVpa').value.trim()})});user=data.merchant;$('#merchantSetup').style.display='none';$('#merchantSideName').textContent=user.business_name;notice('');toast('Merchant setup completed.');await Promise.all([loadVpas(),loadOverview()])}catch(error){toast(error.message)}}
-function debounce(fn,ms){let h;return()=>{clearTimeout(h);h=setTimeout(fn,ms)}}
-function renderTable(rows,compact=false){if(!rows?.length)return `<tr><td class="empty" colspan="${compact?5:7}">No payment requests match this view.</td></tr>`;return rows.map(o=>`<tr><td><strong>${esc(o.id)}</strong></td><td>${esc(dt(o.created_at))}</td><td>${money(o.amount)}</td><td>${esc(o.vpa_address)}</td>${compact?'':`<td>${esc(o.utr||'—')}</td>`}<td><span class="state ${esc(String(o.status||'').toLowerCase())}">${esc(o.status||'PENDING')}</span></td>${compact?'':`<td><button type="button" class="btn-inline" data-order-id="${esc(o.id)}">Open</button></td>`}</tr>`).join('')}
-async function loadOverview(){if(!isPreview){try{const d=await api('/api/merchant/dashboard?dateFilter='+encodeURIComponent($('#periodSelect').value));metrics=d.metrics||{};orders=d.recentTransactions||[];if(d.vpas)vpas=d.vpas;$('#appNotice').style.display='none'}catch(e){notice('Unable to load merchant metrics: '+e.message);return}}$('#metricVolume').textContent=money(metrics.totalVolume);$('#metricCompleted').textContent=int(metrics.completedTransactions);$('#metricPending').textContent=int(metrics.pendingTransactions);$('#reportVolume').textContent=money(metrics.totalVolume);$('#reportCompleted').textContent=int(metrics.completedTransactions);$('#reportPending').textContent=int(metrics.pendingTransactions);$('#recentTable').innerHTML=renderTable(orders.slice(0,7),true);const comp=Number(metrics.completedTransactions)||0,total=Number(metrics.totalTransactions)||0,pct=total?Math.round(comp/total*100):0;$('#completionRing').style.background=`conic-gradient(#39ecc0 0 ${pct}%,#1c444c ${pct}% 100%)`;$('#completionRate').textContent=pct+'%';$('#statusCompleted').textContent=int(comp);$('#statusPending').textContent=int(metrics.pendingTransactions);$('#statusTotal').textContent=int(total);renderChart(orders);renderMiniPanels()}
-function renderChart(rows){const target=$('#activityChart');const arr=rows.filter(o=>o.status==='COMPLETED').slice(0,14).reverse().map(o=>Number(o.amount)||0);if(!arr.length){target.innerHTML='<div class="empty">No completed transaction records in this period.</div>';return}const vals=arr.length===1?[0,...arr]:arr,max=Math.max(...vals,1),step=620/(vals.length-1),coords=vals.map((v,i)=>`${(i*step).toFixed(1)},${(195-(v/max)*164).toFixed(1)}`),points=coords.join(' '),area=`M0,195 L${coords.map(p=>p.replace(',',' ')).join(' L')} L620,210 L0,210 Z`;target.innerHTML=`<svg class="chart" viewBox="0 0 620 230" role="img" aria-label="Chart of recorded completed order amounts"><defs><linearGradient id="areaGradient" x1="0" y1="0" x2="0" y2="1"><stop stop-color="#44e9ae" stop-opacity=".4"/><stop offset="1" stop-color="#44e9ae" stop-opacity="0"/></linearGradient></defs><path class="gridline" d="M0 55H620 M0 105H620 M0 155H620 M0 205H620"/><path d="${area}" fill="url(#areaGradient)"/><polyline points="${points}" fill="none" stroke="#55f5b9" stroke-width="4" stroke-linejoin="round" stroke-linecap="round"/></svg>`}
-function renderMiniPanels(){$('#overviewVpas').textContent=int(vpas.length);$('#overviewActiveVpas').textContent=int(vpas.filter(v=>v.status==='ACTIVE').length);$('#overviewNotifications').innerHTML=notifications.slice(0,3).map(n=>`<div class="activity-item"><div class="n-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path><path d="M13.73 21a2 2 0 0 1-3.46 0"></path></svg></div><div><b>${esc(n.title)}</b><small>${esc(n.message)}</small></div></div>`).join('')||'<div class="empty">No activity alerts recorded.</div>'}
-async function loadPayments(){if(!isPreview){try{const params=new URLSearchParams({status:statusFilter,search:$('#paymentsSearch').value.trim(),limit:'100'});const d=await api('/api/merchant/payments?'+params);orders=d.orders||[]}catch(e){toast(e.message);return}}const term=($('#paymentsSearch')?.value||'').toLowerCase();let r=orders.filter(o=>(statusFilter==='ALL'||o.status===statusFilter)&&(!term||[o.id,o.description,o.utr,o.vpa_address].some(v=>String(v||'').toLowerCase().includes(term))));$('#paymentsTable').innerHTML=renderTable(r)}
-function showOrder(id){const o=orders.find(x=>x.id===id);if(!o)return;$('#txDetails').style.display='block';$('#txDetails').innerHTML=`<div class="module-head"><h2>Transaction ${esc(o.id)}</h2><button type="button" class="btn tiny" id="hideTxDetails">Close ×</button></div><div class="order-details"><div>Amount<strong>${money(o.amount)}</strong></div><div>Status<strong>${esc(o.status)}</strong></div><div>Receiving UPI<strong>${esc(o.vpa_address)}</strong></div><div>Transaction reference<strong>${esc(o.utr||'Not recorded')}</strong></div><div>Created<strong>${esc(dt(o.created_at))}</strong></div><div>Completed at<strong>${esc(o.settled_at?dt(o.settled_at):'Not recorded')}</strong></div></div>`;$('#hideTxDetails').onclick=()=>$('#txDetails').style.display='none';$('#txDetails').scrollIntoView({behavior:'smooth',block:'nearest'})}
-async function loadVpas(){if(!isPreview){try{const d=await api('/api/merchant/vpas');vpas=d.vpas||[]}catch(e){toast(e.message);return}}const active=vpas.filter(v=>v.status==='ACTIVE').length,paused=vpas.filter(v=>v.status==='PAUSED').length,cooldown=vpas.filter(v=>v.status==='COOLDOWN').length;$('#vpaTotal').textContent=int(vpas.length);$('#vpaActive').textContent=int(active);$('#vpaPaused').textContent=int(paused);$('#vpaCooldown').textContent=int(cooldown);$('#vpaTable').innerHTML=vpas.length?vpas.map(v=>`<tr><td><strong>${esc(v.vpa_address)}</strong></td><td>${esc(v.bank_name||'—')}</td><td><span class="state ${v.status==='ACTIVE'?'':'pending'}">${esc(v.status)}</span></td><td>${v.is_default?'Primary':'—'}</td><td>${v.is_default?'':`<button class="btn-inline" data-vpa-action="set_default" data-vpa-id="${esc(v.id)}">Make primary</button>`}<button class="btn-inline" data-vpa-action="${v.status==='ACTIVE'?'pause':'resume'}" data-vpa-id="${esc(v.id)}">${v.status==='ACTIVE'?'Pause':'Resume'}</button></td></tr>`).join(''):'<tr><td class="empty" colspan="5">No receiving UPI IDs configured. Add one below.</td></tr>';$('#routingAccounts').innerHTML=vpas.map(v=>`<span>${esc(v.vpa_address)} <strong>${esc(v.status)}${v.is_default?' · Primary':''}</strong></span>`).join('')||'<div class="empty">No receiving accounts configured.</div>';renderMiniPanels();populateSelect()}
-async function updateVpa(id,action){if(isPreview){toast('Preview only — no account settings were changed.');return}if(!['pause','resume','set_default'].includes(action))return;try{await api('/api/merchant/vpas/'+encodeURIComponent(id),{method:'PATCH',body:JSON.stringify({action})});toast('UPI account updated.');loadVpas()}catch(e){toast(e.message)}}
-async function addVpa(e){e.preventDefault();if(isPreview){toast('Preview only — no UPI ID was added.');return}try{await api('/api/merchant/vpas',{method:'POST',body:JSON.stringify({vpaAddress:$('#vpaAddress').value.trim(),bankName:$('#vpaBank').value.trim()})});$('#addVpaForm').reset();toast('UPI account added.');loadVpas()}catch(err){toast(err.message)}}
-function populateSelect(){const sel=$('#newVpa');if(!sel)return;let prev=sel.value;sel.innerHTML='<option value="">Use default active UPI ID</option>'+vpas.filter(v=>v.status==='ACTIVE').map(v=>`<option value="${esc(v.vpa_address)}">${esc(v.vpa_address)}${v.is_default?' (Primary)':''}</option>`).join('');if([...sel.options].some(o=>o.value===prev))sel.value=prev}
-async function createPayment(e){e.preventDefault();if(isPreview){toast('Preview only. Open a signed-in merchant session to create an actual payment request.');return}const amount=Number($('#newAmount').value);if(!Number.isFinite(amount)||amount<=0){toast('Enter a positive payment amount.');return}const body={amount,description:$('#newDesc').value.trim(),vpaAddress:$('#newVpa').value||null,orderId:$('#newOrderId').value.trim()||null};try{const d=await api('/api/merchant/payments',{method:'POST',body:JSON.stringify(body)});createdOrder=d.order;showCreatedOrder(createdOrder);toast('Payment request created.')}catch(err){toast(err.message)}}
-function showCreatedOrder(o){const qr=o.upi_uri_dynamic||o.upi_uri||'';let html=`<div class="qr-result"><div class="qr-shell"><div id="createdQr"></div></div><div><div class="overline">ORDER READY</div><div class="pay-amount" style="text-align:left">${money(o.amount)}</div><p>${esc(o.id)}</p><p>Receiving UPI: <strong>${esc(o.vpa_address)}</strong></p><div class="form-actions"><button type="button" class="btn tiny" data-copy="${esc(qr)}">Copy UPI URI</button></div></div></div><p class="fine" style="margin-top:18px">A request has been created. Its creation is not proof of received funds; track its status in Transactions.</p>`;$('#createResult').className='';$('#createResult').innerHTML=html;const q=$('#createdQr');if(window.QRCode&&qr){try{new QRCode(q,{text:qr,width:174,height:174,correctLevel:QRCode.CorrectLevel.M})}catch{q.textContent='QR generation unavailable'}}else q.textContent='QR preview unavailable. Copy the URI instead.'}
-async function loadReports(){if(!isPreview){try{const d=await api('/api/merchant/reports?dateFilter='+encodeURIComponent($('#periodSelect').value));metrics=d.metrics||metrics}catch(e){toast(e.message);return}}$('#reportVolume').textContent=money(metrics.totalVolume);$('#reportCompleted').textContent=int(metrics.completedTransactions);$('#reportPending').textContent=int(metrics.pendingTransactions)}
-async function exportCsv(){if(isPreview){toast('Preview mode does not export financial records.');return}try{const url='/api/merchant/reports?dateFilter='+encodeURIComponent($('#periodSelect').value)+'&format=csv';const res=await fetch(url,{headers:(!clerkEnabled&&token())?{Authorization:'Bearer '+token()}: {},credentials:'same-origin'});if(!res.ok)throw Error('CSV export failed ('+res.status+')');const blob=await res.blob(),link=document.createElement('a');link.href=URL.createObjectURL(blob);link.download='disha8.2_transactions.csv';document.body.appendChild(link);link.click();link.remove();setTimeout(()=>URL.revokeObjectURL(link.href),1000);toast('CSV export downloaded.')}catch(e){toast(e.message)}}
-async function loadAccess(){if(isPreview){$('#accessTable').innerHTML='<tr><td colspan="4" class="empty">Design preview — no server IPs displayed.</td></tr>';return}try{const d=await api('/api/merchant/ip-whitelist');const ips=d.ips||[];$('#accessTable').innerHTML=ips.length?ips.map(i=>`<tr><td>${esc(i.ip_address||i.ip_range||'—')}</td><td>${esc(i.description||'—')}</td><td>${i.is_active?'Active':'Paused'}</td><td><button class="btn-inline" type="button" data-remove-access="${esc(i.id)}">Remove</button></td></tr>`).join(''):'<tr><td colspan="4" class="empty">No server IPs configured.</td></tr>';$('#blockedAccess').innerHTML=(d.blocked||[]).length?(d.blocked||[]).slice(0,15).map(b=>`<div class="activity-item"><div class="n-icon">!</div><div><b>${esc(b.ip_address)}</b><small>${esc(b.reason||b.endpoint||'Blocked access')}</small></div></div>`).join(''):'<div class="empty">No blocked events reported.</div>'}catch(e){toast(e.message)}}
-async function addAccess(e){e.preventDefault();if(isPreview){toast('Preview mode — no IP added.');return}const raw=$('#accessIp').value.trim();if(!raw){toast('Enter an IP address or CIDR.');return}try{await api('/api/merchant/ip-whitelist',{method:'POST',body:JSON.stringify({ip_address:raw.includes('/')?'':raw,ip_range:raw.includes('/')?raw:'',description:$('#accessDesc').value.trim()})});$('#addAccessForm').reset();toast('Allowed IP saved.');loadAccess()}catch(e){toast(e.message)}}
-async function removeAccess(id){if(isPreview){toast('Preview mode — nothing removed.');return}if(!confirm('Remove this IP from the allowlist?'))return;try{await api('/api/merchant/ip-whitelist/'+encodeURIComponent(id),{method:'DELETE'});toast('IP removed.');loadAccess()}catch(e){toast(e.message)}}
-async function runApiExplorer(){const path=$('#apiExplorerEndpoint').value;const el=$('#apiExplorerResult');if(isPreview){el.textContent='Preview mode — API requests are disabled.';return}if(!['/health','/api/auth/me','/api/merchant/dashboard','/api/merchant/vpas','/api/merchant/notifications'].includes(path))return;el.textContent='Requesting…';try{const data=await api(path);el.textContent=JSON.stringify(data,null,2).slice(0,4000)}catch(e){el.textContent=e.message}}
-async function loadNotifications(){if(!isPreview){try{const d=await api('/api/merchant/notifications');notifications=d.notifications||[]}catch{return}}$('#fullNotifications').innerHTML=notifications.length?notifications.map(n=>`<div class="activity-item"><div class="n-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path><path d="M13.73 21a2 2 0 0 1-3.46 0"></path></svg></div><div><b>${esc(n.title)}</b><small>${esc(n.message)}</small><small>${esc(dt(n.created_at))}</small></div></div>`).join(''):'<div class="empty">No activity notifications recorded.</div>';renderMiniPanels()}
-async function markRead(){if(isPreview){toast('Preview only.');return}try{await api('/api/merchant/notifications/read',{method:'POST',body:'{}'});toast('Notifications marked read.');loadNotifications()}catch(e){toast(e.message)}}
-async function runRiskTest(){if(isPreview){toast('Preview only — test results require a connected merchant session.');return}try{const d=await api('/api/merchant/fraud-test',{method:'POST',body:JSON.stringify({testType:$('#riskScenario').value})});const el=$('#riskResult');el.style.display='block';el.innerHTML=`<div class="overline">SIMULATED SECURITY TEST · NOT A LIVE INCIDENT</div><h2>${esc(d.decision||'Test completed')}</h2><p>${esc(d.reason||'No details')}</p><div class="fine">${esc(d.actionTaken||'')}</div>`}catch(e){toast(e.message)}}
-async function saveProfile(e){e.preventDefault();if(isPreview){toast('Preview mode: settings are not saved.');return}try{const body={businessName:$('#settingsName').value.trim(),contactPhone:$('#settingsPhone').value.trim(),city:$('#settingsCity').value.trim()};await api('/api/merchant/profile',{method:'PUT',body:JSON.stringify(body)});$('#merchantSideName').textContent=body.businessName;toast('Business profile saved.')}catch(e){toast(e.message)}}
-function testVoice(){if(!('speechSynthesis'in window)){toast('Voice playback is not supported in this browser.');return}const lang=$('#voiceLanguage').value,vol=Number($('#voiceVolume').value)/100;let txt=lang==='hi-IN'?'यह DISHA 8.2 से एक परीक्षण घोषणा है।':lang==='mr-IN'?'ही DISHA 8.2 कडून एक चाचणी सूचना आहे.':'This is a test announcement from DISHA eight point two.';const u=new SpeechSynthesisUtterance(txt);u.lang=lang;u.volume=vol;window.speechSynthesis.cancel();window.speechSynthesis.speak(u)}
-async function copyText(value){try{await navigator.clipboard.writeText(value);toast('Copied to clipboard.')}catch{toast('Clipboard unavailable.')}}
-async function logout(){
-  if(isPreview){location.assign('/login');return}
-  if(clerkEnabled){
-    try{
-      const key=window.DISHA_CLERK_PUBLISHABLE_KEY;
-      const domain=atob(key.split('_')[2]).slice(0,-1);
-      if(!/^[a-z0-9.-]+$/i.test(domain))throw Error('Invalid Clerk domain');
-      if(!window.Clerk){
-        await new Promise((resolve,reject)=>{
-          const script=document.createElement('script');
-          script.src='https://'+domain+'/npm/@clerk/clerk-js@6/dist/clerk.browser.js';
-          script.crossOrigin='anonymous';script.dataset.clerkPublishableKey=key;
-          script.onload=resolve;script.onerror=reject;document.head.appendChild(script);
-        });
-      }
-      await window.Clerk.load();
-      await window.Clerk.signOut();
-    }catch(error){toast('Unable to sign out securely. Please try again.');return}
-  }else{
-    try{await api('/api/auth/logout',{method:'POST',body:'{}'})}catch{}
-    sessionStorage.removeItem('disha_token');sessionStorage.removeItem('disha_merchant');
-  }
-  location.replace('/login');
+/* DISHA 8.2 — live merchant console. No preview, mock orders, or sample balances. */
+(() => {
+'use strict';
+const $ = selector => document.querySelector(selector);
+const $$ = selector => Array.from(document.querySelectorAll(selector));
+const esc = x => String(x??'').replace(/[&<>"']/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
+const money = value => new Intl.NumberFormat('en-IN',{style:'currency',currency:'INR'}).format(Number(value)||0);
+const num = value => new Intl.NumberFormat('en-IN').format(Number(value)||0);
+const date = value => value?new Date(Number(value)).toLocaleString('en-IN',{dateStyle:'medium',timeStyle:'short'}):'—';
+const plain = value => String(value||'').trim();
+const views = {
+ overview:['Overview','Live activity across your merchant workspace'],
+ payments:['Transactions','Track every payment request and recorded outcome'],
+ create:['Create payment','Generate a customer-specific UPI link and QR'],
+ vpas:['UPI accounts','Manage the UPI addresses that receive your payments'],
+ routing:['Routing & accounts','Inspect the primary and active receiving accounts'],
+ risk:['Security review','Actual order-state indicators for this workspace'],
+ access:['IP directory','Maintain the server IP addresses registered for your business'],
+ reports:['Reports & exports','Download recorded merchant payment activity'],
+ notifications:['Notifications','Operational events from this workspace'],
+ soundbox:['Voice alerts','Announce a recorded completed transaction'],
+ api:['Developer connections','Check your authenticated merchant API connectivity'],
+ settings:['Business settings','Manage your company profile and access']
+};
+let merchant=null,metrics={},orders=[],vpas=[],notifications=[],filter='ALL',clerk=null;
+let created=null,loading=false;
+function toast(message){
+ const el=$('#toast');if(!el)return;el.textContent=message;el.classList.remove('hidden');
+ clearTimeout(toast.timer);toast.timer=setTimeout(()=>el.classList.add('hidden'),4500);
 }
-window.addEventListener('hashchange',()=>{const v=getView();if(titles[v]&&!$('#view-'+v)?.classList.contains('active'))switchView(v)});
+function notice(message){
+ const el=$('#appNotice');if(!el)return;el.textContent=message||'';el.style.display=message?'block':'none';
+}
+function busy(element,flag){if(element)element.disabled=Boolean(flag);}
+async function authInit(){
+ const key=window.DISHA_CLERK_PUBLISHABLE_KEY;
+ if(!key)throw Error('Merchant authentication is unavailable');
+ const part=key.split('_')[2];
+ if(!part)throw Error('Invalid authentication configuration');
+ const host=atob(part.replace(/-/g,'+').replace(/_/g,'/')).replace(/\0+$/g,'');
+ if(!/^[a-z0-9.-]+$/i.test(host))throw Error('Authentication host invalid');
+ if(!window.Clerk){
+  await new Promise((resolve,reject)=>{
+   const script=document.createElement('script');
+   script.src='https://'+host+'/npm/@clerk/clerk-js@6/dist/clerk.browser.js';
+   script.dataset.clerkPublishableKey=key;
+   script.crossOrigin='anonymous';
+   script.onload=resolve;script.onerror=()=>reject(Error('Unable to connect to secure sign-in'));
+   document.head.appendChild(script);
+  });
+ }
+ clerk=window.Clerk;await clerk.load();
+ if(!clerk.isSignedIn||!clerk.session){location.replace('/login');return false}
+ return true;
+}
+async function authHeaders(withBody=false){
+ if(!clerk?.session)throw Error('Your sign-in session has expired');
+ const jwt=await clerk.session.getToken();
+ if(!jwt)throw Error('Your sign-in session has expired');
+ const authorization='Bearer '+jwt;
+ const headers={Authorization:authorization,'X-CSRF-Token':authorization,Accept:'application/json'};
+ if(withBody)headers['Content-Type']='application/json';
+ return headers;
+}
+async function api(path,options={}){
+ const headers={...(await authHeaders(Boolean(options.body))),...(options.headers||{})};
+ const r=await fetch(path,{credentials:'same-origin',cache:'no-store',...options,headers});
+ let data;try{data=await r.json()}catch{data={}}
+ if(!r.ok){const error=Error(data.error||data.message||'Request failed ('+r.status+')');error.status=r.status;throw error}
+ return data;
+}
+function view(name){
+ if(!views[name])name='overview';
+ $$('.view').forEach(el=>el.classList.toggle('active',el.id==='view-'+name));
+ $$('#appSide [data-view]').forEach(el=>{
+  el.classList.toggle('active',el.dataset.view===name);
+  if(el.dataset.view===name)el.setAttribute('aria-current','page');
+  else el.removeAttribute('aria-current');
+ });
+ $('#viewHeading').textContent=views[name][0];$('#viewSubtitle').textContent=views[name][1];
+ if(location.hash!=='#'+name)history.replaceState(null,'','#'+name);
+ closeMenu();
+ const actions={overview:loadOverview,payments:loadPayments,create:loadVpas,vpas:loadVpas,
+ routing:loadVpas,risk:loadRisk,access:loadAccess,reports:loadReports,
+ notifications:loadNotifications,api:showApiStatus};
+ if(actions[name])actions[name]();
+}
+function closeMenu(){
+ $('#appSide')?.classList.remove('open');$('#sideBackdrop')?.classList.remove('open');
+ $('#sideToggle')?.setAttribute('aria-expanded','false');
+}
+function setupBindings(){
+ $$('#appSide [data-view]').forEach(button=>button.addEventListener('click',()=>view(button.dataset.view)));
+ $$('[data-switch]').forEach(button=>button.addEventListener('click',()=>view(button.dataset.switch)));
+ $('#sideToggle')?.addEventListener('click',()=>{
+  $('#appSide').classList.toggle('open');$('#sideBackdrop').classList.toggle('open');
+  $('#sideToggle').setAttribute('aria-expanded',String($('#appSide').classList.contains('open')));
+ });
+ $('#sideBackdrop')?.addEventListener('click',closeMenu);
+ document.addEventListener('keydown',e=>{if(e.key==='Escape')closeMenu()});
+ window.addEventListener('hashchange',()=>{const target=location.hash.slice(1);if(views[target])view(target)});
+ $('#periodSelect')?.addEventListener('change',()=>{loadOverview();loadReports()});
+ $('#globalSearch')?.addEventListener('keydown',e=>{
+  if(e.key==='Enter'){view('payments');$('#paymentsSearch').value=e.target.value;loadPayments()}
+ });
+ let debounce;$('#paymentsSearch')?.addEventListener('input',()=>{
+  clearTimeout(debounce);debounce=setTimeout(loadPayments,260);
+ });
+ $$('#paymentFilter [data-status]').forEach(button=>button.addEventListener('click',()=>{
+  filter=button.dataset.status;
+  $$('#paymentFilter [data-status]').forEach(b=>b.classList.toggle('active',b===button));
+  loadPayments();
+ }));
+ const forms={setupMerchantForm:setupMerchant,addVpaForm:addVpa,createPaymentForm:createPayment,
+   addAccessForm:addAccess,settingsForm:saveSettings};
+ Object.entries(forms).forEach(([key,fn])=>$('#'+key)?.addEventListener('submit',fn));
+ const actions={exportTop:exportCsv,exportReport:exportCsv,refreshVpas:loadVpas,
+   refreshAccess:loadAccess,markRead:markRead,runApiExplorer:showApiStatus,
+   testHealth:testHealth,playVoice:announceLatest,signOut:logout,settingsLogout:logout};
+ Object.entries(actions).forEach(([key,fn])=>$('#'+key)?.addEventListener('click',fn));
+ $('#copyEndpoints')?.addEventListener('click',()=>copyText(
+  'GET /api/auth/me\nGET /api/merchant/dashboard\nGET /api/merchant/payments\nPOST /api/merchant/payments\nGET /api/merchant/vpas\nPOST /api/merchant/vpas\nGET /api/merchant/reports'));
+ $('#vpaTable')?.addEventListener('click',e=>{
+  const button=e.target.closest('[data-vpa-action]');if(button)updateVpa(button.dataset.vpaId,button.dataset.vpaAction);
+ });
+ $('#paymentsTable')?.addEventListener('click',e=>{
+  const button=e.target.closest('[data-order-id]');if(button)showOrder(button.dataset.orderId);
+ });
+ $('#createResult')?.addEventListener('click',e=>{
+  const button=e.target.closest('[data-copy]');if(button)copyText(button.dataset.copy);
+ });
+ $('#accessTable')?.addEventListener('click',e=>{
+  const button=e.target.closest('[data-remove-access]');if(button)removeAccess(button.dataset.removeAccess);
+ });
+}
+function merchantHeader(){
+ const name=merchant.business_name||merchant.email||'New merchant';
+ $('#merchantSideName').textContent=name;
+ $('#merchantSideSub').textContent=merchant.email||'Merchant administrator';
+ $('#merchantInitial').textContent=name.slice(0,2).toUpperCase();
+ $('#environmentLabel').innerHTML='<span class="dot"></span> Live workspace';
+ $('#settingsName').value=merchant.business_name||'';
+ $('#settingsPhone').value=merchant.contact_phone||'';
+ $('#settingsCity').value=merchant.city||'';
+ $('#merchantSetup').style.display=merchant.setup_completed?'none':'block';
+ if(!merchant.setup_completed){
+  $('#setupBusinessName').value=merchant.business_name||'';
+  notice('Complete business setup and add your receiving UPI ID to start.');
+ }else notice('');
+}
+async function init(){
+ setupBindings();
+ try{
+  if(!await authInit())return;
+  const result=await api('/api/auth/me');
+  merchant=result.merchant;
+  if(!merchant)throw Error('Merchant identity is missing');
+  merchantHeader();
+  await Promise.allSettled([loadVpas(),loadOverview(),loadNotifications()]);
+  view(views[location.hash.slice(1)]?location.hash.slice(1):'overview');
+ }catch(error){
+  if(error.status===401){location.replace('/login');return}
+  notice('Unable to load your merchant workspace: '+error.message);
+  toast('Connection needs attention');
+ }
+}
+async function setupMerchant(event){
+ event.preventDefault();const button=event.submitter;busy(button,true);
+ try{
+  const d=await api('/api/merchant/setup',{method:'POST',
+   body:JSON.stringify({businessName:plain($('#setupBusinessName').value),
+     primaryVpa:plain($('#setupPrimaryVpa').value),accountType:$('#setupAccountType').value,mcc:$('#setupMcc').value.trim()})});
+  merchant=d.merchant;merchantHeader();await loadVpas();await loadOverview();toast('Workspace activated');
+ }catch(error){toast(error.message)}finally{busy(button,false)}
+}
+function orderTable(rows,compact=false){
+ if(!rows.length)return '<tr><td colspan="'+(compact?5:7)+'" class="empty">No real payment records in this view.</td></tr>';
+ return rows.map(o=>'<tr><td><strong>'+esc(o.id)+'</strong></td><td>'+esc(date(o.created_at))+
+  '</td><td>'+money(o.amount)+'</td><td>'+esc(o.vpa_address)+'</td>'+
+  (compact?'':'<td>'+esc(o.utr||'—')+'</td>')+
+  '<td><span class="state '+esc(String(o.status).toLowerCase())+'">'+esc(o.status)+'</span></td>'+
+  (compact?'':'<td><button type="button" class="btn-inline" data-order-id="'+esc(o.id)+'">Details</button></td>')+'</tr>').join('');
+}
+async function loadOverview(){
+ try{
+  const d=await api('/api/merchant/dashboard?dateFilter='+encodeURIComponent($('#periodSelect').value));
+  metrics=d.metrics||{};orders=d.recentTransactions||[];if(d.vpas)vpas=d.vpas;
+  if(d.notifications)notifications=d.notifications;
+  $('#metricVolume').textContent=money(metrics.totalVolume);
+  $('#metricCompleted').textContent=num(metrics.completedTransactions);
+  $('#metricPending').textContent=num(metrics.pendingTransactions);
+  $('#metricOrders').textContent=num(metrics.totalTransactions);
+  $('#recentTable').innerHTML=orderTable(orders.slice(0,7),true);
+  const pct=Number(metrics.successRate)||0;
+  $('#completionRate').textContent=pct+'%';
+  $('#completionRing').style.background='conic-gradient(#2e6fe4 '+pct+'%, #e7edf8 '+pct+'% 100%)';
+  $('#statusCompleted').textContent=num(metrics.completedTransactions);
+  $('#statusPending').textContent=num(metrics.pendingTransactions);
+  $('#statusTotal').textContent=num(metrics.totalTransactions);
+  renderChart();miniPanels();notice(merchant.setup_completed?'':'Complete business setup and add your receiving UPI ID to start.');
+ }catch(e){notice('Unable to load live dashboard data: '+e.message)}
+}
+function renderChart(){
+ const target=$('#activityChart'),values=orders.filter(o=>o.status==='COMPLETED').slice(0,14).reverse().map(o=>Number(o.amount)||0);
+ if(!values.length){target.innerHTML='<div class="empty">No completed payments in this period.</div>';return}
+ const points=values.length===1?[0,...values]:values,max=Math.max(1,...points);
+ const coordinates=points.map((v,i)=>[(620*i/(points.length-1)).toFixed(1),(195-v*155/max).toFixed(1)]);
+ const polyline=coordinates.map(p=>p.join(',')).join(' ');
+ target.innerHTML='<svg class="chart" viewBox="0 0 620 220" role="img" aria-label="Completed payment amounts">'+
+  '<path class="gridline" d="M0 40 H620 M0 90 H620 M0 140 H620 M0 190 H620" />'+
+  '<polyline fill="none" stroke="#376ddd" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round" points="'+polyline+'"/>'+
+  '</svg>';
+}
+function miniPanels(){
+ $('#overviewVpas').textContent=num(vpas.length);
+ $('#overviewActiveVpas').textContent=num(vpas.filter(o=>o.status==='ACTIVE').length);
+ const html=notifications.slice(0,3).map(n=>
+  '<div class="activity-item"><div class="n-icon">•</div><div><b>'+esc(n.title)+
+  '</b><small>'+esc(n.message)+'</small></div></div>').join('');
+ $('#overviewNotifications').innerHTML=html||'<div class="empty">No operational notifications.</div>';
+}
+async function loadPayments(){
+ try{
+  const params=new URLSearchParams({status:filter,search:$('#paymentsSearch').value.trim(),limit:'200'});
+  const d=await api('/api/merchant/payments?'+params.toString());
+  orders=d.orders||[];$('#paymentsTable').innerHTML=orderTable(orders);
+ }catch(error){toast(error.message)}
+}
+function showOrder(id){
+ const o=orders.find(x=>x.id===id);if(!o)return;
+ const detail=$('#txDetails');detail.style.display='block';
+ detail.innerHTML='<div class="module-head"><h2>Payment '+esc(o.id)+'</h2><button type="button" class="btn tiny" id="closeDetail">Close ×</button></div>'+
+  '<div class="order-details">'+[
+   ['Amount',money(o.amount)],['Status',esc(o.status)],['Receiving UPI',esc(o.vpa_address)],
+   ['UTR',esc(o.utr||'Not recorded')],['Created',esc(date(o.created_at))],
+   ['Your reference',esc(o.external_reference||'—')]
+  ].map(pair=>'<div>'+pair[0]+'<strong>'+pair[1]+'</strong></div>').join('')+'</div>';
+ $('#closeDetail').onclick=()=>detail.style.display='none';
+ detail.scrollIntoView({behavior:'smooth',block:'nearest'});
+}
+async function loadVpas(){
+ try{
+  const d=await api('/api/merchant/vpas');vpas=d.vpas||[];
+  $('#vpaTotal').textContent=num(vpas.length);
+  $('#vpaActive').textContent=num(vpas.filter(v=>v.status==='ACTIVE').length);
+  $('#vpaPaused').textContent=num(vpas.filter(v=>v.status==='PAUSED').length);
+  $('#vpaDefault').textContent=num(vpas.filter(v=>v.is_default).length);
+  $('#vpaTable').innerHTML=vpas.length?vpas.map(v=>
+   '<tr><td><strong>'+esc(v.vpa_address)+'</strong></td><td>'+esc((v.bank_name||'—')+' · '+(v.account_type==='MERCHANT'?'P2M':'P2P'))+'</td>'+
+   '<td><span class="state '+(v.status==='ACTIVE'?'active':'paused')+'">'+esc(v.status)+'</span></td>'+
+   '<td>'+(v.is_default?'Primary':'—')+'</td><td>'+
+   (v.is_default?'':'<button type="button" class="btn-inline" data-vpa-action="set_default" data-vpa-id="'+esc(v.id)+'">Make primary</button>')+
+   '<button type="button" class="btn-inline" data-vpa-action="'+(v.status==='ACTIVE'?'pause':'resume')+
+   '" data-vpa-id="'+esc(v.id)+'">'+(v.status==='ACTIVE'?'Pause':'Resume')+'</button></td></tr>').join(''):
+   '<tr><td colspan="5" class="empty">No receiving UPI IDs. Add one after merchant setup.</td></tr>';
+  $('#routingAccounts').innerHTML=vpas.length?vpas.map(v=>
+   '<span>'+esc(v.vpa_address)+' <strong>'+esc(v.status)+(v.is_default?' · Primary':'')+'</strong></span>').join(''):
+   '<div class="empty">No receiving accounts configured.</div>';
+  populateSelect();miniPanels();
+ }catch(e){toast(e.message)}
+}
+function populateSelect(){
+ const select=$('#newVpa');if(!select)return;
+ const previous=select.value;
+ select.innerHTML='<option value="">Use primary active UPI ID</option>'+vpas.filter(v=>v.status==='ACTIVE').map(v=>
+  '<option value="'+esc(v.vpa_address)+'">'+esc(v.vpa_address)+(v.is_default?' (Primary)':'')+'</option>').join('');
+ if([...select.options].some(o=>o.value===previous))select.value=previous;
+}
+async function addVpa(e){
+ e.preventDefault();busy(e.submitter,true);
+ try{
+  await api('/api/merchant/vpas',{method:'POST',body:JSON.stringify({
+   vpaAddress:$('#vpaAddress').value.trim(),bankName:$('#vpaBank').value.trim(),accountType:$('#vpaAccountType').value,mcc:$('#vpaMcc').value.trim()
+  })});
+  $('#addVpaForm').reset();await loadVpas();toast('Receiving UPI ID added');
+ }catch(error){toast(error.message)}finally{busy(e.submitter,false)}
+}
+async function updateVpa(id,action){
+ try{
+  await api('/api/merchant/vpas/'+encodeURIComponent(id),{method:'PATCH',body:JSON.stringify({action})});
+  await loadVpas();toast('Receiving account updated');
+ }catch(e){toast(e.message)}
+}
+async function createPayment(e){
+ e.preventDefault();const button=e.submitter;busy(button,true);
+ const amount=plain($('#newAmount').value);
+ if(!/^\d+(?:\.\d{1,2})?$/.test(amount)){toast('Enter a valid amount up to two decimal places');busy(button,false);return}
+ try{
+  const response=await api('/api/merchant/payments',{method:'POST',body:JSON.stringify({
+   amount,description:$('#newDesc').value.trim(),orderId:$('#newOrderId').value.trim(),
+   vpaAddress:$('#newVpa').value||null
+  })});
+  created=response.order;showCreatedOrder(created);toast('Live payment request generated');
+  await loadOverview();
+ }catch(error){toast(error.message)}finally{busy(button,false)}
+}
+function showCreatedOrder(o){
+ const link=location.origin+o.checkout_url;
+ const box=$('#createResult');box.className='';
+ box.innerHTML='<div class="qr-result"><div class="qr-shell"><div id="createdQr"></div></div>'+
+  '<div class="qr-copy"><div class="overline">REQUEST CREATED</div><div class="pay-amount">'+money(o.amount)+'</div>'+
+  '<p>'+esc(o.id)+'</p><p>Receiving '+esc(o.vpa_address)+'</p>'+
+  '<div class="form-actions">'+
+  '<button type="button" class="btn tiny" data-copy="'+esc(link)+'">Copy payment link</button>'+
+  '<button type="button" class="btn tiny ghost" data-copy="'+esc(o.upi_uri_dynamic)+'">Copy UPI URI</button>'+
+  '<a class="btn tiny primary" href="'+esc(o.checkout_url)+'" target="_blank" rel="noopener">Open checkout ↗</a>'+
+  '</div></div></div><p class="fine" style="margin-top:14px">The request expires after three minutes. Share the link with your customer.</p>';
+ const node=$('#createdQr');
+ if(window.QRCode && o.upi_uri_dynamic){
+  new QRCode(node,{text:o.upi_uri_dynamic,width:174,height:174,correctLevel:QRCode.CorrectLevel.M});
+ }else node.textContent='UPI URI ready — use the payment link.';
+}
+async function loadReports(){
+ try{
+  const d=await api('/api/merchant/reports?dateFilter='+encodeURIComponent($('#periodSelect').value));
+  const m=d.metrics||{};
+  $('#reportVolume').textContent=money(m.totalVolume);
+  $('#reportCompleted').textContent=num(m.completedTransactions);
+  $('#reportPending').textContent=num(m.pendingTransactions);
+ }catch(e){toast(e.message)}
+}
+async function exportCsv(){
+ try{
+  const headers=await authHeaders();
+  const response=await fetch('/api/merchant/reports?dateFilter='+
+   encodeURIComponent($('#periodSelect').value)+'&format=csv',
+   {headers,credentials:'same-origin',cache:'no-store'});
+  if(!response.ok)throw Error('Export unavailable ('+response.status+')');
+  const data=await response.blob(),url=URL.createObjectURL(data),anchor=document.createElement('a');
+  anchor.href=url;anchor.download='disha-merchant-ledger.csv';document.body.appendChild(anchor);
+  anchor.click();anchor.remove();setTimeout(()=>URL.revokeObjectURL(url),2500);
+  toast('Ledger CSV downloaded');
+ }catch(e){toast(e.message)}
+}
+async function loadRisk(){
+ try{
+  const d=await api('/api/merchant/risk'),r=d.risk||{};
+  $('#riskResult').style.display='block';
+  $('#riskResult').innerHTML='<h2>Current order controls</h2><div class="risk-facts">'+
+    '<div><b>'+num(r.open)+'</b><small>Open payment requests</small></div>'+
+    '<div><b>'+num(r.expired)+'</b><small>Expired requests</small></div>'+
+    '<div><b>'+num(r.completed)+'</b><small>Completed records</small></div></div>';
+ }catch(e){toast(e.message)}
+}
+async function loadAccess(){
+ try{
+  const d=await api('/api/merchant/ip-whitelist'),ips=d.ips||[];
+  $('#accessTable').innerHTML=ips.length?ips.map(o=>
+   '<tr><td>'+esc(o.ip_address)+'</td><td>'+esc(o.description||'—')+'</td>'+
+   '<td>Saved</td><td><button type="button" class="btn-inline" data-remove-access="'+esc(o.id)+'">Remove</button></td></tr>').join(''):
+   '<tr><td colspan="4" class="empty">No server addresses registered yet.</td></tr>';
+  if($('#blockedAccess'))$('#blockedAccess').innerHTML='<div class="empty">No events available for this workspace.</div>';
+ }catch(e){toast(e.message)}
+}
+async function addAccess(e){
+ e.preventDefault();busy(e.submitter,true);
+ const input=$('#accessIp').value.trim();
+ try{
+  await api('/api/merchant/ip-whitelist',{method:'POST',body:JSON.stringify({
+   ip_address:input.includes('/')?'':input,ip_range:input.includes('/')?input:'',
+   description:$('#accessDesc').value.trim()
+  })});
+  $('#addAccessForm').reset();await loadAccess();toast('Server address saved');
+ }catch(err){toast(err.message)}finally{busy(e.submitter,false)}
+}
+async function removeAccess(id){
+ if(!confirm('Remove this server address?'))return;
+ try{await api('/api/merchant/ip-whitelist/'+encodeURIComponent(id),{method:'DELETE'});await loadAccess();toast('Address removed')}
+ catch(e){toast(e.message)}
+}
+async function loadNotifications(){
+ try{
+  const d=await api('/api/merchant/notifications');notifications=d.notifications||[];
+  $('#fullNotifications').innerHTML=notifications.length?notifications.map(n=>
+   '<div class="activity-item"><div class="n-icon">•</div><div><b>'+esc(n.title)+'</b>'+
+   '<small>'+esc(n.message)+'</small><small>'+esc(date(n.created_at))+'</small></div></div>').join(''):
+   '<div class="empty">You have no notifications.</div>';
+  miniPanels();
+ }catch(e){toast(e.message)}
+}
+async function markRead(){
+ try{await api('/api/merchant/notifications/read',{method:'POST',body:'{}'});await loadNotifications();toast('Notifications marked read')}
+ catch(e){toast(e.message)}
+}
+async function saveSettings(e){
+ e.preventDefault();busy(e.submitter,true);
+ try{
+  await api('/api/merchant/profile',{method:'PUT',body:JSON.stringify({
+   businessName:$('#settingsName').value.trim(),contactPhone:$('#settingsPhone').value.trim(),
+   city:$('#settingsCity').value.trim()
+  })});
+  merchant.business_name=$('#settingsName').value.trim();
+  merchantHeader();toast('Business profile saved');
+ }catch(e2){toast(e2.message)}finally{busy(e.submitter,false)}
+}
+async function testHealth(){
+ try{
+  const r=await fetch('/health',{cache:'no-store'});
+  if(!r.ok)throw Error('Backend returned '+r.status);
+  const d=await r.json();$('#healthResult').textContent='Railway API: '+(d.status||'Online');
+ }catch(e){$('#healthResult').textContent=e.message}
+}
+async function showApiStatus(){
+ const selected=$('#apiExplorerEndpoint')?.value||'/api/auth/me';
+ const allowed=['/health','/api/auth/me','/api/merchant/dashboard','/api/merchant/vpas','/api/merchant/notifications'];
+ const path=allowed.includes(selected)?selected:'/api/auth/me';
+ const output=$('#apiExplorerResult');if(!output)return;
+ output.textContent='Checking live API…';
+ try{
+  const response=path==='/health'?await fetch(path,{cache:'no-store'}):null;
+  const result=response?await response.json():await api(path);
+  output.textContent=JSON.stringify(result,null,2).slice(0,5500);
+ }catch(e){output.textContent=e.message}
+}
+function announceLatest(){
+ if(!('speechSynthesis' in window)){toast('Voice alerts are not supported by this browser');return}
+ const completed=orders.find(o=>o.status==='COMPLETED');
+ if(!completed){toast('No completed payment is available to announce');return}
+ const language=$('#voiceLanguage').value,volume=Number($('#voiceVolume').value)/100;
+ const phrase=language==='hi-IN'?'भुगतान दर्ज हुआ '+money(completed.amount):
+  language==='mr-IN'?'पेमेंट नोंदले गेले '+money(completed.amount):
+  'Recorded payment of '+money(completed.amount);
+ const utterance=new SpeechSynthesisUtterance(phrase);utterance.lang=language;
+ utterance.volume=volume;window.speechSynthesis.cancel();window.speechSynthesis.speak(utterance);
+}
+async function copyText(value){
+ try{await navigator.clipboard.writeText(value);toast('Copied to clipboard')}
+ catch(e){toast('Clipboard unavailable — use your browser share controls')}
+}
+async function logout(){
+ try{if(!clerk)throw Error('No active authentication session');await clerk.signOut();location.assign('/login')}
+ catch(e){toast('Unable to sign out: '+e.message)}
+}
 document.addEventListener('DOMContentLoaded',init);
 })();

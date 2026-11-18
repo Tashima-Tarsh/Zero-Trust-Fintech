@@ -1,0 +1,93 @@
+<!doctype html>
+<html lang="en"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="theme-color" content="#f7f8fc"><title>Complete your UPI payment | DISHA 8.2</title>
+<link rel="icon" href="/assets/favicon.svg">
+<style>
+:root{color-scheme:light;color:#182135;background:#f7f8fc;font-family:-apple-system,BlinkMacSystemFont,Inter,system-ui,sans-serif}
+*{box-sizing:border-box}body{margin:0;min-height:100svh;background:radial-gradient(ellipse at 50% 0%,#edf2ff 0,transparent 50%),#f7f8fc}
+header{max-width:1050px;margin:auto;padding:28px;display:flex;align-items:center;justify-content:space-between}
+.brand{font-size:17px;letter-spacing:-.8px;font-weight:800;color:#141e31;text-decoration:none}.brand span{color:#5171ba}
+.fine{font-size:12px;color:#79879c}.container{max-width:520px;margin:25px auto 80px;padding:0 16px}
+.card{padding:38px;background:#fff;border:1px solid #e5e9f2;border-radius:24px;box-shadow:0 18px 70px #11233a0b,0 1px 2px #12223c08}
+.overline{font-size:11px;letter-spacing:1.5px;text-transform:uppercase;font-weight:800;color:#68758c}
+h1{font-size:27px;letter-spacing:-1px;margin:12px 0 4px}
+.amount{font-size:45px;font-weight:750;letter-spacing:-2px;margin:20px 0 10px}
+.small{font-size:13px;color:#7c889a;margin:0}
+.panel{border-radius:17px;background:#f8faff;border:1px solid #e9edf6;margin:22px 0;padding:22px;display:flex;flex-direction:column;align-items:center;gap:14px}
+#qr{background:white;border-radius:12px;padding:14px;min-height:196px;display:grid;place-items:center}
+#qr img{display:block}.line{display:flex;justify-content:space-between;align-items:center;gap:15px;border-bottom:1px solid #eef1f6;padding:12px 0;font-size:13px}
+.line span{color:#68778d}.line strong{font-size:13px;text-align:right;overflow-wrap:anywhere}
+.btn{display:flex;width:100%;min-height:48px;align-items:center;justify-content:center;gap:8px;border-radius:12px;border:1px solid #dbe2ed;font-size:14px;font-weight:700;cursor:pointer;text-decoration:none;background:#fff;color:#213655;margin-top:11px}
+.btn.primary{background:#1e3b72;color:#fff;border-color:#1e3b72;box-shadow:0 5px 20px #1e3b7220}
+.btn:focus-visible{outline:3px solid #9bb8ed;outline-offset:3px}
+.btn:disabled{opacity:.5;cursor:not-allowed}.state{font-size:13px;background:#eef4ff;color:#2c5797;border-radius:10px;padding:12px 14px;margin:20px 0}
+.state.success{background:#eaf8f0;color:#116d49}.state.error{background:#fff1f2;color:#aa3443}
+footer{text-align:center;font-size:11px;color:#9ba7b7;padding:5px 20px 25px;line-height:1.8}
+@media(max-width:550px){header{padding:20px}.container{margin:0 auto 40px}.card{padding:24px 18px}h1{font-size:24px}.amount{font-size:39px}}
+</style>
+<script src="/vendor/qrcode.min.js" defer></script>
+</head><body>
+<header><a class="brand" href="/">DISHA <span>8.2</span></a><span class="fine">Protected payment request</span></header>
+<main class="container"><div class="card">
+<div class="overline">UPI payment</div><h1 id="business">Loading payment details…</h1>
+<p class="small" id="reference">Verifying your payment link</p>
+<div class="amount" id="amount">—</div>
+<div class="panel"><div id="qr" aria-label="UPI payment QR"></div><p class="small" style="text-align:center">Scan with your UPI app or open it below</p></div>
+<div class="line"><span>Receiving UPI ID</span><strong id="vpa">—</strong></div>
+<div class="line"><span>Payment reference</span><strong id="ref">—</strong></div>
+<div class="line"><span>Expires</span><strong id="expires">—</strong></div>
+<div id="status" class="state" role="status" aria-live="polite">Checking request…</div>
+<a id="openUpi" class="btn primary" href="#" style="pointer-events:none;opacity:.6">Open UPI app</a>
+<button type="button" class="btn" id="copy" disabled>Copy payment URI</button>
+<button type="button" class="btn" id="refresh">Refresh payment status</button>
+<p class="fine" style="line-height:1.7;margin-top:20px">Only the merchant's recorded payment status is shown here. Opening an app or returning to this page does not by itself confirm payment.</p>
+</div></main><footer>Powered by DISHA 8.2 · Do not share your UPI PIN or bank credentials</footer>
+<script>
+(function(){
+'use strict';
+const $=id=>document.getElementById(id),params=new URLSearchParams(location.search);
+const orderId=params.get('orderId'),token=params.get('token');
+let uri='',timer=null;
+const money=v=>new Intl.NumberFormat('en-IN',{style:'currency',currency:'INR'}).format(v);
+function status(msg,type=''){const el=$('status');el.textContent=msg;el.className='state '+type;}
+async function load(){
+ if(!orderId||!token){status('This payment link is incomplete. Request a new link from the merchant.','error');return;}
+ try{
+ const r=await fetch('/api/merchant/public/order/'+encodeURIComponent(orderId)+'?token='+encodeURIComponent(token),
+  {cache:'no-store',credentials:'same-origin'});
+ const data=await r.json();
+ if(!r.ok||!data.success)throw Error(data.error||'Unable to retrieve the payment request');
+ const o=data.order;
+ $('business').textContent=o.business_name;
+ $('reference').textContent=o.description||'Payment request';
+ $('amount').textContent=money(o.amount);
+ $('vpa').textContent=o.vpa_address;
+ $('ref').textContent=o.id;
+ $('expires').textContent=new Date(o.expires_at).toLocaleString('en-IN',{dateStyle:'medium',timeStyle:'short'});
+ if(o.status==='COMPLETED'){
+  status('This payment is recorded as completed.','success');$('openUpi').style.pointerEvents='none';
+  $('openUpi').style.opacity='.5';$('openUpi').textContent='Payment recorded';$('copy').disabled=true;return;
+ }
+ if(o.status==='EXPIRED'||o.status==='FAILED'){
+  status('This payment request is '+o.status.toLowerCase()+'. Ask the merchant for a new link.','error');
+  $('openUpi').style.pointerEvents='none';$('openUpi').style.opacity='.5';$('copy').disabled=true;return;
+ }
+ uri=o.upi_uri;
+ $('openUpi').href=uri;$('openUpi').textContent='Open UPI app';
+ $('openUpi').style.pointerEvents='auto';$('openUpi').style.opacity='1';$('copy').disabled=false;
+ status('Payment request active. Complete payment in your UPI app, then refresh for its recorded status.');
+ if(!$('qr').dataset.value||$('qr').dataset.value!==uri){
+  $('qr').replaceChildren();$('qr').dataset.value=uri;
+  if(window.QRCode)new QRCode($('qr'),{text:uri,width:176,height:176,correctLevel:QRCode.CorrectLevel.M});
+  else $('qr').textContent='QR unavailable. Use the UPI app button.';
+ }
+ }catch(e){status(e.message||'Unable to load payment request','error');}
+}
+$('copy').onclick=async()=>{if(!uri)return;try{await navigator.clipboard.writeText(uri);status('UPI payment URI copied.')}catch{status('Your browser blocked clipboard access.','error')}};
+$('refresh').onclick=load;
+load();timer=setInterval(load,5000);
+document.addEventListener('visibilitychange',()=>{if(!document.hidden)load()});
+})();
+</script>
+</body></html>
