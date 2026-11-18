@@ -167,8 +167,17 @@
             Receiving Bank VPA (UPI ID)
             <input id="setupPrimaryVpa" required placeholder="business@oksbi or merchant@okhdfcbank">
           </label>
+          <label class="field">UPI account type
+            <select id="setupAccountType">
+              <option value="PERSONAL">Personal / P2P receiving UPI</option>
+              <option value="MERCHANT">Bank-issued merchant UPI / P2M</option>
+            </select>
+          </label>
+          <label class="field">Bank-issued MCC (required for P2M)
+            <input id="setupMcc" maxlength="4" inputmode="numeric" placeholder="Four digits from your bank QR">
+          </label>
           <div class="form-actions" style="grid-column:1/-1;">
-            <button type="submit" class="btn primary">Save & Activate Rail</button>
+            <button type="submit" class="btn primary">Save Merchant Workspace</button>
           </div>
         </form>
       </div>
@@ -401,6 +410,15 @@
             <label class="field">
               Bank / Rail Name
               <input id="vpaBank" placeholder="e.g. State Bank of India">
+            </label>
+            <label class="field">UPI account type
+              <select id="vpaAccountType">
+                <option value="PERSONAL">Personal / P2P</option>
+                <option value="MERCHANT">Bank-issued merchant / P2M</option>
+              </select>
+            </label>
+            <label class="field">Bank-issued MCC (for P2M)
+              <input id="vpaMcc" maxlength="4" inputmode="numeric" placeholder="Four digits from your bank QR">
             </label>
             <div class="form-actions" style="grid-column:1/-1;">
               <button class="btn primary" type="submit">Add Receiving VPA</button>
