@@ -9,11 +9,15 @@ const num = value => new Intl.NumberFormat('en-IN').format(Number(value)||0);
 const date = value => value?new Date(Number(value)).toLocaleString('en-IN',{dateStyle:'medium',timeStyle:'short'}):'—';
 const plain = value => String(value||'').trim();
 const views = {
- overview:['Overview','Live activity across your merchant workspace'],
+ overview:['Overview','Your business activity, financial evidence and operational priorities'],
+ intelligence:['Payment Intelligence','Order-bound UTR and evidence correlation'],
  payments:['Transactions','Track every payment request and recorded outcome'],
  create:['Create payment','Generate a customer-specific UPI link and QR'],
  vpas:['UPI accounts','Manage the UPI addresses that receive your payments'],
  routing:['Routing & accounts','Inspect the primary and active receiving accounts'],
+ vault:['Vault & Evidence','Device observations and order-bound evidence'],
+ ledger:['Reconciliation & Ledger','Qualified financial records and report status'],
+ integrations:['Integrations & Automation','Developer connections and configuration'],
  risk:['Security review','Actual order-state indicators for this workspace'],
  access:['IP directory','Maintain the server IP addresses registered for your business'],
  reports:['Reports & exports','Download recorded merchant payment activity'],
@@ -22,7 +26,7 @@ const views = {
  api:['Developer connections','Check your authenticated merchant API connectivity'],
  settings:['Business settings','Manage your company profile and access']
 };
-let merchant=null,metrics={},orders=[],vpas=[],notifications=[],filter='ALL',clerk=null;
+let merchant=null,metrics={},orders=[],vpas=[],notifications=[],trend=[],filter='ALL',clerk=null;
 let created=null,loading=false;
 function toast(message){
  const el=$('#toast');if(!el)return;el.textContent=message;el.classList.remove('hidden');
@@ -37,7 +41,7 @@ async function authInit(){
  if(!key)throw Error('Merchant authentication is unavailable');
  const part=key.split('_')[2];
  if(!part)throw Error('Invalid authentication configuration');
- const host=atob(part.replace(/-/g,'+').replace(/_/g,'/')).replace(/\0+$/g,'');
+ const host=atob(part.replace(/-/g,'+').replace(/_/g,'/')).replace(/(?:\$|\0+)$/, '');
  if(!/^[a-z0-9.-]+$/i.test(host))throw Error('Authentication host invalid');
  if(!window.Clerk){
   await new Promise((resolve,reject)=>{
@@ -69,7 +73,7 @@ async function api(path,options={}){
  if(!r.ok){const error=Error(data.error||data.message||'Request failed ('+r.status+')');error.status=r.status;throw error}
  return data;
 }
-function view(name){
+function view(name,replaceHistory=false){
  if(!views[name])name='overview';
  $$('.view').forEach(el=>el.classList.toggle('active',el.id==='view-'+name));
  $$('#appSide [data-view]').forEach(el=>{
@@ -78,12 +82,19 @@ function view(name){
   else el.removeAttribute('aria-current');
  });
  $('#viewHeading').textContent=views[name][0];$('#viewSubtitle').textContent=views[name][1];
- if(location.hash!=='#'+name)history.replaceState(null,'','#'+name);
+ if(location.hash!=='#'+name) {
+  if(replaceHistory)history.replaceState(null,'','#'+name);
+  else history.pushState(null,'','#'+name);
+ }
  closeMenu();
+ if(typeof window.scrollTo==='function')window.scrollTo(0,0);
  const actions={overview:loadOverview,payments:loadPayments,create:loadVpas,vpas:loadVpas,
  routing:loadVpas,risk:loadRisk,access:loadAccess,reports:loadReports,
- notifications:loadNotifications,api:showApiStatus};
- if(actions[name])actions[name]();
+ notifications:loadNotifications,api:showApiStatus,intelligence:loadIntelligence,vault:loadVault,ledger:loadLedger};
+ if(actions[name]) {
+  const work=actions[name]();
+  if(work&&typeof work.catch==='function')work.catch(error=>toast(error.message));
+ }
 }
 function closeMenu(){
  $('#appSide')?.classList.remove('open');$('#sideBackdrop')?.classList.remove('open');
@@ -91,14 +102,27 @@ function closeMenu(){
 }
 function setupBindings(){
  $$('#appSide [data-view]').forEach(button=>button.addEventListener('click',()=>view(button.dataset.view)));
- $$('[data-switch]').forEach(button=>button.addEventListener('click',()=>view(button.dataset.switch)));
+ $$('.merchant-tabbar [data-smart-tab]').forEach(button=>button.addEventListener('click',()=>{
+   const area=button.closest('.module');area.querySelectorAll('[data-smart-tab]').forEach(b=>b.classList.toggle('active',b===button));
+   area.querySelectorAll('.smart-pane').forEach(p=>p.classList.toggle('active',p.id===button.dataset.smartTab));
+ }));
+ $('#merchant-mobile-menu')?.addEventListener('click',()=>{
+   $('#appSide')?.classList.add('open');$('#sideBackdrop')?.classList.add('open');
+   $('#sideToggle')?.setAttribute('aria-expanded','true');
+ });
+ document.addEventListener('click',event=>{
+  const target=event.target.closest('[data-switch]');
+  if(target)view(target.dataset.switch);
+ });
  $('#sideToggle')?.addEventListener('click',()=>{
   $('#appSide').classList.toggle('open');$('#sideBackdrop').classList.toggle('open');
   $('#sideToggle').setAttribute('aria-expanded',String($('#appSide').classList.contains('open')));
  });
  $('#sideBackdrop')?.addEventListener('click',closeMenu);
  document.addEventListener('keydown',e=>{if(e.key==='Escape')closeMenu()});
- window.addEventListener('hashchange',()=>{const target=location.hash.slice(1);if(views[target])view(target)});
+ const routeFromUrl=()=>{const target=location.hash.slice(1);if(views[target])view(target,true)};
+ window.addEventListener('hashchange',routeFromUrl);
+ window.addEventListener('popstate',routeFromUrl);
  $('#periodSelect')?.addEventListener('change',()=>{loadOverview();loadReports()});
  $('#globalSearch')?.addEventListener('keydown',e=>{
   if(e.key==='Enter'){view('payments');$('#paymentsSearch').value=e.target.value;loadPayments()}
@@ -115,6 +139,7 @@ function setupBindings(){
    addAccessForm:addAccess,settingsForm:saveSettings};
  Object.entries(forms).forEach(([key,fn])=>$('#'+key)?.addEventListener('submit',fn));
  const actions={exportTop:exportCsv,exportReport:exportCsv,refreshVpas:loadVpas,
+   importVpaCsv:bulkImportVpas,downloadVpaTemplate:downloadVpaTemplate,
    refreshAccess:loadAccess,markRead:markRead,runApiExplorer:showApiStatus,
    testHealth:testHealth,playVoice:announceLatest,signOut:logout,settingsLogout:logout};
  Object.entries(actions).forEach(([key,fn])=>$('#'+key)?.addEventListener('click',fn));
@@ -138,15 +163,13 @@ function merchantHeader(){
  $('#merchantSideName').textContent=name;
  $('#merchantSideSub').textContent=merchant.email||'Merchant administrator';
  $('#merchantInitial').textContent=name.slice(0,2).toUpperCase();
- $('#environmentLabel').innerHTML='<span class="dot"></span> Live workspace';
+ $('#environmentLabel').innerHTML='<span class="dot"></span> '+(merchant.is_internal_test?'Internal production test':'Merchant workspace');
  $('#settingsName').value=merchant.business_name||'';
  $('#settingsPhone').value=merchant.contact_phone||'';
  $('#settingsCity').value=merchant.city||'';
  $('#merchantSetup').style.display=merchant.setup_completed?'none':'block';
- if(!merchant.setup_completed){
-  $('#setupBusinessName').value=merchant.business_name||'';
-  notice('Complete business setup and add your receiving UPI ID to start.');
- }else notice('');
+ if(!merchant.setup_completed)$('#setupBusinessName').value=merchant.business_name||'';
+ notice('');
 }
 async function init(){
  setupBindings();
@@ -157,7 +180,7 @@ async function init(){
   if(!merchant)throw Error('Merchant identity is missing');
   merchantHeader();
   await Promise.allSettled([loadVpas(),loadOverview(),loadNotifications()]);
-  view(views[location.hash.slice(1)]?location.hash.slice(1):'overview');
+  view(views[location.hash.slice(1)]?location.hash.slice(1):'overview',true);
  }catch(error){
   if(error.status===401){location.replace('/login');return}
   notice('Unable to load your merchant workspace: '+error.message);
@@ -169,8 +192,8 @@ async function setupMerchant(event){
  try{
   const d=await api('/api/merchant/setup',{method:'POST',
    body:JSON.stringify({businessName:plain($('#setupBusinessName').value),
-     primaryVpa:plain($('#setupPrimaryVpa').value),accountType:$('#setupAccountType').value,mcc:$('#setupMcc').value.trim()})});
-  merchant=d.merchant;merchantHeader();await loadVpas();await loadOverview();toast('Workspace activated');
+     primaryVpa:plain($('#setupPrimaryVpa').value),primaryHolderName:plain($('#setupHolderName').value),primaryBankName:plain($('#setupBankName').value),accountType:$('#setupAccountType').value,mcc:$('#setupMcc').value.trim()})});
+  merchant=d.merchant;merchantHeader();await loadVpas();await loadOverview();view('overview');toast('Workspace activated');
  }catch(error){toast(error.message)}finally{busy(button,false)}
 }
 function orderTable(rows,compact=false){
@@ -184,7 +207,7 @@ function orderTable(rows,compact=false){
 async function loadOverview(){
  try{
   const d=await api('/api/merchant/dashboard?dateFilter='+encodeURIComponent($('#periodSelect').value));
-  metrics=d.metrics||{};orders=d.recentTransactions||[];if(d.vpas)vpas=d.vpas;
+  metrics=d.metrics||{};orders=d.recentTransactions||[];trend=d.trend||[];if(d.vpas)vpas=d.vpas;
   if(d.notifications)notifications=d.notifications;
   $('#metricVolume').textContent=money(metrics.totalVolume);
   $('#metricCompleted').textContent=num(metrics.completedTransactions);
@@ -197,19 +220,37 @@ async function loadOverview(){
   $('#statusCompleted').textContent=num(metrics.completedTransactions);
   $('#statusPending').textContent=num(metrics.pendingTransactions);
   $('#statusTotal').textContent=num(metrics.totalTransactions);
-  renderChart();miniPanels();notice(merchant.setup_completed?'':'Complete business setup and add your receiving UPI ID to start.');
+  renderChart();miniPanels();
  }catch(e){notice('Unable to load live dashboard data: '+e.message)}
 }
 function renderChart(){
- const target=$('#activityChart'),values=orders.filter(o=>o.status==='COMPLETED').slice(0,14).reverse().map(o=>Number(o.amount)||0);
- if(!values.length){target.innerHTML='<div class="empty">No completed payments in this period.</div>';return}
- const points=values.length===1?[0,...values]:values,max=Math.max(1,...points);
- const coordinates=points.map((v,i)=>[(620*i/(points.length-1)).toFixed(1),(195-v*155/max).toFixed(1)]);
- const polyline=coordinates.map(p=>p.join(',')).join(' ');
- target.innerHTML='<svg class="chart" viewBox="0 0 620 220" role="img" aria-label="Completed payment amounts">'+
-  '<path class="gridline" d="M0 40 H620 M0 90 H620 M0 140 H620 M0 190 H620" />'+
-  '<polyline fill="none" stroke="#376ddd" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round" points="'+polyline+'"/>'+
-  '</svg>';
+ const target=$('#activityChart');
+ const values=trend.filter(point=>Number(point.volume)>0).slice(-30);
+ if(!values.length){
+  target.innerHTML='<div class="empty-state"><span class="empty-graphic" aria-hidden="true">↗</span><strong>Activity will appear here</strong><p>No completed payment records in this period. Create a payment request to begin tracking.</p><button type="button" class="btn tiny ghost" data-switch="create">Create payment ↗</button></div>';
+  return;
+ }
+ const width=680,top=24,bottom=182;
+ const max=Math.max(1,...values.map(p=>Number(p.volume)));
+ const points=values.map((p,i)=>{
+  const x=values.length===1?width/2:(i/(values.length-1))*width;
+  const y=bottom-(Number(p.volume)/max)*(bottom-top);
+  return {x,y,label:new Date(Number(p.day)).toLocaleDateString('en-IN',{day:'numeric',month:'short'}),amount:Number(p.volume)};
+ });
+ const line=points.map(p=>p.x.toFixed(2)+','+p.y.toFixed(2)).join(' ');
+ const area='0,'+bottom+' '+line+' '+width+','+bottom;
+ const grid=[0,1,2,3,4].map(i=>{
+  const y=bottom-i*(bottom-top)/4;
+  return '<line x1="0" y1="'+y+'" x2="'+width+'" y2="'+y+'" class="trend-grid"/>';
+ }).join('');
+ const ticks=[points[0],points[Math.floor(points.length/2)],points[points.length-1]]
+  .filter((point,i,array)=>array.indexOf(point)===i)
+  .map(point=>'<text class="trend-axis" x="'+point.x+'" y="217" text-anchor="middle">'+esc(point.label)+'</text>').join('');
+ target.innerHTML='<div class="chart-frame"><div class="chart-total"><span>Recorded volume</span><strong>'+money(values.reduce((sum,p)=>sum+Number(p.volume),0))+'</strong></div>'+
+  '<svg class="chart premium-trend" viewBox="0 0 680 226" role="img" aria-label="Actual completed payment volume by day">'+
+  '<defs><linearGradient id="dishaArea" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#7563d5" stop-opacity=".28"/><stop offset="1" stop-color="#7563d5" stop-opacity="0"/></linearGradient></defs>'+
+  grid+'<polygon points="'+area+'" fill="url(#dishaArea)"/><polyline points="'+line+'" fill="none" stroke="#7563d5" stroke-width="3.6" stroke-linecap="round" stroke-linejoin="round"/>'+
+  points.map(p=>'<circle cx="'+p.x+'" cy="'+p.y+'" r="4" fill="#7563d5" stroke="#fff" stroke-width="2"><title>'+esc(p.label+': '+money(p.amount))+'</title></circle>').join('')+ticks+'</svg></div>';
 }
 function miniPanels(){
  $('#overviewVpas').textContent=num(vpas.length);
@@ -219,6 +260,47 @@ function miniPanels(){
   '</b><small>'+esc(n.message)+'</small></div></div>').join('');
  $('#overviewNotifications').innerHTML=html||'<div class="empty">No operational notifications.</div>';
 }
+
+async function merchantEvidence(){
+ const d=await api('/api/merchant/payments?limit=200');
+ return d.orders||[];
+}
+function evidenceTable(rows,mode){
+ if(!rows.length)return '<div class="empty">No recorded merchant orders in this workspace.</div>';
+ const heading=mode==='vault'?'<th>Order</th><th>Vault outcome</th><th>Reference candidate</th><th>Payment status</th>':'<th>Order</th><th>Amount</th><th>UTR</th><th>Observed evidence</th><th>Recorded status</th>';
+ const cells=rows.map(o=>{
+  const outcome=o.vault_outcome||'No Vault observation';
+  if(mode==='vault')return '<tr><td>'+esc(o.id)+'</td><td>'+esc(outcome)+'</td><td>'+esc(o.vault_utr_candidate||'Not provided')+'</td><td>'+esc(o.status)+'</td></tr>';
+  return '<tr><td>'+esc(o.id)+'<small>'+esc(o.vpa_address)+'</small></td><td>'+esc(money(o.amount))+'</td><td>'+esc(o.utr||'Not recorded')+'</td><td>'+esc(outcome)+'</td><td>'+esc(o.status)+'</td></tr>';
+ }).join('');
+ return '<table class="merchant-op-table"><thead><tr>'+heading+'</tr></thead><tbody>'+cells+'</tbody></table>';
+}
+async function loadIntelligence(){
+ try{
+  const items=await merchantEvidence();
+  $('#intelligence-table').innerHTML=evidenceTable(items,'intelligence');
+  const questionable=items.filter(o=>o.vault_outcome&&String(o.vault_outcome).toUpperCase()!=='VERIFIED'||o.status==='EXPIRED'||o.status==='FAILED');
+  $('#intelligence-exceptions').innerHTML=questionable.length?evidenceTable(questionable,'intelligence'):'<div class="empty">No recorded exceptions in the loaded order register. This is not a platform-wide fraud guarantee.</div>';
+ }catch(e){$('#intelligence-table').textContent='Unable to retrieve merchant intelligence: '+e.message}
+}
+
+async function loadLedger(){
+ const summary=$('#merchant-ledger-summary'),body=$('#merchant-ledger-records');
+ if(!summary||!body)return;
+ try{
+  const d=await api('/api/merchant/ledger');
+  if(!d.connected){summary.textContent='Financial journal schema is not provisioned';body.innerHTML='<div class="empty">No journal data available.</div>';return}
+  summary.textContent='Posted journals: '+num(d.summary?.posted||0)+' · Amount: '+money(Number(d.summary?.posted_paise||0)/100);
+  body.innerHTML=d.journals.length?'<table class="merchant-op-table"><thead><tr><th>Journal</th><th>Order</th><th>Amount</th><th>State</th><th>Posted</th></tr></thead><tbody>'+
+    d.journals.map(j=>'<tr><td>'+esc(j.journal_id)+'</td><td>'+esc(j.order_id)+'</td><td>'+esc(money(Number(j.amount_paise)/100))+'</td><td>'+esc(j.state)+'</td><td>'+esc(j.posted_at||'Not posted')+'</td></tr>').join('')+'</tbody></table>':'<div class="empty">No financial journal records exist for this tenant.</div>';
+ }catch(e){summary.textContent='Ledger unavailable';body.textContent=e.message}
+}
+
+async function loadVault(){
+ try{$('#vault-table').innerHTML=evidenceTable((await merchantEvidence()).filter(o=>o.vault_outcome||o.vault_utr_candidate),'vault')}
+ catch(e){$('#vault-table').textContent='Unable to retrieve Vault records: '+e.message}
+}
+
 async function loadPayments(){
  try{
   const params=new URLSearchParams({status:filter,search:$('#paymentsSearch').value.trim(),limit:'200'});
@@ -246,16 +328,27 @@ async function loadVpas(){
   $('#vpaPaused').textContent=num(vpas.filter(v=>v.status==='PAUSED').length);
   $('#vpaDefault').textContent=num(vpas.filter(v=>v.is_default).length);
   $('#vpaTable').innerHTML=vpas.length?vpas.map(v=>
-   '<tr><td><strong>'+esc(v.vpa_address)+'</strong></td><td>'+esc((v.bank_name||'—')+' · '+(v.account_type==='MERCHANT'?'P2M':'P2P'))+'</td>'+
+   '<tr><td><strong>'+esc(v.vpa_address)+'</strong></td><td>'+esc(v.holder_name||'Not entered')+'</td><td>'+esc((v.bank_name||'—')+' · '+(v.account_type==='MERCHANT'?'P2M':'P2P'))+'</td>'+
    '<td><span class="state '+(v.status==='ACTIVE'?'active':'paused')+'">'+esc(v.status)+'</span></td>'+
    '<td>'+(v.is_default?'Primary':'—')+'</td><td>'+
    (v.is_default?'':'<button type="button" class="btn-inline" data-vpa-action="set_default" data-vpa-id="'+esc(v.id)+'">Make primary</button>')+
    '<button type="button" class="btn-inline" data-vpa-action="'+(v.status==='ACTIVE'?'pause':'resume')+
    '" data-vpa-id="'+esc(v.id)+'">'+(v.status==='ACTIVE'?'Pause':'Resume')+'</button></td></tr>').join(''):
-   '<tr><td colspan="5" class="empty">No receiving UPI IDs. Add one after merchant setup.</td></tr>';
-  $('#routingAccounts').innerHTML=vpas.length?vpas.map(v=>
-   '<span>'+esc(v.vpa_address)+' <strong>'+esc(v.status)+(v.is_default?' · Primary':'')+'</strong></span>').join(''):
-   '<div class="empty">No receiving accounts configured.</div>';
+   '<tr><td colspan="6" class="empty">No UPI accounts yet. Add your own receiving UPI ID below, or import a CSV.</td></tr>';
+  $('#routingAccounts').innerHTML=vpas.length?vpas.map(v=>{
+   const used=Math.max(0,Number(v.daily_tx_count)||0),limit=Math.max(1,Number(v.daily_tx_limit)||15);
+   const pct=Math.min(100,Math.round(used/limit*100));
+   const score=Math.max(0,Math.min(100,Number(v.health_score)||0));
+   return '<article class="routing-entry"><div class="routing-entry-head"><div><strong>'+esc(v.holder_name||v.vpa_address)+
+     '</strong><small>'+esc(v.vpa_address)+'</small></div><span class="state '+(v.status==='ACTIVE'?'active':'paused')+'">'+esc(v.status)+'</span></div>'+
+     '<div class="routing-facts"><span>Internal health score <b>'+num(score)+'/100</b></span>'+
+     '<span>Requests today <b>'+num(used)+' / '+num(limit)+'</b></span>'+
+     '<span>Policy volume today <b>'+money(v.daily_volume)+'</b></span></div>'+
+     '<div class="routing-meter" aria-label="'+pct+' percent daily request allowance used"><span style="width:'+pct+'%"></span></div>'+
+     '<small class="routing-caption">'+(v.is_default?'Primary receiving account':'Additional receiving account')+
+     ' · Internal policy indicators, not a bank-verified balance</small></article>';
+  }).join(''):
+   '<div class="empty-state"><strong>No receiving accounts connected</strong><p>Add your own UPI ID in Accounts before creating payment requests.</p><button type="button" class="btn tiny ghost" data-switch="vpas">Open UPI accounts</button></div>';
   populateSelect();miniPanels();
  }catch(e){toast(e.message)}
 }
@@ -270,10 +363,35 @@ async function addVpa(e){
  e.preventDefault();busy(e.submitter,true);
  try{
   await api('/api/merchant/vpas',{method:'POST',body:JSON.stringify({
-   vpaAddress:$('#vpaAddress').value.trim(),bankName:$('#vpaBank').value.trim(),accountType:$('#vpaAccountType').value,mcc:$('#vpaMcc').value.trim()
+   vpaAddress:$('#vpaAddress').value.trim(),holderName:$('#vpaHolder').value.trim(),bankName:$('#vpaBank').value.trim(),accountType:$('#vpaAccountType').value,mcc:$('#vpaMcc').value.trim()
   })});
   $('#addVpaForm').reset();await loadVpas();toast('Receiving UPI ID added');
  }catch(error){toast(error.message)}finally{busy(e.submitter,false)}
+}
+async function bulkImportVpas(event){
+ const button=event.currentTarget;
+ const input=$('#vpaCsvFile'),status=$('#importVpaStatus'),file=input?.files?.[0];
+ if(!file){toast('Choose a CSV file first');return}
+ if(file.size>256*1024){toast('CSV file must be smaller than 256 KB');return}
+ busy(button,true);
+ try{
+  if(!window.DISHAVpaImport)throw Error('UPI import tool is unavailable');
+  const source=await file.text();
+  const accounts=window.DISHAVpaImport.parseVpaCsv(source);
+  status.textContent='Validating '+accounts.length+' UPI account(s)…';
+  const result=await api('/api/merchant/vpas/import',{method:'POST',body:JSON.stringify({accounts})});
+  input.value='';
+  status.textContent=result.imported+' account(s) imported. All accounts belong to your merchant workspace.';
+  await loadVpas();toast(result.imported+' receiving UPI accounts imported');
+ }catch(error){status.textContent='Import not saved: '+error.message;toast(error.message)}
+ finally{busy(button,false)}
+}
+function downloadVpaTemplate(){
+ const csv='upi_id,account_holder,bank_name,account_type,mcc\n';
+ const blob=new Blob([csv],{type:'text/csv;charset=utf-8'});
+ const href=URL.createObjectURL(blob),a=document.createElement('a');
+ a.href=href;a.download='disha-upi-accounts-template.csv';document.body.appendChild(a);a.click();a.remove();
+ setTimeout(()=>URL.revokeObjectURL(href),2500);
 }
 async function updateVpa(id,action){
  try{

@@ -3,6 +3,7 @@
   "include": [
     "/api/*",
     "/health",
+    "/ws",
     "/ws/*",
     "/login",
     "/signup",
@@ -12,7 +13,11 @@
     "/merchant-console.html",
     "/merchant-dashboard.html",
     "/auth-config.js",
-    "/debug.html"
+    "/vendor/simplewebauthn.umd.js",
+    "/debug.html",
+    "/request-access",
+    "/owner",
+    "/owner-console.html"
   ],
   "exclude": [
     "/assets/*",
