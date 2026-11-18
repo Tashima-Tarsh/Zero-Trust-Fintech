@@ -9,9 +9,18 @@ const script=fs.readFileSync(path.join(__dirname,'../public/one-touch-vault.js')
 const merchant=fs.readFileSync(path.join(__dirname,'../public/merchant-checkout.html'),'utf8');
 const checkout=fs.readFileSync(path.join(__dirname,'../public/checkout.html'),'utf8');
 assert.match(merchant,/DISHAOneTouchVault\.beginHandoff\(orderId,vaultSessionId,token\)/);
-assert.match(merchant,/DISHAOneTouchVault\.submitReturnEvidence\(orderId\)/);
+assert.match(merchant,/const packet=vault\.requestEvidence\(orderId\)/);
+assert.match(merchant,/vault\.acknowledgeEvidence\(orderId,packet\.eventId,result\)/);
 assert.match(checkout,/DISHAOneTouchVault\.beginHandoff\(currentSession\.orderId,vaultSessionId,currentSession\.sessionId\)/);
-assert.match(checkout,/DISHAOneTouchVault\.submitReturnEvidence\(\)/);
+assert.match(checkout,/const packet=vault\.requestEvidence\(\)/);
+assert.match(checkout,/vault\.acknowledgeEvidence\(packet\.orderId,packet\.eventId,result\)/);
+for(const page of [merchant,checkout]){
+  assert.match(page,/fetch\('\/api\/vault\/evidence'/);
+  assert.ok(page.indexOf('vault.requestEvidence(')<page.indexOf("fetch('/api/vault/evidence'"),
+    'Browser must request evidence from Vault before transmitting');
+  assert.ok(page.indexOf("fetch('/api/vault/evidence'")<page.indexOf('vault.acknowledgeEvidence('),
+    'Browser must acknowledge only after server storage');
+}
 assert.doesNotMatch(checkout,/finalizePayment\(orderId, txnRef/,
   'A URL status must not directly finalize settlement');
 (async()=>{
@@ -55,6 +64,19 @@ assert.doesNotMatch(checkout,/finalizePayment\(orderId, txnRef/,
 
   v.markBackgrounded(order);
   root.location.search='?orderId='+order+'&Status=SUCCESS&txnId=123456789012&am=500.01';
+  const vaultPacket=v.requestEvidence(order);
+  assert.equal(vaultPacket.orderId,order);
+  assert.equal(vaultPacket.vaultSessionId,vault);
+  assert.equal(vaultPacket.token,token);
+  assert.equal(vaultPacket.evidence.returnParams.txnId,'123456789012');
+  assert.equal(vaultPacket.evidence.returnParams.Status,'SUCCESS');
+  assert.equal(vaultPacket.evidence.browserEvent,'RETURN_QUERY_OBSERVED');
+  assert.deepEqual(JSON.parse(JSON.stringify(v.requestEvidence(order))),
+    JSON.parse(JSON.stringify(vaultPacket)),'Repeated Vault requests yield the same event');
+  await assert.rejects(async()=>v.acknowledgeEvidence(order,'incorrect',{success:true,state:'UTR_CANDIDATE_UNVERIFIED'}),
+    /does not match/);
+  await assert.rejects(async()=>v.acknowledgeEvidence(order,vaultPacket.eventId,
+    {success:true,state:'VERIFIED',verified:true}),/acknowledgment is invalid/);
   failFirst=true;
   await assert.rejects(v.submitReturnEvidence(order),/Network temporarily down/);
   assert.equal(calls.length,1);
@@ -68,6 +90,9 @@ assert.doesNotMatch(checkout,/finalizePayment\(orderId, txnRef/,
   assert.deepEqual(calls[0],calls[1],'Network retries use frozen event ID and evidence payload');
   await v.submitReturnEvidence(order);
   assert.equal(calls.length,2,'Receipt suppresses duplicate HTTP posts');
+  assert.equal(v.requestEvidence(order),null,'Acknowledged evidence cannot be sent again');
+  assert.equal(JSON.parse(memory.get('disha82:vault-evidence:'+order)).token,undefined,
+    'Checkout token must be erased from handoff store after acknowledgment');
 
   root.location.search='';
   v.beginHandoff(order,vault,token);
@@ -77,5 +102,14 @@ assert.doesNotMatch(checkout,/finalizePayment\(orderId, txnRef/,
   assert.equal(noUtr.utrCandidate,null);
   assert.equal(noUtr.verified,false);
   assert.equal(calls.length,3);
+  // Direct browser acknowledgment path, without invoking legacy submit helper.
+  v.beginHandoff(order,vault,token);
+  v.markBackgrounded(order);
+  const browserReceived=v.requestEvidence(order);
+  const directReceipt=v.acknowledgeEvidence(order,browserReceived.eventId,
+    {success:true,state:'RETURN_OBSERVED_NO_UTR',utrCandidate:null});
+  assert.equal(directReceipt.state,'RETURN_OBSERVED_NO_UTR');
+  assert.equal(directReceipt.verified,false);
+  assert.equal(v.requestEvidence(order),null);
   console.log('VAULT_BROWSER_EVIDENCE_PASS: one-tap handoff, automatic observed return, UTR extraction, retry idempotency and no fake settlement.');
 })().catch(e=>{console.error(e);process.exitCode=1});

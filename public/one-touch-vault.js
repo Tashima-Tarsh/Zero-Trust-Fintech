@@ -126,40 +126,85 @@
     }
     return observed;
   }
-  async function submitReturnEvidence(orderId=getPendingOrderId()){
-    if(sending)return sending;
+  // The checkout browser asks the Vault for the evidence packet. The Vault
+  // returns the observations for this particular authorized handoff without
+  // sending or inventing any financial outcome itself.
+  function requestEvidence(orderId=getPendingOrderId()){
     const data=readAttempt(orderId);
-    if(!data||data.receipt||typeof document!=='undefined'&&document.visibilityState==='hidden')
-      return data?.receipt||null;
+    if(!data||data.receipt||
+       (typeof document!=='undefined'&&document.visibilityState==='hidden'))
+      return null;
     const params=returnFields();
-    if(data.hiddenAt===null&&Object.keys(params).length===0)return null;
     if(!data.evidence){
+      if(data.hiddenAt===null&&Object.keys(params).length===0)return null;
       data.evidence={
         browserEvent:Object.keys(params).length?'RETURN_QUERY_OBSERVED':'APP_RESUME',
         handoffAt:data.handoffAt,hiddenAt:data.hiddenAt,
         returnedAt:Date.now(),returnParams:params
       };
-      saveAttempt(data); // Frozen event payload for safe network retries.
+      saveAttempt(data); // Persist the same evidence for network retries.
     }
+    // Returned only to this checkout's first-party JS. Backend authenticates
+    // both the Vault authorization and the original order token before storing.
+    return {
+      orderId:data.orderId,
+      vaultSessionId:data.vaultSessionId,
+      token:data.token,
+      eventId:data.eventId,
+      evidence:JSON.parse(JSON.stringify(data.evidence))
+    };
+  }
+
+  // Browser acknowledges only after /api/vault/evidence successfully stores
+  // the packet. No local success flag can turn an observation into settlement.
+  function acknowledgeEvidence(orderId,eventId,serverReply){
+    const data=readAttempt(orderId);
+    if(!data||data.eventId!==eventId||!data.evidence)
+      throw Error('Vault evidence acknowledgment does not match this handoff.');
+    if(data.receipt)return data.receipt;
+    const safeStates=new Set([
+      'UTR_CANDIDATE_UNVERIFIED',
+      'RETURN_OBSERVED_NO_UTR',
+      'FAILURE_CLAIM_UNVERIFIED',
+      'CONFLICTING_EVIDENCE',
+      'LATE_RETURN_OBSERVATION'
+    ]);
+    if(!serverReply||serverReply.success!==true||!safeStates.has(serverReply.state))
+      throw Error('Vault evidence storage acknowledgment is invalid.');
+    data.receipt={
+      success:true,
+      state:serverReply.state,
+      utrCandidate:typeof serverReply.utrCandidate==='string'?
+        serverReply.utrCandidate:null,
+      verified:false,
+      settled:false
+    };
+    delete data.token; // Remove the order bearer token once acknowledged.
+    saveAttempt(data);
+    return data.receipt;
+  }
+
+  // Backward-compatible helper for older checkout clients. The canonical
+  // checkout pages now explicitly request -> submit -> acknowledge.
+  async function submitReturnEvidence(orderId=getPendingOrderId()){
+    if(sending)return sending;
+    const packet=requestEvidence(orderId);
+    if(!packet)return readAttempt(orderId)?.receipt||null;
     sending=(async()=>{
       const response=await fetch('/api/vault/evidence',{
         method:'POST',credentials:'same-origin',cache:'no-store',
-        headers:{'Content-Type':'application/json','X-CSRF-Token':data.token},
-        body:JSON.stringify({orderId:data.orderId,vaultSessionId:data.vaultSessionId,
-          token:data.token,eventId:data.eventId,evidence:data.evidence})
+        headers:{'Content-Type':'application/json','X-CSRF-Token':packet.token},
+        body:JSON.stringify(packet)
       });
       const result=await response.json().catch(()=>({}));
       if(!response.ok||!result.success)
         throw Error(result.error||'Vault evidence could not be delivered');
-      data.receipt={success:true,state:result.state,
-        utrCandidate:result.utrCandidate||null,verified:false,settled:false};
-      delete data.token; // Do not retain payment-link token after acknowledgment.
-      saveAttempt(data);
-      return data.receipt;
+      return acknowledgeEvidence(orderId,packet.eventId,result);
     })();
     try{return await sending}finally{sending=null}
   }
 
   root.DISHAOneTouchVault=Object.freeze({getDeviceUserId,authorize,launchUPI,
-    beginHandoff,markBackgrounded,submitReturnEvidence,getPendingOrderId});
+    beginHandoff,markBackgrounded,requestEvidence,acknowledgeEvidence,
+    submitReturnEvidence,getPendingOrderId});
 })(window);
