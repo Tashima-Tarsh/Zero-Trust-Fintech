@@ -109,7 +109,8 @@ CREATE TABLE IF NOT EXISTS sessions (
     expires_at BIGINT NOT NULL,
     qr_refresh_at BIGINT NOT NULL
 );
-CREATE UNIQUE INDEX IF NOT EXISTS idx_sessions_unique_active_amount ON sessions(vpa_address, challenge_amount) WHERE status = 'PENDING';
+-- Uniqueness is enforced by order_id, txn_ref and UTR binding, not by amount.
+-- Different customers may legitimately pay the same amount to the same VPA.
 
 -- 4. Transactions Ledger
 CREATE TABLE IF NOT EXISTS transactions (

@@ -385,14 +385,18 @@ class VPARouter {
         VALUES (?, ?, 'QUARANTINE', 'HIGH', ?, -40, ?)
       `).run(eventId, vpaId, reason, now);
     } else if (this.pgPool) {
-      this.pgPool.query(`
-        UPDATE vpa_pool
-        SET status = 'COOLDOWN',
-            health_score = 30,
-            risk_level = 'HIGH',
-            cooldown_until = $1
-        WHERE id = $2
-      `, [cooldown7Days, vpaId]);
+      return (async () => {
+        await this.pgPool.query(
+          "UPDATE vpa_pool SET status='COOLDOWN',health_score=30,risk_level='HIGH',cooldown_until=$1 WHERE id=$2",
+          [cooldown7Days,vpaId]
+        );
+        await this.pgPool.query(
+          "INSERT INTO vpa_health_events (id,vpa_id,event_type,severity,description,health_impact,created_at) " +
+          "VALUES ($1,$2,'QUARANTINE','HIGH',$3,-40,$4)",
+          [eventId,vpaId,reason,now]
+        );
+        return { success:true,vpaId,status:'COOLDOWN',cooldownUntil:cooldown7Days,reason };
+      })();
     }
 
     console.log(`🚨 [VPARouter] VPA ${vpaId} QUARANTINED for 7 days. Reason: ${reason}`);
@@ -430,6 +434,13 @@ class VPARouter {
             risk_level = 'HIGH'
         WHERE health_score < 50 AND status = 'ACTIVE'
       `).run();
+    } else if (this.pgPool) {
+      return (async () => {
+        await this.pgPool.query("UPDATE vpa_pool SET daily_tx_count=0,daily_volume=0,unique_senders_today=0 WHERE status NOT IN ('RETIRED','BANNED')");
+        await this.pgPool.query("UPDATE vpa_pool SET health_score=LEAST(100,health_score+2) WHERE status='ACTIVE' AND health_score<100");
+        await this.pgPool.query("UPDATE vpa_pool SET status='COOLDOWN',risk_level='HIGH' WHERE status='ACTIVE' AND health_score<50");
+        return { success:true,timestamp:now };
+      })();
     }
 
     return { success: true, timestamp: now };
@@ -439,11 +450,18 @@ class VPARouter {
    * Pool Analytics & Bank Diversity Metrics
    */
   getPoolAnalytics(merchantId = 'mer_default') {
-    if (this.sqliteDb) {
-      const allVpas = this.sqliteDb.prepare(`
-        SELECT * FROM vpa_pool WHERE merchant_id = ? OR merchant_id = 'mer_default'
-      `).all(merchantId);
+    if (this.pgPool && !this.sqliteDb) {
+      return this.pgPool.query("SELECT * FROM vpa_pool WHERE merchant_id=$1 OR merchant_id='mer_default'",[merchantId])
+        .then(result => this.summarizeVpaPool(result.rows));
+    }
+    if (!this.sqliteDb) {
+      return { total:0,active:0,avgHealth:100,bankDiversity:[],timeSlots:{},capacity:{} };
+    }
+    const allVpas=this.sqliteDb.prepare("SELECT * FROM vpa_pool WHERE merchant_id=? OR merchant_id='mer_default'").all(merchantId);
+    return this.summarizeVpaPool(allVpas);
+  }
 
+  summarizeVpaPool(allVpas) {
       const total = allVpas.length;
       const active = allVpas.filter(v => v.status === 'ACTIVE').length;
       const cooldown = allVpas.filter(v => v.status === 'COOLDOWN').length;
@@ -489,9 +507,6 @@ class VPARouter {
           monthlySafeVolumeCapacity: dailySafeVolumeCapacity * 30
         }
       };
-    }
-
-    return { total: 0, active: 0, avgHealth: 100, bankDiversity: [], timeSlots: {}, capacity: {} };
   }
 }
 

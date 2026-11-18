@@ -358,7 +358,8 @@ function wsRateLimit(ip) {
   }
   return true;
 }
-wss.on('connection', (ws, req) => {
+wss.on('connection', async (ws, req) => {
+  try {
   const wsIp = wsClientIp(req);
   if (!wsRateLimit(wsIp)) {
     ws.close(4429, 'Too many WebSocket connections. Slow down.');
@@ -379,7 +380,7 @@ wss.on('connection', (ws, req) => {
     ws.close(4400, 'Missing orderId parameter');
     return;
   }
-  const session = db.findSessionByOrderId(orderId);
+  const session = await db.findSessionByOrderId(orderId);
   if (!session) {
     ws.close(4404, 'Session not found for orderId');
     return;
@@ -413,6 +414,10 @@ wss.on('connection', (ws, req) => {
   ws.on('error', (err) => {
     console.error(`[WebSocket] Client error for ${orderId}:`, err.message);
   });
+  } catch (err) {
+    console.error('[WebSocket] Failed to validate session:', err.message);
+    ws.close(1011, 'Session validation unavailable');
+  }
 });
 function maskUtr(utr) {
   if (!utr || typeof utr !== 'string') return '************';
@@ -452,35 +457,37 @@ function broadcastOrderSuccess(orderId, payload) {
 // ════════════════════════════════════════════════════════════════════
 // TASK 3: SESSION TOKEN GENERATION
 // ═══════════════════════════════════════════════════════════════════
-function generateSession(baseAmount = 100, description = '', customVpa = null) {
+async function generateSession(baseAmount = 100, description = '', customVpa = null) {
   const sessionId = crypto.randomBytes(16).toString('hex');
   const now = Date.now();
   const expiresAt = now + (180 * 1000); // 3 minutes TTL
   const qrRefreshAt = now + (15 * 1000); // 15 seconds dynamic refresh
   const orderId = 'Order_' + crypto.randomBytes(5).toString('hex').toUpperCase();
   const txnRef = 'TXN_' + now + '_' + crypto.randomBytes(3).toString('hex').toUpperCase();
+  const challengeAmount = Number(baseAmount);
   // TASK 9: Select optimal VPA to prevent bans or primary VPA
   let vpaAddress = (customVpa && String(customVpa).trim()) ? String(customVpa).trim() : null;
   let merchantType = 'P2P';
   let vpaMcc = null;
 
   // Velocity control: if custom VPA is at hourly limit, reject
-  if (vpaAddress && !db.checkVpaVelocity(vpaAddress)) {
+  if (vpaAddress && !await db.checkVpaVelocity(vpaAddress)) {
     throw new Error('VPA_VELOCITY_LIMIT');
   }
 
   if (!vpaAddress) {
     let route = null;
     try {
-      route = db.selectVPARoute('mer_default', challengeAmount);
+      route = await db.selectVPARoute('mer_default', challengeAmount);
     } catch (e) {
       route = null;
     }
     const routeObj = route || {};
     // Check velocity on routed VPA; if at limit, find another active VPA under limit
-    if (routeObj.vpaAddress && !db.checkVpaVelocity(routeObj.vpaAddress)) {
-      const activeVPAs = db.getAllActiveVPAs ? db.getAllActiveVPAs() : [];
-      const underLimit = activeVPAs.find(v => db.checkVpaVelocity(v.vpa_address));
+    if (routeObj.vpaAddress && !await db.checkVpaVelocity(routeObj.vpaAddress)) {
+      const activeVPAs = db.getAllActiveVPAs ? await db.getAllActiveVPAs() : [];
+      const candidates = await Promise.all(activeVPAs.map(async v => ({...v, eligible: await db.checkVpaVelocity(v.vpa_address)})));
+      const underLimit = candidates.find(v => v.eligible);
       if (underLimit) {
         vpaAddress = underLimit.vpa_address;
         merchantType = underLimit.account_type || 'PERSONAL';
@@ -494,14 +501,13 @@ function generateSession(baseAmount = 100, description = '', customVpa = null) {
       vpaMcc = routeObj.mcc || null;
     }
   } else {
-    const mt = db.getVpaMerchantType(vpaAddress);
+    const mt = await db.getVpaMerchantType(vpaAddress);
     merchantType = mt.accountType;
     vpaMcc = mt.mcc;
   }
   // Challenge amount is the exact baseAmount — no extra paise offsets.
   // ECC vault signature + UTR-order binding is the mathematical proof;
   // amount uniqueness is enforced by UTR-order binding, not challenge_amount.
-  const challengeAmount = Number(baseAmount);
   const session = {
     sessionId,
     orderId,
@@ -519,9 +525,9 @@ function generateSession(baseAmount = 100, description = '', customVpa = null) {
     state: 'WAITING',
     utr: null
   };
-  db.saveSession(session);
+  await db.saveSession(session);
   // Velocity control: increment hourly count for the selected VPA
-  db.incrementVpaVelocity(vpaAddress);
+  await db.incrementVpaVelocity(vpaAddress);
   return session;
 }
 // ═══════════════════════════════════════════════════════════════════
@@ -582,7 +588,7 @@ app.get('/api/session/new', checkoutLimiter, async (req, res) => {
     let validatedVpa = null;
     const requestedVpa = (req.query.vpa || req.query.pa || req.query.vpaAddress || '').trim();
     if (requestedVpa) {
-      const activeVpas = (typeof db.getAllActiveVPAs === 'function' ? db.getAllActiveVPAs().map(v => v.vpa_address.toLowerCase()) : []);
+      const activeVpas = (typeof db.getAllActiveVPAs === 'function' ? (await db.getAllActiveVPAs()).map(v => v.vpa_address.toLowerCase()) : []);
       const primaryVpa = (process.env.MERCHANT_UPI_ID || MERCHANT_UPI_ID || '').toLowerCase();
       if (activeVpas.includes(requestedVpa.toLowerCase()) || requestedVpa.toLowerCase() === primaryVpa) {
         validatedVpa = requestedVpa;
@@ -594,7 +600,7 @@ app.get('/api/session/new', checkoutLimiter, async (req, res) => {
         });
       }
     }
-    const session = generateSession(baseAmount, description, validatedVpa);
+    const session = await generateSession(baseAmount, description, validatedVpa);
     const upiLink = generateUPILink(session);
     const links = appLinks(upiLink);
     // Generate base64 QR as helper, though frontend renders direct to canvas
@@ -625,8 +631,8 @@ app.get('/api/session/new', checkoutLimiter, async (req, res) => {
   }
 });
 // Fetch active session status
-app.get('/api/session/:orderId', (req, res) => {
-  const session = db.findSessionByOrderId(req.params.orderId);
+app.get('/api/session/:orderId', async (req, res) => {
+  const session = await db.findSessionByOrderId(req.params.orderId);
   if (!session) {
     return res.status(404).json({ success: false, error: 'Session not found' });
   }
@@ -639,8 +645,8 @@ app.get('/api/session/:orderId', (req, res) => {
 });
 
 // Order state polling endpoint for checkout page (mathematical time window: 15s-180s)
-app.get('/api/order-state/:orderId', (req, res) => {
-  const state = db.getOrderState(req.params.orderId);
+app.get('/api/order-state/:orderId', async (req, res) => {
+  const state = await db.getOrderState(req.params.orderId);
   if (!state) {
     return res.status(404).json({ success: false, error: 'Order not found' });
   }
@@ -743,8 +749,8 @@ app.post('/api/verify', verifyLimiter, async (req, res) => {
     // LAYER 1: SESSION CHECK
     // ─────────────────────────────────────────────────────────────
     let session = null;
-    if (detectedOrderId) session = db.findSessionByOrderId(detectedOrderId);
-    if (!session && txnRef) session = db.findSessionByTxnRef(txnRef);
+    if (detectedOrderId) session = await db.findSessionByOrderId(detectedOrderId);
+    if (!session && txnRef) session = await db.findSessionByTxnRef(txnRef);
     if (!session) {
       return res.status(400).json({
         success: false,
@@ -754,9 +760,9 @@ app.post('/api/verify', verifyLimiter, async (req, res) => {
       });
     }
 
-    const bindingResult = db.bindUtrToOrder(parsedUtr, session.orderId);
+    const bindingResult = await db.bindUtrToOrder(parsedUtr, session.orderId);
     if (bindingResult === 'BOUND_TO_OTHER_ORDER') {
-      db.updateSessionState(session.orderId, 'REJECTED');
+      await db.updateSessionState(session.orderId, 'REJECTED');
       return res.status(400).json({
         success: false,
         state: 'REJECTED',
@@ -773,7 +779,7 @@ app.post('/api/verify', verifyLimiter, async (req, res) => {
 
     // State 1: Too early (0 < t < 15s)
     if (timeElapsedMs < T_MIN_MS) {
-      db.updateSessionState(session.orderId, 'WAITING');
+      await db.updateSessionState(session.orderId, 'WAITING');
       return res.status(200).json({
         success: true,
         state: 'WAITING',
@@ -785,8 +791,8 @@ app.post('/api/verify', verifyLimiter, async (req, res) => {
 
     // State 4: Too late (t > 180s)
     if (timeElapsedMs > T_MAX_MS) {
-      db.updateSessionState(session.orderId, 'EXPIRED');
-      db.updateSessionStatus(session.orderId, 'EXPIRED');
+      await db.updateSessionState(session.orderId, 'EXPIRED');
+      await db.updateSessionStatus(session.orderId, 'EXPIRED');
       return res.status(400).json({
         success: false,
         state: 'EXPIRED',
@@ -797,7 +803,7 @@ app.post('/api/verify', verifyLimiter, async (req, res) => {
     }
 
     // State 2: Verification window (15s <= t <= 180s)
-    db.updateSessionState(session.orderId, 'VERIFY_WINDOW');
+    await db.updateSessionState(session.orderId, 'VERIFY_WINDOW');
 
     // Prepare evidence & session context for Zero-Trust scoring engine
     const sessionContext = {
@@ -815,8 +821,8 @@ app.post('/api/verify', verifyLimiter, async (req, res) => {
     const attemptsCount = (session.verificationAttempts || 0) + 1;
     session.verificationAttempts = attemptsCount;
     const hist = {
-      utrSeen: db.isUtrBlacklisted(parsedUtr),
-      imageHashSeen: req.body.imageHash ? (typeof db.isImageHashSeen === 'function' ? db.isImageHashSeen(req.body.imageHash) : false) : false,
+      utrSeen: await db.isUtrBlacklisted(parsedUtr),
+      imageHashSeen: req.body.imageHash ? (typeof db.isImageHashSeen === 'function' ? await db.isImageHashSeen(req.body.imageHash) : false) : false,
       attemptsThisSession: attemptsCount,
       priorConfirmed: 0
     };
@@ -838,7 +844,7 @@ app.post('/api/verify', verifyLimiter, async (req, res) => {
     if (trustResult.tier === 'REJECT') {
       let mappedLayer = 2;
       if (trustResult.gate === 'SESSION_EXPIRED') {
-        db.updateSessionStatus(session.orderId, 'EXPIRED');
+        await db.updateSessionStatus(session.orderId, 'EXPIRED');
         mappedLayer = 1;
       } else if (trustResult.gate === 'AMOUNT_MISMATCH') {
         mappedLayer = 2;
@@ -868,8 +874,8 @@ app.post('/api/verify', verifyLimiter, async (req, res) => {
     // ─────────────────────────────────────────────────────────────
     const orderAgeMs = now - session.createdAt;
     if (orderAgeMs > T_MAX_MS) {
-      db.updateSessionState(session.orderId, 'EXPIRED');
-      db.updateSessionStatus(session.orderId, 'EXPIRED');
+      await db.updateSessionState(session.orderId, 'EXPIRED');
+      await db.updateSessionStatus(session.orderId, 'EXPIRED');
       return res.status(400).json({
         success: false,
         state: 'EXPIRED',
@@ -932,8 +938,8 @@ app.post('/api/verify', verifyLimiter, async (req, res) => {
       });
     }
     // Update session status
-    db.updateSessionStatus(session.orderId, 'SUCCESS', parsedUtr);
-    db.updateSessionState(session.orderId, 'VERIFIED');
+    await db.updateSessionStatus(session.orderId, 'SUCCESS', parsedUtr);
+    await db.updateSessionState(session.orderId, 'VERIFIED');
     // Notify connected browser via WebSocket (TASK 11)
     const successPayload = {
       orderId: session.orderId,
@@ -995,7 +1001,7 @@ app.post('/api/verify-cfc', verifyLimiter, async (req, res) => {
         reason: 'UTR must be exactly 12 numeric digits.'
       });
     }
-    const session = db.findSessionByOrderId(orderId);
+    const session = await db.findSessionByOrderId(orderId);
     if (!session) {
       return res.status(404).json({
         success: false,
@@ -1018,7 +1024,7 @@ app.post('/api/verify-cfc', verifyLimiter, async (req, res) => {
       });
     }
     // Cancellation cooldown: reject CFC if user recently cancelled a UPI prompt
-    const cooldown = db.checkSessionCooldown(session.orderId);
+    const cooldown = await db.checkSessionCooldown(session.orderId);
     if (cooldown.inCooldown) {
       return res.status(400).json({
         success: false,
@@ -1039,8 +1045,8 @@ app.post('/api/verify-cfc', verifyLimiter, async (req, res) => {
       });
     }
     if (timeElapsedMs > T_MAX_MS) {
-      db.updateSessionStatus(session.orderId, 'EXPIRED');
-      db.updateSessionState(session.orderId, 'EXPIRED');
+      await db.updateSessionStatus(session.orderId, 'EXPIRED');
+      await db.updateSessionState(session.orderId, 'EXPIRED');
       return res.status(400).json({
         success: false,
         state: 'EXPIRED',
@@ -1048,9 +1054,9 @@ app.post('/api/verify-cfc', verifyLimiter, async (req, res) => {
         reason: 'Order timeout (>3 minutes). Please create a new order.'
       });
     }
-    const bindingResult = db.bindUtrToOrder(cleanUtr, session.orderId);
+    const bindingResult = await db.bindUtrToOrder(cleanUtr, session.orderId);
     if (bindingResult === 'BOUND_TO_OTHER_ORDER') {
-      db.updateSessionState(session.orderId, 'REJECTED');
+      await db.updateSessionState(session.orderId, 'REJECTED');
       return res.status(400).json({
         success: false,
         state: 'REJECTED',
@@ -1065,7 +1071,7 @@ app.post('/api/verify-cfc', verifyLimiter, async (req, res) => {
         reason: 'Could not bind UTR to order. Please try again.'
       });
     }
-    db.updateSessionState(session.orderId, 'VERIFY_WINDOW');
+    await db.updateSessionState(session.orderId, 'VERIFY_WINDOW');
     const { txId, verification } = await db.atomicSettle(
       session.orderId,
       cleanUtr,
@@ -1073,8 +1079,8 @@ app.post('/api/verify-cfc', verifyLimiter, async (req, res) => {
       session.vpaAddress,
       null
     );
-    db.updateSessionStatus(session.orderId, 'SUCCESS', cleanUtr);
-    db.updateSessionState(session.orderId, 'VERIFIED');
+    await db.updateSessionStatus(session.orderId, 'SUCCESS', cleanUtr);
+    await db.updateSessionState(session.orderId, 'VERIFIED');
     const successPayload = {
       orderId: session.orderId,
       utr: cleanUtr,
@@ -1118,8 +1124,8 @@ app.post('/api/cfc/cancel', verifyLimiter, async (req, res) => {
     if (!orderId) {
       return res.status(400).json({ success: false, error: 'orderId required' });
     }
-    db.setSessionCooldown(orderId, 120 * 1000); // 2-minute cooldown
-    db.updateSessionState(orderId, 'CANCELLED');
+    await db.setSessionCooldown(orderId, 120 * 1000); // 2-minute cooldown
+    await db.updateSessionState(orderId, 'CANCELLED');
     return res.json({
       success: true,
       cooldownSeconds: 120,
@@ -1157,10 +1163,10 @@ app.post('/api/webauthn/register/start', async (req, res) => {
     if (!userId || !userName || !orderId) {
       return res.status(400).json({ success: false, error: 'userId, userName and orderId required' });
     }
-    if (!db.findSessionByOrderId(orderId)) {
+    if (!await db.findSessionByOrderId(orderId)) {
       return res.status(404).json({ success: false, error: 'SESSION_NOT_FOUND' });
     }
-    const existingKeys = db.findPasskeysByUserId(userId);
+    const existingKeys = await db.findPasskeysByUserId(userId);
     const options = await generateRegistrationOptions({
       rpName: RP_NAME,
       rpID: RP_ID,
@@ -1216,7 +1222,7 @@ app.post('/api/webauthn/register/finish', async (req, res) => {
     }
     const info = verification.registrationInfo;
     const verifiedCredential = info.credential;
-    const saved = db.savePasskey(
+    const saved = await db.savePasskey(
       stored.userId,
       verifiedCredential.id,
       Buffer.from(verifiedCredential.publicKey).toString('base64url'),
@@ -1246,11 +1252,11 @@ app.post('/api/webauthn/authenticate/start', async (req, res) => {
     if (!userId || !orderId) {
       return res.status(400).json({ success: false, error: 'userId and orderId required' });
     }
-    const checkoutSession = db.findSessionByOrderId(orderId);
+    const checkoutSession = await db.findSessionByOrderId(orderId);
     if (!checkoutSession) {
       return res.status(404).json({ success: false, error: 'SESSION_NOT_FOUND' });
     }
-    const existingKeys = db.findPasskeysByUserId(userId);
+    const existingKeys = await db.findPasskeysByUserId(userId);
     if (!existingKeys.length) {
       return res.status(400).json({
         success: false,
@@ -1292,7 +1298,7 @@ app.post('/api/webauthn/authenticate/finish', async (req, res) => {
       authChallenges.delete(sessionId);
       return res.status(400).json({ success: false, error: 'Invalid or expired session' });
     }
-    const existingKey = db.findPasskeyByCredentialId(credential.id);
+    const existingKey = await db.findPasskeyByCredentialId(credential.id);
     if (!existingKey || existingKey.user_id !== stored.userId) {
       return res.status(401).json({ success: false, error: 'Unknown credential' });
     }
@@ -1312,7 +1318,7 @@ app.post('/api/webauthn/authenticate/finish', async (req, res) => {
     if (!verification.verified) {
       return res.status(401).json({ success: false, error: 'Vault signature rejected' });
     }
-    db.updatePasskeyCounter(existingKey.credential_id, verification.authenticationInfo.newCounter);
+    await db.updatePasskeyCounter(existingKey.credential_id, verification.authenticationInfo.newCounter);
     authChallenges.set(sessionId, {
       ...stored,
       status: 'VAULT_VERIFIED_AWAITING_UPI',
@@ -1354,15 +1360,15 @@ app.post('/api/checkout/finalize-upi', verifyLimiter, async (req, res) => {
     }
 
     // Find the checkout session
-    const session = db.findSessionByOrderId(orderId);
+    const session = await db.findSessionByOrderId(orderId);
     if (!session) {
       return res.status(404).json({ success: false, error: 'SESSION_NOT_FOUND' });
     }
 
     // Anti-reuse: bind UTR to this order
-    const bindingResult = db.bindUtrToOrder(txnRef, orderId);
+    const bindingResult = await db.bindUtrToOrder(txnRef, orderId);
     if (bindingResult === 'BOUND_TO_OTHER_ORDER') {
-      db.updateSessionState(orderId, 'REJECTED');
+      await db.updateSessionState(orderId, 'REJECTED');
       return res.status(400).json({
         success: false,
         error: 'UTR_BOUND_TO_OTHER_ORDER',
@@ -1371,7 +1377,7 @@ app.post('/api/checkout/finalize-upi', verifyLimiter, async (req, res) => {
     }
 
     // Settle via atomic ledger
-    db.updateSessionState(orderId, 'VERIFY_WINDOW');
+    await db.updateSessionState(orderId, 'VERIFY_WINDOW');
     const { txId, verification } = await db.atomicSettle(
       orderId,
       txnRef,
@@ -1379,8 +1385,8 @@ app.post('/api/checkout/finalize-upi', verifyLimiter, async (req, res) => {
       session.vpaAddress,
       null
     );
-    db.updateSessionStatus(orderId, 'SUCCESS', txnRef);
-    db.updateSessionState(orderId, 'VERIFIED');
+    await db.updateSessionStatus(orderId, 'SUCCESS', txnRef);
+    await db.updateSessionState(orderId, 'VERIFIED');
 
     const successPayload = {
       orderId,
@@ -1424,7 +1430,7 @@ app.post('/api/checkout/finalize-upi', verifyLimiter, async (req, res) => {
 app.get('/api/debug/flow/:orderId', async (req, res) => {
   try {
     const { orderId } = req.params;
-    const session = db.findSessionByOrderId(orderId);
+    const session = await db.findSessionByOrderId(orderId);
     if (!session) {
       return res.status(404).json({
         success: false,
@@ -1434,9 +1440,9 @@ app.get('/api/debug/flow/:orderId', async (req, res) => {
     }
 
     const stored = authChallenges.get(session.sessionId);
-    const cooldown = db.checkSessionCooldown(orderId);
-    const velocity = db.checkVpaVelocity(session.vpaAddress);
-    const boundOrder = db.getUtrBoundOrder(session.utr || '');
+    const cooldown = await db.checkSessionCooldown(orderId);
+    const velocity = await db.checkVpaVelocity(session.vpaAddress);
+    const boundOrder = await db.getUtrBoundOrder(session.utr || '');
 
     const steps = [
       { step: 1, name: 'Session Created', status: session.status, detail: `orderId=${session.orderId}, vpa=${session.vpaAddress}, amount=₹${session.challengeAmount}, createdAt=${new Date(session.createdAt).toISOString()}` },
@@ -1468,7 +1474,7 @@ app.get('/api/debug/flow/:orderId', async (req, res) => {
 app.get('/api/debug/session/:orderId', async (req, res) => {
   try {
     const { orderId } = req.params;
-    const session = db.findSessionByOrderId(orderId);
+    const session = await db.findSessionByOrderId(orderId);
     if (!session) {
       return res.status(404).json({ success: false, error: 'SESSION_NOT_FOUND' });
     }
@@ -1485,14 +1491,15 @@ app.get('/api/debug/session/:orderId', async (req, res) => {
 // List all VPAs with velocity status
 app.get('/api/debug/vpas', async (req, res) => {
   try {
-    const vpas = db.getAllActiveVPAs ? db.getAllActiveVPAs() : [];
+    const vpas = db.getAllActiveVPAs ? await db.getAllActiveVPAs() : [];
     const now = Date.now();
     const hourBucket = Math.floor(now / (60 * 60 * 1000));
-    const vpaStatus = vpas.map(v => {
-      const countRow = db.sqliteDb.prepare(
-        `SELECT count FROM vpa_hourly_txns WHERE vpa_address = ? AND hour_bucket = ?`
-      ).get(v.vpa_address, hourBucket);
-      const currentCount = countRow ? countRow.count : 0;
+    const vpaStatus = await Promise.all(vpas.map(async v => {
+      const currentCount = db.isPostgres && process.env.DB_BACKEND === 'postgres'
+        ? await db.getVpaHourlyCount(v.vpa_address)
+        : (db.sqliteDb.prepare(
+          `SELECT count FROM vpa_hourly_txns WHERE vpa_address = ? AND hour_bucket = ?`
+        ).get(v.vpa_address, hourBucket)?.count || 0);
       return {
         vpa: v.vpa_address,
         holder: v.holder_name,
@@ -1504,7 +1511,7 @@ app.get('/api/debug/vpas', async (req, res) => {
         underLimit: currentCount < 15,
         status: v.status
       };
-    });
+    }));
     return res.json({ success: true, vpaz: vpaStatus, timestamp: now });
   } catch (err) {
     res.status(500).json({ success: false, error: 'INTERNAL_SERVER_ERROR', message: err.message });
@@ -1541,7 +1548,7 @@ app.post('/handle-share', shareLimiter, async (req, res) => {
     let session = null;
     const clientIp = req.ip || (req.socket && req.socket.remoteAddress) || '127.0.0.1';
     if (detectedOrderId) {
-      session = db.findSessionByOrderId(detectedOrderId);
+      session = await db.findSessionByOrderId(detectedOrderId);
     }
     if (!session) {
       if (req.accepts('json') && !req.accepts('html')) {
@@ -1565,7 +1572,7 @@ app.post('/handle-share', shareLimiter, async (req, res) => {
     // Time window check for share flow
     const shareTimeElapsedMs = now - session.createdAt;
     if (shareTimeElapsedMs < T_MIN_MS) {
-      db.updateSessionState(session.orderId, 'WAITING');
+      await db.updateSessionState(session.orderId, 'WAITING');
       if (req.accepts('json') && !req.accepts('html')) {
         return res.status(200).json({
           success: true,
@@ -1578,8 +1585,8 @@ app.post('/handle-share', shareLimiter, async (req, res) => {
       return res.redirect(`/failed.html?reason=${encodeURIComponent('Please wait before verifying payment')}`);
     }
     if (shareTimeElapsedMs > T_MAX_MS) {
-      db.updateSessionState(session.orderId, 'EXPIRED');
-      db.updateSessionStatus(session.orderId, 'EXPIRED');
+      await db.updateSessionState(session.orderId, 'EXPIRED');
+      await db.updateSessionStatus(session.orderId, 'EXPIRED');
       if (req.accepts('json') && !req.accepts('html')) {
         return res.status(400).json({
           success: false,
@@ -1591,7 +1598,7 @@ app.post('/handle-share', shareLimiter, async (req, res) => {
       }
       return res.redirect(`/failed.html?reason=${encodeURIComponent('Order timeout (>3 minutes)')}`);
     }
-    db.updateSessionState(session.orderId, 'VERIFY_WINDOW');
+    await db.updateSessionState(session.orderId, 'VERIFY_WINDOW');
     // Extract server-side verified evidence (NO lenient client defaults)
     const ev = extractReceiptEvidence(rawReceipt, sessionContext);
     ev.amount = parsedAmount;
@@ -1599,7 +1606,7 @@ app.post('/handle-share', shareLimiter, async (req, res) => {
     const attemptsCount = (session.verificationAttempts || 0) + 1;
     session.verificationAttempts = attemptsCount;
     const hist = {
-      utrSeen: db.isUtrBlacklisted(parsedUtr),
+      utrSeen: await db.isUtrBlacklisted(parsedUtr),
       imageHashSeen: false,
       attemptsThisSession: attemptsCount,
       priorConfirmed: 0
@@ -1607,9 +1614,9 @@ app.post('/handle-share', shareLimiter, async (req, res) => {
     // ────────────────────────────────────────────────────────────
     // LAYER 4: CUSTOMER / ORDER IDENTITY BINDING (Cross-Order UTR Reuse Prevention)
     // ───────────────────────────────────────────────────────────
-    const bindingResult = db.bindUtrToOrder(parsedUtr, session.orderId);
+    const bindingResult = await db.bindUtrToOrder(parsedUtr, session.orderId);
     if (bindingResult === 'BOUND_TO_OTHER_ORDER') {
-      db.updateSessionState(session.orderId, 'REJECTED');
+      await db.updateSessionState(session.orderId, 'REJECTED');
       if (req.accepts('json') && !req.accepts('html')) {
         return res.status(400).json({
           success: false,
@@ -1666,8 +1673,8 @@ app.post('/handle-share', shareLimiter, async (req, res) => {
       req.body.imageHash || null
     );
     // Update session status in DB
-    db.updateSessionStatus(session.orderId, 'SUCCESS', parsedUtr);
-    db.updateSessionState(session.orderId, 'VERIFIED');
+    await db.updateSessionStatus(session.orderId, 'SUCCESS', parsedUtr);
+    await db.updateSessionState(session.orderId, 'VERIFIED');
     // ⚡ CRITICAL: INSTANT WEBSOCKET DISPATCH TO WAITING CHECKOUT (LAPTOP/DESKTOP/MOBILE)
     const successPayload = {
       orderId: session.orderId,
@@ -1773,7 +1780,7 @@ app.post('/api/simulate-payment', async (req, res) => {
     });
   }
   const { orderId } = req.body;
-  const session = db.findSessionByOrderId(orderId);
+  const session = await db.findSessionByOrderId(orderId);
   if (!session) {
     return res.status(404).json({ success: false, error: 'Order not found' });
   }
@@ -1787,8 +1794,8 @@ app.post('/api/simulate-payment', async (req, res) => {
     session.challengeAmount,
     session.vpaAddress
   );
-  db.blacklistUtr(mockUtr, session.orderId, session.challengeAmount, 'Simulated payment');
-  db.updateSessionStatus(session.orderId, 'SUCCESS', mockUtr);
+  await db.blacklistUtr(mockUtr, session.orderId, session.challengeAmount, 'Simulated payment');
+  await db.updateSessionStatus(session.orderId, 'SUCCESS', mockUtr);
   const payload = {
     orderId: session.orderId,
     utr: mockUtr,
@@ -1802,8 +1809,8 @@ app.post('/api/simulate-payment', async (req, res) => {
   res.json({ success: true, ...payload, ledgerVerification: verification });
 });
 // Ledger receipts API
-app.get('/api/ledger/:orderId', (req, res) => {
-  const session = db.findSessionByOrderId(req.params.orderId);
+app.get('/api/ledger/:orderId', async (req, res) => {
+  const session = await db.findSessionByOrderId(req.params.orderId);
   if (!session) {
     return res.status(404).json({ success: false, error: 'Order not found' });
   }
@@ -1855,32 +1862,32 @@ app.post('/api/vpa/upload', requireAdminAuth, async (req, res) => {
   }
 });
 // 3. Emergency quarantine (7-day cooldown + health reduction)
-app.post('/api/vpa/quarantine', requireAdminAuth, (req, res) => {
+app.post('/api/vpa/quarantine', requireAdminAuth, async (req, res) => {
   try {
     const { vpaId, reason } = req.body;
     if (!vpaId) {
       return res.status(400).json({ success: false, error: 'vpaId is required' });
     }
-    const result = db.vpaRouter.quarantineVPA(vpaId, reason || 'Bank warning / emergency freeze');
+    const result = await db.vpaRouter.quarantineVPA(vpaId, reason || 'Bank warning / emergency freeze');
     res.json({ success: true, ...result });
   } catch (err) {
     res.status(500).json({ success: false, error: 'INTERNAL_SERVER_ERROR' });
   }
 });
 // 4. Pool analytics & bank diversity breakdown
-app.get('/api/vpa/analytics', requireAdminAuth, (req, res) => {
+app.get('/api/vpa/analytics', requireAdminAuth, async (req, res) => {
   try {
     const merchantId = req.query.merchantId || 'mer_default';
-    const analytics = db.vpaRouter.getPoolAnalytics(merchantId);
+    const analytics = await db.vpaRouter.getPoolAnalytics(merchantId);
     res.json({ success: true, analytics });
   } catch (err) {
     res.status(500).json({ success: false, error: 'INTERNAL_SERVER_ERROR' });
   }
 });
 // 5. Daily health reset & rebalance (6 AM Cron trigger)
-app.post('/api/vpa/health-check', requireAdminAuth, (req, res) => {
+app.post('/api/vpa/health-check', requireAdminAuth, async (req, res) => {
   try {
-    const result = db.vpaRouter.dailyHealthResetAndRebalance();
+    const result = await db.vpaRouter.dailyHealthResetAndRebalance();
     res.json({
       success: true,
       message: 'Daily VPA health recalibration and rebalance complete',
@@ -1907,8 +1914,8 @@ app.post('/api/gaming/verify-payment', async (req, res) => {
     }
     // Look up session
     let session = null;
-    if (sessionId) session = db.findSessionByTxnRef(sessionId);
-    if (!session && orderId) session = db.findSessionByOrderId(orderId);
+    if (sessionId) session = await db.findSessionByTxnRef(sessionId);
+    if (!session && orderId) session = await db.findSessionByOrderId(orderId);
     if (session) {
       const amt = Number(amount || session.challengeAmount);
       if (Math.abs(amt - session.challengeAmount) > 0.001) {
@@ -1919,7 +1926,7 @@ app.post('/api/gaming/verify-payment', async (req, res) => {
           receivedAmount: amt
         });
       }
-      if (db.isUtrBlacklisted(utr)) {
+      if (await db.isUtrBlacklisted(utr)) {
         return res.status(400).json({
           success: false,
           error: 'UTR_ALREADY_USED',
@@ -1932,8 +1939,8 @@ app.post('/api/gaming/verify-payment', async (req, res) => {
         session.challengeAmount,
         session.vpaAddress
       );
-      db.blacklistUtr(utr, session.orderId, session.challengeAmount, `Gaming verification: ${company.company_name}`);
-      db.updateSessionStatus(session.orderId, 'SUCCESS', utr);
+      await db.blacklistUtr(utr, session.orderId, session.challengeAmount, `Gaming verification: ${company.company_name}`);
+      await db.updateSessionStatus(session.orderId, 'SUCCESS', utr);
       return res.json({
         success: true,
         status: 'VERIFIED',
@@ -1956,7 +1963,7 @@ app.post('/api/gaming/verify-payment', async (req, res) => {
       });
     }
     // Direct enterprise settlement for authorized IP-whitelisted gaming partners
-    if (db.isUtrBlacklisted(utr)) {
+    if (await db.isUtrBlacklisted(utr)) {
       return res.status(400).json({
         success: false,
         error: 'UTR_ALREADY_USED',
@@ -1979,7 +1986,7 @@ app.post('/api/gaming/verify-payment', async (req, res) => {
       numAmount,
       assignedVpa
     );
-    db.blacklistUtr(utr, generatedOrderId, numAmount, `Gaming direct settlement: ${company.company_name}`);
+    await db.blacklistUtr(utr, generatedOrderId, numAmount, `Gaming direct settlement: ${company.company_name}`);
     return res.json({
       success: true,
       status: 'VERIFIED',
@@ -2004,10 +2011,10 @@ app.get('/failed', (req, res) => res.sendFile(path.join(__dirname, 'public', 'fa
 (async () => {
   await db.initDb();
   // Daily cron at 00:05 to reset daily VPA limits
-  setInterval(() => {
+  setInterval(async () => {
     const d = new Date();
     if (d.getHours() === 0 && d.getMinutes() === 5) {
-      db.resetDailyVPAs();
+      await db.resetDailyVPAs();
     }
   }, 60000);
   server.listen(PORT, '0.0.0.0', () => {

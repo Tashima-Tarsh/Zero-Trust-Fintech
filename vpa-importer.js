@@ -126,6 +126,21 @@ class VPAImporter {
           } else {
             results.skipped++;
           }
+        } else if (this.pgPool) {
+          const info = await this.pgPool.query(
+            'INSERT INTO vpa_pool (id,vpa_address,holder_name,bank_name,account_type,status,' +
+            'health_score,risk_level,preferred_time_slot,active_hours_start,active_hours_end,' +
+            'daily_tx_limit,daily_volume_limit,per_tx_limit,unique_senders_daily_limit,daily_tx_count,' +
+            'daily_volume,unique_senders_today,min_gap_minutes,cooldown_until,merchant_id,mcc,notes,excel_row_id,created_at) ' +
+            "VALUES ($1,$2,$3,$4,$5,'ACTIVE',100,'LOW',$6,$7,$8,$9,$10,$11,12,0,0,0,$12,0,$13,$14,$15,$16,$17) " +
+            'ON CONFLICT (vpa_address) DO NOTHING',
+            [vpaId,vpaAddress,holderName,bankName,accountType,timeSlot,startHour,endHour,
+              dailyTxLimit,dailyVolLimit,perTxLimit,minGap,merchantId,mcc,notes,'row_'+(i+1),now]
+          );
+          if (info.rowCount > 0) results.added++;
+          else results.skipped++;
+        } else {
+          throw new Error('NO_DATABASE_BACKEND');
         }
       } catch (err) {
         results.errors.push({ row: i + 1, vpa: vpaAddress, error: err.message });

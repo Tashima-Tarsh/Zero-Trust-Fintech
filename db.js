@@ -15,6 +15,8 @@ let sqliteDb = null;
 let isPostgres = false;
 let vpaRouter = null;
 let vpaImporter = null;
+let pgStore = null;
+const usePostgresAuthority = process.env.DB_BACKEND === 'postgres';
 
 // Proxy object for router and importer
 const dbAccessor = {
@@ -31,8 +33,9 @@ vpaImporter = new VPAImporter(dbAccessor);
 async function initDb() {
   let sqliteOk = false;
 
-  // 1. Native SQLite session store — always required.
-  try {
+  // Retain the existing SQLite store unless the explicit PostgreSQL cutover
+  // has been configured after a verified backup and data import.
+  if (!usePostgresAuthority) try {
     const { DatabaseSync } = require('node:sqlite');
     const dbPath = prepareSqliteDatabasePath();
     sqliteDb = new DatabaseSync(dbPath);
@@ -49,7 +52,8 @@ async function initDb() {
 
   // 2. PostgreSQL (ledger / VPA analytics) — additive, never replaces SQLite.
   const dbUrl = process.env.DATABASE_URL;
-  if (dbUrl && !dbUrl.includes('localhost:5432/disha82') && sqliteOk) {
+  if (usePostgresAuthority && !dbUrl) throw new Error('DB_BACKEND=postgres requires DATABASE_URL');
+  if (dbUrl && !dbUrl.includes('localhost:5432/disha82') && (sqliteOk || usePostgresAuthority)) {
     try {
       const { Pool } = require('pg');
       const testPool = new Pool({ connectionString: dbUrl, connectionTimeoutMillis: 2000 });
@@ -63,6 +67,16 @@ async function initDb() {
         dbUrl.split('@')[1] || 'remote host'
       );
       await setupPostgresTables();
+      if (usePostgresAuthority) {
+        // DO NOT automatically run data migrations on production startup.
+        // The migration scripts are run and verified separately before cutover.
+        const verified = await pgPool.query("SELECT payload FROM disha_migration_control WHERE name='sqlite_to_postgres_verified'");
+        if (verified.rowCount !== 1 || verified.rows[0]?.payload?.sourceIntegrity !== 'ok') {
+          throw new Error('PostgreSQL migration verification marker missing: refusing cutover');
+        }
+        const { buildStore } = require('./financial/postgres-store');
+        pgStore = buildStore(pgPool, vpaRouter);
+      }
     } catch (err) {
       console.log(
         'ℹ️ [Database] PostgreSQL unavailable (' + err.message + '). Continuing SQLite-only.'
@@ -70,10 +84,13 @@ async function initDb() {
     }
   }
 
+  if (usePostgresAuthority) {
+    if (!pgStore) throw new Error('PostgreSQL authority unavailable: refusing SQLite fallback');
+    console.log('✅ [Database] PostgreSQL is the sole checkout authority (DB_BACKEND=postgres)');
+    return;
+  }
   if (!sqliteOk) {
-    throw new Error(
-      'Database initialization failed: SQLite session store could not be created'
-    );
+    throw new Error('Database initialization failed: SQLite session store could not be created');
   }
 }
 
@@ -1096,3 +1113,25 @@ module.exports = {
   checkSessionCooldown,
   setSessionCooldown
 };
+
+// PG authority adapters are async. Leave SQLite method bodies unchanged for
+// existing deployments; callers await both sync and async implementations.
+if (usePostgresAuthority) {
+  const methods = [
+    'selectVPA','selectVPARoute','saveSession','findSessionByOrderId',
+    'findSessionByTxnRef','findSessionByAmount','updateSessionStatus',
+    'isUtrBlacklisted','blacklistUtr','isImageHashSeen','blacklistImageHash',
+    'recordTransactionAndLedger','getLedgerVerification','atomicSettle',
+    'resetDailyVPAs','getVpaMerchantType','updateSessionState','getOrderState',
+    'getUtrBoundOrder','bindUtrToOrder','getAllActiveVPAs','savePasskey',
+    'findPasskeyByCredentialId','findPasskeysByUserId','updatePasskeyCounter',
+    'checkVpaVelocity','incrementVpaVelocity','checkSessionCooldown','setSessionCooldown',
+    'getVpaHourlyCount'
+  ];
+  for (const method of methods) {
+    module.exports[method] = (...args) => {
+      if (!pgStore) throw new Error('PostgreSQL state store is not initialized');
+      return pgStore[method](...args);
+    };
+  }
+}
