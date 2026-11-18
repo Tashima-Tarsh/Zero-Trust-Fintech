@@ -13,7 +13,7 @@ const QRCode = require('qrcode');
 const { clerkMiddleware, getAuth } = require('@clerk/express');
 const db = require('./db');
 const { createMerchantApi } = require('./merchant-api');
-const {createReconciliationRouter,initializeReconciliationSchema} = require('./financial/reconciliation-webhook');
+const {createReconciliationRouter,initializeReconciliationSchema,reconcileCredit} = require('./financial/reconciliation-webhook');
 const {createVaultEvidenceRouter,initializeVaultEvidenceSchema,rememberVaultAuthorization} = require('./financial/vault-evidence');
 const {initializeClaimObserver,observeClaim} = require('./financial/untrusted-utr-claims');
 const {

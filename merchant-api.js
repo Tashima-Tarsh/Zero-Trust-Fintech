@@ -138,7 +138,7 @@ function createMerchantApi({db,getAuth,buildUpiUri}) {
       "vpa_address TEXT NOT NULL UNIQUE,bank_name TEXT NOT NULL DEFAULT '',"+
       "status TEXT NOT NULL DEFAULT 'ACTIVE' CHECK(status IN ('ACTIVE','PAUSED')),"+
       "is_default BOOLEAN NOT NULL DEFAULT FALSE,account_type TEXT NOT NULL DEFAULT 'PERSONAL',mcc TEXT,"+
-      "health_score INTEGER NOT NULL DEFAULT 98,daily_tx_count INTEGER NOT NULL DEFAULT 0,"+
+      "health_score INTEGER NOT NULL DEFAULT 98,daily_tx_count INTEGER NOT NULL DEFAULT 0,daily_volume REAL NOT NULL DEFAULT 0.0,"+
       "daily_tx_limit INTEGER NOT NULL DEFAULT 15,daily_volume_limit REAL NOT NULL DEFAULT 25000.0,"+
       "cooldown_until INTEGER NOT NULL DEFAULT 0,active_hours_start INTEGER NOT NULL DEFAULT 8,"+
       "active_hours_end INTEGER NOT NULL DEFAULT 22,preferred_time_slot TEXT NOT NULL DEFAULT 'ANY',"+
@@ -147,6 +147,7 @@ function createMerchantApi({db,getAuth,buildUpiUri}) {
       "ALTER TABLE saas_merchant_vpas ADD COLUMN IF NOT EXISTS mcc TEXT;"+
       "ALTER TABLE saas_merchant_vpas ADD COLUMN IF NOT EXISTS health_score INTEGER NOT NULL DEFAULT 98;"+
       "ALTER TABLE saas_merchant_vpas ADD COLUMN IF NOT EXISTS daily_tx_count INTEGER NOT NULL DEFAULT 0;"+
+      "ALTER TABLE saas_merchant_vpas ADD COLUMN IF NOT EXISTS daily_volume REAL NOT NULL DEFAULT 0.0;"+
       "ALTER TABLE saas_merchant_vpas ADD COLUMN IF NOT EXISTS daily_tx_limit INTEGER NOT NULL DEFAULT 15;"+
       "ALTER TABLE saas_merchant_vpas ADD COLUMN IF NOT EXISTS daily_volume_limit REAL NOT NULL DEFAULT 25000.0;"+
       "ALTER TABLE saas_merchant_vpas ADD COLUMN IF NOT EXISTS cooldown_until INTEGER NOT NULL DEFAULT 0;"+
