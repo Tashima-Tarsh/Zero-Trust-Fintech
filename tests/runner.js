@@ -27,6 +27,7 @@ const UNIT_TESTS = [
   'test-one-touch-vault.js', // one biometric to vault register/authenticate, then UPI intent
   'test-vault-browser-evidence.js', // automatic post-UPI browser evidence packet and idempotent retries
   'test-utr-hypothesis.js', // UTR anti-fraud and no-false-credit regression
+  'test-pony-tail-window.js', // Pony-tail 15s/180s temporal invariants and no UTR poisoning
   'test-android-fixture.js', // no-money P2P URL and UTR intent fixture
   'test-saas-white-production.js', // no demo data; 12 live merchant routes and white layout
   'test-sqlite-storage.js', // fail-closed Railway SQLite path and storage guard
