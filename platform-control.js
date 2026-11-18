@@ -13,7 +13,7 @@ const EMAIL=/^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const safeName=s=>val(s,160).replace(/[\u0000-\u001f]/g,'');
 function createPlatformControl({db,getAuth,clerkEmailResolver=getClerkVerifiedEmail}){
  const router=express.Router();
- const pool=db.pgPool;
+ let pool=db.pgPool;
  const active=()=>process.env.DISHA_INVITE_ONLY_ENABLED==='true';
  const ownerId=()=>process.env.DISHA_OWNER_CLERK_USER_ID||'';
  const limiter=new Map();
@@ -22,6 +22,9 @@ function createPlatformControl({db,getAuth,clerkEmailResolver=getClerkVerifiedEm
    'INSERT INTO disha_platform_audit(id,actor_id,action,target_id,details,created_at) VALUES($1,$2,$3,$4,$5,$6)',
    [id('aud_'),actor,action,target,JSON.stringify(details),Date.now()]);
  async function init(){
+   // db.initDb() assigns the PostgreSQL pool asynchronously after this router is constructed.
+   // Resolve it at startup; all handlers reference this same refreshed closure variable.
+   pool=db.pgPool||pool;
    if(!pool)throw Error('Platform control requires PostgreSQL');
    // Do not break public checkout startup for missing owner bootstrap configuration.\n   // Invite-only remains enabled: no user may access or auto-provision a merchant.\n   if(active()&&!ownerId())console.error('[Platform Control] OWNER CLERK USER ID MISSING — merchant access denied until configured');
    await pool.query(
