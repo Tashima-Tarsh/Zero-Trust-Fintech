@@ -7,7 +7,6 @@ Android 15/17 headless UIAutomator dumps are unreliable on GitHub runners.
 """
 import json
 import re
-import shlex
 import subprocess
 import time
 import urllib.parse
@@ -21,7 +20,10 @@ CHECKOUT=("http://10.0.2.2:8765/merchant-checkout.html?"
           "orderId=ORD_ANDROID_CI_1001&token="+("b"*48))
 
 def run(args,timeout=35):
-    proc=subprocess.run(args,capture_output=True,text=True,timeout=timeout)
+    try:
+        proc=subprocess.run(args,capture_output=True,text=True,timeout=timeout)
+    except subprocess.TimeoutExpired as exc:
+        raise RuntimeError("ANDROID_ADB_TIMEOUT after "+str(timeout)+"s: "+repr(args)) from exc
     if proc.returncode:
         raise RuntimeError("Command failed "+repr(args)+"\n"+proc.stdout+"\n"+proc.stderr)
     return proc.stdout
@@ -33,9 +35,11 @@ def log():
     return adb("logcat","-d","-s","DISHA_UPI_TEST:I","*:S")
 
 def command(name):
-    return adb("shell","am","start","-W","-n",
+    # Command-only transitions (e.g. refresh) never wait for launch completion.
+    # DOM state is collected inside the existing WebView Activity instead.
+    return adb("shell","am","start","-n",
         "ai.disha.testupi/.TestBrowserActivity","--activity-single-top",
-        "--es","command",name)
+        "--es","command",name,timeout=15)
 
 def states():
     items=[]
@@ -53,15 +57,17 @@ def states():
 def wait_state(condition,label,timeout=50):
     until=time.monotonic()+timeout
     last=None
+    # Only accept snapshots emitted after this wait starts. Do not relaunch
+    # TestBrowserActivity just to check a value: -W can hang on headless CI.
+    baseline=len(states())
     while time.monotonic()<until:
-        command("snapshot")
         data=states()
-        if data:
+        if len(data)>baseline:
             last=data[-1]
             if condition(last):
                 print("CHECKOUT_DOM_OK "+label+" "+json.dumps(last),flush=True)
                 return last
-        time.sleep(1.5)
+        time.sleep(1.2)
     (OUT/"last-state.json").write_text(json.dumps(last,indent=2),encoding="utf-8")
     raise AssertionError("Missing checkout DOM: "+label+"; last="+repr(last)+"\n"+log()[-2500:])
 
@@ -100,7 +106,8 @@ def tap_native(target):
 
 def test():
     print("A01: DISHA payment opens with only amount and Touch to Pay",flush=True)
-    adb("shell","am start -W -n ai.disha.testupi/.TestBrowserActivity --es url "+shlex.quote(CHECKOUT))
+    adb("shell","am","start","-n","ai.disha.testupi/.TestBrowserActivity",
+        "--es","url",CHECKOUT,timeout=15)
     page=wait_state(lambda s:s["stage"]=="initial" and "499.01" in s["amount"]
         and not s["disabled"] and not s["qr"],
         "Touch-first stage shows server amount, without premature QR")
