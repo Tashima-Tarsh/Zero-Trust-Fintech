@@ -90,7 +90,7 @@ function view(name,replaceHistory=false){
  if(typeof window.scrollTo==='function')window.scrollTo(0,0);
  const actions={overview:loadOverview,payments:loadPayments,create:loadVpas,vpas:loadVpas,
  routing:loadVpas,risk:loadRisk,access:loadAccess,reports:loadReports,
- notifications:loadNotifications,api:showApiStatus,intelligence:loadIntelligence,vault:loadVault};
+ notifications:loadNotifications,api:showApiStatus,intelligence:loadIntelligence,vault:loadVault,ledger:loadLedger};
  if(actions[name]) {
   const work=actions[name]();
   if(work&&typeof work.catch==='function')work.catch(error=>toast(error.message));
@@ -283,6 +283,19 @@ async function loadIntelligence(){
   $('#intelligence-exceptions').innerHTML=questionable.length?evidenceTable(questionable,'intelligence'):'<div class="empty">No recorded exceptions in the loaded order register. This is not a platform-wide fraud guarantee.</div>';
  }catch(e){$('#intelligence-table').textContent='Unable to retrieve merchant intelligence: '+e.message}
 }
+
+async function loadLedger(){
+ const summary=$('#merchant-ledger-summary'),body=$('#merchant-ledger-records');
+ if(!summary||!body)return;
+ try{
+  const d=await api('/api/merchant/ledger');
+  if(!d.connected){summary.textContent='Financial journal schema is not provisioned';body.innerHTML='<div class="empty">No journal data available.</div>';return}
+  summary.textContent='Posted journals: '+num(d.summary?.posted||0)+' · Amount: '+money(Number(d.summary?.posted_paise||0)/100);
+  body.innerHTML=d.journals.length?'<table class="merchant-op-table"><thead><tr><th>Journal</th><th>Order</th><th>Amount</th><th>State</th><th>Posted</th></tr></thead><tbody>'+
+    d.journals.map(j=>'<tr><td>'+esc(j.journal_id)+'</td><td>'+esc(j.order_id)+'</td><td>'+esc(money(Number(j.amount_paise)/100))+'</td><td>'+esc(j.state)+'</td><td>'+esc(j.posted_at||'Not posted')+'</td></tr>').join('')+'</tbody></table>':'<div class="empty">No financial journal records exist for this tenant.</div>';
+ }catch(e){summary.textContent='Ledger unavailable';body.textContent=e.message}
+}
+
 async function loadVault(){
  try{$('#vault-table').innerHTML=evidenceTable((await merchantEvidence()).filter(o=>o.vault_outcome||o.vault_utr_candidate),'vault')}
  catch(e){$('#vault-table').textContent='Unable to retrieve Vault records: '+e.message}
