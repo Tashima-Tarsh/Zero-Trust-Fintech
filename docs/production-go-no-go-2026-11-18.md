@@ -44,3 +44,17 @@ This is a release gate, not an assertion that the server is down. Code and Postg
 ## Architectural constraints and remaining technical debt
 
 The root Node service is deployed on Railway; the Python `zero-trust-fintech-production/` service is a separate codebase with its own workflow and is not evidence of an active Railway Python deployment. Editor agent folders (`.kilo/`, `.vscode/`, `.continue/`) were retained. Static site mirrors are generated deployment targets, not safe-to-delete clutter. Root server tests historically skipped some integration failures, so mandatory deterministic unit tests and specialized CI were strengthened, but this does not replace real-device payment testing.
+
+## 19 November 2026 production hardening addendum
+
+**Current decision remains NO-GO for unmonitored external real-money merchant onboarding.** Passing a checkout URL test and a simulated Android intent test is not a bank-side authorization or an authenticated funds-credit callback.
+
+- **Immutable merchant intent:** New `saas_merchant_orders` rows snapshot `payee_name`, `payee_account_type`, and `payee_mcc`. Existing links no longer change P2P/P2M fields after a merchant edits a receiving account. Migration is additive and preserves historical records. Full PostgreSQL merchant integration tests were added and passed.
+- **Pre-PIN fail closed:** Missing/invalid P2M MCC and unknown account types reject order creation before writing the session. P2P continues to carry only personal-payee parameters.
+- **Public checkout isolation:** All `/api/session/new` requests default to the owner-configured personal receiving VPA, never the legacy shared pool; another tenant VPA in query is rejected.
+- **Session recovery:** A cached but expired unpaid session cannot be reused when returning to the checkout. An already posted verified receipt can still be retrieved.
+- **Visible bank-facing intent details:** Both checkout variants show configured payment type and receiving VPA below the amount. These are configuration details, **not a claim of verified bank onboarding**.
+- **Owner release gate:** Owner Settings displays separate P2P, P2M, company activation, and financial-credit source status; it reports NO-GO until independent bank acceptance and reconciliation are verified.
+- **Developer cleanup:** Removed empty VS Code extension file; replaced broken PowerShell tasks; kept the GitHub/Railway/Clerk/Cloudflare/n8n MCP settings and Kilo workflows because they are legitimate user IDE configurations. See `docs/dev-mcp-n8n-runtime-audit-2026-11-19.md`.
+- **Production blocker:** Reconciliation credentials (credit evidence source ID and HMAC secret) are not present in Railway. The bank or acquirer must establish valid P2M merchant eligibility and UPI status infrastructure. This cannot be satisfied by installing n8n or adding frontend code alone.
+- **Data cleanup:** Historical ledgers and settlements have **not** been deleted. The destructive reset remains gated by verified backup, maintenance mode and explicit execution.
