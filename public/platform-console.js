@@ -38,6 +38,19 @@ async function load(screen){
  if(screen==='incidents'){const r=await api('/owner/incidents');incidents=r.incidents||[];$('#incident-kpis').innerHTML=field(incidents.filter(x=>x.status==='OPEN').length,'Open recorded incidents')+field(incidents.filter(x=>x.severity==='CRITICAL').length,'Critical incidents')+field('Unavailable','Frontend monitoring')+field('Unavailable','Deployment monitoring');
  $('#incidents-body').innerHTML=incidents.length?incidents.map(i=>'<tr><td><span class="state">'+esc(i.severity)+'</span></td><td>'+esc(i.service)+'</td><td>'+esc(i.summary)+'</td><td>'+esc(i.status)+'</td><td>'+when(i.created_at)+'</td><td>'+(i.status==='RESOLVED'?'Resolved':'<button data-incident="'+esc(i.id)+'" data-inc-status="'+(i.status==='OPEN'?'ACKNOWLEDGED':'RESOLVED')+'">'+(i.status==='OPEN'?'Acknowledge':'Resolve')+'</button>')+'</td></tr>').join(''):'<tr><td colspan="6">No incidents recorded in the platform incident store. External telemetry is not connected.</td></tr>';
  $('#telemetry-body').innerHTML=Object.entries(r.telemetry||{}).map(([k,v])=>'<div><b>'+esc(k)+'</b><span>'+esc(v)+'</span></div>').join('');}
+ if(screen==='settings'){
+   const c=await api('/owner/configuration');
+   const output=[];
+   if(c.owner){output.push('<div><b>Platform Owner</b><span>'+esc(c.owner.display_name)+' · '+esc(c.owner.email)+'</span></div>');output.push('<div><b>Personal business</b><span>'+esc(c.owner.business_name)+' · '+esc(c.owner.professional_title)+'</span></div>')}
+   output.push('<div><b>Owner test tenant</b><span>'+esc(c.personalTenant?.id||'Not created')+'</span></div>');
+   for(const a of c.personalTenant?.upiAccounts||[])output.push('<div><b>'+esc(a.is_default?'Primary P2P':'Secondary P2P')+'</b><span>'+esc(a.vpa_address)+' · '+esc(a.status)+'</span></div>');
+   if(c.companyTenant)output.push('<div><b>Company tenant</b><span>'+esc(c.companyTenant.business_name)+' · '+esc(c.companyTenant.access_status)+'</span></div>');
+   for(const a of c.companyUpiAccounts||[])output.push('<div><b>Company P2M</b><span>'+esc(a.vpa_address)+' · MCC '+esc(a.mcc)+' · '+esc(a.status)+'</span></div>');
+   for(const msg of c.warnings||[])output.push('<div><b>Attention</b><span>'+esc(msg)+'</span></div>');
+   output.push('<div><b>Access policy</b><span>'+esc(c.settings?.inviteOnly?'Invite-only':'Not activated')+'</span></div>');
+   output.push('<div><b>Checkout simulation</b><span>'+esc(c.settings?.simulationDisabled?'Disabled':'Check configuration')+'</span></div>');
+   $('#owner-configuration').innerHTML=output.join('');
+ }
  if(screen==='settings'){const r=await api('/owner/audit');$('#audit-body').innerHTML=(r.events||[]).slice(0,35).map(e=>'<div><b>'+esc(e.action)+'</b><span>'+esc(e.target_id)+' · '+when(e.created_at)+'</span></div>').join('')||'No audit events recorded yet.';}
  if(screen==='infrastructure'){try{const r=await fetch('/health',{cache:'no-store'});if(!r.ok)throw Error('HTTP '+r.status);const j=await r.json();$('#infra-api').textContent=j.status||'Responding'}catch(e){$('#infra-api').textContent='Unavailable: '+e.message;}}
 }
