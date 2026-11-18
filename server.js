@@ -701,6 +701,13 @@ app.get('/api/session/new', checkoutLimiter, async (req, res) => {
         });
       }
     }
+    // DISHA public ₹1 Try Checkout must always target the explicitly configured
+    // owner receiving account, never select another tenant's rotating VPA.
+    // This changes only the dedicated demo-trial intent, not merchant orders.
+    if(!requestedVpa && baseAmount===1 && description==='DISHA checkout' &&
+       process.env.DISHA_INVITE_ONLY_ENABLED==='true'){
+      validatedVpa=process.env.MERCHANT_UPI_ID||null;
+    }
     const session = await generateSession(baseAmount, description, validatedVpa);
     const upiLink = generateUPILink(session);
     const links = appLinks(upiLink);
