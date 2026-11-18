@@ -9,7 +9,7 @@ const script=fs.readFileSync(path.join(__dirname,'../public/one-touch-vault.js')
 const merchant=fs.readFileSync(path.join(__dirname,'../public/merchant-checkout.html'),'utf8');
 const checkout=fs.readFileSync(path.join(__dirname,'../public/checkout.html'),'utf8');
 const cosmic=fs.readFileSync(path.join(__dirname,'../public/cosmic-checkout.js'),'utf8');
-assert.match(cosmic,/vault\.beginHandoff\(orderId\(\),vaultSessionId,session\.token\)/);
+assert.match(cosmic,/vault\.beginHandoff\(orderId\(\),vaultSessionId,session\.token,chosen\)/);
 assert.match(cosmic,/const packet=vault\.requestEvidence\(orderId\(\)\)/);
 assert.match(cosmic,/vault\.acknowledgeEvidence\(orderId\(\),packet\.eventId,result\)/);
 for(const page of [cosmic]){
@@ -54,7 +54,7 @@ assert.doesNotMatch(cosmic,/finalizePayment\(orderId, txnRef/,
     URLSearchParams,Uint8Array,Date,console});
   const v=root.DISHAOneTouchVault;
   const order='ORD_TEST_1234',vault='a'.repeat(32),token='b'.repeat(48);
-  v.beginHandoff(order,vault,token);
+  v.beginHandoff(order,vault,token,'gpay');
   assert.equal(v.getPendingOrderId(),order);
   assert.equal(await v.submitReturnEvidence(order),null,
     'No background or explicit app return: no observation should be submitted');
@@ -69,6 +69,7 @@ assert.doesNotMatch(cosmic,/finalizePayment\(orderId, txnRef/,
   assert.equal(vaultPacket.evidence.returnParams.txnId,'123456789012');
   assert.equal(vaultPacket.evidence.returnParams.Status,'SUCCESS');
   assert.equal(vaultPacket.evidence.browserEvent,'RETURN_QUERY_OBSERVED');
+  assert.equal(vaultPacket.evidence.selectedApp,'gpay');
   assert.deepEqual(JSON.parse(JSON.stringify(v.requestEvidence(order))),
     JSON.parse(JSON.stringify(vaultPacket)),'Repeated Vault requests yield the same event');
   await assert.rejects(async()=>v.acknowledgeEvidence(order,'incorrect',{success:true,state:'UTR_CANDIDATE_UNVERIFIED'}),
