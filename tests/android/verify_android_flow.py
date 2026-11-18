@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
-"""Real Android emulator UI test against the unmodified DISHA checkout page.
+"""Headless real Android WebView + test-only UPI intent receiver.
 
-The receiving Android app is explicitly TEST-ONLY: it never moves money,
-never returns a fabricated success, and never contacts a bank.
+No banking, financial transaction, fake 'bank success' or production service.
+Uses actual document DOM via android.webkit.WebView.evaluateJavascript, because
+Android 15/17 headless UIAutomator dumps are unreliable on GitHub runners.
 """
 import json
 import re
@@ -11,7 +12,6 @@ import subprocess
 import time
 import urllib.parse
 import urllib.request
-import xml.etree.ElementTree as ET
 from pathlib import Path
 
 OUT=Path("test-results/android")
@@ -20,107 +20,124 @@ BASE="http://127.0.0.1:8765"
 CHECKOUT=("http://10.0.2.2:8765/merchant-checkout.html?"
           "orderId=ORD_ANDROID_CI_1001&token="+("b"*48))
 
-def cmd(args,timeout=45,check=True):
-    p=subprocess.run(args,capture_output=True,text=True,timeout=timeout)
-    if check and p.returncode:
-        raise RuntimeError("Command failed: "+repr(args)+"\n"+p.stdout+"\n"+p.stderr)
-    return p.stdout
+def run(args,timeout=35):
+    proc=subprocess.run(args,capture_output=True,text=True,timeout=timeout)
+    if proc.returncode:
+        raise RuntimeError("Command failed "+repr(args)+"\n"+proc.stdout+"\n"+proc.stderr)
+    return proc.stdout
 
-def adb(*args,timeout=45):
-    return cmd(["adb",*args],timeout=timeout)
+def adb(*args,timeout=35):
+    return run(["adb",*args],timeout=timeout)
 
-def hierarchy():
-    adb("shell","uiautomator","dump","/sdcard/disha-ui.xml",timeout=50)
-    return adb("shell","cat","/sdcard/disha-ui.xml")
+def log():
+    return adb("logcat","-d","-s","DISHA_UPI_TEST:I","*:S")
 
-def screenshot(name):
-    with (OUT/(name+".png")).open("wb") as out:
-        subprocess.run(["adb","exec-out","screencap","-p"],stdout=out,check=True,timeout=30)
-    (OUT/(name+".xml")).write_text(hierarchy(),encoding="utf-8")
+def command(name):
+    return adb("shell","am","start","-W","-n",
+        "ai.disha.testupi/.TestBrowserActivity","--activity-single-top",
+        "--es","command",name)
 
-def node_for(label,xml):
-    root=ET.fromstring(xml)
-    for node in root.iter("node"):
-        hay=(node.attrib.get("text","")+" "+node.attrib.get("content-desc","")).lower()
-        if label.lower() in hay:
-            return node
-    return None
+def states():
+    items=[]
+    for line in log().splitlines():
+        match=re.search(r"CHECKOUT_DOM (.+)$",line)
+        if not match:continue
+        try:
+            raw=json.loads(match.group(1))
+            value=json.loads(raw) if isinstance(raw,str) else raw
+            if isinstance(value,dict):items.append(value)
+        except (ValueError,TypeError):
+            continue
+    return items
 
-def wait_for(label,timeout=60):
-    end=time.monotonic()+timeout
-    latest=""
-    while time.monotonic()<end:
-        latest=hierarchy()
-        match=node_for(label,latest)
-        if match is not None: return match
+def wait_state(condition,label,timeout=50):
+    until=time.monotonic()+timeout
+    last=None
+    while time.monotonic()<until:
+        command("snapshot")
+        data=states()
+        if data:
+            last=data[-1]
+            if condition(last):
+                print("CHECKOUT_DOM_OK "+label+" "+json.dumps(last),flush=True)
+                return last
         time.sleep(1.5)
-    (OUT/"ui-failure.xml").write_text(latest,encoding="utf-8")
-    raise AssertionError("Android UI missing "+repr(label))
+    (OUT/"last-state.json").write_text(json.dumps(last,indent=2),encoding="utf-8")
+    raise AssertionError("Missing checkout DOM: "+label+"; last="+repr(last)+"\n"+log()[-2500:])
 
-def tap(label):
-    n=wait_for(label)
-    m=re.match(r"\[(\d+),(\d+)\]\[(\d+),(\d+)\]",n.attrib.get("bounds",""))
-    if not m: raise AssertionError("Bad bounds for "+label)
-    x1,y1,x2,y2=map(int,m.groups())
-    adb("shell","input","tap",str((x1+x2)//2),str((y1+y2)//2))
+def await_log(text,timeout=35):
+    until=time.monotonic()+timeout
+    while time.monotonic()<until:
+        if text in log():return
+        time.sleep(1)
+    raise AssertionError("Log marker missing "+text+"\n"+log()[-4000:])
+
+def screen(name):
+    with (OUT/(name+".png")).open("wb") as fh:
+        subprocess.run(["adb","exec-out","screencap","-p"],check=True,stdout=fh,timeout=30)
+    (OUT/(name+".log")).write_text(log(),encoding="utf-8")
 
 def set_state(value):
     url=BASE+"/__test/state?value="+urllib.parse.quote(value)
-    request=urllib.request.Request(url,method="POST",headers={"X-CI-Fixture-Key":"CI_ANDROID_ONLY"})
-    with urllib.request.urlopen(request,timeout=10) as resp:
+    req=urllib.request.Request(url,method="POST",headers={"X-CI-Fixture-Key":"CI_ANDROID_ONLY"})
+    with urllib.request.urlopen(req,timeout=10) as resp:
         assert json.load(resp)["status"]==value
 
-def state():
+def fixture_state():
     with urllib.request.urlopen(BASE+"/health",timeout=10) as resp:
         return json.load(resp)["status"]
 
 def test():
-    print("A01 Loading the real merchant checkout HTML in Android WebView",flush=True)
-    # The Android adb shell interprets '&' unless the entire query URL is quoted
-    # inside the remote shell. Preserve the token, not just the orderId.
+    print("A01: actual DISHA merchant checkout DOM in Android",flush=True)
     adb("shell","am start -W -n ai.disha.testupi/.TestBrowserActivity --es url "+shlex.quote(CHECKOUT))
-    wait_for("DISHA QA Merchant")
-    wait_for("499.01")
-    wait_for("qa-receiver@oksbi")
-    screenshot("01-pending-checkout")
-    assert state()=="PENDING"
+    page=wait_state(lambda s:"DISHA QA Merchant" in s["business"] and
+        "499.01" in s["amount"] and s["vpa"]=="qa-receiver@oksbi"
+        and "Payment request active." in s["status"] and s["qr"],
+        "PENDING merchant name, INR amount, recipient, QR")
+    assert page["href"].startswith("upi://pay?")
+    params=urllib.parse.parse_qs(urllib.parse.urlsplit(page["href"]).query)
+    assert params["pa"]==["qa-receiver@oksbi"]
+    assert params["am"]==["499.01"]
+    assert params["cu"]==["INR"]
+    assert "mc" not in params,"P2P URI MUST NOT include MCC"
+    assert fixture_state()=="PENDING"
+    screen("01-android-checkout")
 
-    print("A02 Tapping Open UPI app invokes Android ACTION_VIEW for upi://pay",flush=True)
-    tap("Open UPI app")
-    wait_for("DISHA TEST RECEIVER")
-    wait_for("NO MONEY MOVES")
-    wait_for("qa-receiver@oksbi")
-    wait_for("499.01")
-    screenshot("02-mock-upi-receiver")
-    log=adb("logcat","-d","-s","DISHA_UPI_TEST:I","*:S")
-    assert "RECEIVED pa=qa-receiver@oksbi" in log,log[-2000:]
-    assert "am=499.01" in log,log[-2000:]
-    assert "cu=INR" in log,log[-2000:]
-    assert "mc=null" in log,"P2P intent must omit MCC"
+    print("A02: live WebView Open UPI button opens Android intent receiver",flush=True)
+    command("open")
+    await_log("ANDROID_WEBVIEW_DISPATCH upi://pay")
+    await_log("RECEIVED pa=qa-receiver@oksbi")
+    await_log("am=499.01")
+    await_log("cu=INR")
+    await_log("mc=null")
+    screen("02-android-upi-intent")
 
-    print("A03 UPI app cancellation returns without marking a payment complete",flush=True)
-    tap("Cancel and return")
-    wait_for("Payment request active.")
-    assert state()=="PENDING"
-    screenshot("03-cancelled-still-pending")
+    print("A03: Android BACK cancels UPI without posting a payment",flush=True)
+    adb("shell","input","keyevent","KEYCODE_BACK")
+    wait_state(lambda s:"Payment request active." in s["status"],
+               "cancelled UPI app still PENDING")
+    assert fixture_state()=="PENDING"
+    screen("03-cancelled-no-credit")
 
-    print("A04 Only a fixture BACKEND state change can show completion",flush=True)
+    print("A04: only fixture backend update can display recorded COMPLETED",flush=True)
     set_state("COMPLETED")
-    tap("Refresh payment status")
-    wait_for("recorded as completed")
-    screenshot("04-completed-by-backend")
+    command("refresh")
+    wait_state(lambda s:"recorded as completed" in s["status"],
+               "backend completed status")
+    screen("04-completed-backend-only")
 
-    print("A05 Expired payment link has no usable UPI action",flush=True)
+    print("A05: expired request disables UPI intent",flush=True)
     set_state("EXPIRED")
-    tap("Refresh payment status")
-    wait_for("expired")
-    screenshot("05-expired-request")
-    print("ANDROID_P2P_E2E_PASS: UI, intent, amount, payee, MCC, cancellation, backend state, expiry",flush=True)
+    command("refresh")
+    wait_state(lambda s:"expired" in s["status"].lower()
+               and s["pointerEvents"]=="none","expired checkout button disabled")
+    screen("05-expired-no-payment")
+    print("ANDROID_P2P_E2E_PASS: Android WebView DOM, QR, URI, payee/amount/MCC, handoff, cancel, backend state, expiry",flush=True)
 
 if __name__=="__main__":
     try:test()
     except BaseException as exc:
         print("ANDROID_P2P_E2E_FAILED "+repr(exc),flush=True)
-        try:screenshot("fatal-failure")
+        try:screen("android-error")
         except Exception:pass
         raise
