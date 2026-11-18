@@ -83,9 +83,20 @@ def set_state(value):
     with urllib.request.urlopen(req,timeout=10) as resp:
         assert json.load(resp)["status"]==value
 
-def fixture_state():
+def fixture_info():
     with urllib.request.urlopen(BASE+"/health",timeout=10) as resp:
-        return json.load(resp)["status"]
+        return json.load(resp)
+
+def fixture_state():
+    return fixture_info()["status"]
+
+def tap_native(target):
+    if not isinstance(target,dict) or not target.get("visible"):
+        raise AssertionError("Visible Android checkout action required: "+repr(target))
+    x,y=int(target["x"]),int(target["y"])
+    if not (0<x<2000 and 0<y<3500):
+        raise AssertionError("Invalid Android touch target "+repr(target))
+    adb("shell","input","tap",str(x),str(y))
 
 def test():
     print("A01: actual DISHA merchant checkout DOM in Android",flush=True)
@@ -103,9 +114,14 @@ def test():
     assert fixture_state()=="PENDING"
     screen("01-android-checkout")
 
-    print("A02: live WebView Open UPI button opens Android intent receiver",flush=True)
-    command("open")
-    await_log("ANDROID_WEBVIEW_DISPATCH upi://pay")
+    print("A02: native Android tap triggers one Vault prompt and UPI receiver",flush=True)
+    # ADB input tap is a real Android touch, unlike evaluateJavascript(.click())
+    # which loses user activation before a chained OS app handoff.
+    tap_native(page["openTarget"])
+    await_log("ANDROID_WEBVIEW_DISPATCH upi://pay",timeout=35)
+    auth=fixture_info()
+    assert auth["vaultRegistered"],"Fixture Vault must register the device"
+    assert auth["vaultPrompts"]==1,"First payment cannot ask for two passkey prompts"
     await_log("RECEIVED pa=qa-receiver@oksbi")
     await_log("am=499.01")
     await_log("cu=INR")
@@ -117,6 +133,22 @@ def test():
     wait_state(lambda s:"Payment request active." in s["status"],
                "cancelled UPI app still PENDING")
     assert fixture_state()=="PENDING"
+    # The return happens via Android activity lifecycle. The checkout asks its
+    # Vault for event evidence and submits it automatically with no UTR input.
+    until=time.monotonic()+30
+    vault=None
+    while time.monotonic()<until:
+        with urllib.request.urlopen(BASE+"/__test/vault",timeout=8) as resp:
+            vault=json.load(resp)
+        if vault["count"]>=1:break
+        time.sleep(1)
+    assert vault is not None and vault["count"]==1,(
+        "Returning from Android UPI app did not deliver one Vault evidence packet: "+repr(vault))
+    evidence=vault["events"][0]
+    assert evidence["orderId"]=="ORD_ANDROID_CI_1001"
+    assert evidence["state"]=="RETURN_OBSERVED_NO_UTR"
+    assert evidence["utrCandidate"] is None,"Cancelled external app cannot create a UTR"
+    assert fixture_state()=="PENDING","A browser return must not settle a payment"
     screen("03-cancelled-no-credit")
 
     print("A04: only fixture backend update can display recorded COMPLETED",flush=True)

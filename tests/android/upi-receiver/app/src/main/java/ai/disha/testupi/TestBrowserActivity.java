@@ -34,7 +34,12 @@ public final class TestBrowserActivity extends Activity {
                 snapshot();
             }
         });
-        webView.setWebChromeClient(new WebChromeClient());
+        webView.setWebChromeClient(new WebChromeClient() {
+            @Override public boolean onConsoleMessage(android.webkit.ConsoleMessage message) {
+                Log.i(TAG, "WEBVIEW_CONSOLE "+message.messageLevel()+": "+message.message());
+                return true;
+            }
+        });
         webView.getSettings().setJavaScriptEnabled(true);
         webView.getSettings().setDomStorageEnabled(true);
         webView.getSettings().setLoadsImagesAutomatically(true);
@@ -73,9 +78,25 @@ public final class TestBrowserActivity extends Activity {
             "var a=document.getElementById('openUpi');return JSON.stringify({" +
             "business:v('business'),amount:v('amount'),vpa:v('vpa')," +
             "status:v('status'),href:a?a.getAttribute('href'):''," +
-            "pointerEvents:a?a.style.pointerEvents:'',qr:!!document.querySelector('#qr img, #qr canvas')" +
-            "});})()";
+            "pointerEvents:a?a.style.pointerEvents:'',qr:!!document.querySelector('#qr img, #qr canvas')," +
+            "vaultHelp:v('vaultHelp'),readyState:document.readyState," +
+            "openTarget:target(a),fallbackTarget:target(document.getElementById('oneTouchFallback'))" +
+            "});function target(el){if(!el)return null;var r=el.getBoundingClientRect();" +
+            "return {x:Math.round((r.left+r.width/2)*devicePixelRatio)," +
+            "y:Math.round((r.top+r.height/2)*devicePixelRatio)," +
+            "visible:r.width>0&&r.height>0&&getComputedStyle(el).display!='none'};}})()";
         webView.evaluateJavascript(js, data -> Log.i(TAG, "CHECKOUT_DOM "+data));
+    }
+
+    // Mirror a real Android browser host: when the UPI app covers this
+    // activity, WebView receives the normal activity visibility lifecycle.
+    @Override protected void onPause() {
+        if (webView != null) webView.onPause();
+        super.onPause();
+    }
+    @Override protected void onResume() {
+        super.onResume();
+        if (webView != null) webView.onResume();
     }
 
     @Override protected void onDestroy() {

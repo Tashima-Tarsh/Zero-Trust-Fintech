@@ -4,6 +4,9 @@ const http=require('node:http'),fs=require('node:fs'),path=require('node:path');
 const root=path.join(__dirname,'..','..','public'),port=8765;
 const orderId='ORD_ANDROID_CI_1001',token='b'.repeat(48),expiresAt=Date.now()+12*60*1000;
 let status='PENDING',vaultRegistered=false,vaultPrompts=0;
+const CI_REGISTER_SESSION='a1'.repeat(16);
+const CI_AUTH_SESSION='b2'.repeat(16);
+const evidenceEvents=new Map();
 const reply=(res,code,value,type='application/json')=>{
  res.writeHead(code,{'content-type':type,'cache-control':'no-store'});
  res.end(type.includes('json')?JSON.stringify(value):value);
@@ -12,7 +15,7 @@ const uri=new URL('upi://pay');
 for(const [key,val] of Object.entries({pa:'qa-receiver@oksbi',pn:'DISHA QA Merchant',am:'499.01',cu:'INR',tn:'Automated test - no money'}))uri.searchParams.set(key,val);
 http.createServer((req,res)=>{
  const url=new URL(req.url,'http://10.0.2.2:'+port);
- if(url.pathname==='/health')return reply(res,200,{ok:true,status,vaultRegistered,vaultPrompts});
+ if(url.pathname==='/health')return reply(res,200,{ok:true,status,vaultRegistered,vaultPrompts,evidenceCount:evidenceEvents.size});
  if(url.pathname==='/merchant-checkout.html')return reply(res,200,fs.readFileSync(path.join(root,'merchant-checkout.html')),'text/html');
  if(url.pathname==='/vendor/qrcode.min.js')return reply(res,200,fs.readFileSync(path.join(root,'vendor','qrcode.min.js')),'application/javascript');
  if(url.pathname==='/one-touch-vault.js')return reply(res,200,
@@ -27,22 +30,57 @@ http.createServer((req,res)=>{
    let input={};try{input=JSON.parse(body)}catch(_){}
    if(url.pathname.endsWith('/authenticate/start'))
      return vaultRegistered
-       ?reply(res,200,{success:true,sessionId:'CI_VAULT_AUTH',publicKey:{}})
+       ?reply(res,200,{success:true,sessionId:CI_AUTH_SESSION,publicKey:{}})
        :reply(res,400,{success:false,needsRegistration:true,error:'REGISTER_FIRST'});
    if(url.pathname.endsWith('/register/start'))
-     return reply(res,200,{success:true,sessionId:'CI_VAULT_REGISTER',publicKey:{}});
+     return reply(res,200,{success:true,sessionId:CI_REGISTER_SESSION,publicKey:{}});
    if(url.pathname.endsWith('/register/finish')){
      vaultPrompts++;vaultRegistered=true;
-     return reply(res,200,{success:true,sessionId:'CI_VAULT_REGISTER',
+     return reply(res,200,{success:true,sessionId:CI_REGISTER_SESSION,
        orderId:orderId,credentialId:'CI_KEY'});
    }
    if(url.pathname.endsWith('/authenticate/finish')){
      vaultPrompts++;
-     return reply(res,200,{success:true,sessionId:'CI_VAULT_AUTH',orderId:orderId});
+     return reply(res,200,{success:true,sessionId:CI_AUTH_SESSION,orderId:orderId});
    }
    return reply(res,404,{error:'CI_WEB_AUTH_NOT_FOUND'});
   });
   return;
+ }
+ // The test fixture emulates a Vault-authorized evidence store, never a bank.
+ // Production /api/vault/evidence and signature validation are exercised in
+ // the separate PostgreSQL integration suite. Only fixture calls reach here.
+ if(url.pathname==='/__test/vault'&&req.method==='GET')
+   return reply(res,200,{ok:true,count:evidenceEvents.size,
+     events:[...evidenceEvents.values()].map(e=>({
+       eventId:e.eventId,orderId:e.orderId,state:e.state,utrCandidate:e.utrCandidate
+     }))});
+ if(url.pathname==='/api/vault/evidence'&&req.method==='POST'){
+   let raw='';
+   req.on('data',chunk=>{raw+=chunk;if(raw.length>5000)req.destroy()});
+   req.on('end',()=>{
+     let packet={};try{packet=JSON.parse(raw)}catch(_){}
+     const evidence=packet.evidence||{};
+     if(packet.orderId!==orderId||packet.token!==token||
+       req.headers['x-csrf-token']!==token||
+       ![CI_REGISTER_SESSION,CI_AUTH_SESSION].includes(packet.vaultSessionId)||
+       !/^[0-9a-f]{32}$/.test(packet.eventId||'')||
+       !['APP_RESUME','RETURN_QUERY_OBSERVED','PAGESHOW_RETURN'].includes(evidence.browserEvent))
+       return reply(res,403,{success:false,error:'CI_INVALID_VAULT_PACKET'});
+     const params=evidence.returnParams||{};
+     const utr=/^\d{12}$/.test(params.txnId||'')?params.txnId:null;
+     const recorded=evidenceEvents.get(packet.eventId);
+     if(recorded&&JSON.stringify(recorded.packet)!==JSON.stringify(packet))
+       return reply(res,409,{success:false,error:'CI_EVIDENCE_REPLAY_CONFLICT'});
+     const event=recorded||{eventId:packet.eventId,orderId:packet.orderId,
+       state:utr?'UTR_CANDIDATE_UNVERIFIED':'RETURN_OBSERVED_NO_UTR',
+       utrCandidate:utr,packet};
+     evidenceEvents.set(packet.eventId,event);
+     return reply(res,202,{success:true,state:event.state,
+       utrCandidate:event.utrCandidate,verified:false,settled:false,
+       replayed:Boolean(recorded)});
+   });
+   return;
  }
  if(url.pathname==='/api/merchant/public/order/'+orderId){
   if(url.searchParams.get('token')!==token)return reply(res,404,{success:false,error:'Payment request not found'});

@@ -44,6 +44,24 @@ const path=require('node:path');
   assert.equal(oneTouch.status,200);
   const qr=await fetch(origin+'/vendor/qrcode.min.js');
   assert.equal(qr.status,200);
+  const make=body=>({method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+  const vaultUser='vault_android_ci';
+  const authFirst=await fetch(origin+'/api/webauthn/authenticate/start',make({
+    userId:vaultUser,orderId:order}));
+  assert.equal(authFirst.status,400);
+  assert.equal((await authFirst.json()).needsRegistration,true);
+  const regStart=await(await fetch(origin+'/api/webauthn/register/start',
+    make({userId:vaultUser,orderId:order,userName:'CI Vault'}))).json();
+  assert.match(regStart.sessionId,/^[0-9a-f]{32}$/i,'Test fixture must use production-compatible Vault IDs');
+  const regDone=await(await fetch(origin+'/api/webauthn/register/finish',
+    make({sessionId:regStart.sessionId,credential:{id:'CI_PASSKEY'}}))).json();
+  assert.equal(regDone.sessionId,regStart.sessionId);
+  const authNext=await(await fetch(origin+'/api/webauthn/authenticate/start',
+    make({userId:vaultUser,orderId:order}))).json();
+  assert.match(authNext.sessionId,/^[0-9a-f]{32}$/i);
+  const authDone=await(await fetch(origin+'/api/webauthn/authenticate/finish',
+    make({sessionId:authNext.sessionId,credential:{id:'CI_PASSKEY'}}))).json();
+  assert.equal(authDone.sessionId,authNext.sessionId);
   async function change(value){
    const r=await fetch(origin+'/__test/state?value='+value,{method:'POST',
     headers:{'X-CI-Fixture-Key':'CI_ANDROID_ONLY'}});
