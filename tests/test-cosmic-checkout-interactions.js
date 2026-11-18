@@ -83,7 +83,15 @@ async function flush(){for(let i=0;i<20;i++)await Promise.resolve()}
  document.visibilityState='visible';callbacks.visibilitychange();
  await flush();
  assert.equal(state.posted,1);
- assert.equal(active(),'checking','Browser return cannot create payment receipt');
+ assert.equal(active(),'checking','Unclassified browser return cannot create payment receipt');
+ assert.equal(model.needsPaymentMethodRetry({handoffAt:1000,returnedAt:1800,returnParams:{}}),true,
+  'Immediate pre-PIN exit should preserve UPI choice and QR fallback');
+ assert.equal(model.needsPaymentMethodRetry({handoffAt:1000,returnedAt:22000,returnParams:{}}),false,
+  'Long app return is a normal pending-evidence journey');
+ assert.equal(model.needsPaymentMethodRetry({handoffAt:1000,returnedAt:4500,returnParams:{Status:'FAILURE'}}),true,
+  'App-reported rejection is not a completed bank failure');
+ assert.equal(model.needsPaymentMethodRetry({handoffAt:1000,returnedAt:4500,returnParams:{Status:'SUCCESS'}}),false,
+  'App status success requires financial confirmation, not a forced retry');
  state.ledger='SUCCESS';state.utr='123456789012';
  callbacks.focus();await flush();
  assert.equal(active(),'receipt','Server-confirmed ledger permits receipt');

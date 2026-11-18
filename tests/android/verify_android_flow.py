@@ -145,8 +145,8 @@ def test():
     await_log("mc=null")
     screen("02-android-upi-intent")
     adb("shell","input","keyevent","KEYCODE_BACK")
-    wait_state(lambda s:s["stage"]=="checking",
-        "cancelled UPI return results in checking, not receipt")
+    wait_state(lambda s:s["stage"] in ("methods","checking"),
+        "cancelled UPI return permits retry or checking, never a receipt")
     assert fixture_state()=="PENDING"
     until=time.monotonic()+30
     evidence=None

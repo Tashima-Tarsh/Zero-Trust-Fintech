@@ -35,6 +35,8 @@ async function flush(){for(let i=0;i<30;i++)await Promise.resolve()}
 (async()=>{
  assert.equal(model.supportsNativeUPI('Mozilla/5.0 (Windows NT 10.0)'),false);
  assert.equal(model.supportsNativeUPI('Mozilla/5.0 (Linux; Android 15)'),true);
+ assert.match(model.buildAppUrl(uri,'phonepe','Mozilla/5.0 (iPhone; CPU iPhone OS 18_0)'),/^phonepe:\/\/upi\/pay\?/);
+ assert.match(model.buildAppUrl(uri,'gpay','Mozilla/5.0 (iPhone; CPU iPhone OS 18_0)'),/^gpay:\/\/upi\/pay\?/);
  const android=harness('Mozilla/5.0 (Linux; Android 15) Chrome/120','phonepe');
  await flush();
  assert.equal(android.nodes.btnOneTouch.disabled,false);
