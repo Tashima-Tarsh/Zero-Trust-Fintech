@@ -73,6 +73,19 @@ const {buildUpiUri}=require('../utils/upi-intent');
   assert.ok(order.checkout_url.includes('/merchant-checkout.html?'));
   assert.ok(order.upi_uri_dynamic.startsWith('upi://pay?'));
   assert.ok(order.upi_uri_dynamic.includes('pa=acme'));
+  // 24/7 single-account merchant must not get blocked by routing-hours or
+  // arbitrary per-request cooldown while creating consecutive requests.
+  await pg.query('UPDATE saas_merchant_vpas SET active_hours_start=0,active_hours_end=1 WHERE vpa_address=$1',
+    ['acme'+nonce+'@oksbi']);
+  r=await call('/api/merchant/payments',alice,'POST',{
+    amount:'125.00',description:'Second real request'});
+  assert.equal(r.status,201,'One-account merchant must create repeated payment links without cooldown blocking');
+  assert.ok(r.data.order.upi_uri_dynamic.includes('pa=acme'));
+  const vpaStorage=await pg.query('SELECT daily_counter_date,last_used_at,cooldown_until FROM saas_merchant_vpas WHERE vpa_address=$1',
+    ['acme'+nonce+'@oksbi']);
+  assert.equal(typeof vpaStorage.rows[0].daily_counter_date,'string');
+  assert.ok(Number(vpaStorage.rows[0].last_used_at)>0);
+  assert.ok(Number(vpaStorage.rows[0].cooldown_until)>0);
   r=await call('/api/merchant/vpas',alice);
   assert.equal(r.status,200);
   assert.equal(r.data.vpas[0].holder_name,'Acme Treasury');
@@ -109,15 +122,15 @@ const {buildUpiUri}=require('../utils/upi-intent');
   r=await call('/api/merchant/payments',bob);
   assert.equal(r.data.orders.length,0,'Tenant B must not see tenant A payment');
   r=await call('/api/merchant/payments',alice);
-  assert.equal(r.data.orders.length,1);
-  assert.equal(r.data.orders[0].id,order.id);
+  assert.equal(r.data.orders.length,2);
+  assert.equal(r.data.orders[0].status,'PENDING');
   r=await call('/api/merchant/dashboard',alice);
   assert.equal(r.data.metrics.completedTransactions,0,'No fake settlement');
-  assert.equal(r.data.metrics.pendingTransactions,1);
+  assert.equal(r.data.metrics.pendingTransactions,2);
   assert.ok(Array.isArray(r.data.trend),'Dashboard must provide real daily volume series');
   assert.equal(r.data.trend.length,0,'No fake completed volume points');
   r=await call('/api/merchant/risk',alice);
-  assert.equal(r.data.risk.open,1);
+  assert.equal(r.data.risk.open,2);
   r=await call('/api/merchant/ip-whitelist',alice,'POST',{ip_address:'192.0.2.10',description:'Office egress'});
   assert.equal(r.status,201);
   const ipId=r.data.id;
