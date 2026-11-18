@@ -1766,6 +1766,8 @@ app.post('/api/npci-callback', (req, res) => {
 });
 // Simulation helper for one-click developer testing (guarded against production abuse - OFF by default)
 app.post('/api/simulate-payment', async (req, res) => {
+  // Production never exposes a simulated payment or fabricated ledger posting.
+  if (process.env.NODE_ENV === 'production') return res.status(404).json({success:false,error:'NOT_FOUND'});
   const isProd = process.env.NODE_ENV === 'production';
   const simulationEnabled = process.env.ENABLE_PAYMENT_SIMULATION === 'true'; // OFF by default
   const headerKey = req.headers['x-admin-key'] ||
