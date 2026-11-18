@@ -1565,17 +1565,6 @@ app.post('/handle-share', shareLimiter, async (req, res) => {
       }
       return res.redirect(`/failed.html?reason=${encodeURIComponent('Evidence confidence score too low. Authentic receipt required.')}`);
     }
-    // FULLY AUTOMATED: only HIGH confidence tier settles instantly.
-    if (trustResult.tier !== 'HIGH') {
-      if (req.accepts('json') && !req.accepts('html')) {
-        return res.status(400).json({
-          success: false,
-          code: 'EVIDENCE_INSUFFICIENT',
-          reason: 'Automated settlement requires HIGH confidence tier.'
-        });
-      }
-      return res.redirect(`/failed.html?reason=${encodeURIComponent('Automated settlement requires HIGH confidence tier.')}`);
-    }
     // Web Share Target text is untrusted, even when its layout looks genuine.
     // It may update the order's reference-observed state, never the money ledger.
     await db.updateSessionState(session.orderId, 'UTR_OBSERVED');
