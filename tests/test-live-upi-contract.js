@@ -28,6 +28,6 @@ assert.throws(()=>context.build({...session,merchantType:'MERCHANT',mcc:'0000'})
 assert.throws(()=>context.build({...session,merchantType:'MERCHANT',mcc:null}),/BANK_VERIFIED_MCC_REQUIRED/);
 assert.throws(()=>context.build({...session,merchantType:'UNCLASSIFIED'}),/UNKNOWN_UPI_ACCOUNT_CLASSIFICATION/);
 assert.match(source,/generateUPILink\(session\);\s*await db\.saveSession\(session\)/,'Must validate UPI before session saved');
-assert.ok(source.includes('requestedVpa.toLowerCase() === primaryVpa'),'Public checkout may only use owner's receiving VPA');
+assert.ok(source.includes('requestedVpa.toLowerCase() === primaryVpa'),"Public checkout may only use owner's receiving VPA");
 assert.ok(!source.includes('Metadata Shield'),'Must not obscure commercial transactions');
 console.log('P2P_P2M_INTENT_CONTRACT_PASS: consistent merchant classification, truthful notes, no pre-PIN malformed MCC.');
