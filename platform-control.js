@@ -186,10 +186,20 @@ function createPlatformControl({db,getAuth,clerkEmailResolver=getClerkVerifiedEm
     success:true,owner:profile.rows[0]||null,
     personalTenant:{id:ownerTenantId(),upiAccounts:personal.rows},
     companyTenant:company.rows[0]||null,companyUpiAccounts:companyAccounts.rows,
-    settings:{inviteOnly:active(),simulationDisabled:process.env.ENABLE_PAYMENT_SIMULATION!=='true',publicTestAmount:1},
+    settings:{inviteOnly:active(),simulationDisabled:process.env.ENABLE_PAYMENT_SIMULATION!=='true',publicTestAmount:1,
+      reconciliationConfigured:Boolean(process.env.RECONCILIATION_WEBHOOK_SECRET&&process.env.RECONCILIATION_SOURCE_ID),
+      companyP2mEnabled:Boolean(company.rows[0]?.access_status==='ACTIVE'&&companyAccounts.rows.some(v=>v.account_type==='MERCHANT'&&v.status==='ACTIVE')),
+      personalP2pEnabled:personal.rows.some(v=>v.account_type==='PERSONAL'&&v.status==='ACTIVE')},
+    release:{decision:'NO_GO_UNTIL_BANK_EVIDENCE',checks:{
+      bankP2pAcceptance:'NOT_YET_VERIFIED',
+      bankP2mAcceptance:'NOT_YET_VERIFIED',
+      financialCreditSource:(process.env.RECONCILIATION_WEBHOOK_SECRET&&process.env.RECONCILIATION_SOURCE_ID)?'CONFIGURED_NOT_END_TO_END_VERIFIED':'NOT_CONFIGURED',
+      p2mCompanyAccount:company.rows[0]?.access_status==='ACTIVE'&&companyAccounts.rows.some(v=>v.account_type==='MERCHANT'&&v.status==='ACTIVE')?'ACTIVE':'PENDING_APPROVAL'
+    }},
     warnings:[
       ...(personal.rows.length<2?['One or more personal UPI accounts could not be provisioned; check existing tenant ownership.']:[]),
-      ...((company.rows.length&&!companyAccounts.rows.length)?['Company P2M account has not been registered.']:[])
+      ...((company.rows.length&&!companyAccounts.rows.length)?['Company P2M account has not been registered.']:[]),
+      ...(!(process.env.RECONCILIATION_WEBHOOK_SECRET&&process.env.RECONCILIATION_SOURCE_ID)?['Bank-side credit reconciliation is not configured; do not treat an app return as payment success.']:[])
     ]
    });
  }));
