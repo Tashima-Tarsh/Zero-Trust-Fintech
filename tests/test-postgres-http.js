@@ -13,7 +13,7 @@ const crypto=require('node:crypto');
  const child=spawn(process.execPath,['server.js'],{
   cwd:path.join(__dirname,'..'),
   env:{...process.env,PORT:String(port),DB_BACKEND:'postgres',DATABASE_URL:dburl,
-   MERCHANT_UPI_ID:'testing@upi',NODE_ENV:'test',APP_URL:base,WEBAUTHN_RP_ORIGIN:base},
+   MERCHANT_UPI_ID:'disha82@okaxis',NODE_ENV:'test',APP_URL:base,WEBAUTHN_RP_ORIGIN:base},
   stdio:['ignore','pipe','pipe']
  });
  let logs='';
@@ -33,6 +33,9 @@ const crypto=require('node:crypto');
   const checkout=await fetch(base+'/checkout/');
   assert.equal(checkout.status,200);
   assert.match(await checkout.text(),/DISHA/i);
+  const unauthorized=await fetch(base+'/api/session/new?amount=1&vpa=othermerchant@upi');
+  assert.equal(unauthorized.status,400,'Public checkout must reject cross-tenant VPA substitution');
+  assert.equal((await unauthorized.json()).error,'UNAUTHORIZED_PAYEE_VPA');
   const newSession=await fetch(base+'/api/session/new?amount=500.01&vpa=disha82@okaxis');
   if(newSession.status!==200)throw Error('SESSION_CREATE_HTTP_'+newSession.status+': '+await newSession.text());
   const data=await newSession.json();
