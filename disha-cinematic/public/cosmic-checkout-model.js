@@ -29,6 +29,8 @@
    const u=new URL(href);
    if(!['https:','http:'].includes(u.protocol))return '';
    u.hash='';
+   // The Android fallback intent extra must never carry checkout bearer tokens.
+   u.searchParams.delete('token');
    u.searchParams.set('upi_intent_fallback','1');
    return u.href;
   }catch(_){return ''}

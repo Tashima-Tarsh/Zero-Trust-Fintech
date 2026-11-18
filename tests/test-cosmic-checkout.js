@@ -90,6 +90,10 @@ const href='https://disha8-2.thenitishkr.in/checkout?amount=1&debug=1#fragment';
 const fallback=model.checkoutFallbackUrl(href);
 assert.equal(fallback,'https://disha8-2.thenitishkr.in/checkout?amount=1&debug=1&upi_intent_fallback=1');
 assert.equal(model.checkoutFallbackUrl('javascript:alert(1)'),'');
+const merchantFallback=model.checkoutFallbackUrl('https://disha8-2.thenitishkr.in/merchant-checkout.html?orderId=ORD_TEST&token='+'a'.repeat(48));
+assert.equal(new URL(merchantFallback).searchParams.has('token'),false,
+ 'Merchant bearer must never enter the external UPI app fallback URL');
+assert.equal(new URL(merchantFallback).searchParams.get('orderId'),'ORD_TEST');
 const launched=model.buildAppUrl(qr,'gpay','Android',href);
 assert.match(launched,/S\.browser_fallback_url=/);
 assert.equal(decodeURIComponent(launched.split('S.browser_fallback_url=')[1].split(';end')[0]),fallback);

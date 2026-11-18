@@ -17,6 +17,17 @@
  const orderId=()=>session?.orderId||null;
  const debug=query.get('debug')==='1';
  const intentFallback=query.get('upi_intent_fallback')==='1';
+ const merchantFallbackKey=id=>'disha82:merchant-intent-fallback:'+id;
+ // Only the original checkout tab can restore its order bearer on fallback.
+ function merchantFallbackToken(id){
+  if(!intentFallback||!id)return null;
+  try{
+   const saved=JSON.parse(sessionStorage.getItem(merchantFallbackKey(id))||'null');
+   if(saved&&Date.now()<Number(saved.expiresAt)&&
+      /^[a-f0-9]{24,64}$/i.test(saved.token||''))return saved.token;
+  }catch(_){}
+  return null;
+ }
  const debugHistory=[];
  function debugStatus(phase,server=''){
   if(!debug)return;
@@ -97,7 +108,7 @@
   if(mode==='merchant'){
    const o=raw.order;
    if(!o?.id||!o.upi_uri||!Number(o.amount))throw Error('Payment link is incomplete');
-   return {orderId:o.id,token:query.get('token'),upiUri:model.qrPayload(o.upi_uri),
+   return {orderId:o.id,token:query.get('token')||merchantFallbackToken(o.id),upiUri:model.qrPayload(o.upi_uri),
      amount:Number(o.amount),expiresAt:Number(o.expires_at),initialStatus:o.status,
      paymentType:o.payment_type,payeeVpa:o.vpa_address};
   }
@@ -138,7 +149,7 @@
  async function getSession(){
   let url;
   if(mode==='merchant'){
-   const id=query.get('orderId'),token=query.get('token');
+   const id=query.get('orderId'),token=query.get('token')||merchantFallbackToken(id);
    if(!id||!token)throw Error('This payment link is incomplete. Request a new link.');
    url='/api/merchant/public/order/'+encodeURIComponent(id)+'?token='+encodeURIComponent(token);
   }else{
@@ -274,7 +285,19 @@
   try {
    const chosen=model.safeApp(app);
    trace('APP_SELECTED','OK',chosen);
-   const target=model.buildAppUrl(session.upiUri,chosen,userAgent,location.href);
+   let checkoutHref=location.href;
+   if(mode==='merchant'){
+    let stored=false;
+    try{
+     sessionStorage.setItem(merchantFallbackKey(orderId()),JSON.stringify({
+      token:session.token,expiresAt:session.expiresAt
+     }));
+     stored=true;
+    }catch(_){}
+    // No browser-local recovery means no fallback extra; never embed a token.
+    if(!stored)checkoutHref='';
+   }
+   const target=model.buildAppUrl(session.upiUri,chosen,userAgent,checkoutHref);
    if(!handoffStarted){
     vault.beginHandoff(orderId(),vaultSessionId,session.token,chosen);
     handoffStarted=true;
@@ -419,6 +442,9 @@
   showStage('initial');
   try{
    session=await getSession();
+   if(intentFallback&&mode==='merchant'&&session?.orderId){
+    try{sessionStorage.removeItem(merchantFallbackKey(session.orderId))}catch(_){}
+   }
    if(debug){
     try{
      const prior=JSON.parse(sessionStorage.getItem('disha82:diag:'+session.orderId)||'[]');
