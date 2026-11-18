@@ -64,6 +64,11 @@ async function flush(){for(let i=0;i<30;i++)await Promise.resolve()}
  android.apps.find(x=>x.dataset.app==='gpay').events.click();
  assert.equal(android.state.beginCount,2,'A fresh GPay retry must get a new Vault handoff event');
  assert.match(android.state.opened,/package=com\.google\.android\.apps\.nbu\.paisa\.user/);
+ let prevented=false;
+ android.nodes.oneTouchFallback.events.click({preventDefault(){prevented=true}});
+ assert.equal(prevented,true,'Generic fallback must use the tested click handler');
+ assert.equal(android.state.beginCount,3,'A generic fallback tap must create its own Vault event');
+ assert.equal(android.state.opened,uri,'Generic retry must preserve the exact UPI payee and amount');
 
  assert.equal(android.nodes.oneTouchFallback.href,uri,'Unresolved targeted intent must offer generic UPI fallback');
  const desktop=harness('Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/157','gpay');

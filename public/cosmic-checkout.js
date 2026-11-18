@@ -388,6 +388,10 @@
    get('checkoutDebugCopy').addEventListener('click',copyDebugReport);
   }
   get('btnOneTouch').addEventListener('click',authorize);
+  get('oneTouchFallback').addEventListener('click',event=>{
+   event.preventDefault();
+   openApp('generic'); // Fresh handoff for the user's fallback tap.
+  });
   document.querySelectorAll('[data-app]').forEach(el=>
    el.addEventListener('click',()=>openApp(el.dataset.app)));
   get('showQr').addEventListener('click',()=>{
