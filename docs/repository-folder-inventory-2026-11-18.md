@@ -1,6 +1,6 @@
 # DISHA 8.2 — Repository Folder Inventory and Production Debt Register
 
-Date: 18 November 2026. Source: GitHub repository tree `main`, files: **479**, nested directories: **76**.
+Date: 18 November 2026. Source: GitHub repository tree `main`, files: **481**, nested directories: **76**.
 
 **Change policy:** This is an inventory and risk classification, **not evidence a folder can be deleted**. In particular, the three frontend mirrors and the separate Python backend remain referenced by builds or workflows. No financial data is deleted by this report.
 
@@ -76,7 +76,7 @@ Date: 18 November 2026. Source: GitHub repository tree `main`, files: **479**, n
 - `dist/js/` — 2 files below
 - `dist/pay/` — 1 files below
 - `dist/vendor/` — 1 files below
-- `docs/` — 9 files below
+- `docs/` — 11 files below
 - `financial/` — 7 files below
 - `middleware/` — 1 files below
 - `migrations/` — 2 files below
