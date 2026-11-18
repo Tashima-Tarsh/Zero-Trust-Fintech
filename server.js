@@ -13,6 +13,7 @@ const QRCode = require('qrcode');
 const { clerkMiddleware, getAuth } = require('@clerk/express');
 const db = require('./db');
 const { createMerchantApi } = require('./merchant-api');
+const {createReconciliationRouter,initializeReconciliationSchema} = require('./financial/reconciliation-webhook');
 const {
   buildNPCIIntentUri,
   sanitizeTransactionNote,
@@ -221,7 +222,9 @@ async function idempotencyMiddleware(req, res, next) {
   };
   next();
 }
-app.use(express.json());
+app.use(express.json({verify:(req,res,body)=>{
+  if(req.path==='/api/reconciliation/credit')req.rawReconciliationBody=Buffer.from(body);
+}}));
 app.use(express.urlencoded({ extended: true }));
 app.use(idempotencyMiddleware);
 if (process.env.NODE_ENV === 'production') {
@@ -477,6 +480,11 @@ function broadcastOrderSuccess(orderId, payload) {
   }
 }
 // ════════════════════════════════════════════════════════════════════
+// Authenticated internal account-credit boundary; disabled without explicit connector config.
+// It never accepts customer-origin callbacks as bank-confirmed funds.
+app.use('/api/reconciliation',createReconciliationRouter({
+  getPool:()=>db.pgPool,onSettled:broadcastOrderSuccess
+}));
 // TASK 3: SESSION TOKEN GENERATION
 // ═══════════════════════════════════════════════════════════════════
 async function generateSession(baseAmount = 100, description = '', customVpa = null) {
@@ -1812,6 +1820,10 @@ app.get('/failed', (req, res) => res.sendFile(path.join(__dirname, 'public', 'fa
 (async () => {
   await db.initDb();
   if (db.pgPool && CLERK_ENABLED) await merchantApi.init();
+  if(process.env.RECONCILIATION_WEBHOOK_SECRET && process.env.RECONCILIATION_SOURCE_ID){
+    if(!db.pgPool || !CLERK_ENABLED)throw new Error('Reconciliation requires PostgreSQL and merchant tenant tables');
+    await initializeReconciliationSchema(db.pgPool);
+  }
   // Daily cron at 00:05 to reset daily VPA limits
   setInterval(async () => {
     const d = new Date();

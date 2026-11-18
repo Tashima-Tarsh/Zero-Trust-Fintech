@@ -76,3 +76,5 @@ jobs:
         run: node tests/test-postgres-utr-evidence-http.js
       - name: Test authenticated tenant merchant SaaS end to end
         run: node tests/test-postgres-merchant-saas.js
+      - name: Prove authenticated statement reconciliation and no false ledger credits
+        run: node tests/test-postgres-reconciliation-http.js
