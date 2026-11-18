@@ -20,6 +20,7 @@ const TESTS_DIR = path.join(__dirname);
 const UNIT_TESTS = [
   'test-disha.js',        // challenge math, session, NPCI link, double-entry ledger
   'test-npci-intent.js',  // NPCI URI builder / parser / timestamp
+  'test-cosmic-checkout.js', // unified Touch -> app/QR -> ledger receipt
   'test-checkout-production.js', // checkout routing, passkey and browser JS syntax
   'test-financial-money.js',
   'test-utr-confidence-source.js', // forged UTR success receipts cannot release
