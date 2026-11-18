@@ -29,9 +29,16 @@ on:
     branches: [main]
     paths:
       - 'financial/**'
-      - 'migrations/001_financial_core.sql'
-      - 'tests/test-postgres-financial-core.js'
+      - 'merchant-api.js'
+      - 'server.js'
+      - 'platform-control.js'
+      - 'db.js'
+      - 'utils/upi-intent.js'
+      - 'migrations/**'
+      - 'tests/test-postgres-*.js'
       - 'tests/test-financial-money.js'
+      - 'tests/test-live-upi-contract.js'
+      - '.github/workflows/postgres-financial-core.yml'
 
 jobs:
   postgres-transaction-invariants:
