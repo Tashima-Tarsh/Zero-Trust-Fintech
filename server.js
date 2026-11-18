@@ -283,8 +283,10 @@ app.get('/signup', (req,res) => {
 });
 app.get(['/dashboard', '/payments', '/analytics'], (req, res) => {
   if (!CLERK_ENABLED) return res.redirect('/login');
-  const { userId } = getAuth(req);
-  if (!userId) return res.redirect('/login');
+  // HTML shell has no tenant records: the Clerk SDK authorizes the browser and
+  // every merchant API call independently enforces its verified identity.
+  // Requiring server-side cookies here would reject valid bearer-token users.
+  res.setHeader('Cache-Control', 'no-store');
   res.sendFile(path.join(__dirname, 'public', 'merchant-console.html'));
 });
 // disha-cinematic (merchant SaaS) removed - P2P/P2M routing handled via /api/verify
