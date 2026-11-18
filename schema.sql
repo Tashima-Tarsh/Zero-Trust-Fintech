@@ -85,13 +85,9 @@ CREATE TABLE IF NOT EXISTS vpa_sender_tracking (
     UNIQUE(vpa_id, customer_vpa, tracking_date)
 );
 
--- Seed Primary Merchant VPAs with human time-slots and conservative limits
-INSERT INTO vpa_pool (id, vpa_address, holder_name, bank_name, status, health_score, preferred_time_slot, daily_tx_limit, daily_volume_limit, merchant_id, created_at)
-VALUES 
-    ('vpa_axis_01', 'disha82@okaxis', 'Ramesh Kirana Core', 'Axis Bank', 'ACTIVE', 98, 'MORNING', 15, 25000.00, 'mer_default', 1700000000000),
-    ('vpa_icici_02', 'disha82@icici', 'Ramesh Secondary', 'ICICI Bank', 'ACTIVE', 96, 'AFTERNOON', 15, 25000.00, 'mer_default', 1700000000000),
-    ('vpa_yes_03', 'disha82@ybl', 'Ramesh Retail Store', 'YES Bank', 'ACTIVE', 94, 'EVENING', 15, 25000.00, 'mer_default', 1700000000000)
-ON CONFLICT (vpa_address) DO NOTHING;
+-- Production intentionally has no fabricated receiving UPI accounts.
+-- The platform owner's real receiving VPAs are provisioned from secured
+-- Railway environment configuration into an isolated internal tenant.
 
 -- 3. Sessions & Orders
 CREATE TABLE IF NOT EXISTS sessions (
