@@ -5,7 +5,8 @@ const merchant=read('merchant-api.js'),server=read('server.js'),client=read('pub
 for(const f of ['public/checkout.html','public/merchant-checkout.html']){
  const s=read(f);
  assert.ok(s.includes('id="checkoutTimer"')&&s.includes('id="paymentKind"'),'Checkout must show expiry and P2P/P2M payee');
- assert.ok(s.includes('/cosmic-checkout.js?v=account-kind4'),'Checkout JS cache must refresh');
+ assert.match(s,/\/cosmic-checkout\.js\?v=[A-Za-z0-9._-]+/,'Checkout JS must be cache-versioned');
+ assert.match(s,/\/cosmic-checkout-model\.js\?v=[A-Za-z0-9._-]+/,'Checkout model must be cache-versioned');
 }
 assert.ok(client.includes('function setPaymentKind()')&&client.includes('setPaymentKind();'),'Checkout must render actual receiving type');
 assert.ok(merchant.includes('payee_account_type')&&merchant.includes('payee_mcc'),'Merchant payment must snapshot account classification and MCC');
