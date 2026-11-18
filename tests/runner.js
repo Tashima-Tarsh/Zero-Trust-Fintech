@@ -22,7 +22,8 @@ const UNIT_TESTS = [
   'test-payment-classification-ui.js', // transparent P2P/P2M checkout and release criteria
   'test-live-upi-contract.js', // authentic P2P/P2M URI fields, strict MCC and payee isolation
   'test-npci-intent.js',  // NPCI URI builder / parser / timestamp
-  'test-upi-intent-handoff.js', // Android user gesture + desktop QR + generic fallback
+  'test-upi-intent-handoff.js',
+  'test-checkout-diagnostics.js', // opt-in UPI trace security and backend receipt, no financial claims // Android user gesture + desktop QR + generic fallback
   'test-cosmic-checkout-interactions.js', // Stage transitions and ledger receipt authority
   'test-expired-checkout-recovery.js', // no unpaid intent resurrection beyond three minutes
   'test-checkout-one-rupee.js', // direct checkout default and saved-session amount

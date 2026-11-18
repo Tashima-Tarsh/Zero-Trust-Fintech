@@ -35,18 +35,25 @@
     return data;
   }
 
-  async function authorize(orderId){
+  async function authorize(orderId,reporter){
+    const emit=(event,code='OK')=>{try{if(typeof reporter==='function')reporter(event,code)}catch(_){}};
     if(!orderId || !/^[a-z0-9_-]{6,150}$/i.test(orderId))
       throw Error('The payment request is invalid.');
     const sdk=root.SimpleWebAuthnBrowser;
+    emit('VAULT_ENV',root.isSecureContext===false?'INSECURE_CONTEXT':
+      !sdk?.startAuthentication?'SDK_MISSING':
+      root.PublicKeyCredential===undefined?'NO_WEB_AUTHN':'OK');
     if(!sdk?.startRegistration || !sdk?.startAuthentication)
       throw Error('Device vault could not load. Retry or use another supported browser.');
     const userId=getDeviceUserId();
     let begin;
+    emit('VAULT_AUTH_API');
     try {begin=await post('/api/webauthn/authenticate/start',{userId,orderId});}
     catch(error){
       if(!error.needsRegistration)throw error;
+      emit('VAULT_REGISTER_NEEDED');
       const init=await post('/api/webauthn/register/start',{userId,userName:'DISHA Device Vault',orderId});
+      emit('VAULT_REGISTER_PROMPT');
       const credential=await sdk.startRegistration({optionsJSON:init.publicKey});
       const finish=await post('/api/webauthn/register/finish',{sessionId:init.sessionId,credential});
       if(!finish.success || !finish.sessionId || finish.orderId!==orderId)
@@ -54,6 +61,7 @@
       return {sessionId:finish.sessionId,registered:true};
     }
     if(!begin.success||!begin.sessionId)throw Error('Vault challenge missing.');
+    emit('VAULT_AUTH_PROMPT');
     const credential=await sdk.startAuthentication({optionsJSON:begin.publicKey});
     const finish=await post('/api/webauthn/authenticate/finish',{sessionId:begin.sessionId,credential});
     if(!finish.success||finish.orderId!==orderId)
