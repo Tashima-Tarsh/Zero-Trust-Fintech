@@ -59,7 +59,7 @@ assert.match(js,/bulkImportVpas/);
 assert.match(js,/merchant\.setup_completed/);
 assert.match(js,/history\.pushState/,'Navigation must support browser Back');
 assert.match(css,/premium-merchant-console/,'Apply dedicated premium console theme');
-assert.match(css,/\/assets\/disha-8-2-wordmark-cropped\.png/);
+assert.match(page,/src="\/assets\/disha-8-2-wordmark-cropped\.png"/);
 assert.match(css,/@media\(max-width:900px\)/);
 assert.match(css,/@media\(max-width:620px\)/);
 const {parseVpaCsv}=require('../public/merchant-vpa-import.js');
