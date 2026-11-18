@@ -204,3 +204,13 @@ body{isolation:isolate;overflow:hidden}
 }
 .checkout-timer[data-expired="true"]{color:#ffb8ae;text-shadow:0 0 12px #e6565766}
 @media(max-height:620px){.checkout-timer{font-size:10px;min-height:17px;margin-bottom:2px!important}}
+
+
+/* Clear bank-facing intent identity under amount, without a second checkout card. */
+.checkout-payment-kind{
+ max-width:100%;padding:0 8px;margin:0 auto 4px;
+ color:#d8eafd;font:600 11px/1.45 system-ui,sans-serif;
+ overflow-wrap:anywhere;text-align:center;letter-spacing:.025em;
+ text-shadow:0 2px 9px #000b;
+}
+@media(max-width:480px){.checkout-payment-kind{font-size:10px;padding:0 4px}}

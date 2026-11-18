@@ -42,11 +42,13 @@
    const o=raw.order;
    if(!o?.id||!o.upi_uri||!Number(o.amount))throw Error('Payment link is incomplete');
    return {orderId:o.id,token:query.get('token'),upiUri:model.qrPayload(o.upi_uri),
-     amount:Number(o.amount),expiresAt:Number(o.expires_at),initialStatus:o.status};
+     amount:Number(o.amount),expiresAt:Number(o.expires_at),initialStatus:o.status,
+     paymentType:o.payment_type,payeeVpa:o.vpa_address};
   }
   return {orderId:raw.orderId,token:raw.sessionId,
    upiUri:model.qrPayload(raw.upiLink),amount:Number(raw.challengeAmount),
-   expiresAt:Number(raw.expiresAt),initialStatus:'PENDING'};
+   expiresAt:Number(raw.expiresAt),initialStatus:'PENDING',
+   paymentType:raw.paymentType,payeeVpa:raw.vpaAddress};
  }
  function saveAuthorizedSession(){
   if(mode!=='generic'||!session)return;
@@ -96,6 +98,15 @@
  }
  function expired(){return Boolean(session?.expiresAt && Date.now()>session.expiresAt)}
  function setMoney(amount){get('payAmount').textContent=format(amount)}
+ function setPaymentKind(){
+  const label=get('paymentKind');
+  if(!label||!session)return;
+  const p=new URLSearchParams(session.upiUri.split('?')[1]||'');
+  const kind=session.paymentType==='P2M'?'P2M':'P2P';
+  const name=kind==='P2M'?'Merchant receiving UPI':'Personal receiving UPI';
+  const payee=session.payeeVpa||p.get('pa')||'';
+  label.textContent=kind+' · '+name+(payee?' · '+payee:'');
+ }
  function preferred(){
   try{return model.safeApp(localStorage.getItem(prefKey)||'generic')}catch(_){return 'generic'}
  }
@@ -307,6 +318,7 @@
   try{
    session=await getSession();
    setMoney(session.amount);
+   setPaymentKind();
    tickSessionTimer();
    // Resolve a verified recorded credit even after the original checkout TTL.
    await pollLedger();
