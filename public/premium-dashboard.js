@@ -9,11 +9,15 @@ const num = value => new Intl.NumberFormat('en-IN').format(Number(value)||0);
 const date = value => value?new Date(Number(value)).toLocaleString('en-IN',{dateStyle:'medium',timeStyle:'short'}):'—';
 const plain = value => String(value||'').trim();
 const views = {
- overview:['Overview','Live activity across your merchant workspace'],
+ overview:['Overview','Your business activity, financial evidence and operational priorities'],
+ intelligence:['Payment Intelligence','Order-bound UTR and evidence correlation'],
  payments:['Transactions','Track every payment request and recorded outcome'],
  create:['Create payment','Generate a customer-specific UPI link and QR'],
  vpas:['UPI accounts','Manage the UPI addresses that receive your payments'],
  routing:['Routing & accounts','Inspect the primary and active receiving accounts'],
+ vault:['Vault & Evidence','Device observations and order-bound evidence'],
+ ledger:['Reconciliation & Ledger','Qualified financial records and report status'],
+ integrations:['Integrations & Automation','Developer connections and configuration'],
  risk:['Security review','Actual order-state indicators for this workspace'],
  access:['IP directory','Maintain the server IP addresses registered for your business'],
  reports:['Reports & exports','Download recorded merchant payment activity'],
@@ -86,7 +90,7 @@ function view(name,replaceHistory=false){
  if(typeof window.scrollTo==='function')window.scrollTo(0,0);
  const actions={overview:loadOverview,payments:loadPayments,create:loadVpas,vpas:loadVpas,
  routing:loadVpas,risk:loadRisk,access:loadAccess,reports:loadReports,
- notifications:loadNotifications,api:showApiStatus};
+ notifications:loadNotifications,api:showApiStatus,intelligence:loadIntelligence,vault:loadVault};
  if(actions[name]) {
   const work=actions[name]();
   if(work&&typeof work.catch==='function')work.catch(error=>toast(error.message));
@@ -97,7 +101,15 @@ function closeMenu(){
  $('#sideToggle')?.setAttribute('aria-expanded','false');
 }
 function setupBindings(){
- $$('#appSide [data-view]').forEach(button=>button.addEventListener('click',()=>view(button.dataset.view)));
+ $('#appSide [data-view]').forEach(button=>button.addEventListener('click',()=>view(button.dataset.view)));
+ $('.merchant-tabbar [data-smart-tab]').forEach(button=>button.addEventListener('click',()=>{
+   const area=button.closest('.module');area.querySelectorAll('[data-smart-tab]').forEach(b=>b.classList.toggle('active',b===button));
+   area.querySelectorAll('.smart-pane').forEach(p=>p.classList.toggle('active',p.id===button.dataset.smartTab));
+ }));
+ $('#merchant-mobile-menu')?.addEventListener('click',()=>{
+   $('#appSide')?.classList.add('open');$('#sideBackdrop')?.classList.add('open');
+   $('#sideToggle')?.setAttribute('aria-expanded','true');
+ });
  document.addEventListener('click',event=>{
   const target=event.target.closest('[data-switch]');
   if(target)view(target.dataset.switch);
@@ -151,7 +163,7 @@ function merchantHeader(){
  $('#merchantSideName').textContent=name;
  $('#merchantSideSub').textContent=merchant.email||'Merchant administrator';
  $('#merchantInitial').textContent=name.slice(0,2).toUpperCase();
- $('#environmentLabel').innerHTML='<span class="dot"></span> Live workspace';
+ $('#environmentLabel').innerHTML='<span class="dot"></span> '+(merchant.is_internal_test?'Internal production test':'Merchant workspace');
  $('#settingsName').value=merchant.business_name||'';
  $('#settingsPhone').value=merchant.contact_phone||'';
  $('#settingsCity').value=merchant.city||'';
@@ -248,6 +260,34 @@ function miniPanels(){
   '</b><small>'+esc(n.message)+'</small></div></div>').join('');
  $('#overviewNotifications').innerHTML=html||'<div class="empty">No operational notifications.</div>';
 }
+
+async function merchantEvidence(){
+ const d=await api('/api/merchant/payments?limit=200');
+ return d.orders||[];
+}
+function evidenceTable(rows,mode){
+ if(!rows.length)return '<div class="empty">No recorded merchant orders in this workspace.</div>';
+ const heading=mode==='vault'?'<th>Order</th><th>Vault outcome</th><th>Reference candidate</th><th>Payment status</th>':'<th>Order</th><th>Amount</th><th>UTR</th><th>Observed evidence</th><th>Recorded status</th>';
+ const cells=rows.map(o=>{
+  const outcome=o.vault_outcome||'No Vault observation';
+  if(mode==='vault')return '<tr><td>'+esc(o.id)+'</td><td>'+esc(outcome)+'</td><td>'+esc(o.vault_utr_candidate||'Not provided')+'</td><td>'+esc(o.status)+'</td></tr>';
+  return '<tr><td>'+esc(o.id)+'<small>'+esc(o.vpa_address)+'</small></td><td>'+esc(money(o.amount))+'</td><td>'+esc(o.utr||'Not recorded')+'</td><td>'+esc(outcome)+'</td><td>'+esc(o.status)+'</td></tr>';
+ }).join('');
+ return '<table class="merchant-op-table"><thead><tr>'+heading+'</tr></thead><tbody>'+cells+'</tbody></table>';
+}
+async function loadIntelligence(){
+ try{
+  const items=await merchantEvidence();
+  $('#intelligence-table').innerHTML=evidenceTable(items,'intelligence');
+  const questionable=items.filter(o=>o.vault_outcome&&String(o.vault_outcome).toUpperCase()!=='VERIFIED'||o.status==='EXPIRED'||o.status==='FAILED');
+  $('#intelligence-exceptions').innerHTML=questionable.length?evidenceTable(questionable,'intelligence'):'<div class="empty">No recorded exceptions in the loaded order register. This is not a platform-wide fraud guarantee.</div>';
+ }catch(e){$('#intelligence-table').textContent='Unable to retrieve merchant intelligence: '+e.message}
+}
+async function loadVault(){
+ try{$('#vault-table').innerHTML=evidenceTable((await merchantEvidence()).filter(o=>o.vault_outcome||o.vault_utr_candidate),'vault')}
+ catch(e){$('#vault-table').textContent='Unable to retrieve Vault records: '+e.message}
+}
+
 async function loadPayments(){
  try{
   const params=new URLSearchParams({status:filter,search:$('#paymentsSearch').value.trim(),limit:'200'});
