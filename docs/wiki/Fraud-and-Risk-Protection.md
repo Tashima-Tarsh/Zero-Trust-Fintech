@@ -1,68 +1,79 @@
-# Fraud and risk protection — verify the relationship, not the picture
+# DISHA Fraud Intelligence — Trust the relationship, not the screenshot
 
-DISHA 8.2 approaches payment risk as a chain of questions about a specific commercial order. A convincing receipt screenshot alone is not enough; the system considers the intended recipient, amount, time, reference history, observed device journey and source of financial evidence.
+DISHA 8.2 approaches fraud resistance by analyzing the **connection between an order and the evidence surrounding it**. Instead of awarding a successful outcome because an image looks genuine, the product asks a sequence of precise questions about recipient, amount, order identity, timing, duplicate references and the source of financial evidence.
 
-**The aim is to reduce avoidable mistakes and manipulation—not to promise that fraud becomes mathematically impossible.**
-
-## Risk categories the product addresses
-
-| What can go wrong | DISHA's relevant control | What the control actually establishes |
-| --- | --- | --- |
-| A reference is copied from another order | Duplicate and conflicting UTR checks | The reference claim is not unique or is disputed |
-| A customer shows an attractive but forged receipt | Customer-origin claims remain unverified | An image or text alone cannot create a completed ledger entry |
-| The payment went to a different UPI address | Recipient matching | The available evidence does not match the intended payee |
-| The amount is short or modified | Exact-paise order matching | The claimed or qualified credit amount must match the order |
-| The customer reuses an expired link | Server expiry and time-window rules | The request is no longer valid for a new attempt |
-| A bank/app returns pending or failure | Separate observation and credit states | The product does not mistake a status string for confirmed funds |
-| A financial event is duplicated | Idempotent financial posting and UTR ownership | The same qualified event is not counted twice |
-| A financial event belongs to a different merchant | Tenant and account matching | One merchant cannot receive another merchant's financial record |
-| An authorized event contains contradictory details | Risk review and quarantine | The item needs investigation instead of automatic approval |
-
-## Three trust levels
-
-**Level 1 — What was intended.** The order says whom to pay, how much, the receiving account type and when the window expires.
-
-**Level 2 — What was observed or claimed.** A browser handoff, returned fields, a customer-supplied UTR or receipt can help investigate. They may be missing, incorrect, recycled or fabricated.
-
-**Level 3 — What can be financially accounted for.** A qualifying independently authenticated, matching credit record supports a completed ledger event and the corresponding receipt. Without it, Level 2 does not become Level 3.
-
-## The decision process
+## A layered decision architecture
 
 ~~~mermaid
 flowchart TD
- O["Original DISHA order"] --> A["Payee / amount / time / reference comparisons"]
- V["Vault device evidence"] --> A
- A --> C{"Missing or conflicting evidence?"}
- C -->|Yes| Q["Keep unverified; flag discrepancy"]
- C -->|No| P["Await qualifying credit evidence"]
- P --> F{"Independently qualified credit record received?"}
- F -->|No| N["Not confirmed"]
- F -->|Yes| M{"Exact order, amount, payee and unique reference?"}
- M -->|No| X["Quarantined exception"]
- M -->|Yes| L["Post completion and ledger"]
+ A["ORIGINAL PAYMENT ORDER<br/>Payee · Amount · Reference · Expiry"]:::blue
+ B["VAULT OBSERVATIONS<br/>Authorized handoff · Return · Candidate reference"]:::purple
+ A --> C["IDENTITY CHECK<br/>Right payee and order?"]:::amber
+ B --> C
+ C --> D["VALUE CHECK<br/>Exact amount down to the paise?"]:::amber
+ D --> E["TEMPORAL CHECK<br/>Within intended order window?"]:::amber
+ E --> F["REPLAY CHECK<br/>Reference or event already seen?"]:::amber
+ F --> G{"Evidence consistent?"}:::amber
+ G -->|"No"| X["FLAG FOR REVIEW<br/>Conflicting or late observation"]:::rose
+ G -->|"Yes"| H["CORRELATED OBSERVATION<br/>Useful, but not bank-credit proof"]:::purple
+ H --> I["SEPARATE QUALIFIED CREDIT MATCH"]:::green
+ I --> J{"Merchant · Recipient · Amount · Reference match?"}:::amber
+ J -->|"No"| Q["QUARANTINE FINANCIAL EXCEPTION"]:::rose
+ J -->|"Yes"| K["BALANCED LEDGER & CONFIRMED RECEIPT"]:::green
+ classDef blue fill:#103453,stroke:#38BDF8,stroke-width:2px,color:#FFF;
+ classDef purple fill:#30204F,stroke:#C084FC,stroke-width:2px,color:#FFF;
+ classDef amber fill:#472D18,stroke:#FBBF24,stroke-width:2px,color:#FFF;
+ classDef green fill:#103C31,stroke:#34D399,stroke-width:2px,color:#FFF;
+ classDef rose fill:#4A1F31,stroke:#FB7185,stroke-width:2px,color:#FFF;
 ~~~
 
-## Time and reference checks
+## What DISHA checks
 
-DISHA uses a short, three-minute checkout session. Its temporal controls also distinguish an early observation, an observation inside the expected window and an expired return. These timing rules are **screening criteria**, not statistical proof that a payment succeeded.
+| Protection | Question answered | Why it matters |
+| --- | --- | --- |
+| **Recipient consistency** | Is the UPI address the account selected for this order? | Helps identify misdirected or incorrectly attributed payment claims |
+| **Exact-value matching** | Does the amount match the order, including paise? | Separates correct orders from altered or short payments |
+| **Pony-tail temporal analysis** | Was the observation early, within the expected window or late? | Gives suspicious timing a defined business context |
+| **Reference collision** | Has a claimed twelve-digit reference appeared on another order? | Surfaces replay and conflict patterns |
+| **Device-context analysis** | What authorized handoff and browser return were recorded? | Adds context beyond a customer-supplied screenshot |
+| **Financial source integrity** | Does a qualified credit belong to the same account and original order? | Supports legitimate accounting completion |
+| **Idempotent accounting** | Has the same credit already been posted? | Prevents counting a matched credit twice |
+| **Quarantine** | Do material financial fields disagree? | Keeps unresolved financial events out of completed records |
 
-A UTR can appear on pending or unsuccessful transfers. Therefore even a correctly shaped twelve-digit reference, an in-window return and a matching payee do **not** establish a bank credit by themselves.
+## Pony-tail — the time-window concept
 
-## Operational fraud controls
+The current checkout request lasts **180 seconds**. Its evidence policy distinguishes an initial observation period from the main observation window and events that arrive after the defined session period.
 
-The codebase includes merchant-specific account isolation, receiving-UPI health and availability fields, account pause controls, duplicate-event handling, evidence history, and quarantine of mismatched financial-credit events. The platform has a separate owner incident and release-control view.
+~~~mermaid
+flowchart LR
+ A["0–15 seconds<br/>Early observation"]:::blue --> B["15–180 seconds<br/>Expected observation window"]:::amber --> C["After expiry<br/>Late observation"]:::rose
+ classDef blue fill:#103453,stroke:#38BDF8,color:#FFF,stroke-width:2px;
+ classDef amber fill:#472D18,stroke:#FBBF24,color:#FFF,stroke-width:2px;
+ classDef rose fill:#4A1F31,stroke:#FB7185,color:#FFF,stroke-width:2px;
+~~~
 
-The repository also contains broader VPA-routing and n8n automation designs. Their existence is not proof that all associated orchestration or bank-status monitoring is live.
+**Timing is a risk signal, not a payment-success probability.** An event arriving inside the window is not proof of funds; a late return does not by itself prove that no transfer occurred.
 
-## What the product does not claim
+## Four common fraud and error scenarios
 
-- No audited claim of 0% fraud, 99.7% accuracy, guaranteed fraud reduction or zero false positives.
-- No guarantee that rotating receiving accounts prevents a bank restriction or an account freeze.
-- No claim that a customer screenshot, PIN screen, UPI response text or browser return constitutes final financial settlement.
-- No production certification until real-bank evidence, incident operations and independent security acceptance are established.
+### Copied success receipt
 
-## Merchant playbook for disputed payments
+A screenshot or receipt text may look authentic, but its customer-origin content is not inherently an account-credit record. DISHA keeps it at the evidence level.
 
-If a customer says they paid but the order is not confirmed, locate the order, check the intended amount and recipient, inspect the recorded Vault observations and reference conflicts, and keep the order unresolved until an appropriate confirmed credit record can be matched. Escalate inconsistencies rather than releasing goods based only on an attractive image.
+### UTR shared across orders
 
-[Back to the knowledge centre](Home.md)
+A candidate reference linked to two different orders is a conflict. DISHA records that conflict for review rather than letting the first customer claim determine who paid.
+
+### Correct-looking amount, wrong recipient
+
+The original payee is preserved with the order. A discrepancy between that recipient and the available evidence is visible for investigation.
+
+### A financial event that cannot be matched
+
+Even a signed credit event must agree with the merchant, receiving address, exact amount, original order and permitted matching context. Conflicting financial events belong in an exception path.
+
+## Fraud protection is also an operations decision
+
+Good controls give merchants the information needed to decide what to investigate, not a fictional promise that all risk vanishes. DISHA presents uncertainty explicitly: **observed, unverified, conflicting, late, qualified or completed**.
+
+[Vault architecture](Vault-Architecture.md) · [Complete platform architecture](Platform-Architecture.md) · [Home](Home.md)

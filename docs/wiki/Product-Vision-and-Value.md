@@ -1,70 +1,76 @@
-# Product vision — a better record of what happened to the payment
+# The DISHA vision — Merchant-owned payment intelligence
 
-## The proposition
+<img src="../../public/assets/disha-8-2-wordmark-cropped.png" width="300" alt="DISHA 8.2">
 
-**DISHA 8.2 is merchant-owned payment intelligence around the existing UPI journey.**
+## The money moves on UPI. The intelligence belongs to you.
 
-It does not ask the customer to learn a new wallet or change banks. It asks the merchant to change how it creates, observes and accounts for a payment request.
+Digital payments made transferring money easier. They did not automatically make every business payment easier to explain.
 
-A conventional "payment received" green tick can be reassuring, but the real commercial question is deeper: **did the right money reach the right receiving account for the right order, and what supports that conclusion?**
+A customer can show a reference number. A storefront can display a QR. A seller can receive a screenshot. But a business still needs one coherent answer to the question that matters: **what happened to this particular order?**
 
-DISHA is built to preserve that distinction across the customer checkout, merchant workflow and financial record.
+DISHA 8.2 is designed around that question.
 
-## Five operational problems
+It gives merchants a single environment where **the intended order, the customer's checkout journey, available evidence, payment discrepancies and financial records belong together**.
 
-### 1. Orders and payment references become detached
+## The five problems DISHA solves
 
-A reference on a chat screenshot may not say which cart, service, receiving account or merchant it belongs to. DISHA begins by creating a fixed order context with the right payee, amount and expiry. This makes later evidence easier to compare.
-
-### 2. A payment attempt looks too much like a completed payment
-
-An app can open and close. A customer can return from it without entering a PIN, or with an uncertain result. DISHA records the available observation without treating the return as a bank credit.
-
-### 3. Merchants have to investigate payment disputes manually
-
-Wrong amount, reused reference, altered image, unexpected recipient and delayed credit can produce contradictory signals. DISHA links those signals to the order and gives the business a structured record for review.
-
-### 4. The merchant's information is fragmented
-
-Payment links, receiving accounts, reported outcomes, transaction history, evidence, notifications and financial records often live in separate tools. DISHA brings these parts together in merchant and owner workspaces.
-
-### 5. The software business model can scale against the merchant
-
-Some providers charge recurring software fees or a percentage on eligible transactions; fees vary by actual payment type and contract. DISHA proposes a one-time software and implementation license with costs transparently separated from applicable banking, infrastructure and support expenses.
-
-## The product pillars
-
-| Pillar | Product promise | What exists in the current repository |
+| Business pain | The DISHA approach | Business impact |
 | --- | --- | --- |
-| **A clear checkout** | One order, one receiving account, one understandable payment request | Payment links, QR, app selection, three-minute expiry and P2P/P2M separation |
-| **DISHA Vault** | Remember permitted evidence of the customer journey | Passkey-authorized handoff and order-bound browser evidence |
-| **Fraud resistance** | Challenge conflicts rather than believe appearances | Payee, exact amount, reference, window and duplicate evidence checks |
-| **Merchant operations** | Give each business a control room for its own orders | Business onboarding, payment creation, receiving accounts, reports, exports, notifications |
-| **Financial accountability** | A real completion must have a real accounting basis | Qualified-credit reconciliation rules, quarantine and balanced-ledger path; live source remains unconnected |
-| **Platform governance** | Controlled onboarding and oversight | Owner approvals, tenants, incidents, analytics and release settings |
+| A reference number has no clear order identity | Start with a fixed amount, recipient, reference and time window | Traceable customer payment requests |
+| Payment screenshots may be misleading | Inspect authorized handoff observations and reference conflicts separately from actual credit | Fewer guess-based decisions |
+| Receiving accounts are difficult to coordinate | Manage personal and bank-issued merchant UPI addresses in one workspace | Clearer account selection and payment history |
+| Finance has to piece together multiple systems | Connect order context to qualified credit evidence and ledger entries | More coherent financial records |
+| Growth creates more platform dependency | Merchant-controlled software and one-time commercial model | Better clarity about software ownership and costs |
 
-## A practical story
+## The DISHA business model
 
-Consider a merchant selling a digital service worth ₹500. The merchant creates a request for ₹500, sends the checkout and sees it in their own workspace. The buyer selects a UPI app. The browser later returns. DISHA Vault logs that return, but no UTR may be available; the order remains unresolved. If a qualified credit of exactly ₹500 can later be connected to that merchant's receiving account and order, DISHA can record it and produce a confirmed receipt. If a conflicting reference appears instead, the merchant has information to investigate rather than a fabricated sale.
+~~~mermaid
+flowchart LR
+ A["Merchant-owned<br/>Order context"]:::blue --> B["Customer UPI<br/>Payment experience"]:::blue
+ B --> C["DISHA Vault<br/>Authorized evidence"]:::purple
+ C --> D["Risk intelligence<br/>Check conflicts"]:::orange
+ D --> E["Qualified credit<br/>Financial match"]:::green
+ E --> F["Business records<br/>Receipt · Ledger · Reports"]:::green
+ classDef blue fill:#103453,stroke:#38BDF8,color:#FFF,stroke-width:2px;
+ classDef purple fill:#30204F,stroke:#C084FC,color:#FFF,stroke-width:2px;
+ classDef orange fill:#472D18,stroke:#FBBF24,color:#FFF,stroke-width:2px;
+ classDef green fill:#103C31,stroke:#34D399,color:#FFF,stroke-width:2px;
+~~~
 
-## Who DISHA is for
+### 1. The merchant owns the order
 
-**Independent merchants** who want a consistent way to create UPI requests, track outcomes and investigate ambiguous payments.
+DISHA begins before a UPI app opens. It records the precise receiving account, exact amount and original order. A payment link is therefore a business instrument, not just a generic QR.
 
-**Growing commerce businesses** that need organized receiving accounts, merchant staff workflows, reporting and cleaner order-to-payment records.
+### 2. The customer keeps their familiar payment app
 
-**High-volume platforms** evaluating a self-controlled payment operating layer with strong isolation, traceability and accountability. The current release is not yet qualified for real-money external launch at scale.
+The checkout presents supported UPI applications and a QR alternative. The external banking network moves the funds; DISHA stays focused on the surrounding business experience.
 
-**Product and operations teams** responsible for evidence review, launch gates, exception handling and merchant support.
+### 3. The Vault remembers the authorized journey
 
-## Positioning boundaries
+DISHA Vault associates a supported device authorization and available browser-return information with the original order, leaving unavailable information unclaimed.
 
-DISHA is not a bank or NPCI substitute. It does not supply a guaranteed merchant classification, guarantee zero account restrictions, make every UPI payment free under every contract, hold funds on behalf of merchants or guarantee that all banking apps reveal a UTR.
+### 4. Fraud intelligence challenges inconsistency
 
-Its competitive differentiator is a coherent **merchant-owned evidence and operations experience** paired with a one-time software-commercial proposal, not a claim to defeat the banking system.
+DISHA examines unusual timing, amount mismatches, unexpected recipients and conflicting reference claims. Suspicion is treated as information to investigate rather than a reason to manufacture a successful or failed payment.
 
-## The long-term ambition
+### 5. Financial records require a different kind of evidence
 
-Make payment operations more explainable, more portable and less dependent on manual screenshot-based decision-making. The roadmap is evidence-led: prove live bank acceptance, prove the credit-to-ledger path, validate Vault compatibility, and only then open controlled external merchant onboarding.
+The merchant's accounts are served by financial reconciliation and balanced ledger records. A payment-looking image is not a balance-sheet entry. Where qualified credit evidence matches the order, the completed outcome can support a receipt.
 
-[Read the end-to-end journey](End-to-End-Journey.md) · [Return home](Home.md)
+## Who DISHA is designed for
+
+**Local commerce** — Shops and independent merchants who want better payment-request clarity and fewer screenshot disputes.
+
+**Digital-first businesses** — Sellers with order-based checkout, virtual products, subscriptions or services that need consistent payment records.
+
+**High-volume operations** — Businesses with multiple receiving accounts, reporting requirements and operational exceptions.
+
+**Platform owners** — Operators responsible for approved merchant access, oversight, identity separation and business accountability.
+
+## A different definition of control
+
+Control is not pretending to own the bank rail or claiming that every fee can be eliminated. It is the ability to understand the request, choose eligible receiving accounts, review the available evidence and maintain trustworthy merchant records without outsourcing every layer of the software experience.
+
+**DISHA 8.2: own the experience, understand the evidence, keep the record.**
+
+[Platform architecture](Platform-Architecture.md) · [Customer journey](End-to-End-Journey.md) · [Home](Home.md)

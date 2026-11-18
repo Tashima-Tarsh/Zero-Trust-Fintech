@@ -1,72 +1,74 @@
-# Records, reconciliation and receipts — what counts as completed
+# Financial Intelligence — Order, evidence, reconciliation and receipt
 
-A merchant should be able to explain not just the amount requested but what occurred after it was requested. DISHA separates **operational events**, **customer-origin observations** and **qualified financial records**.
+A merchant needs more than payment links. It needs a clear relationship between the customer order, any observations of the payment attempt and the money that can actually be recorded as received.
 
-## The three record families
+DISHA maintains these as separate, connected layers.
 
-### 1. The order
+## Three types of record
 
-An order captures the amount, the intended receiving UPI account, the merchant, the customer-facing reference and the validity window. This is a request to pay, not a transaction credit.
+| Record family | What it contains | What it tells the merchant |
+| --- | --- | --- |
+| 🟦 **Order** | Original merchant, recipient, amount, reference and time window | What the business asked the customer to pay |
+| 🟪 **Vault evidence** | Authorized handoff, browser return, available reference and discrepancies | What DISHA observed or was told |
+| 🟩 **Financial record** | Independently qualified matching credit and balanced accounting entry | What can be recorded as a completed transaction |
 
-### 2. The evidence trail
+**A screenshot belongs to the evidence story, not automatically to the financial story.**
 
-DISHA Vault can attach the authorized browser handoff and any permitted return parameters. It may contain a UTR candidate, claimed success/failure or no reference at all. This evidence is useful for review but is not, by itself, a confirmation that money reached the merchant.
-
-### 3. The financial record
-
-A separately qualified account-credit event, when available and correctly matched, supports a completed transaction and balanced ledger entry. The financial path checks that the credit belongs to the proper merchant, receiving address, amount, reference and original order. Conflicting qualified events are quarantined.
-
-## Payment status lifecycle
+## Financial reconciliation architecture
 
 ~~~mermaid
-stateDiagram-v2
- [*] --> Requested
- Requested --> Pending: Customer checkout opened
- Pending --> Observed: Device return or reference observation
- Observed --> AwaitingCredit: Evidence recorded
- Pending --> AwaitingCredit: No return details
- Requested --> Expired: Session lifetime ends
- Pending --> Expired: Session lifetime ends
- AwaitingCredit --> Completed: Qualified matching credit
- AwaitingCredit --> Review: Conflicting or unqualified evidence
- Review --> Completed: Later qualified matching credit
- Expired --> Completed: Independently reconciled valid credit
- Completed --> [*]
+flowchart TB
+ A["Original DISHA order<br/>Merchant · Payee · Exact amount"]:::blue
+ B["Qualified receiving-account credit record"]:::green
+ C["Vault observations<br/>Unverified customer-origin claims"]:::purple
+ A --> D["Financial matching<br/>Tenant · Recipient · Amount · Window · Reference"]:::amber
+ B --> D
+ C -. "Investigation context only" .-> D
+ D --> E{"All qualifying fields agree?"}:::amber
+ E -->|"Yes"| F["Balanced merchant financial journal"]:::green
+ F --> G["Completed transaction"]:::green
+ G --> H["Printable and shareable receipt"]:::green
+ E -->|"No"| Q["Quarantined financial exception"]:::rose
+ Q --> R["Merchant investigation"]:::blue
+ classDef blue fill:#103453,stroke:#38BDF8,color:#FFF,stroke-width:2px;
+ classDef purple fill:#30204F,stroke:#C084FC,color:#FFF,stroke-width:2px;
+ classDef amber fill:#472D18,stroke:#FBBF24,color:#FFF,stroke-width:2px;
+ classDef green fill:#103C31,stroke:#34D399,color:#FFF,stroke-width:2px;
+ classDef rose fill:#4A1F31,stroke:#FB7185,color:#FFF,stroke-width:2px;
 ~~~
 
-This diagram is a business-level lifecycle. Product screens may show different labels for intermediate states. Expiry does not prove that money never moved; likewise a UTR claim does not prove that it did.
+## What does a balanced ledger accomplish?
 
-## Reconciliation decisions
+A completed financial event is represented as corresponding debit and credit entries attached to the same merchant transaction. The entries balance, and the record can be associated with the specific original order. This reduces inconsistent bookkeeping and makes reporting clearer.
 
-| Financial situation | Business treatment |
+The ledger is the merchant's **accounting record**, not a substitute for the receiving bank's actual statement.
+
+## Customer receipt journey
+
+~~~mermaid
+flowchart LR
+ A["Qualified credit"]:::green --> B["Exact order match"]:::amber --> C["Financial journal posted"]:::green --> D["Confirmed status"]:::green --> E["Receipt<br/>Print · Share"]:::blue
+ classDef blue fill:#103453,stroke:#38BDF8,color:#FFF,stroke-width:2px;
+ classDef amber fill:#472D18,stroke:#FBBF24,color:#FFF,stroke-width:2px;
+ classDef green fill:#103C31,stroke:#34D399,color:#FFF,stroke-width:2px;
+~~~
+
+A customer receives a completed receipt when an appropriate financial record supports it. A device returning from a UPI application is an observation, not the same event.
+
+## How exceptions are handled
+
+| Situation | DISHA business interpretation |
 | --- | --- |
-| No qualified credit available | Keep unresolved; do not issue completed receipt |
-| Authenticated matching credit, once | Record completed transaction and balanced ledger |
-| Duplicate of a previously posted credit | Reuse existing financial outcome; never double count |
-| Credit for the wrong merchant | Quarantine |
-| Different amount or recipient | Quarantine |
-| Credit outside the permitted matching window | Quarantine / investigate |
-| Customer shares a screenshot or reference only | Store as an unverified claim, not as a bank-credit entry |
-| Browser returns with “success” text | Observation only; no automatic settled record |
+| Customer has opened the app but no qualified credit is available | Keep the order unresolved |
+| App returned with a reference candidate | Record and examine the unverified claim |
+| Customer returns after the checkout timer expires | Preserve timing context; do not infer that money did or did not move |
+| Qualified credit belongs to another receiving account | Hold the discrepancy for review |
+| Qualified credit shows a different amount | Investigate the mismatch |
+| Same qualified credit is received again | Avoid duplicate posting |
+| Qualified credit matches the original merchant order | Post and present the completed financial record |
 
-## Why a balanced ledger matters
+## What the merchant gets
 
-A merchant's financial history must reconcile. DISHA has accounting structures designed to record both sides of a completed transaction as matching entries. Their value is not an animated green badge; it is that the recorded amount must remain internally consistent and tied to a specific order.
+A consistent transaction timeline, meaningful statuses, qualified ledger entries, evidence views, exception context, reporting and CSV exports. Rather than relying on visual appearances, the business can tell the story of each order from start to finish.
 
-**A ledger is not a substitute for the bank's actual statement.** When the bank-facing credit source has not been established, the ledger must not invent money.
-
-## Customer receipt
-
-A confirmed checkout can present the recorded order, amount, recipient and reference and allow printing or sharing. This receipt should be available **after** a qualifying completed financial record, not immediately after a user returns from a payment app.
-
-Until then, the customer should see a truthful pending, checking or expired state. A fresh payment session should not silently reuse an expired unresolved request.
-
-## Exceptions and dispute resolution
-
-When a customer says “I paid,” the business can use the order history and evidence log to investigate. Staff should look for the correct merchant and amount, a legitimate statement credit, an appropriate reference match, and any conflicting use of the same reference. A mismatch becomes an exception, not a second sale.
-
-## Current implementation versus release status
-
-The active product includes the financial matching rules, duplicate controls, quarantine inbox concept, exact-value ledger path and a customer receipt presentation. The latest production review states that the independent authenticated real-world credit source is **not yet connected**. Real-money settlement-to-receipt acceptance therefore remains incomplete.
-
-[DISHA Vault](DISHA-Vault.md) · [Fraud controls](Fraud-and-Risk-Protection.md) · [Home](Home.md)
+[Fraud intelligence](Fraud-and-Risk-Protection.md) · [Merchant workspaces](Merchant-and-Owner-Workspaces.md) · [Home](Home.md)

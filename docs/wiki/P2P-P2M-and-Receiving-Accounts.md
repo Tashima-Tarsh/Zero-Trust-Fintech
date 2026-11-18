@@ -1,55 +1,67 @@
-# Personal and merchant UPI — P2P, P2M and receiving-account operations
+# DISHA Receiving Accounts — P2P, P2M and intelligent selection
 
-An account's classification matters because banking applications and acquiring institutions do not treat all UPI payment requests identically. DISHA records the account type and preserves it for the life of the order.
+A business's receiving account is central to its payment experience. DISHA distinguishes personal UPI accounts from genuine merchant-classified accounts and keeps each customer's original recipient attached to the order.
 
-## Two payment types
+## P2P and P2M are not interchangeable
 
-| | Personal receiving UPI (P2P) | Bank-issued merchant receiving UPI (P2M) |
+| | Personal receiving UPI — **P2P** | Bank-issued merchant receiving UPI — **P2M** |
 | --- | --- | --- |
-| Intended recipient | An eligible personal UPI address | A bank/acquirer-registered merchant address |
-| Who authorizes eligibility | The applicable account bank/provider | The issuing bank/acquirer and applicable merchant rules |
-| What DISHA shows | Personal receiving account | Merchant receiving account |
-| What DISHA preserves | Payee and amount for that order | Merchant identity, payee, amount and the bank-issued merchant classification |
-| Can DISHA convert it into the other type? | **No** | **No** |
-| Status in code | Different construction path and validation | Requires a real merchant category value and correct classification |
-| Live launch evidence | Real bank/app P2P acceptance pending | Bank-issued merchant eligibility and P2M acceptance pending |
+| Recipient | Eligible personal UPI address | Bank/acquirer-issued merchant UPI address |
+| Classification | Personal account | Merchant status established by issuing institution |
+| Customer experience | Familiar UPI app or QR | Familiar UPI app or QR |
+| DISHA order | Preserves the specific personal payee and amount | Preserves merchant payee, bank-issued category and amount |
+| Bank role | Determines payment acceptance | Determines merchant eligibility and payment acceptance |
+| Product distinction | Does not attach merchant-only identity fields | Uses merchant-specific payment details, not a synthetic conversion |
 
-The **merchant category code (MCC)** is a banking classification, not a marketing choice. Entering a four-digit value into software cannot create bank-approved merchant status.
+A four-digit merchant category code is part of a legitimate merchant-account configuration. Merely typing one into a software form does **not** turn a personal account into an approved merchant account.
 
-## How a merchant manages receiving accounts
-
-The approved business adds its own receiving UPI address, account holder name and applicable bank/category details. It can set a primary account, register more addresses, pause or resume eligible accounts and use a controlled bulk import. The platform records account status, activity and health-related indicators.
-
-When a new order is created, its intended payee details are kept with the order. Changing the merchant's primary UPI account later must not silently redirect an already-shared link.
+## Receiving-account architecture
 
 ~~~mermaid
-flowchart TD
- A["Merchant owns eligible receiving accounts"] --> B["Choose correct P2P or P2M classification"]
- B --> C["DISHA checks required account details"]
- C --> D["Create order with fixed receiving details"]
- D --> E["Generate checkout and QR"]
- E --> F["Existing UPI app decides whether the request is accepted"]
- F --> G["Observe and reconcile separately"]
+flowchart TB
+ A["Merchant's own eligible receiving UPI accounts"]:::blue --> B{"Account type"}:::amber
+ B -->|"Personal"| P["P2P account record"]:::blue
+ B -->|"Bank-issued merchant"| M["P2M account record<br/>Merchant classification"]:::green
+ P --> H["Eligible account selection<br/>Health · Load · Availability"]:::purple
+ M --> H
+ H --> O["Order with fixed payee and amount"]:::blue
+ O --> C["Customer checkout<br/>QR and app choice"]:::blue
+ C --> U["Existing UPI network and banks"]:::gray
+ classDef blue fill:#103453,stroke:#38BDF8,color:#FFF,stroke-width:2px;
+ classDef purple fill:#30204F,stroke:#C084FC,color:#FFF,stroke-width:2px;
+ classDef amber fill:#472D18,stroke:#FBBF24,color:#FFF,stroke-width:2px;
+ classDef green fill:#103C31,stroke:#34D399,color:#FFF,stroke-width:2px;
+ classDef gray fill:#293241,stroke:#CBD5E1,color:#FFF,stroke-width:2px;
 ~~~
 
-## Multiple receiving accounts and account health
+## Multiple account management
 
-The active product includes account lists, a primary-account setting, per-account activity indicators and routing/availability controls. These can help the merchant manage configured receiving accounts and avoid selecting an account that has been paused or is otherwise unavailable.
+A merchant can register several eligible receiving UPI addresses, designate a primary account, pause or resume secondary accounts and import a controlled set of additional records. The product also maintains per-account activity and health indicators.
 
-The repository also contains a larger VPA routing engine and stored n8n workflows for health and quarantine. Their presence does not establish that a bank has approved any account rotation, that bank restrictions can be evaded or that all workflow automation is operating in the production service.
+### Five-factor account selection
 
-## Common failure situations
+When DISHA chooses among eligible receiving accounts, its selection logic considers:
 
-**The UPI app fails before PIN.** This can be caused by app support, receiving account eligibility, an invalid merchant classification or other bank-side rejection. It is not proof the customer entered the wrong PIN or that the merchant received money.
+| Factor | Business meaning |
+| --- | --- |
+| **Health** | Prefer accounts that meet available health criteria |
+| **Cooldown** | Consider how recently an account was selected |
+| **Daily load** | Respect configured daily activity and volume limits |
+| **Preferred time slot** | Consider the receiving account's configured activity period |
+| **Diversity factor** | Add a balancing input rather than always favoring one account |
 
-**An account is personal but declared merchant.** DISHA is designed to reject inconsistent classification rather than quietly downgrading it to a personal transfer.
+The router also considers recent selection history. These are **software routing and availability controls**, not authorization to circumvent bank rules, per-account limits or risk screening.
 
-**The merchant edits the primary receiving account.** A previously issued order should remain bound to the originally recorded recipient.
+## Preserve the recipient chosen at order creation
 
-**A QR opens but the bank refuses the recipient.** Producing a syntactically valid QR does not certify that a bank accepts the account.
+One important DISHA design principle is **immutable payee intent**. When a merchant creates a payment request, its receiving address, payee name and account classification are saved with that order. Later changes to the merchant's primary UPI address must not rewrite the original customer's link.
 
-## Live acceptance required
+## The three most important account decisions
 
-Before external merchants accept real money, an actual personal VPA and an actual bank-issued merchant VPA need separate on-device tests, including a small successful payment, incorrect PIN, cancellation, expiry and app refusal. A qualifying financial credit must be established separately from the appearance of the UPI app.
+**Can this account receive the intended payment?** The bank and UPI application determine that, not the appearance of a QR.
 
-[End-to-end journey](End-to-End-Journey.md) · [Product roadmap](Release-Status-and-Roadmap.md) · [Home](Home.md)
+**Is this the correct type of account?** DISHA treats personal and merchant recipients differently and preserves that distinction.
+
+**Is this the intended recipient for this order?** Every payment request retains its own specific payee, preventing unintended substitution.
+
+[Customer journey](End-to-End-Journey.md) · [Platform architecture](Platform-Architecture.md) · [Home](Home.md)

@@ -1,79 +1,83 @@
-# Frequently asked questions — DISHA 8.2
+# DISHA 8.2 — Frequently Asked Questions
 
-## Is DISHA a new payment app or digital wallet?
+## What is DISHA 8.2?
 
-No. Customers use their existing supported UPI apps. DISHA provides merchant-owned checkout software, evidence capture, risk review, account management and financial-record workflows around those payments.
+DISHA is merchant-owned payment intelligence software around direct UPI checkout, device evidence, risk decisions, merchant operations and financial records. It is not a new UPI network or bank.
 
-## Does DISHA hold customers' funds?
+## What is the principal benefit?
 
-Its product concept is non-custodial: funds move through the existing UPI participants to the intended receiving account rather than into a DISHA wallet.
+Every payment request can have a consistent story: what the merchant asked for, what the customer attempted, what the checkout observed and what can be financially recorded.
 
-## Does the buyer have to install DISHA?
+## Does the customer need a DISHA wallet or mobile app?
 
-No separate DISHA consumer wallet installation is required. The checkout can offer installed UPI apps on a supported phone or a QR alternative.
+No new DISHA wallet is required. On supported devices, a customer can open a familiar UPI application from the checkout; a QR alternative is provided.
 
-## What exactly is DISHA Vault?
+## What is DISHA Vault?
 
-An order-bound, passkey-authorized observation trail for a customer's checkout handoff and browser return. It records what the first-party browser can observe; it is not a bank account reader or proof of funds.
+A device-authorized, order-specific observation system. It can record the checkout's permitted browser handoff and return information. [See the full architecture](Vault-Architecture.md).
 
-## Can DISHA automatically discover the UTR inside PhonePe or Google Pay?
+## Does the Vault read my UPI PIN or private bank screen?
 
-A normal browser cannot inspect another app's private transaction details. It can record permitted return details *if* the app exposes them. Some returns have no UTR and should be recorded honestly as such.
+No. Those remain inside the customer's bank/payment application. The Vault observes the first-party browser's own journey and any permitted return parameters.
 
-## Does a 12-digit UTR prove payment success?
+## What happens if a customer closes the UPI app before paying?
 
-No. A UTR can appear on pending or unsuccessful transfers. It is useful as a candidate reference, but a qualifying account credit is needed for a financially completed record.
+DISHA does not equate opening or closing the app with a completed payment. The order retains the observations and its actual financial status.
 
-## What happens if a customer closes the UPI app without paying?
+## Can a UTR alone confirm a payment?
 
-The checkout should not claim that the merchant received money. The order can remain unresolved or expire, and any observed return can be recorded as evidence.
+A reference is useful, but a customer-supplied or browser-exposed reference alone does not prove that funds reached the intended receiving account. Financial completion depends on qualified matching credit evidence.
 
-## Can DISHA protect against fake screenshots and replay?
+## How does DISHA respond to a fake receipt?
 
-It includes controls that keep unverified screenshots and customer-origin reference claims from becoming completed financial records on their own, and it checks conflicts and duplicates. It cannot promise zero fraud.
+It keeps customer-origin receipts or references at the evidence level. They can be compared with the order and flagged, but they do not themselves create completed accounting entries.
 
-## Does DISHA offer both P2P and P2M?
+## What fraud controls does DISHA use?
 
-The repository distinguishes personal receiving accounts from bank-issued merchant accounts. A merchant account requires authentic bank/acquirer classification; DISHA does not create it simply by labelling a payment P2M.
+Order and recipient consistency, exact amount checks, temporal screening, conflicting-reference detection, duplicate-event controls, qualified-credit matching and financial exception review. [Explore fraud intelligence](Fraud-and-Risk-Protection.md).
 
-## Does the merchant receive funds instantly?
+## Can a merchant choose several receiving UPI addresses?
 
-The applicable banking system determines transfer and settlement outcomes. DISHA cannot guarantee instantaneous credit merely because the UPI app shows a response. A completed DISHA accounting record depends on an appropriately qualified credit.
+Yes. The merchant workspace supports multiple receiving accounts, primary selection and eligible account-management controls. A payment request retains its original payee details.
 
-## Does DISHA charge 0% MDR?
+## Does DISHA support P2P and P2M?
 
-The proposed DISHA software arrangement does not deduct a DISHA percentage from each transaction. That does **not** mean all banks, external payment products or merchant transaction categories have zero fees. The applicable charges depend on the actual arrangement.
+It distinguishes personal UPI receiving accounts from bank-issued merchant receiving accounts. A merchant classification must be legitimate; DISHA does not create merchant eligibility by renaming an account.
 
-## How is the product priced?
+## What is the three-minute timer?
 
-The proposal is one-time software licensing and implementation, with the written scope defining any support, hosting or third-party costs. No universal price is established in this repository.
+The order-specific checkout has a defined 180-second payment request window. It helps manage validity and timing context but does not itself establish whether a bank credit exists.
 
-## Can a merchant import many receiving UPI IDs?
+## Does DISHA hold customer funds?
 
-The merchant workspace includes managed additional receiving accounts and controlled bulk import. Bank eligibility, contractual restrictions and account acceptance still apply.
+DISHA's software model is non-custodial. Actual UPI money movement happens through the applicable existing banking system.
 
-## Are all receiving-account rotation and n8n health workflows live?
+## What happens when a payment is confirmed?
 
-No such claim can be made from workflow files alone. The repository includes stored orchestration definitions and active receiving-account management, but the 19 November assessment did not establish a running end-to-end n8n bank-credit workflow.
+When a qualified financial record matches the original order, the transaction can be accounted for in the balanced ledger, and the checkout can present a completed receipt.
 
-## What is on the merchant dashboard?
+## What can the merchant see?
 
-Order creation and tracking, transaction history, receiving UPI accounts, reports, exports, evidence, ledger views, notifications, settings and operational controls. The platform owner has a separate approval and oversight console.
+Orders, receiving UPI accounts, recorded statuses, Vault evidence, risk-oriented views, reports, notifications, financial ledger records and exports, all within the business's workspace.
 
-## When does the customer get a payment receipt?
+## What can the platform owner see?
 
-When DISHA has a completed financial record supported by an appropriate matching credit. A browser return or customer screenshot alone must not generate a paid receipt.
+Access applications, merchant approvals, separate tenants, overall transaction oversight, incidents and platform financial/evidence reporting, subject to owner access controls.
 
-## Is it ready for live merchant onboarding?
+## How is DISHA priced?
 
-Not for unmonitored external real-money use as of the documented 19 November 2026 release assessment. The live P2P/P2M bank acceptance, independently sourced credit and complete operations/sign-off remain open release gates.
+The proposed commercial relationship is one-time software licensing and implementation rather than a DISHA percentage of payment volume. Specific terms, hosting, bank charges, maintenance and support are agreed separately.
 
-## Is the repository open-source?
+## Does DISHA remove every UPI fee?
 
-The code is publicly visible, but the actual Business Source License 1.1 terms restrict commercial use and require licensing. It is more accurate to call it **source-available** than unrestricted open source.
+No. The real financial benefit depends on the merchant's current arrangement and which specific platform charges are avoidable. Many UPI payment categories do not incur the same fee structure.
 
-## How can I review the product and track readiness?
+## Is the source unrestricted open source?
 
-See the [main product page](../../README.md), the [complete journey](End-to-End-Journey.md), the [release roadmap](Release-Status-and-Roadmap.md), and [the website](https://disha8-2.thenitishkr.in/).
+No. The source is publicly accessible under Business Source License 1.1 with restrictions on commercial use. An appropriate agreement is required for commercial deployment.
+
+## Where can I explore DISHA?
+
+Visit the [DISHA 8.2 website](https://disha8-2.thenitishkr.in/), [product architecture](Platform-Architecture.md), [knowledge centre](Home.md), or [request access](https://disha8-2.thenitishkr.in/request-access).
 
 [Back to the knowledge centre](Home.md)

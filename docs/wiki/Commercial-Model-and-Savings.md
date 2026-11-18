@@ -1,62 +1,59 @@
-# Commercial model and potential merchant savings
+# The economics of owning the payment software
 
-DISHA's commercial proposition is **merchant-owned payment software under a one-time license and implementation arrangement**, tailored to the customer's business requirements. It is not a universal claim that all payment costs disappear.
+**A one-time DISHA software and implementation relationship — not a DISHA percentage deducted from each payment.**
 
-## What the business is buying
+The product's commercial philosophy is straightforward: a business should be able to own its checkout experience and payment intelligence as software, while continuing to use eligible UPI receiving accounts and the existing banking network.
 
-A merchant evaluating DISHA is evaluating control over a software environment: branded checkout, receiving-account configuration, order creation, evidence capture, risk management, reports, finance-oriented records and owner-governed access.
+## What the business acquires
 
-The proposed contract is a one-time commercial software and setup agreement rather than a DISHA percentage deducted from each payment. Pricing, onboarding scope, support, upgrades, operational responsibility and licensing must be specified in an actual commercial agreement.
+The proposed commercial scope can bring together the branded customer checkout, DISHA Vault evidence, receiving-account management, fraud-oriented exception analysis, merchant reporting, financial record views, and a controlled platform operating environment.
 
-This is different from claiming that the UPI network has a particular universal MDR. Many UPI categories and payment arrangements have materially different fee rules; **do not apply a made-up 2% fee to every UPI payment**.
+The precise license, implementation work, ongoing support and operational responsibilities belong in a written agreement; they are not implied by a marketing table.
 
-## Sources of possible value
+## Where economic value can arise
 
-1. **Avoidable payment-platform charges**, but only where the merchant currently pays a charge that would cease under an eligible new arrangement.
-2. **Reduced manual reconciliation**, if the merchant's working process and qualified credit integration truly replace human matching effort.
-3. **Clearer disputes**, from retaining order-linked evidence and contradictions rather than relying only on customer screenshots.
-4. **One workspace**, reducing operational fragmentation across requests, receiving accounts, evidence and reporting.
-5. **Predictable software commercial terms**, subject to the signed agreement and actual infrastructure and maintenance obligations.
+~~~mermaid
+flowchart LR
+ A["Merchant's current payment operations"]:::blue --> B["Avoidable external platform costs"]:::amber
+ A --> C["Manual reconciliation workload"]:::amber
+ A --> D["Fragmented order information"]:::amber
+ B --> E["DISHA software ownership model"]:::purple
+ C --> E
+ D --> E
+ E --> F["Potential business value<br/>Less avoidable cost · Clearer records"]:::green
+ classDef blue fill:#103453,stroke:#38BDF8,color:#FFF,stroke-width:2px;
+ classDef amber fill:#472D18,stroke:#FBBF24,color:#FFF,stroke-width:2px;
+ classDef purple fill:#30204F,stroke:#C084FC,color:#FFF,stroke-width:2px;
+ classDef green fill:#103C31,stroke:#34D399,color:#FFF,stroke-width:2px;
+~~~
 
-## Illustrative monthly scenarios
+### Illustrative savings — based on an avoidable fee
 
-| Merchant monthly volume | Avoidable existing fee (assumed, not observed) | Gross potential avoided fee per month |
+| Eligible monthly payment volume | Hypothetically avoidable charge | Potential gross monthly reduction |
 | ---: | ---: | ---: |
 | ₹10 lakh | 0.5% | ₹5,000 |
-| ₹1 crore | 0.5% | ₹50,000 |
+| ₹50 lakh | 0.5% | ₹25,000 |
 | ₹1 crore | 1.0% | ₹1,00,000 |
 | ₹10 crore | 1.0% | ₹10,00,000 |
 
-These values are pure examples: **monthly volume multiplied by the actual avoidable charge rate**. They are not a DISHA saving guarantee, benchmark or statement that traditional providers always charge these rates. A merchant whose eligible payments already cost 0% has no MDR reduction to claim.
+These are **arithmetic scenarios**, not claims about actual merchant bills or universal UPI MDR. Some eligible UPI transactions already carry no such fee, and a zero-fee existing arrangement offers no additional MDR saving.
 
-## Evaluate the real business case
+## What to include in a real business comparison
 
-**Annual gross avoidable platform charges** = eligible annual volume × actual avoidable rate.
+**Potential recurring value** = demonstrably avoidable platform charges + demonstrably reduced operating costs.
 
-**Annual operational value** = documented manual effort avoided × loaded cost per hour, plus any *demonstrated* cost reductions in the merchant's own process.
+**Total ownership cost** = one-time software and implementation price + eligible bank/provider costs + hosting + maintenance + support + internal operations.
 
-**First-year net benefit** = gross avoidable charges + operational value − one-time software/implementation price − bank/provider charges − infrastructure − maintenance − internal operating cost.
+**Net commercial result** = recurring value − total applicable costs over the comparison period.
 
-**Payback months** = initial one-time investment ÷ realistic monthly net benefit, only when that benefit is positive.
+A business should compare DISHA with its own invoices, transaction mix and operating process. Savings are meaningful only where an existing expense can truly be removed or reduced.
 
-Do not include speculative fraud savings, impossible bank fee elimination or unmeasured productivity gains as though they were signed financial results.
+## Why non-custodial software matters
 
-## Worked example (hypothetical)
+DISHA is not proposing to hold customers' funds as a separate wallet. The existing UPI network and participating banks manage the money transfer to an eligible receiving account. DISHA offers software for the request, trust context and accounting record around that transfer.
 
-A business has ₹1 crore per month of relevant payments and proves that a 0.5% platform charge is avoidable on the eligible portion. Its gross avoided software/platform fee could be ₹50,000 per month. It must then subtract any replacement infrastructure, onboarding, banking and support expense. If only 40% of volume is eligible, the gross avoided charge drops to ₹20,000 per month before those costs.
+## Licensing and commercial access
 
-## What DISHA does and does not take custody of
+DISHA 8.2 is **source-available under Business Source License 1.1**, with commercial use requiring appropriate terms. The public repository is not an unrestricted commercial-use grant. The applicable software and support agreement should spell out what the merchant receives and which costs remain external.
 
-DISHA's proposed software does not need to hold customer funds in a proprietary DISHA wallet. The applicable UPI banks and participants transfer money to the receiving account. Bank settlement timings, restrictions, reversals, tax obligations and legal requirements are not rewritten by the DISHA contract.
-
-## Licensing
-
-The repository uses **Business Source License 1.1 with restrictive non-commercial use terms**, including a stated change date of 15 November 2030 and future change license. The source is publicly visible but is **not an unrestricted open-source commercial license**. A commercial customer requires the agreed license and implementation terms.
-
-See the repository [LICENSE](../../LICENSE) and contact [nitish@thenitishkr.in](mailto:nitish@thenitishkr.in) for commercial discussions.
-
-## Proof before pricing promises
-
-Product-led claims should be built from merchant invoices, measurable operating time and completed pilot results. Before quoting a return on investment, establish correct real-bank operation and a viable verified-credit workflow. Economic modelling cannot substitute for go-live acceptance.
-
-[Product vision](Product-Vision-and-Value.md) · [Release status](Release-Status-and-Roadmap.md) · [Home](Home.md)
+**[Discuss your business requirements](mailto:nitish@thenitishkr.in)** · [Explore the product](Product-Vision-and-Value.md) · [Home](Home.md)
