@@ -2,26 +2,34 @@
   "version": "2.0.0",
   "tasks": [
     {
-      "label": "n8n: Set up and start",
-      "type": "process",
-      "command": "powershell.exe",
-      "args": ["-NoProfile", "-File", "${workspaceFolder}/forensic-upi-intent-engine/scripts/windows/n8n.ps1", "-Action", "Setup"],
-      "problemMatcher": []
+      "label": "DISHA: Build frontend deployment bundles",
+      "type": "shell",
+      "command": "npm",
+      "args": ["run", "build"],
+      "windows": { "command": "npm.cmd" },
+      "options": { "cwd": "${workspaceFolder}" },
+      "problemMatcher": [],
+      "group": "build"
     },
     {
-      "label": "n8n: Start server",
-      "type": "process",
-      "command": "powershell.exe",
-      "args": ["-NoProfile", "-File", "${workspaceFolder}/forensic-upi-intent-engine/scripts/windows/n8n.ps1", "-Action", "Start"],
-      "problemMatcher": []
+      "label": "DISHA: Check source syntax",
+      "type": "shell",
+      "command": "npm",
+      "args": ["run", "lint"],
+      "windows": { "command": "npm.cmd" },
+      "options": { "cwd": "${workspaceFolder}" },
+      "problemMatcher": [],
+      "group": "test"
     },
     {
-      "label": "n8n: Check connections",
-      "type": "process",
-      "command": "powershell.exe",
-      "args": ["-NoProfile", "-File", "${workspaceFolder}/forensic-upi-intent-engine/scripts/windows/n8n.ps1", "-Action", "Status"],
-      "problemMatcher": []
+      "label": "DISHA: Test payment and SaaS contracts",
+      "type": "shell",
+      "command": "npm",
+      "args": ["test"],
+      "windows": { "command": "npm.cmd" },
+      "options": { "cwd": "${workspaceFolder}" },
+      "problemMatcher": [],
+      "group": "test"
     }
   ]
 }
-
