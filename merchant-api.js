@@ -12,6 +12,19 @@ const now = () => Date.now();
 const val = (v,n=160) => String(v == null ? '' : v).trim().slice(0,n);
 const fail = (status,message) => Object.assign(new Error(message),{status});
 const vpaPattern = /^[a-z0-9._-]{2,100}@[a-z0-9._-]{2,40}$/i;
+const maxPayment = () => Math.min(Math.max(Number(process.env.MERCHANT_PAYMENT_MAX_RUPEES)||100000,1),99999999);
+const accountConfig = input => {
+  const type=String(input.accountType||'PERSONAL').toUpperCase();
+  if(!['PERSONAL','MERCHANT'].includes(type))throw fail(400,'Select a valid UPI account type');
+  const mcc=type==='MERCHANT'?val(input.mcc,4):null;
+  if(type==='MERCHANT'&&!/^\d{4}$/.test(mcc))throw fail(400,'Bank-issued merchant MCC must be exactly four digits');
+  return {type,mcc};
+};
+function upi(o,holder,amount,description,orderId){
+  const base={pa:o.vpa_address,pn:holder,am:amount,tn:description.slice(0,40),maxAmount:maxPayment()};
+  if(o.account_type==='MERCHANT')return require('./utils/upi-intent').buildUpiUri({...base,kind:'P2M',mc:o.mcc,tr:orderId.replace(/[^A-Za-z0-9]/g,'').slice(0,35)});
+  return require('./utils/upi-intent').buildUpiUri({...base,kind:'P2P'});
+}
 const vpa = v => {
   const result=val(v,150).toLowerCase();
   if(!vpaPattern.test(result))throw fail(400,'Enter a valid receiving UPI ID');
@@ -50,7 +63,7 @@ function createMerchantApi({db,getAuth,buildUpiUri}) {
       "id TEXT PRIMARY KEY,merchant_id TEXT NOT NULL REFERENCES saas_merchants(id),"+
       "vpa_address TEXT NOT NULL UNIQUE,bank_name TEXT NOT NULL DEFAULT '',"+
       "status TEXT NOT NULL DEFAULT 'ACTIVE' CHECK(status IN ('ACTIVE','PAUSED')),"+
-      "is_default BOOLEAN NOT NULL DEFAULT FALSE,created_at BIGINT NOT NULL);"+
+      "is_default BOOLEAN NOT NULL DEFAULT FALSE,account_type TEXT NOT NULL DEFAULT 'PERSONAL',mcc TEXT,created_at BIGINT NOT NULL);ALTER TABLE saas_merchant_vpas ADD COLUMN IF NOT EXISTS account_type TEXT NOT NULL DEFAULT 'PERSONAL';ALTER TABLE saas_merchant_vpas ADD COLUMN IF NOT EXISTS mcc TEXT;"+
       "CREATE INDEX IF NOT EXISTS idx_saas_vpa_tenant ON saas_merchant_vpas(merchant_id);"+
       "CREATE TABLE IF NOT EXISTS saas_merchant_orders ("+
       "id TEXT PRIMARY KEY,merchant_id TEXT NOT NULL REFERENCES saas_merchants(id),"+
@@ -88,8 +101,9 @@ function createMerchantApi({db,getAuth,buildUpiUri}) {
       [req.params.orderId,token]);
     if(!r.rowCount)throw fail(404,'Payment request not found');
     const o=r.rows[0],amount=Number(o.amount_paise)/100;
-    const uri=buildUpiUri({kind:'P2P',pa:o.vpa_address,pn:o.business_name,
-      am:amount,tn:(o.description||'Payment').slice(0,40)});
+    const setting=await db.pgPool.query('SELECT account_type,mcc FROM saas_merchant_vpas WHERE merchant_id=$1 AND vpa_address=$2',
+      [o.merchant_id,o.vpa_address]);
+    const uri=upi({...o,...(setting.rows[0]||{})},o.business_name,amount,o.description||'Payment',o.id);
     res.set('Cache-Control','no-store').json({success:true,order:{
       id:o.id,amount,business_name:o.business_name,vpa_address:o.vpa_address,
       description:o.description,status:invoiceStatus(o),expires_at:Number(o.expires_at),
@@ -121,6 +135,7 @@ function createMerchantApi({db,getAuth,buildUpiUri}) {
 
   router.post('/merchant/setup',wrap(async(req,res)=>{
     const name=val(req.body.businessName,150),account=vpa(req.body.primaryVpa);
+    const type=accountConfig(req.body);
     if(name.length<3)throw fail(400,'Business name must be at least three characters');
     const c=await db.pgPool.connect();
     try{
@@ -128,9 +143,9 @@ function createMerchantApi({db,getAuth,buildUpiUri}) {
       await c.query("UPDATE saas_merchants SET business_name=$2,setup_completed=TRUE,updated_at=$3 WHERE id=$1",
         [req.merchant.id,name,now()]);
       await c.query(
-        "INSERT INTO saas_merchant_vpas(id,merchant_id,vpa_address,is_default,created_at) "+
-        "VALUES($1,$2,$3,TRUE,$4) ON CONFLICT(vpa_address) DO NOTHING",
-        [id('vpa_'),req.merchant.id,account,now()]);
+        "INSERT INTO saas_merchant_vpas(id,merchant_id,vpa_address,is_default,account_type,mcc,created_at) "+
+        "VALUES($1,$2,$3,TRUE,$4,$5,$6) ON CONFLICT(vpa_address) DO NOTHING", 
+        [id('vpa_'),req.merchant.id,account,type.type,type.mcc,now()]);
       const owner=await c.query(
         'SELECT id FROM saas_merchant_vpas WHERE merchant_id=$1 AND vpa_address=$2',
         [req.merchant.id,account]);
@@ -155,18 +170,19 @@ function createMerchantApi({db,getAuth,buildUpiUri}) {
 
   router.get('/merchant/vpas',wrap(async(req,res)=>{
     const rows=await db.pgPool.query(
-      'SELECT id,vpa_address,bank_name,status,is_default,created_at FROM saas_merchant_vpas WHERE merchant_id=$1 ORDER BY is_default DESC,created_at ASC',
+      'SELECT id,vpa_address,bank_name,status,is_default,account_type,mcc,created_at FROM saas_merchant_vpas WHERE merchant_id=$1 ORDER BY is_default DESC,created_at ASC',
       [req.merchant.id]);
     res.json({success:true,vpas:rows.rows});
   }));
   router.post('/merchant/vpas',wrap(async(req,res)=>{
     if(!req.merchant.setup_completed)throw fail(409,'Complete merchant setup first');
     const account=vpa(req.body.vpaAddress);
+    const type=accountConfig(req.body);
     const first=await db.pgPool.query('SELECT 1 FROM saas_merchant_vpas WHERE merchant_id=$1 LIMIT 1',[req.merchant.id]);
     const r=await db.pgPool.query(
-      "INSERT INTO saas_merchant_vpas(id,merchant_id,vpa_address,bank_name,status,is_default,created_at) "+
-      "VALUES($1,$2,$3,$4,'ACTIVE',$5,$6) ON CONFLICT(vpa_address) DO NOTHING RETURNING id",
-      [id('vpa_'),req.merchant.id,account,val(req.body.bankName,100),!first.rowCount,now()]);
+      "INSERT INTO saas_merchant_vpas(id,merchant_id,vpa_address,bank_name,status,is_default,account_type,mcc,created_at) "+
+      "VALUES($1,$2,$3,$4,'ACTIVE',$5,$6,$7,$8) ON CONFLICT(vpa_address) DO NOTHING RETURNING id"
+      [id('vpa_'),req.merchant.id,account,val(req.body.bankName,100),!first.rowCount,type.type,type.mcc,now()]);
     if(!r.rowCount)throw fail(409,'UPI ID already registered');
     res.status(201).json({success:true,id:r.rows[0].id});
   }));
@@ -212,7 +228,7 @@ function createMerchantApi({db,getAuth,buildUpiUri}) {
     const dateFilter=String(req.query.dateFilter||'30d');
     const [m,orders,vpas,notifications]=await Promise.all([
       metrics(req.merchant.id,dateFilter),getOrders(req.merchant.id,dateFilter,20),
-      db.pgPool.query('SELECT id,vpa_address,bank_name,status,is_default FROM saas_merchant_vpas WHERE merchant_id=$1 ORDER BY is_default DESC',[req.merchant.id]),
+      db.pgPool.query('SELECT id,vpa_address,bank_name,status,is_default,account_type,mcc FROM saas_merchant_vpas WHERE merchant_id=$1 ORDER BY is_default DESC',[req.merchant.id]),
       db.pgPool.query('SELECT id,title,message,created_at,read_at FROM saas_merchant_notifications WHERE merchant_id=$1 ORDER BY created_at DESC LIMIT 10',[req.merchant.id])
     ]);
     res.json({success:true,metrics:m,recentTransactions:orders,vpas:vpas.rows,notifications:notifications.rows});
@@ -231,7 +247,7 @@ function createMerchantApi({db,getAuth,buildUpiUri}) {
     if(!req.merchant.setup_completed)throw fail(409,'Complete merchant setup before creating payment requests');
     let paise;
     try{paise=rupeesToPaise(String(req.body.amount));}catch(e){throw fail(400,'Invalid payment amount');}
-    if(BigInt(paise)<100n||BigInt(paise)>9999999999n)throw fail(400,'Amount must be between ₹1 and ₹9.99 crore');
+    if(BigInt(paise)<100n||BigInt(paise)>BigInt(Math.floor(maxPayment()*100)))throw fail(400,'Amount exceeds the configured UPI payment limit');
     const amount=Number(paise)/100;
     const description=val(req.body.description||'Payment',100);
     const externalReference=val(req.body.orderId,100);
@@ -259,8 +275,7 @@ function createMerchantApi({db,getAuth,buildUpiUri}) {
       await notify(c,req.merchant.id,'Payment request created','Request '+orderId+' created for ₹'+amount.toFixed(2));
       await c.query('COMMIT');
     }catch(e){await c.query('ROLLBACK');throw e;}finally{c.release();}
-    const uri=buildUpiUri({kind:'P2P',pa:receiving.vpa_address,
-      pn:req.merchant.business_name,am:amount,tn:description.slice(0,40)});
+    const uri=upi(receiving,req.merchant.business_name,amount,description,orderId);
     res.status(201).json({success:true,order:{
       id:orderId,amount,description,vpa_address:receiving.vpa_address,
       status:'PENDING',expires_at:expiresAt,
