@@ -2,6 +2,9 @@
 -- This migration is additive and safe to repeat; it does not import records.
 
 ALTER TABLE vpa_pool ADD COLUMN IF NOT EXISTS mcc TEXT;
+-- Existing Railway Postgres deployments may predate these session fields.
+ALTER TABLE sessions ADD COLUMN IF NOT EXISTS state TEXT NOT NULL DEFAULT 'WAITING';
+ALTER TABLE sessions ADD COLUMN IF NOT EXISTS customer_id TEXT;
 DROP INDEX IF EXISTS idx_sessions_unique_active_amount;
 ALTER TABLE sessions DROP CONSTRAINT IF EXISTS sessions_state_check;
 ALTER TABLE sessions ADD CONSTRAINT sessions_state_check
