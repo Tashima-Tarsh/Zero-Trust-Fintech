@@ -99,72 +99,68 @@ def tap_native(target):
     adb("shell","input","tap",str(x),str(y))
 
 def test():
-    print("A01: actual DISHA merchant checkout DOM in Android",flush=True)
+    print("A01: DISHA payment opens with only amount and Touch to Pay",flush=True)
     adb("shell","am start -W -n ai.disha.testupi/.TestBrowserActivity --es url "+shlex.quote(CHECKOUT))
-    page=wait_state(lambda s:"DISHA QA Merchant" in s["business"] and
-        "499.01" in s["amount"] and s["vpa"]=="qa-receiver@oksbi"
-        and "Payment request active." in s["status"] and s["qr"],
-        "PENDING merchant name, INR amount, recipient, QR")
-    assert page["href"].startswith("upi://pay?")
-    params=urllib.parse.parse_qs(urllib.parse.urlsplit(page["href"]).query)
-    assert params["pa"]==["qa-receiver@oksbi"]
-    assert params["am"]==["499.01"]
-    assert params["cu"]==["INR"]
-    assert "mc" not in params,"P2P URI MUST NOT include MCC"
+    page=wait_state(lambda s:s["stage"]=="initial" and "499.01" in s["amount"]
+        and not s["disabled"] and not s["qr"],
+        "Touch-first stage shows server amount, without premature QR")
     assert fixture_state()=="PENDING"
     screen("01-android-checkout")
 
-    print("A02: native Android tap triggers one Vault prompt and UPI receiver",flush=True)
-    # ADB input tap is a real Android touch, unlike evaluateJavascript(.click())
-    # which loses user activation before a chained OS app handoff.
-    tap_native(page["openTarget"])
-    await_log("ANDROID_WEBVIEW_DISPATCH upi://pay",timeout=35)
+    print("A02: one physical tap authorizes Vault, then shows UPI methods",flush=True)
+    tap_native(page["touchTarget"])
+    methods=wait_state(lambda s:s["stage"]=="methods" and s["appTarget"]["visible"],
+        "WebAuthn single prompt, native UPI choices")
     auth=fixture_info()
-    assert auth["vaultRegistered"],"Fixture Vault must register the device"
-    assert auth["vaultPrompts"]==1,"First payment cannot ask for two passkey prompts"
+    assert auth["vaultRegistered"],"Test Vault must register this device"
+    assert auth["vaultPrompts"]==1,"One Touch must not ask for a second credential prompt"
+    assert not methods["qr"],"QR must remain hidden until user chooses QR"
+
+    print("A03: native Android UPI handoff and cancellation",flush=True)
+    # CRED/UPI fallback uses the standard upi:// URI, allowing the installed
+    # fixture receiver to exercise real Android intent dispatch.
+    tap_native(methods["appTarget"])
+    await_log("ANDROID_WEBVIEW_DISPATCH upi://pay",timeout=35)
     await_log("RECEIVED pa=qa-receiver@oksbi")
     await_log("am=499.01")
     await_log("cu=INR")
     await_log("mc=null")
     screen("02-android-upi-intent")
-
-    print("A03: Android BACK cancels UPI without posting a payment",flush=True)
     adb("shell","input","keyevent","KEYCODE_BACK")
-    wait_state(lambda s:"Payment request active." in s["status"],
-               "cancelled UPI app still PENDING")
+    wait_state(lambda s:s["stage"]=="checking",
+        "cancelled UPI return results in checking, not receipt")
     assert fixture_state()=="PENDING"
-    # The return happens via Android activity lifecycle. The checkout asks its
-    # Vault for event evidence and submits it automatically with no UTR input.
     until=time.monotonic()+30
-    vault=None
+    evidence=None
     while time.monotonic()<until:
-        with urllib.request.urlopen(BASE+"/__test/vault",timeout=8) as resp:
-            vault=json.load(resp)
-        if vault["count"]>=1:break
+        with urllib.request.urlopen(BASE+"/__test/vault",timeout=8) as response:
+            evidence=json.load(response)
+        if evidence["count"]>=1:break
         time.sleep(1)
-    assert vault is not None and vault["count"]==1,(
-        "Returning from Android UPI app did not deliver one Vault evidence packet: "+repr(vault))
-    evidence=vault["events"][0]
-    assert evidence["orderId"]=="ORD_ANDROID_CI_1001"
-    assert evidence["state"]=="RETURN_OBSERVED_NO_UTR"
-    assert evidence["utrCandidate"] is None,"Cancelled external app cannot create a UTR"
-    assert fixture_state()=="PENDING","A browser return must not settle a payment"
+    assert evidence is not None and evidence["count"]==1,(
+        "Return did not deliver one Vault event: "+repr(evidence))
+    item=evidence["events"][0]
+    assert item["orderId"]=="ORD_ANDROID_CI_1001"
+    assert item["state"]=="RETURN_OBSERVED_NO_UTR"
+    assert item["utrCandidate"] is None
+    assert fixture_state()=="PENDING","Browser return cannot establish completed payment"
     screen("03-cancelled-no-credit")
 
-    print("A04: only fixture backend update can display recorded COMPLETED",flush=True)
+    print("A04: receipt appears only after server-ledger completion",flush=True)
     set_state("COMPLETED")
-    command("refresh")
-    wait_state(lambda s:"recorded as completed" in s["status"],
-               "backend completed status")
+    receipt=wait_state(lambda s:s["stage"]=="receipt" and s["receiptUtr"]=="123456789012",
+        "backend-confirmed completion only")
+    assert receipt["stage"]=="receipt"
     screen("04-completed-backend-only")
 
-    print("A05: expired request disables UPI intent",flush=True)
+    print("A05: expired link cannot start new UPI handoff",flush=True)
     set_state("EXPIRED")
     command("refresh")
-    wait_state(lambda s:"expired" in s["status"].lower()
-               and s["pointerEvents"]=="none","expired checkout button disabled")
+    wait_state(lambda s:s["stage"]=="initial" and s["disabled"]
+        and "expired" in s["status"].lower(),
+        "expired checkout disables Touch to Pay")
     screen("05-expired-no-payment")
-    print("ANDROID_P2P_E2E_PASS: Android WebView DOM, QR, URI, payee/amount/MCC, handoff, cancel, backend state, expiry",flush=True)
+    print("ANDROID_COSMIC_P2P_E2E_PASS: Touch gate, app picker, real Android intent, cancellation evidence, ledger receipt and expiry",flush=True)
 
 if __name__=="__main__":
     try:test()
