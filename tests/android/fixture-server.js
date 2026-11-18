@@ -17,6 +17,17 @@ http.createServer((req,res)=>{
  const url=new URL(req.url,'http://10.0.2.2:'+port);
  if(url.pathname==='/health')return reply(res,200,{ok:true,status,vaultRegistered,vaultPrompts,evidenceCount:evidenceEvents.size});
  if(url.pathname==='/merchant-checkout.html')return reply(res,200,fs.readFileSync(path.join(root,'merchant-checkout.html')),'text/html');
+ const allowedAssets=new Map([
+  ['/cosmic-checkout.css','text/css'],
+  ['/cosmic-checkout.js','application/javascript'],
+  ['/cosmic-checkout-model.js','application/javascript'],
+  ['/assets/disha-8-2-wordmark-cropped.png','image/png'],
+  ['/assets/upi-googlepay.svg','image/svg+xml'],
+  ['/assets/upi-phonepe.svg','image/svg+xml'],
+  ['/assets/upi-paytm.svg','image/svg+xml']
+ ]);
+ if(allowedAssets.has(url.pathname))
+   return reply(res,200,fs.readFileSync(path.join(root,url.pathname.slice(1))),allowedAssets.get(url.pathname));
  if(url.pathname==='/vendor/qrcode.min.js')return reply(res,200,fs.readFileSync(path.join(root,'vendor','qrcode.min.js')),'application/javascript');
  if(url.pathname==='/one-touch-vault.js')return reply(res,200,
   fs.readFileSync(path.join(root,'one-touch-vault.js')),'application/javascript');
@@ -81,6 +92,13 @@ http.createServer((req,res)=>{
        replayed:Boolean(recorded)});
    });
    return;
+ }
+
+ if(url.pathname==='/api/ledger/'+orderId){
+  if(url.searchParams.get('token')!==token)return reply(res,401,{success:false,error:'SESSION_TOKEN_REQUIRED'});
+  return reply(res,200,{success:true,orderId,challengeAmount:499.01,
+   status:status==='COMPLETED'?'SUCCESS':status,
+   utr:status==='COMPLETED'?'123456789012':null,createdAt:Date.now()-45000});
  }
  if(url.pathname==='/api/merchant/public/order/'+orderId){
   if(url.searchParams.get('token')!==token)return reply(res,404,{success:false,error:'Payment request not found'});
