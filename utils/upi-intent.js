@@ -57,7 +57,8 @@ function buildUpiUri(o) {
   // an invalid pa otherwise produces an app-side error before UPI PIN.
   const payee=String(o.pa||'').trim();
   if(!VPA_RE.test(payee))throw new Error('A valid receiving UPI ID is required');
-  parts.push('pa=' + encodeURIComponent(payee));
+  // A validated VPA contains only URI-safe characters; retain literal @ for PSP interoperability.
+  parts.push('pa=' + payee);
   const pn = cleanText(o.pn, 40) || 'Payee';
   parts.push('pn=' + encodeURIComponent(pn));
 

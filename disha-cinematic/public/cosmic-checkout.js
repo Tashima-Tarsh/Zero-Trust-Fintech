@@ -270,11 +270,15 @@
   try {
    const chosen=model.safeApp(app);
    trace('APP_SELECTED','OK',chosen);
-   const target=model.buildAppUrl(session.upiUri,chosen,userAgent);
-   if(!handoffStarted){
-    vault.beginHandoff(orderId(),vaultSessionId,session.token,chosen);
-    handoffStarted=true;
+   const target=model.buildAppUrl(session.upiUri,chosen,userAgent,location.href);
+   if(evidenceSending||vault.requestEvidence(orderId())){
+    message('Finishing the previous app return. Try again once it is recorded.','info');
+    void submitReturnEvidence(true);
+    return;
    }
+   // Every fresh user tap must have its own app, event ID and return window.
+   vault.beginHandoff(orderId(),vaultSessionId,session.token,chosen);
+   handoffStarted=true;
    savePreferred(chosen);
    missingBackgroundLogged=false;
    showStage('methods');
@@ -355,6 +359,9 @@
   // opened a UPI app. Some apps reject the intent before their PIN screen.
   // Require a browser-observed background/return event (or explicit return
   // parameters, as captured by the Vault) before entering checking.
+  if(query.get('upi_intent_fallback')==='1'&&!handoffStarted){
+   void pollLedger();return;
+  }
   const observed=typeof vault.requestEvidence==='function'?vault.requestEvidence(orderId()):null;
   if(session&&vault.getPendingOrderId()===orderId()&&observed){
    authorized=true;handoffStarted=true;
@@ -440,8 +447,13 @@
    const returnEvidence=typeof vault.requestEvidence==='function'?vault.requestEvidence(orderId()):null;
    if(vault.getPendingOrderId()===orderId()&&returnEvidence){
     authorized=true;handoffStarted=true;
-    showStage('checking');
-    void submitReturnEvidence();
+    vaultSessionId=returnEvidence.vaultSessionId;
+    const retry=query.get('upi_intent_fallback')==='1'||
+      model.needsPaymentMethodRetry(returnEvidence.evidence);
+    showStage(retry?'methods':'checking');
+    if(query.get('upi_intent_fallback')==='1')
+      message('The selected UPI app could not open. Choose another app or scan QR.','info');
+    void submitReturnEvidence(retry);
    }
    ledgerTicker=setInterval(()=>{void pollLedger()},3500);
    expiryTicker=setInterval(tickSessionTimer,1000);
