@@ -208,9 +208,10 @@ function createMerchantApi({db,getAuth,buildUpiUri,platformControl}) {
       [id('note_'),merchantId,title,message,now()]);
   }
   function link(orderId,token,internalTest=false){
-    // Only owner-provisioned internal testing automatically enables diagnostics.
-    // External merchant/customer links retain privacy-by-default behavior.
-    return '/merchant-checkout.html?orderId='+encodeURIComponent(orderId)+'&token='+encodeURIComponent(token)+
+    // Owner test links bypass potentially stale Cloudflare static checkout HTML.
+    // External merchant checkout links remain unchanged and private by default.
+    const page=internalTest?'/api/runtime/merchant-checkout':'/merchant-checkout.html';
+    return page+'?orderId='+encodeURIComponent(orderId)+'&token='+encodeURIComponent(token)+
       (internalTest?'&debug=1':'');
   }
   router.get('/merchant/public/order/:orderId',wrap(async(req,res)=>{

@@ -20,4 +20,7 @@ assert.match(clerk,/Switch to Super Admin sign-in/);
 assert.match(clerk,/primaryEmailAddress\?\.emailAddress/);
 assert.match(owner,/id="owner-pending-count"/);
 assert.match(consoleJS,/refreshOwnerInbox\(/);
+assert.match(owner,/href="\/api\/runtime\/checkout\?amount=1&amp;debug=1"|href="\/api\/runtime\/checkout\?amount=1&debug=1"/);
+const merchantApi=read('merchant-api.js');
+assert.match(merchantApi,/const page=internalTest\?'\/api\/runtime\/merchant-checkout':'\/merchant-checkout\.html'/);
 console.log('OWNER_RUNTIME_DELIVERY_PASS: protected owner path, pending approval inbox and edge-safe live JS/CSS');
