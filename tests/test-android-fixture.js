@@ -48,8 +48,9 @@ const path=require('node:path');
    '/api/runtime-assets/cosmic-checkout-model.js',
    '/api/runtime-assets/cosmic-checkout.js'
   ];
-  const linked=[...html.matchAll(/(?:src|href)="(\\/(?:api\\/runtime-assets\\/|vendor\\/)[^"?]+)(?:\\?[^"]*)?"/g)]
-   .map(match=>match[1]);
+  const linked=[...html.matchAll(/(?:src|href)="([^"]+)"/g)]
+   .map(match=>match[1].split('?')[0])
+   .filter(asset=>asset.startsWith('/api/runtime-assets/')||asset.startsWith('/vendor/'));
   for(const asset of required)assert.ok(linked.includes(asset),'Checkout must load '+asset);
   for(const asset of linked){
    const response=await fetch(origin+asset);
