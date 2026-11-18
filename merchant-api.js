@@ -238,6 +238,8 @@ function createMerchantApi({db,getAuth,buildUpiUri,platformControl}) {
       amount,o.description||'Payment',o.id);
     res.set('Cache-Control','no-store').json({success:true,order:{
       id:o.id,amount,business_name:o.business_name,vpa_address:o.vpa_address,
+      payee_name:payee.holder_name||o.business_name,
+      payment_type:String(payee.account_type).toUpperCase()==='MERCHANT'?'P2M':'P2P',
       description:o.description,status:invoiceStatus(o),expires_at:Number(o.expires_at),
       upi_uri:uri
     }});
