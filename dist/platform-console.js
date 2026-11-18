@@ -5,6 +5,18 @@ let clerk,owner=null,requests=[],tenants=[],transactions=[],incidents=[],overvie
 const money=p=>new Intl.NumberFormat('en-IN',{style:'currency',currency:'INR'}).format((Number(p)||0)/100);
 const when=t=>t?new Date(Number(t)).toLocaleString('en-IN',{dateStyle:'medium',timeStyle:'short'}):'—';
 const notice=message=>{$('#owner-notice').textContent=message||''};
+async function refreshOwnerInbox(){
+ const badge=$('#owner-pending-count');
+ if(!badge)return;
+ try{
+  const data=await api('/owner/overview');
+  const count=Number(data.metrics?.requests?.pending||0);
+  badge.textContent=String(count);
+  const status=$('#owner-inbox-status');
+  if(status)status.textContent=count===0?'No access applications waiting for review':
+    count+' access application'+(count===1?'':'s')+' waiting for your approval';
+ }catch(_){badge.textContent='—'}
+}
 async function authInit(){
  const key=window.DISHA_CLERK_PUBLISHABLE_KEY;if(!key)throw Error('Clerk is not configured');
  const match=key.split('_')[2];if(!match)throw Error('Invalid authentication configuration');
@@ -26,7 +38,7 @@ function field(value,label){return '<article class="metric"><label>'+esc(label)+
 async function load(screen){
  notice('');
  if(screen==='overview'||screen==='analytics'){const r=await api('/owner/overview');overview=r.metrics;const t=r.metrics.tenants,q=r.metrics.requests,o=r.metrics.orders,i=r.metrics.incidents;const html=field(t.active,'Active external tenants')+field(q.pending,'Awaiting approval')+field(o.total,'Payment requests')+field(i.open,'Open recorded incidents');$('#owner-kpis').innerHTML=html;$('#analytics-kpis').innerHTML=html;}
- if(screen==='requests'){requests=(await api('/owner/requests')).requests||[];$('#requests-body').innerHTML=requests.length?requests.map(r=>'<tr><td><strong>'+esc(r.business_name)+'</strong><span class="sub">'+esc(r.category)+'</span></td><td>'+esc(r.contact_name)+'<span class="sub">'+esc(r.email)+'</span></td><td>'+when(r.created_at)+'</td><td><span class="state">'+esc(r.status)+'</span></td><td>'+(r.status==='REQUESTED'?'<button data-decision="APPROVE" data-id="'+esc(r.id)+'">Approve</button><button data-decision="REJECT" data-id="'+esc(r.id)+'">Reject</button>':'Reviewed')+'</td></tr>').join(''):'<tr><td colspan="5">No access requests received yet.</td></tr>';}
+ if(screen==='requests'){requests=(await api('/owner/requests')).requests||[];void refreshOwnerInbox();$('#requests-body').innerHTML=requests.length?requests.map(r=>'<tr><td><strong>'+esc(r.business_name)+'</strong><span class="sub">'+esc(r.category)+'</span></td><td>'+esc(r.contact_name)+'<span class="sub">'+esc(r.email)+'</span></td><td>'+when(r.created_at)+'</td><td><span class="state">'+esc(r.status)+'</span></td><td>'+(r.status==='REQUESTED'?'<button data-decision="APPROVE" data-id="'+esc(r.id)+'">Approve</button><button data-decision="REJECT" data-id="'+esc(r.id)+'">Reject</button>':'Reviewed')+'</td></tr>').join(''):'<tr><td colspan="5">No access requests received yet.</td></tr>';}
  if(screen==='tenants'||screen==='onboarding'){tenants=(await api('/owner/tenants')).tenants||[];$('#tenants-body').innerHTML=tenants.length?tenants.map(t=>'<tr><td><strong>'+esc(t.business_name||'Unconfigured')+'</strong>'+(t.is_internal_test?'<span class="sub">INTERNAL PRODUCTION TEST</span>':'')+'</td><td>'+esc(t.email||'Owner account')+'</td><td><span class="state">'+esc(t.access_status)+'</span></td><td>'+esc(t.setup_completed?'Complete':'Pending')+'</td><td>'+(t.is_internal_test?'Owner only':t.access_status==='PENDING'?'<button data-approve="'+esc(t.id)+'">Approve merchant</button>':t.access_status==='APPROVED'?(t.identity_connected?'Approved — sign-in activates':'<button data-invite="'+esc(t.id)+'">Send Clerk invite</button>'):t.access_status==='INVITED'?'Invitation sent — awaiting sign-in':t.access_status==='ACTIVE'?'<button data-status="SUSPENDED" data-tenant="'+esc(t.id)+'">Suspend</button>':t.access_status==='SUSPENDED'?'<button data-status="ACTIVE" data-tenant="'+esc(t.id)+'">Reactivate</button>':'—')+'</td></tr>').join(''):'<tr><td colspan="5">No merchants provisioned.</td></tr>';
  $('#onboarding-body').innerHTML=tenants.map(t=>'<div><b>'+esc(t.business_name||t.email||'Merchant')+'</b><span>'+esc(t.access_status)+' · '+(t.setup_completed?'Setup complete':'Setup pending')+'</span></div>').join('')||'No tenant applications approved yet.';}
  if(screen==='transactions'){transactions=(await api('/owner/transactions')).transactions||[];$('#transactions-body').innerHTML=transactions.length?transactions.map(t=>'<tr><td>'+esc(t.id)+'</td><td>'+esc(t.business_name)+'</td><td>'+money(t.amount_paise)+'</td><td><span class="state">'+esc(t.status)+'</span></td><td>'+when(t.created_at)+'</td></tr>').join(''):'<tr><td colspan="5">No payment requests recorded.</td></tr>';}
@@ -102,7 +114,19 @@ $('#owner-invite-form')?.addEventListener('submit',async event=>{
 });
 $('#owner-menu-toggle').addEventListener('click',()=>{let open=!$('#console-nav').classList.contains('open');$('#console-nav').classList.toggle('open',open);$('#nav-backdrop').classList.toggle('open',open);$('#owner-menu-toggle').setAttribute('aria-expanded',String(open))});
 $('#nav-backdrop').addEventListener('click',()=>{$('#console-nav').classList.remove('open');$('#nav-backdrop').classList.remove('open')});
-$('#refresh-data').addEventListener('click',()=>load(location.hash.slice(1)||'overview').catch(e=>notice(e.message)));
+$('#refresh-data').addEventListener('click',()=>{void refreshOwnerInbox();load(location.hash.slice(1)||'overview').catch(e=>notice(e.message))});
 $('#owner-signout').addEventListener('click',async()=>{if(clerk){await clerk.signOut();location.assign('/login')}});
-(async()=>{try{await authInit();owner=await api('/owner/me');if(owner.role!=='PLATFORM_OWNER')throw Error('Not authorized');select(titles[location.hash.slice(1)]?location.hash.slice(1):'overview')}catch(e){notice(e.status===403?'Platform owner access is not authorized for this account.':e.message);$$('.owner-screen').forEach(x=>x.classList.remove('active'))}})();
+(async()=>{try{await authInit();owner=await api('/owner/me');if(owner.role!=='PLATFORM_OWNER')throw Error('Not authorized');void refreshOwnerInbox();select(titles[location.hash.slice(1)]?location.hash.slice(1):'overview')}catch(e){
+ const signedInEmail=String(clerk?.user?.primaryEmailAddress?.emailAddress||'').toLowerCase();
+ notice(e.status===403?
+  'Super Admin access denied. Current Clerk primary email: '+(signedInEmail||'unknown')+
+  '. Authorized verified primary email: nitish@thenitishkr.in. Switch Clerk account to continue.':e.message);
+ if(e.status===403){
+  const control=$('#owner-switch-account');if(control){
+   control.hidden=false;
+   control.addEventListener('click',async()=>{await clerk.signOut();location.assign('/login?owner=1')});
+  }
+ }
+ $('.owner-screen').forEach(x=>x.classList.remove('active'))
+}})();
 })();

@@ -25,6 +25,7 @@
   <div class="auth-content">
    <div class="auth-right-brand" aria-hidden="true"><img src="/assets/disha-8-2-wordmark-cropped.png" alt="" width="230" height="56"></div>
    <div class="auth-kicker">APPROVED MERCHANT IDENTITY</div><p style="color:#b8b5c1;font-size:12px;line-height:1.5;margin:4px 0 15px">Private access for approved merchants. <a href="/request-access" style="color:#f6aa81;text-decoration:underline">Request access</a> if your business is new.</p>
+   <p style="font-size:13px;margin:0 0 14px"><a href="/login?owner=1" style="color:#b56425;text-decoration:underline;font-weight:700">Super Admin sign-in →</a></p>
    <div class="auth-slot-wrap"><div id="auth-slot" aria-live="polite"><div class="status" id="auth-status">Connecting securely to Clerk…</div></div></div>
    
   </div>
@@ -36,6 +37,8 @@
 <script>
 (async function(){
 const status=document.getElementById('auth-status');
+const ownerLogin=/(?:^|[?&])owner=1(?:&|$)/.test(location.search||'');
+const destination=ownerLogin?'/owner#requests':'/dashboard';
 try{
 const key=window.DISHA_CLERK_PUBLISHABLE_KEY;
 if(!key || window.DISHA_CLERK_CONFIG_READY===false)throw Error('Secure merchant sign-in is unavailable. Please contact platform support.');
@@ -52,10 +55,10 @@ s.onload=resolve;s.onerror=()=>reject(Error('Authentication service unavailable'
 await script('https://'+domain+'/npm/@clerk/ui@1/dist/ui.browser.js');
 await script('https://'+domain+'/npm/@clerk/clerk-js@6/dist/clerk.browser.js',true);
 await window.Clerk.load({ui:{ClerkUI:window.__internal_ClerkUICtor}});
-if(window.Clerk.isSignedIn){location.replace('/dashboard');return}
+if(window.Clerk.isSignedIn){location.replace(destination);return}
 status.remove();
 window.Clerk.mountSignIn(document.getElementById('auth-slot'),{
-routing:'hash',forceRedirectUrl:'/dashboard',fallbackRedirectUrl:'/dashboard',signUpUrl:'/request-access'
+routing:'hash',forceRedirectUrl:destination,fallbackRedirectUrl:destination,signUpUrl:'/request-access'
 });
 }catch(err){console.error('[Merchant authentication] Startup failed:',err);status.textContent=err.message||'Unable to start authentication';status.style.color='#ba3749';}
 })();
