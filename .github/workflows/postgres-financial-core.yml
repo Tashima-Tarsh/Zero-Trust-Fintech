@@ -9,6 +9,7 @@ on:
       - 'tests/test-postgres-checkout-store.js'
       - 'tests/test-postgres-migration.js'
       - 'tests/test-postgres-switch.js'
+      - 'tests/test-postgres-http.js'
       - 'scripts/migrate-sqlite-to-postgres.js'
       - 'financial/postgres-store.js'
       - 'migrations/002_postgres_checkout.sql'
@@ -61,3 +62,5 @@ jobs:
         run: node tests/test-postgres-migration.js
       - name: Verify PostgreSQL-only cutover switch
         run: node tests/test-postgres-switch.js
+      - name: Test real checkout HTTP against PostgreSQL
+        run: node tests/test-postgres-http.js
