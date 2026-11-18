@@ -43,7 +43,7 @@ const edge=read('public/_worker.js'),routes=read('public/_routes.json');
 assert.ok(edge.includes('"/auth-config.js"') && routes.includes('"/auth-config.js"'));
 assert.ok(edge.includes('"/signup"') && edge.includes('"/login"'));
 
-for(const [name,component] of [['merchant-signup.html','SignUp'],['merchant-login.html','SignIn']]){
+for(const [name,component] of [['merchant-login.html','SignIn']]){
  const html=read('public/'+name);
  assert.match(html,/<script src="\/auth-config\.js"><\/script>/);
  assert.match(html,/DISHA_CLERK_PUBLISHABLE_KEY/);
@@ -89,7 +89,7 @@ async function testBrowserMount(file,method){
 }
 (async()=>{
  // Premium layout is shared while Clerk owns the complete auth lifecycle.
- for(const [page,mode] of [['merchant-login.html','signin'],['merchant-signup.html','signup']]){
+ for(const [page,mode] of [['merchant-login.html','signin']]){
   const html=read('public/'+page);
   assert.match(html,/href="\/merchant-auth\.css\?v=[a-zA-Z0-9._-]+"/,'Use cache-versioned production auth design');
   assert.match(html,/class="auth-shell"/,'Use accessible split-screen layout');
@@ -106,7 +106,7 @@ async function testBrowserMount(file,method){
  assert.match(styles,/@media\s*\(prefers-reduced-motion:\s*reduce\)/);
  assert.match(styles,/@media\s*\(max-width:\s*1100px\)/);
  assert.match(styles,/@media\s*\(max-width:\s*620px\)/);
- for(const page of ['merchant-login.html','merchant-signup.html']){
+ for(const page of ['merchant-login.html']){
   const html=read('public/'+page);
   assert.match(html,/class="auth-logo-stage"/);
   assert.match(html,/src="\/assets\/disha-8-2-wordmark-cropped\.png"/);
@@ -116,7 +116,7 @@ async function testBrowserMount(file,method){
  assert.ok(fs.statSync(path.join(root,'public/assets/disha-8-2-wordmark-cropped.png')).size>10000,
    'Real metallic logo must be present in the public asset directory');
  // Merchant sign-in and signup use real Clerk widgets and a separately licensed photo.
- for(const page of ['merchant-login.html','merchant-signup.html']){
+ for(const page of ['merchant-login.html']){
   const html=read('public/'+page);
   assert.doesNotMatch(html,/class="auth-network-art"/,'No empty artwork placeholder');
   assert.doesNotMatch(html,/src="\/assets\/merchant-direct-3d\.webp"/);
@@ -139,6 +139,6 @@ async function testBrowserMount(file,method){
  assert.equal(policy.isAllowedPassword('1234567890'),true,'Accept exactly 10 characters');
  assert.equal(policy.isAllowedPassword('12345678901234567890'),true,'Accept longer passwords');
  await testBrowserMount('merchant-login.html','SignIn');
- await testBrowserMount('merchant-signup.html','SignUp');
- console.log('CLERK_MERCHANT_AUTH_PASS: valid Clerk keys, CSP, CDN bootstrap and merchant forms.');
+ assert.ok(read('public/merchant-signup.html').includes('/request-access'), 'Public signup must redirect to request-access');
+ console.log('CLERK_MERCHANT_AUTH_PASS: valid Clerk keys, invite-only routing, CSP and Clerk sign-in.');
 })().catch(err=>{console.error(err);process.exitCode=1;});
