@@ -60,7 +60,7 @@ for(const [name,component] of [['merchant-signup.html','SignUp'],['merchant-logi
 // publishable key, including the terminal dollar-sign delimiter.
 async function testBrowserMount(file,method){
  const html=read('public/'+file);
- const inline=[...html.matchAll(/<script\\b(?![^>]*\\bsrc=)[^>]*>([\\s\\S]*?)<\\/script>/gi)]
+ const inline=[...html.matchAll(/<script\b(?![^>]*\bsrc=)[^>]*>([\s\S]*?)<\/script>/gi)]
   .map(m=>m[1]).find(Boolean);
  assert.ok(inline,'Expected auth bootstrap script');
  const scripts=[],mounts=[],errors=[];
