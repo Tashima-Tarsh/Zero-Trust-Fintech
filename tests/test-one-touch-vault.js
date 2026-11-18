@@ -31,7 +31,8 @@ assert.match(server,/Math\.min\(Date\.now\(\)\+180000,order\.expiresAt\)/);
   let registrationPrompts=0,authenticationPrompts=0,registered=false,opened=null;
   const storage=new Map();
   const window={
-    crypto:{randomUUID:()=> 'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee'},
+    crypto:{randomUUID:()=> 'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee',
+      getRandomValues:bytes=>{bytes.fill(9);return bytes}},
     location:{assign: uri=>{opened=uri}},
     SimpleWebAuthnBrowser:{
       startRegistration:async()=>{registrationPrompts++;return {id:'CI_NEW_PASSKEY'}},
