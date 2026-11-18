@@ -107,9 +107,157 @@ async function main() {
               if(booleanCols[table]?.includes(col))return v===1||v===true;
               return v;
             });
-            const sql='INSERT INTO '+quote(table)+' ('+columns.map(quote).join(',')+') VALUES ('+
-              columns.map((_,i)=>'$'+(i+1)).join(',')+') ON CONFLICT DO NOTHING';
-            await client.query(sql,values);
+            const keys=keyFor[table];
+            const where=keys.map((col,i)=>quote(col)+'=
+          }
+          // Verify every source primary key has exactly one target row AND
+          // all common fields match. Abort on divergent existing data.
+          const keys=keyFor[table];
+          for(const row of rows) {
+            const where=keys.map((col,i)=>quote(col)+'=$'+(i+1)).join(' AND ');
+            const result=await client.query('SELECT * FROM '+quote(table)+' WHERE '+where,
+              keys.map(k=>row[k]));
+            if(result.rowCount!==1)throw Error('Row missing/colliding: '+table);
+            const dest=result.rows[0];
+            for(const [col,value] of Object.entries(row)) {
+              const expected=normalize(value,booleanCols[table]?.includes(col)?'boolean':'');
+              const actual=normalize(dest[col],booleanCols[table]?.includes(col)?'boolean':'');
+              if(expected!==actual)throw Error('Data mismatch in table '+table+' column '+col);
+            }
+          }
+          totals[table]=rows.length;
+        }
+      } finally {snap.close();}
+      // All source objects accounted for before a single commit.
+      await client.query('COMMIT');
+      begun=false;
+      console.log('POSTGRES_MIGRATION_VERIFIED',JSON.stringify(totals));
+      console.log('Keep SQLITE_SOURCE_PATH and snapshot for rollback. Only then enable DB_BACKEND=postgres.');
+    } catch(e) {
+      if(begun)try{await client.query('ROLLBACK');}catch(_){}
+      throw e;
+    } finally {client.release();await pg.end();}
+  } finally {sqlite.close();}
+}
+main().catch(e=>{console.error('MIGRATION_ABORTED:',e.message);process.exitCode=1;});
++(i+1)).join(' AND ');
+            const existing=await client.query(
+              'SELECT * FROM '+quote(table)+' WHERE '+where,keys.map(col=>row[col]));
+            if(existing.rowCount>0 && ['accounts','vpa_pool'].includes(table) &&
+                String(existing.rows[0].created_at)==='1700000000000') {
+              // Only replace known built-in placeholder seeds. Never overwrite
+              // merchant-maintained PostgreSQL records or previously imported data.
+              const fields=columns.filter(col=>!keys.includes(col));
+              await client.query(
+                'UPDATE '+quote(table)+' SET '+
+                fields.map((col,i)=>quote(col)+'=
+          }
+          // Verify every source primary key has exactly one target row AND
+          // all common fields match. Abort on divergent existing data.
+          const keys=keyFor[table];
+          for(const row of rows) {
+            const where=keys.map((col,i)=>quote(col)+'=$'+(i+1)).join(' AND ');
+            const result=await client.query('SELECT * FROM '+quote(table)+' WHERE '+where,
+              keys.map(k=>row[k]));
+            if(result.rowCount!==1)throw Error('Row missing/colliding: '+table);
+            const dest=result.rows[0];
+            for(const [col,value] of Object.entries(row)) {
+              const expected=normalize(value,booleanCols[table]?.includes(col)?'boolean':'');
+              const actual=normalize(dest[col],booleanCols[table]?.includes(col)?'boolean':'');
+              if(expected!==actual)throw Error('Data mismatch in table '+table+' column '+col);
+            }
+          }
+          totals[table]=rows.length;
+        }
+      } finally {snap.close();}
+      // All source objects accounted for before a single commit.
+      await client.query('COMMIT');
+      begun=false;
+      console.log('POSTGRES_MIGRATION_VERIFIED',JSON.stringify(totals));
+      console.log('Keep SQLITE_SOURCE_PATH and snapshot for rollback. Only then enable DB_BACKEND=postgres.');
+    } catch(e) {
+      if(begun)try{await client.query('ROLLBACK');}catch(_){}
+      throw e;
+    } finally {client.release();await pg.end();}
+  } finally {sqlite.close();}
+}
+main().catch(e=>{console.error('MIGRATION_ABORTED:',e.message);process.exitCode=1;});
++(i+1)).join(',')+
+                ' WHERE '+keys.map((col,i)=>quote(col)+'=
+          }
+          // Verify every source primary key has exactly one target row AND
+          // all common fields match. Abort on divergent existing data.
+          const keys=keyFor[table];
+          for(const row of rows) {
+            const where=keys.map((col,i)=>quote(col)+'=$'+(i+1)).join(' AND ');
+            const result=await client.query('SELECT * FROM '+quote(table)+' WHERE '+where,
+              keys.map(k=>row[k]));
+            if(result.rowCount!==1)throw Error('Row missing/colliding: '+table);
+            const dest=result.rows[0];
+            for(const [col,value] of Object.entries(row)) {
+              const expected=normalize(value,booleanCols[table]?.includes(col)?'boolean':'');
+              const actual=normalize(dest[col],booleanCols[table]?.includes(col)?'boolean':'');
+              if(expected!==actual)throw Error('Data mismatch in table '+table+' column '+col);
+            }
+          }
+          totals[table]=rows.length;
+        }
+      } finally {snap.close();}
+      // All source objects accounted for before a single commit.
+      await client.query('COMMIT');
+      begun=false;
+      console.log('POSTGRES_MIGRATION_VERIFIED',JSON.stringify(totals));
+      console.log('Keep SQLITE_SOURCE_PATH and snapshot for rollback. Only then enable DB_BACKEND=postgres.');
+    } catch(e) {
+      if(begun)try{await client.query('ROLLBACK');}catch(_){}
+      throw e;
+    } finally {client.release();await pg.end();}
+  } finally {sqlite.close();}
+}
+main().catch(e=>{console.error('MIGRATION_ABORTED:',e.message);process.exitCode=1;});
++(fields.length+i+1)).join(' AND '),
+                fields.map(col=> {
+                  const v=row[col];
+                  return booleanCols[table]?.includes(col)?(v===1||v===true):v;
+                }).concat(keys.map(col=>row[col]))
+              );
+            } else {
+              const sql='INSERT INTO '+quote(table)+' ('+columns.map(quote).join(',')+') VALUES ('+
+                columns.map((_,i)=>'
+          }
+          // Verify every source primary key has exactly one target row AND
+          // all common fields match. Abort on divergent existing data.
+          const keys=keyFor[table];
+          for(const row of rows) {
+            const where=keys.map((col,i)=>quote(col)+'=$'+(i+1)).join(' AND ');
+            const result=await client.query('SELECT * FROM '+quote(table)+' WHERE '+where,
+              keys.map(k=>row[k]));
+            if(result.rowCount!==1)throw Error('Row missing/colliding: '+table);
+            const dest=result.rows[0];
+            for(const [col,value] of Object.entries(row)) {
+              const expected=normalize(value,booleanCols[table]?.includes(col)?'boolean':'');
+              const actual=normalize(dest[col],booleanCols[table]?.includes(col)?'boolean':'');
+              if(expected!==actual)throw Error('Data mismatch in table '+table+' column '+col);
+            }
+          }
+          totals[table]=rows.length;
+        }
+      } finally {snap.close();}
+      // All source objects accounted for before a single commit.
+      await client.query('COMMIT');
+      begun=false;
+      console.log('POSTGRES_MIGRATION_VERIFIED',JSON.stringify(totals));
+      console.log('Keep SQLITE_SOURCE_PATH and snapshot for rollback. Only then enable DB_BACKEND=postgres.');
+    } catch(e) {
+      if(begun)try{await client.query('ROLLBACK');}catch(_){}
+      throw e;
+    } finally {client.release();await pg.end();}
+  } finally {sqlite.close();}
+}
+main().catch(e=>{console.error('MIGRATION_ABORTED:',e.message);process.exitCode=1;});
++(i+1)).join(',')+') ON CONFLICT DO NOTHING';
+              await client.query(sql,values);
+            }
           }
           // Verify every source primary key has exactly one target row AND
           // all common fields match. Abort on divergent existing data.
