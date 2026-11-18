@@ -189,15 +189,14 @@ function setupSqliteTables() {
       base_amount REAL NOT NULL,
       txn_ref TEXT UNIQUE NOT NULL,
       vpa_address TEXT NOT NULL,
-      status TEXT NOT NULL DEFAULT 'PENDING',
-      state TEXT NOT NULL DEFAULT 'WAITING',
-      customer_id TEXT,
-      utr TEXT,
-      created_at INTEGER NOT NULL,
-      expires_at INTEGER NOT NULL,
-      qr_refresh_at INTEGER NOT NULL
-    );
-    CREATE UNIQUE INDEX IF NOT EXISTS idx_sessions_unique_active_amount ON sessions(vpa_address, challenge_amount) WHERE status = 'PENDING';
+    status TEXT NOT NULL DEFAULT 'PENDING',
+    state TEXT NOT NULL DEFAULT 'WAITING',
+    customer_id TEXT,
+    utr TEXT,
+    created_at INTEGER NOT NULL,
+    expires_at INTEGER NOT NULL,
+    qr_refresh_at INTEGER NOT NULL
+  );
 
     -- Passkey / WebAuthn credential store
     CREATE TABLE IF NOT EXISTS passkeys (

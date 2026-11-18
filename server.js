@@ -30,7 +30,7 @@ const {
 } = require('@simplewebauthn/server');
 const { base64urlToBuffer, bufferToBase64Url } = require('@simplewebauthn/server');
 const { scoreEvidence, suggestAction, WEIGHTS, TIERS } = require('./utils/trust-score');
-const { buildUpiUri, appLinks, generateChallengeAmount: generateUniqueChallenge } = require('./utils/upi-intent');
+const { buildUpiUri, appLinks } = require('./utils/upi-intent');
 const { getClientIP } = require('./utils/ip-utils');
 const { IPWhitelistMiddleware } = require('./middleware/ip-whitelist');
 const adminRoutes = require('./routes/admin/ip-whitelist');
@@ -455,7 +455,6 @@ function generateSession(baseAmount = 100, description = '', customVpa = null) {
   const qrRefreshAt = now + (15 * 1000); // 15 seconds dynamic refresh
   const orderId = 'Order_' + crypto.randomBytes(5).toString('hex').toUpperCase();
   const txnRef = 'TXN_' + now + '_' + crypto.randomBytes(3).toString('hex').toUpperCase();
-  let challengeAmount = Number(baseAmount); // replaced below by the unique-paise amount
   // TASK 9: Select optimal VPA to prevent bans or primary VPA
   let vpaAddress = (customVpa && String(customVpa).trim()) ? String(customVpa).trim() : null;
   let merchantType = 'P2P';
@@ -495,47 +494,30 @@ function generateSession(baseAmount = 100, description = '', customVpa = null) {
     merchantType = mt.accountType;
     vpaMcc = mt.mcc;
   }
-  // Unique-paise challenge: avoid amounts held by live sessions on the same VPA.
-  // Retry on constraint collision so concurrent requests never land the same amount.
-  let saved = false;
-  let lastErr = null;
-  let session = null;
-  for (let attempt = 0; attempt < 10 && !saved; attempt++) {
-    const activeAmounts = new Set();
-    try {
-      const rows = db.sqliteDb.prepare(
-        "SELECT challenge_amount FROM sessions WHERE status = 'PENDING' AND expires_at >= ? AND vpa_address = ?"
-      ).all(Date.now(), vpaAddress);
-      for (const r of rows) activeAmounts.add(Number(Number(r.challenge_amount).toFixed(2)));
-    } catch (e) { /* db without sqlite: fall back to empty set */ }
-    challengeAmount = generateUniqueChallenge(Number(baseAmount), activeAmounts);
-    session = {
-      sessionId,
-      orderId,
-      description: String(description || '').trim(),
-      challengeAmount,
-      baseAmount: Number(baseAmount),
-      txnRef: sanitizeTxnRef(txnRef),
-      vpaAddress,
-      merchantType,
-      mcc: vpaMcc,
-      createdAt: now,
-      expiresAt,
-      qrRefreshAt,
-      status: 'PENDING',
-      state: 'WAITING',
-      utr: null
-    };
-    try {
-      db.saveSession(session);
-      // Velocity control: increment hourly count for the selected VPA
-      db.incrementVpaVelocity(vpaAddress);
-      saved = true;
-    } catch (e) {
-      lastErr = e;
-      if (attempt >= 9) throw e;
-    }
-  }
+  // Challenge amount is the exact baseAmount — no extra paise offsets.
+  // ECC vault signature + UTR-order binding is the mathematical proof;
+  // amount uniqueness is enforced by UTR-order binding, not challenge_amount.
+  const challengeAmount = Number(baseAmount);
+  const session = {
+    sessionId,
+    orderId,
+    description: String(description || '').trim(),
+    challengeAmount,
+    baseAmount: Number(baseAmount),
+    txnRef: sanitizeTxnRef(txnRef),
+    vpaAddress,
+    merchantType,
+    mcc: vpaMcc,
+    createdAt: now,
+    expiresAt,
+    qrRefreshAt,
+    status: 'PENDING',
+    state: 'WAITING',
+    utr: null
+  };
+  db.saveSession(session);
+  // Velocity control: increment hourly count for the selected VPA
+  db.incrementVpaVelocity(vpaAddress);
   return session;
 }
 // ═══════════════════════════════════════════════════════════════════
