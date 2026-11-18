@@ -1,0 +1,41 @@
+'use strict';
+/* DISHA edge checkout isolation regression.
+ * /checkout and /checkout/ must be served from a static Pages asset even
+ * when Railway is offline; dynamic merchant order API still needs Railway.
+ */
+const assert=require('node:assert/strict');
+const fs=require('node:fs');
+const vm=require('node:vm');
+const path=require('node:path');
+const root=path.join(__dirname,'..','public');
+const worker=fs.readFileSync(path.join(root,'_worker.js'),'utf8');
+const routes=JSON.parse(fs.readFileSync(path.join(root,'_routes.json'),'utf8'));
+const checkout=fs.readFileSync(path.join(root,'checkout.html'),'utf8');
+assert.ok(checkout.length>1000,'Static checkout HTML must be present');
+assert.ok(fs.existsSync(path.join(root,'cosmic-checkout.js')),'Checkout script must be present');
+assert.ok(!routes.include.includes('/checkout'),'Checkout must be local to Cloudflare and not forced to Railway');
+for(const p of ['/owner','/request-access','/dashboard','/api/*']){
+ assert.ok(routes.include.includes(p),'Protected proxy route missing '+p);
+}
+for(const p of ['/checkout','/checkout/','/pay','/pay/']){
+ assert.ok(worker.includes(p),'Static checkout mapping missing '+p);
+}
+const context={URL,Request,Response,Headers,console,fetch:async()=>{throw Error('SIMULATED_RAILWAY_502')}};
+vm.createContext(context);
+vm.runInContext(worker.replace('export default','globalThis.edge ='),context,{filename:'_worker.js'});
+(async()=>{
+ let upstream=0,assets=0;
+ context.fetch=async()=>{upstream++;return new Response('Bad Gateway',{status:502})};
+ const env={ASSETS:{fetch:async request=>{assets++;const u=new URL(request.url);assert.equal(u.pathname,'/checkout.html');return new Response(checkout,{status:200,headers:{'content-type':'text/html'}})}}};
+ for(const route of ['/checkout','/checkout/','/pay','/pay/']){
+  const res=await context.edge.fetch(new Request('https://disha8-2.thenitishkr.in'+route),env);
+  assert.equal(res.status,200,route+' must remain static even if Railway is down');
+  assert.match(await res.text(),/<html/i);
+ }
+ assert.equal(upstream,0,'Canonical checkout must not contact Railway for the HTML shell');
+ assert.equal(assets,4);
+ const api=await context.edge.fetch(new Request('https://disha8-2.thenitishkr.in/api/merchant/public/order/example'),env);
+ assert.equal(api.status,502,'Dynamic merchant payment order depends on Railway backend');
+ assert.equal(upstream,1);
+ console.log('CHECKOUT_EDGE_ISOLATION_PASS: static checkout never relies on Railway availability; dynamic APIs proxy as expected');
+})().catch(error=>{console.error(error);process.exitCode=1});
