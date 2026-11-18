@@ -24,7 +24,10 @@ for(const name of checkoutAssets){
 
 assert.ok(checkout.length>1000,'Static checkout HTML must be present');
 assert.ok(fs.existsSync(path.join(root,'cosmic-checkout.js')),'Checkout script must be present');
-assert.ok(!routes.include.includes('/checkout'),'Checkout must be local to Cloudflare and not forced to Railway');
+// Cloudflare Pages only invokes _worker.js for paths listed in _routes.json.
+// Missing these includes previously exposed the obsolete directory index.
+for(const route of ['/checkout','/checkout/','/pay','/pay/','/checkout/index.html','/pay/index.html'])
+ assert.ok(routes.include.includes(route),'Checkout must invoke canonical edge Worker: '+route);
 for(const p of ['/owner','/request-access','/dashboard','/api/*']){
  assert.ok(routes.include.includes(p),'Protected proxy route missing '+p);
 }
@@ -37,9 +40,12 @@ vm.runInContext(worker.replace('export default','globalThis.edge ='),context,{fi
 (async()=>{
  let upstream=0,assets=0;
  context.fetch=async()=>{upstream++;return new Response('Bad Gateway',{status:502})};
- const env={ASSETS:{fetch:async request=>{assets++;const u=new URL(request.url);assert.equal(u.pathname,'/checkout.html');return new Response(checkout,{status:200,headers:{'content-type':'text/html'}})}}};
+ const env={ASSETS:{fetch:async request=>{assets++;const u=new URL(request.url);
+ assert.equal(u.pathname,'/checkout.html');
+ assert.equal(u.searchParams.get('amount'),'1','Requested amount must survive Worker rewrite');
+ return new Response(checkout,{status:200,headers:{'content-type':'text/html'}})}}};
  for(const route of ['/checkout','/checkout/','/pay','/pay/','/checkout/index.html','/pay/index.html']){
-  const res=await context.edge.fetch(new Request('https://disha8-2.thenitishkr.in'+route),env);
+  const res=await context.edge.fetch(new Request('https://disha8-2.thenitishkr.in'+route+'?amount=1'),env);
   assert.equal(res.status,200,route+' must remain static even if Railway is down');
   assert.match(await res.text(),/<html/i);
  }
