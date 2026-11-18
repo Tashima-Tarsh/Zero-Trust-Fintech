@@ -18,6 +18,7 @@ const original={
 async function recover(old,status){
  const context={
   sessionStorage:{getItem:()=>JSON.stringify(old)},
+  resumeKey:'disha82:cosmic-authorized-checkout:v1',
   model,
   fetch:async()=>({ok:true,json:async()=>status}),
   Date,Number,JSON,encodeURIComponent
