@@ -70,6 +70,8 @@ async function main(){
       }
      }
     }
+    await client.query("CREATE TABLE IF NOT EXISTS disha_migration_control (name TEXT PRIMARY KEY, payload JSONB NOT NULL, created_at TIMESTAMPTZ NOT NULL DEFAULT now())");
+    await client.query("INSERT INTO disha_migration_control(name,payload) VALUES ($1,$2::jsonb) ON CONFLICT (name) DO UPDATE SET payload=EXCLUDED.payload,created_at=now()",['sqlite_to_postgres_verified',JSON.stringify({counts,sourceIntegrity:'ok'})]);
     await client.query('COMMIT');tx=false;
     console.log('POSTGRES_MIGRATION_VERIFIED',JSON.stringify(counts));
     console.log('SQLITE_SNAPSHOT_PRESERVED',copy);
