@@ -99,8 +99,8 @@ const {Pool}=require('pg');
   console.log('PASS spoofed NPCI callback: no fake success');
 
   const gaming=await send('/api/gaming/verify-payment',{utr:'631902884112',amount:'499.01'});
-  assert.ok([403,409].includes(gaming.status),
-    'Legacy gaming claim must be refused by IP access guard (403) or settlement guard (409); observed '+gaming.status);
+  assert.ok([401,403,409].includes(gaming.status),
+    'Legacy gaming claim must be refused by unauthenticated (401), IP (403), or settlement (409) guard; observed '+gaming.status);
   if(gaming.status===409)assert.equal(gaming.data.verified,false);
   console.log('PASS legacy direct UTR gaming claim blocked (HTTP '+gaming.status+')');
 
