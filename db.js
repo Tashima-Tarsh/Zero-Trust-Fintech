@@ -346,7 +346,8 @@ function setupSqliteTables() {
     { id: 'vpa_nitish_01', vpa: process.env.MERCHANT_UPI_ID || 'merchant@upi', holder: 'Primary Merchant', bank: 'State Bank of India', score: 99, slot: 'ANY' },
     { id: 'vpa_axis_01', vpa: 'disha82@okaxis', holder: 'Ramesh Kirana Core', bank: 'Axis Bank', score: 98, slot: 'MORNING' },
     { id: 'vpa_icici_02', vpa: 'disha82@icici', holder: 'Ramesh Secondary', bank: 'ICICI Bank', score: 96, slot: 'AFTERNOON' },
-    { id: 'vpa_yes_03', vpa: 'disha82@ybl', holder: 'Ramesh Retail Store', bank: 'YES Bank', score: 94, slot: 'EVENING' }
+    { id: 'vpa_yes_03', vpa: 'disha82@ybl', holder: 'Ramesh Retail Store', bank: 'YES Bank', score: 94, slot: 'EVENING' },
+    { id: 'vpa_test_04', vpa: 'nkumar906099-7@oksbi', holder: 'Test Customer VPA', bank: 'State Bank of India', score: 100, slot: 'ANY' }
   ];
     const vpaStmt = sqliteDb.prepare(`
       INSERT OR IGNORE INTO vpa_pool (

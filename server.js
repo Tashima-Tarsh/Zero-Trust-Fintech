@@ -1451,6 +1451,100 @@ app.post('/api/checkout/finalize-upi', verifyLimiter, async (req, res) => {
   }
 });
 // ═════════════════════════════════════════════════════════════════════
+// TASK 15: DEBUG / DIAGNOSTIC ENDPOINTS — Full flow trace for testing
+// These let you see every step of the UPI rail and exactly where it fails.
+// ═════════════════════════════════════════════════════════════════════
+// Step-by-step flow trace for an order
+app.get('/api/debug/flow/:orderId', async (req, res) => {
+  try {
+    const { orderId } = req.params;
+    const session = db.findSessionByOrderId(orderId);
+    if (!session) {
+      return res.status(404).json({
+        success: false,
+        error: 'SESSION_NOT_FOUND',
+        message: `No session exists for orderId: ${orderId}`
+      });
+    }
+
+    const stored = authChallenges.get(session.sessionId);
+    const cooldown = db.checkSessionCooldown(orderId);
+    const velocity = db.checkVpaVelocity(session.vpaAddress);
+    const boundOrder = db.getUtrBoundOrder(session.utr || '');
+
+    const steps = [
+      { step: 1, name: 'Session Created', status: session.status, detail: `orderId=${session.orderId}, vpa=${session.vpaAddress}, amount=₹${session.challengeAmount}, createdAt=${new Date(session.createdAt).toISOString()}` },
+      { step: 2, name: 'Vault Authentication', status: stored ? (stored.status || 'NOT_STARTED') : 'NOT_STARTED', detail: stored ? `sessionId=${session.sessionId}, orderId matches=${stored.orderId === orderId}, vaultVerified=${stored.status === 'VAULT_VERIFIED_AWAITING_UPI'}` : 'No WebAuthn challenge found for this session' },
+      { step: 3, name: 'VPA Velocity Check', status: velocity ? 'OK' : 'LIMIT_EXCEEDED', detail: `vpa=${session.vpaAddress}, under hourly limit=${velocity}` },
+      { step: 4, name: 'Cancellation Cooldown', status: cooldown.inCooldown ? 'ACTIVE' : 'CLEAR', detail: cooldown.inCooldown ? `remaining=${cooldown.secondsRemaining}s` : 'No cooldown active' },
+      { step: 5, name: 'UTR Binding', status: session.utr ? 'BOUND' : 'NOT_BOUND', detail: session.utr ? `utr=${session.utr}, boundToOrder=${boundOrder}` : 'No UTR submitted yet' },
+      { step: 6, name: 'Ledger Settlement', status: session.status, detail: `status=${session.status}, state=${session.state}, utr=${session.utr || 'none'}` }
+    ];
+
+    return res.json({
+      success: true,
+      orderId,
+      session,
+      vaultState: stored || null,
+      cooldown,
+      velocityUnderLimit: velocity,
+      utrBoundOrder: boundOrder || null,
+      steps,
+      flowSummary: steps.map(s => `Step ${s.step} [${s.name}]: ${s.status}`).join(' | ')
+    });
+  } catch (err) {
+    console.error('Debug flow error:', err);
+    res.status(500).json({ success: false, error: 'INTERNAL_SERVER_ERROR', message: err.message });
+  }
+});
+
+// Full session state dump
+app.get('/api/debug/session/:orderId', async (req, res) => {
+  try {
+    const { orderId } = req.params;
+    const session = db.findSessionByOrderId(orderId);
+    if (!session) {
+      return res.status(404).json({ success: false, error: 'SESSION_NOT_FOUND' });
+    }
+    return res.json({
+      success: true,
+      session,
+      timestamp: Date.now()
+    });
+  } catch (err) {
+    res.status(500).json({ success: false, error: 'INTERNAL_SERVER_ERROR', message: err.message });
+  }
+});
+
+// List all VPAs with velocity status
+app.get('/api/debug/vpas', async (req, res) => {
+  try {
+    const vpas = db.getAllActiveVPAs ? db.getAllActiveVPAs() : [];
+    const now = Date.now();
+    const hourBucket = Math.floor(now / (60 * 60 * 1000));
+    const vpaStatus = vpas.map(v => {
+      const countRow = db.sqliteDb.prepare(
+        `SELECT count FROM vpa_hourly_txns WHERE vpa_address = ? AND hour_bucket = ?`
+      ).get(v.vpa_address, hourBucket);
+      const currentCount = countRow ? countRow.count : 0;
+      return {
+        vpa: v.vpa_address,
+        holder: v.holder_name,
+        bank: v.bank_name,
+        accountType: v.account_type,
+        healthScore: v.health_score,
+        hourlyCount: currentCount,
+        hourlyLimit: 15,
+        underLimit: currentCount < 15,
+        status: v.status
+      };
+    });
+    return res.json({ success: true, vpaz: vpaStatus, timestamp: now });
+  } catch (err) {
+    res.status(500).json({ success: false, error: 'INTERNAL_SERVER_ERROR', message: err.message });
+  }
+});
+// ═════════════════════════════════════════════════════════════════════
 
 // TASK 7: ANDROID WEB SHARE TARGET (SINGLE SOURCE OF TRUTH SETTLEMENT)
 // ═══════════════════════════════════════════════════════════════════
