@@ -31,4 +31,9 @@ assert.doesNotMatch(server,/covers 99\.7%/i,'Do not invent empirical success rat
 assert.doesNotMatch(server,/db\.bindUtrToOrder\(/,
   'Untrusted public claims must never reserve authoritative bank references');
 assert.match(server,/observeClaim\(db\.pgPool,session\.orderId,cleanUtr,'CFC'\)/);
+const vault=fs.readFileSync(path.join(__dirname,'../financial/vault-evidence.js'),'utf8');
+assert.match(vault,/evaluateTemporalGate\(/,
+  'Vault must reuse Pony-tail policy for server-side order timing');
+assert.match(vault,/temporalGate:/,
+  'Vault evidence must retain its mathematical observation-window classification');
 console.log('PONY_TAIL_MATHEMATICAL_BOUNDARIES_PASS: 15s/180s inclusivity, late, early, expiration and adversarial clock; no false credit claims.');

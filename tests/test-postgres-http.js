@@ -43,8 +43,14 @@ const crypto=require('node:crypto');
   assert.equal((await valid.json()).session.orderId,data.orderId);
   const forbidden=await fetch(base+'/api/session/'+encodeURIComponent(data.orderId));
   assert.equal(forbidden.status,401);
-  const orderState=await fetch(base+'/api/order-state/'+encodeURIComponent(data.orderId));
-  assert.equal(orderState.status,200);
+  const stateUrl=base+'/api/order-state/'+encodeURIComponent(data.orderId);
+  const missingToken=await fetch(stateUrl);
+  assert.equal(missingToken.status,401,'Order state must not be readable without a checkout token');
+  const forgedToken=await fetch(stateUrl+'?token='+encodeURIComponent('x'.repeat(48)));
+  assert.equal(forgedToken.status,401,'Another customer cannot read order state');
+  const orderState=await fetch(stateUrl+'?token='+encodeURIComponent(data.sessionId));
+  assert.equal(orderState.status,200,'Checkout holder can poll status');
+  assert.equal((await orderState.json()).success,true);
   console.log('PostgreSQL production path: HTTP checkout, session create, auth, polling PASS');
  }finally {
   child.kill('SIGTERM');

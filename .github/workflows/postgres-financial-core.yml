@@ -18,6 +18,7 @@ on:
       - 'tests/test-postgres-migration.js'
       - 'tests/test-postgres-switch.js'
       - 'tests/test-postgres-http.js'
+      - 'tests/test-postgres-webauthn-store.js'
       - 'scripts/migrate-sqlite-to-postgres.js'
       - 'financial/postgres-store.js'
       - 'migrations/002_postgres_checkout.sql'
@@ -72,6 +73,8 @@ jobs:
         run: node tests/test-postgres-migration.js
       - name: Verify PostgreSQL-only cutover switch
         run: node tests/test-postgres-switch.js
+      - name: Prove durable single-use WebAuthn challenges
+        run: node tests/test-postgres-webauthn-store.js
       - name: Test real checkout HTTP against PostgreSQL
         run: node tests/test-postgres-http.js
       - name: Prove untrusted UTR cannot create financial postings
