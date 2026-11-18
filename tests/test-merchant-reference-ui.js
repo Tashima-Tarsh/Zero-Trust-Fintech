@@ -28,4 +28,13 @@ for(const rule of ['.celestial-earth','.celestial-moon','.stat-portrait','.side-
 }
 for(const size of [1190,920,760,450])assert.ok(css.includes('max-width:'+size+'px'),'Viewport breakpoint missing: '+size);
 assert.ok(!/previewOrders|sampleBalance|fakePayment/i.test(js),'No invented financial records');
+
+for(const selector of ['#vpaAddress','#vpaHolder','#vpaBank','#vpaMcc','#vpaAccountType']){
+ assert.ok(css.includes(selector),'Missing receiving-account icon style: '+selector);
+}
+assert.ok(css.includes('background-repeat:no-repeat,no-repeat!important'),'Field icons must never tile across the input');
+assert.ok(css.includes('background-size:43px 21px,100% 100%!important'),'UPI icon requires explicit layer sizing');
+assert.ok(css.includes('background-size:22px 22px,100% 100%!important'),'Account field icons require explicit layer sizing');
+assert.ok(css.includes('background-position:11px center,center!important'),'Account icons must stay left aligned');
+
 console.log('REFERENCE_GLASS_PASS: approved second design applied to real tenant UI, controls preserved, assets in sync');
