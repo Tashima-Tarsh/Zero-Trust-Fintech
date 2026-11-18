@@ -175,6 +175,24 @@ function createPlatformControl({db,getAuth,clerkEmailResolver=getClerkVerifiedEm
    const t=await pool.query("SELECT id,business_name,is_internal_test FROM saas_merchants WHERE id=$1 AND is_internal_test=TRUE",[ownerTenantId()]);
    res.set('Cache-Control','no-store').json({success:true,role:'PLATFORM_OWNER',testTenant:t.rows[0]||null});
  }));
+ router.get('/owner/configuration',wrap(async(req,res)=>{
+   const [profile,personal,company,companyAccounts]=await Promise.all([
+     pool.query("SELECT display_name,email,phone,business_name,professional_title,updated_at FROM disha_owner_profile WHERE owner_key=$1",[ownerKey()]),
+     pool.query("SELECT vpa_address,holder_name,account_type,status,is_default FROM saas_merchant_vpas WHERE merchant_id=$1 ORDER BY is_default DESC,created_at ASC",[ownerTenantId()]),
+     pool.query("SELECT id,business_name,access_status,setup_completed FROM saas_merchants WHERE id=$1",[companyTenantId()]),
+     pool.query("SELECT vpa_address,holder_name,account_type,mcc,status FROM saas_merchant_vpas WHERE merchant_id=$1",[companyTenantId()])
+   ]);
+   res.set('Cache-Control','no-store').json({
+    success:true,owner:profile.rows[0]||null,
+    personalTenant:{id:ownerTenantId(),upiAccounts:personal.rows},
+    companyTenant:company.rows[0]||null,companyUpiAccounts:companyAccounts.rows,
+    settings:{inviteOnly:active(),simulationDisabled:process.env.ENABLE_PAYMENT_SIMULATION!=='true',publicTestAmount:1},
+    warnings:[
+      ...(personal.rows.length<2?['One or more personal UPI accounts could not be provisioned; check existing tenant ownership.']:[]),
+      ...((company.rows.length&&!companyAccounts.rows.length)?['Company P2M account has not been registered.']:[])
+    ]
+   });
+ }));
  router.get('/owner/overview',wrap(async(req,res)=>{
    const [merchants,requests,orders,incidents]=await Promise.all([
      pool.query("SELECT count(*)::int AS total,count(*) FILTER(WHERE access_status='ACTIVE' AND is_internal_test=FALSE)::int AS active,count(*) FILTER(WHERE is_internal_test=TRUE)::int AS internal FROM saas_merchants"),
