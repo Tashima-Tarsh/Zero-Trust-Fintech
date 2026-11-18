@@ -186,6 +186,37 @@ function createPlatformControl({db,getAuth,clerkEmailResolver=getClerkVerifiedEm
    const r=await pool.query("SELECT o.id,o.merchant_id,m.business_name,o.amount_paise,o.created_at,o.expires_at,s.status,s.utr FROM saas_merchant_orders o JOIN saas_merchants m ON m.id=o.merchant_id JOIN sessions s ON s.session_id=o.session_id ORDER BY o.created_at DESC LIMIT 150");
    res.set('Cache-Control','no-store').json({success:true,transactions:r.rows});
  }));
+
+ router.get('/owner/ledger',wrap(async(req,res)=>{
+   const present=await pool.query("SELECT to_regclass('public.disha_core_journals') IS NOT NULL AS ready");
+   if(!present.rows[0].ready)return res.set('Cache-Control','no-store').json({success:true,connected:false,journals:[],summary:null});
+   const [records,summary]=await Promise.all([
+     pool.query("SELECT j.journal_id,j.order_id,j.merchant_id,m.business_name,j.amount_paise,j.state,j.created_at,j.posted_at FROM disha_core_journals j LEFT JOIN saas_merchants m ON m.id=j.merchant_id ORDER BY j.created_at DESC LIMIT 150"),
+     pool.query("SELECT count(*) FILTER(WHERE state='POSTED')::int AS posted,count(*)::int AS total,COALESCE(sum(amount_paise) FILTER(WHERE state='POSTED'),0)::text AS posted_paise FROM disha_core_journals")
+   ]);
+   res.set('Cache-Control','no-store').json({success:true,connected:true,journals:records.rows,summary:summary.rows[0]});
+ }));
+ router.get('/owner/evidence',wrap(async(req,res)=>{
+   const present=await pool.query("SELECT to_regclass('public.disha_vault_evidence') IS NOT NULL AS ready");
+   if(!present.rows[0].ready)return res.set('Cache-Control','no-store').json({success:true,connected:false,evidence:[]});
+   const r=await pool.query("SELECT o.id AS order_id,m.business_name,v.outcome,v.utr_candidate,v.created_at,s.status "+
+      "FROM saas_merchant_orders o JOIN saas_merchants m ON m.id=o.merchant_id JOIN sessions s ON s.session_id=o.session_id "+
+      "JOIN LATERAL(SELECT outcome,utr_candidate,created_at FROM disha_vault_evidence WHERE order_id=o.id ORDER BY created_at DESC LIMIT 1) v ON TRUE "+
+      "ORDER BY v.created_at DESC LIMIT 150");
+   res.set('Cache-Control','no-store').json({success:true,connected:true,evidence:r.rows});
+ }));
+ router.post('/owner/incidents/:id/status',wrap(async(req,res)=>{
+   const status=val(req.body?.status,20).toUpperCase();
+   if(!['ACKNOWLEDGED','RESOLVED','OPEN'].includes(status))throw err(400,'Invalid incident status');
+   const c=await pool.connect();
+   try{await c.query('BEGIN');const update=await c.query("UPDATE disha_platform_incidents SET status=$2,updated_at=$3 WHERE id=$1 RETURNING id",[req.params.id,status,Date.now()]);
+     if(!update.rowCount)throw err(404,'Incident not found');
+     await audit(c,req.ownerUserId,'INCIDENT_'+status,req.params.id);
+     await c.query('COMMIT');
+   }catch(e){await c.query('ROLLBACK');throw e}finally{c.release()}
+   res.json({success:true,status});
+ }));
+
  router.get('/owner/incidents',wrap(async(req,res)=>{
    const r=await pool.query("SELECT * FROM disha_platform_incidents ORDER BY created_at DESC LIMIT 100");
    res.set('Cache-Control','no-store').json({success:true,incidents:r.rows,telemetry:{application:'NOT_CONNECTED',frontend:'NOT_CONNECTED',deployment:'NOT_CONNECTED'}});
