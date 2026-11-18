@@ -76,7 +76,7 @@ async function api(path,options={}){
 function view(name,replaceHistory=false){
  if(!views[name])name='overview';
  $$('.view').forEach(el=>el.classList.toggle('active',el.id==='view-'+name));
- $$$('#appSide [data-view]').forEach(el=>{
+ $('#appSide [data-view]').forEach(el=>{
   el.classList.toggle('active',el.dataset.view===name);
   if(el.dataset.view===name)el.setAttribute('aria-current','page');
   else el.removeAttribute('aria-current');
