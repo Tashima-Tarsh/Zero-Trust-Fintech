@@ -213,6 +213,26 @@ function createPlatformControl({db,getAuth,clerkEmailResolver=getClerkVerifiedEm
    }catch(e){await c.query('ROLLBACK');throw e}finally{c.release()}
    res.json({success:true,status:choice==='APPROVE'?'APPROVED':'REJECTED',merchantId:merchantId||null});
  }));
+ router.post('/owner/invite-merchant',wrap(async(req,res)=>{
+   // Owner-provisioned invitation. The invited identity still needs verified
+   // Clerk sign-in and cannot self-assign a tenant.
+   const business=safeName(req.body?.businessName),email=val(req.body?.email,254).toLowerCase();
+   if(business.length<3||!EMAIL.test(email))throw err(400,'Business name and valid invited email are required');
+   const c=await pool.connect();let tenantId;
+   try{
+     await c.query('BEGIN');
+     const existing=await c.query("SELECT id FROM saas_merchants WHERE lower(approved_email)=lower($1) FOR UPDATE",[email]);
+     if(existing.rowCount)throw err(409,'This email already has an approved merchant invitation');
+     tenantId=id('mer_');
+     await c.query("INSERT INTO saas_merchants(id,clerk_user_id,business_name,email,approved_email,access_status,approved_by,approved_at,created_at,updated_at) "+
+       "VALUES($1,NULL,$2,$3,$3,'APPROVED',$4,$5,$5,$5)",
+       [tenantId,business,email,req.ownerUserId,Date.now()]);
+     await audit(c,req.ownerUserId,'MERCHANT_DIRECT_APPROVAL',tenantId,{email});
+     await c.query('COMMIT');
+   }catch(e){await c.query('ROLLBACK');throw e}finally{c.release()}
+   // External delivery stays an explicit second step, allowing safe retries.
+   res.status(201).json({success:true,merchantId:tenantId,status:'APPROVED',next:'Send Clerk invite from Tenant Management'});
+ }));
  router.post('/owner/tenants/:id/invite',wrap(async(req,res)=>{
    const target=await pool.query("SELECT id,approved_email,access_status FROM saas_merchants WHERE id=$1 AND is_internal_test=FALSE",[req.params.id]);
    if(!target.rowCount)throw err(404,'Merchant not found');
