@@ -181,7 +181,7 @@ function createMerchantApi({db,getAuth,buildUpiUri}) {
     const first=await db.pgPool.query('SELECT 1 FROM saas_merchant_vpas WHERE merchant_id=$1 LIMIT 1',[req.merchant.id]);
     const r=await db.pgPool.query(
       "INSERT INTO saas_merchant_vpas(id,merchant_id,vpa_address,bank_name,status,is_default,account_type,mcc,created_at) "+
-      "VALUES($1,$2,$3,$4,'ACTIVE',$5,$6,$7,$8) ON CONFLICT(vpa_address) DO NOTHING RETURNING id"
+      "VALUES($1,$2,$3,$4,'ACTIVE',$5,$6,$7,$8) ON CONFLICT(vpa_address) DO NOTHING RETURNING id",
       [id('vpa_'),req.merchant.id,account,val(req.body.bankName,100),!first.rowCount,type.type,type.mcc,now()]);
     if(!r.rowCount)throw fail(409,'UPI ID already registered');
     res.status(201).json({success:true,id:r.rows[0].id});
