@@ -23,6 +23,7 @@ const UNIT_TESTS = [
   'test-cosmic-checkout-interactions.js', // Stage transitions and ledger receipt authority
   'test-cosmic-checkout.js', // unified Touch -> app/QR -> ledger receipt
   'test-checkout-production.js', // checkout routing, passkey and browser JS syntax
+  'test-checkout-edge-gateway.js', // Pages checkout HTML must remain independent from Railway 502
   'test-financial-money.js',
   'test-utr-confidence-source.js', // forged UTR success receipts cannot release
   'test-clerk-merchant-auth.js', // Clerk FAPI CSP, signup and login bootstrapping
