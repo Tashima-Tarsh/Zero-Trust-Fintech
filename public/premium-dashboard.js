@@ -78,7 +78,10 @@ function view(name,replaceHistory=false){
   else el.removeAttribute('aria-current');
  });
  $('#viewHeading').textContent=views[name][0];$('#viewSubtitle').textContent=views[name][1];
- if(location.hash!=='#'+name)history[replaceHistory?'replaceState':'pushState'](null,'','#'+name);
+ if(location.hash!=='#'+name) {
+  if(replaceHistory)history.replaceState(null,'','#'+name);
+  else history.pushState(null,'','#'+name);
+ }
  closeMenu();
  if(typeof window.scrollTo==='function')window.scrollTo(0,0);
  const actions={overview:loadOverview,payments:loadPayments,create:loadVpas,vpas:loadVpas,
