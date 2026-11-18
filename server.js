@@ -229,6 +229,15 @@ async function idempotencyMiddleware(req, res, next) {
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(idempotencyMiddleware);
+if (process.env.NODE_ENV === 'production') {
+  // No customer session dumps, debug consoles or test endpoints in production.
+  app.use((req, res, next) => {
+    if (req.path === '/debug.html' || /^\/api\/debug(?:\/|$)/.test(req.path)) {
+      return res.status(404).json({ success: false, error: 'NOT_FOUND' });
+    }
+    next();
+  });
+}
 const merchantApi = createMerchantApi({db, getAuth, buildUpiUri});
 // Merchant API is isolated: do NOT intercept public checkout APIs.
 app.use('/api', (req,res,next) =>
