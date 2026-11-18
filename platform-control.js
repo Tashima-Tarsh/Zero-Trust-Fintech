@@ -28,7 +28,7 @@ function createPlatformControl({db,getAuth,clerkEmailResolver=getClerkVerifiedEm
    // Verified PRIMARY Clerk email is the only owner credential.
    // An old Clerk user ID, unverified email, or browser field is never enough.
    let verifiedEmail=null;
-   try{verifiedEmail=await clerkEmailResolver(userId)}catch(_){return false}
+   try{verifiedEmail=await clerkEmailResolver(userId)}catch(e){if(e.code==='CLERK_IDENTITY_UNAVAILABLE')throw e;return false}
    return verifiedEmail===SUPER_ADMIN_EMAIL;
  }
  async function ensureOwnerTestTenant(userId){
