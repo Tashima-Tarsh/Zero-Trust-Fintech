@@ -56,6 +56,9 @@ assert.match(page,/id="view-overview"/);
 assert.match(js,/loadVpas/);
 assert.match(js,/function view\(name/);
 assert.match(js,/bulkImportVpas/);
+assert.match(js,/daily_tx_count/,'Routing screen must use real usage counters');
+assert.match(css,/routing-entry/,'Routing screen must have purpose-built operations cards');
+
 assert.match(js,/merchant\.setup_completed/);
 assert.match(js,/history\.pushState/,'Navigation must support browser Back');
 assert.match(css,/premium-merchant-console/,'Apply dedicated premium console theme');
