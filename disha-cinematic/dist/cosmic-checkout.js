@@ -213,7 +213,7 @@
    const chosen=model.safeApp(app);
    const target=model.buildAppUrl(session.upiUri,chosen,userAgent);
    if(!handoffStarted){
-    vault.beginHandoff(orderId(),vaultSessionId,session.token);
+    vault.beginHandoff(orderId(),vaultSessionId,session.token,chosen);
     handoffStarted=true;
    }
    savePreferred(chosen);

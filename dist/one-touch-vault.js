@@ -93,7 +93,10 @@
   function getPendingOrderId(){
     try{return sessionStorage.getItem(LAST)}catch(_){return null}
   }
-  function beginHandoff(orderId,vaultSessionId,checkoutToken){
+  function beginHandoff(orderId,vaultSessionId,checkoutToken,app='generic'){
+    const selectedApp=String(app||'generic').toLowerCase();
+    if(!['gpay','phonepe','paytm','cred','generic'].includes(selectedApp))
+      throw Error('Unsupported UPI application selected.');
     if(!/^[A-Za-z0-9_-]{6,150}$/.test(orderId||'')||
        !/^[a-f0-9]{32}$/i.test(vaultSessionId||'')||
        !/^[a-f0-9]{24,64}$/i.test(checkoutToken||''))
@@ -102,7 +105,7 @@
     const random=new Uint8Array(16);
     root.crypto.getRandomValues(random);
     const eventId=Array.from(random,b=>b.toString(16).padStart(2,'0')).join('');
-    saveAttempt({orderId,vaultSessionId,token:checkoutToken,
+    saveAttempt({orderId,vaultSessionId,token:checkoutToken,selectedApp,
       eventId,handoffAt:Date.now(),hiddenAt:null,evidence:null,receipt:null});
     sessionStorage.setItem(LAST,orderId);
     return eventId;
@@ -140,7 +143,7 @@
       data.evidence={
         browserEvent:Object.keys(params).length?'RETURN_QUERY_OBSERVED':'APP_RESUME',
         handoffAt:data.handoffAt,hiddenAt:data.hiddenAt,
-        returnedAt:Date.now(),returnParams:params
+        returnedAt:Date.now(),selectedApp:data.selectedApp||'generic',returnParams:params
       };
       saveAttempt(data); // Persist the same evidence for network retries.
     }
