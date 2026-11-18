@@ -46,7 +46,8 @@ function createPlatformControl({db,getAuth,clerkEmailResolver=getClerkVerifiedEm
     "ALTER TABLE saas_merchants ADD COLUMN IF NOT EXISTS approved_email TEXT;"+
     "ALTER TABLE saas_merchants ADD COLUMN IF NOT EXISTS is_internal_test BOOLEAN NOT NULL DEFAULT FALSE;"+
     "ALTER TABLE saas_merchants ADD COLUMN IF NOT EXISTS approved_by TEXT;"+
-    "ALTER TABLE saas_merchants ADD COLUMN IF NOT EXISTS approved_at BIGINT;"
+    "ALTER TABLE saas_merchants ADD COLUMN IF NOT EXISTS approved_at BIGINT;"+
+    "CREATE UNIQUE INDEX IF NOT EXISTS uq_disha_approved_email ON saas_merchants(lower(approved_email)) WHERE approved_email IS NOT NULL;"
    );
    // Never manufacture a platform owner identity: it must be configured out-of-band.
    if(active()){
@@ -160,7 +161,7 @@ function createPlatformControl({db,getAuth,clerkEmailResolver=getClerkVerifiedEm
    const record=target.rows[0];
    if(!['APPROVED','INVITED'].includes(record.access_status)||!record.approved_email)throw err(409,'Merchant is not eligible for invitation');
    if(!process.env.CLERK_SECRET_KEY)throw err(503,'Clerk invitation service unavailable');
-   const response=await fetch('https://api.clerk.com/v1/invitations',{method:'POST',headers:{Authorization:'Bearer '+process.env.CLERK_SECRET_KEY,'Content-Type':'application/json'},body:JSON.stringify({email_address:record.approved_email,ignore_existing:true,redirect_url:(process.env.PUBLIC_BASE_URL||'https://disha8-2.thenitishkr.in')+'/login'})});
+   const response=await fetch('https://api.clerk.com/v1/invitations',{method:'POST',headers:{Authorization:'Bearer '+process.env.CLERK_SECRET_KEY,'Content-Type':'application/json'},body:JSON.stringify({email_address:record.approved_email,ignore_existing:true}),signal:AbortSignal.timeout(10000)});
    if(!response.ok){const result=await response.text();throw err(502,'Unable to issue Clerk invitation ('+response.status+')')}
    await pool.query("UPDATE saas_merchants SET access_status='INVITED',updated_at=$2 WHERE id=$1",[record.id,Date.now()]);
    await audit(pool,req.ownerUserId,'CLERK_INVITATION_SENT',record.id);
