@@ -48,7 +48,8 @@ jobs:
       matrix:
         include:
           - api-level: '35'
-            target: google_apis
+            # Automated Test Device image is optimized for headless CI WebView tests.
+            target: google_atd
             profile: pixel_2
             ram: 2048M
             gpu: software
