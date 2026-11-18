@@ -56,4 +56,39 @@ for(const [name,component] of [['merchant-signup.html','SignUp'],['merchant-logi
  assert.ok(inline.length);
  inline.forEach((js,i)=>new vm.Script(js,{filename:name+' inline #'+i}));
 }
-console.log('CLERK_MERCHANT_AUTH_PASS: CDN host from key, safe CSP, bot protection, no-store config, signup/login components, redirects and routing.');
+// Exercise the actual login and signup inline bootstraps against a Clerk-format
+// publishable key, including the terminal dollar-sign delimiter.
+async function testBrowserMount(file,method){
+ const html=read('public/'+file);
+ const inline=[...html.matchAll(/<script\\b(?![^>]*\\bsrc=)[^>]*>([\\s\\S]*?)<\\/script>/gi)]
+  .map(m=>m[1]).find(Boolean);
+ assert.ok(inline,'Expected auth bootstrap script');
+ const scripts=[],mounts=[],errors=[];
+ const status={textContent:'Connecting securely',style:{},remove(){}};
+ const window={
+  DISHA_CLERK_PUBLISHABLE_KEY:realLiveKey,
+  DISHA_CLERK_CONFIG_READY:true,
+  __internal_ClerkUICtor:function(){},
+  Clerk:{isSignedIn:false,load:async()=>{},
+   mountSignIn:(el)=>mounts.push('SignIn'),mountSignUp:(el)=>mounts.push('SignUp')}
+ };
+ const document={
+  getElementById:id=>id==='auth-status'?status:{id},
+  createElement:()=>({dataset:{}}),
+  head:{appendChild(node){scripts.push(node.src);queueMicrotask(()=>node.onload?.())}}
+ };
+ vm.runInNewContext(inline,{window,document,atob,location:{replace(){}},
+  console:{error:(...args)=>errors.push(args.map(String).join(':'))}});
+ await new Promise(resolve=>setImmediate(resolve));
+ assert.deepEqual(errors,[],'Auth page must not display a bootstrap error');
+ assert.deepEqual(scripts,[
+  'https://clerk.merchant.example/npm/@clerk/ui@1/dist/ui.browser.js',
+  'https://clerk.merchant.example/npm/@clerk/clerk-js@6/dist/clerk.browser.js'
+ ],'CDN bundle URLs must have a valid FAPI hostname');
+ assert.deepEqual(mounts,[method],'Clerk must mount the merchant auth form');
+}
+(async()=>{
+ await testBrowserMount('merchant-login.html','SignIn');
+ await testBrowserMount('merchant-signup.html','SignUp');
+ console.log('CLERK_MERCHANT_AUTH_PASS: valid Clerk keys, CSP, CDN bootstrap and merchant forms.');
+})().catch(err=>{console.error(err);process.exitCode=1;});
