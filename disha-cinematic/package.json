@@ -3,6 +3,6 @@
   "version": "8.2.0",
   "description": "DISHA 8.2 Frontend on Cloudflare Pages",
   "scripts": {
-    "build": "node -e \"console.log('Build successful')\""
+    "build": "node ../scripts/build.js"
   }
 }
