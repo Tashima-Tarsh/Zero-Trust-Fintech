@@ -717,6 +717,7 @@ app.get('/api/session/new', checkoutLimiter, async (req, res) => {
       txnRef: session.txnRef,
       vpaAddress: session.vpaAddress,
       merchantName: MERCHANT_NAME,
+      paymentType:String(session.merchantType).toUpperCase()==='MERCHANT'?'P2M':'P2P',
       expiresAt: session.expiresAt,
       qrRefreshAt: session.qrRefreshAt,
       upiLink,
