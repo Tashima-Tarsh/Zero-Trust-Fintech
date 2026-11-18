@@ -121,6 +121,142 @@ button,a{font:inherit}button{cursor:pointer}button:disabled{opacity:.48;cursor:w
  *,*:before,*:after{scroll-behavior:auto!important;animation:none!important;transition:none!important}
  .starfield,.orbit,.vault-core,.receipt-sculpture{will-change:auto}
 }
+
+
+/* DISHA COSMOS II — visible astronomical artwork, not a hidden page wallpaper.
+   The same visual surface appears in both first-party checkout routes. */
+body{background:#040817}
+.universe{
+ z-index:0;
+ background-color:#020713;
+ background-image:
+   linear-gradient(180deg,#060c20a6 0%,#060a191f 32%,#090d1ca1 100%),
+   url('/assets/disha-universe-background.svg');
+ background-size:cover,cover;background-position:center center,center center;
+}
+.checkout-shell{
+ position:relative;z-index:1;width:min(100%,575px);
+ padding:clamp(13px,2.8vh,26px) 14px;
+}
+.checkout-panel{
+ isolation:isolate;min-height:0;
+ background-color:#070e25;
+ background-image:
+  linear-gradient(180deg,#07102bea 0%,#0810289d 27%,#070d204c 54%,#090f25dd 100%),
+  url('/assets/disha-universe-background.svg');
+ background-position:center center,center center;
+ background-size:cover,cover;
+ box-shadow:0 28px 90px #01030bd9,0 0 64px #6b7ffc29,inset 0 1px #e7f4ff44;
+ border:1px solid #a8bbff65;border-radius:25px;
+ backdrop-filter:none;-webkit-backdrop-filter:none;
+}
+.checkout-panel:before{
+ content:"";position:absolute;z-index:-1;inset:0;
+ height:auto;pointer-events:none;
+ background:radial-gradient(ellipse at 51% 43%,#7394dc24,transparent 47%);
+}
+.checkout-brand{
+ display:flex;justify-content:center;align-items:center;
+ position:relative;z-index:2;
+ padding:21px 18px 5px;
+}
+.checkout-brand .logo{
+ width:clamp(176px,39vw,224px);
+ filter:drop-shadow(0 3px 15px #8296ff73);
+}
+.stage{position:relative;z-index:1;min-height:500px}
+.stage-initial{
+ min-height:467px;
+ padding:9px clamp(22px,6vw,46px) 29px;
+ justify-content:flex-start;gap:0;
+}
+.stage-initial .eyebrow{
+ margin-top:9px;margin-bottom:5px;
+ color:#c3d4fc;font-size:10px;font-weight:760;letter-spacing:.29em;
+}
+.stage-initial .amount{
+ font-weight:760;font-size:clamp(45px,9vw,59px);
+ letter-spacing:-.064em;
+ color:#fafdff;
+ text-shadow:0 5px 25px #09164ad4;
+}
+.vault-scene{
+ width:min(100%,315px);aspect-ratio:1;
+ margin:8px auto 10px;
+ transform-style:preserve-3d;perspective:900px;
+}
+.vault-atmosphere{
+ position:absolute;inset:8%;border-radius:50%;
+ background:radial-gradient(circle,#678fd258 2%,#5350b331 43%,transparent 73%);
+ filter:blur(27px);
+ animation:auraPulse 6s ease-in-out infinite;
+}
+.vault-art{
+ display:block;position:relative;z-index:1;
+ width:100%;height:100%;object-fit:contain;
+ mix-blend-mode:screen;
+ filter:drop-shadow(0 0 23px #758bff65) contrast(1.12) saturate(1.12);
+ -webkit-mask-image:radial-gradient(ellipse at 50% 50%,#000 40%,#000d 61%,transparent 77%);
+ mask-image:radial-gradient(ellipse at 50% 50%,#000 40%,#000d 61%,transparent 77%);
+ animation:sculptureDrift 7s ease-in-out infinite;
+}
+.vault-spectral-orbit{
+ position:absolute;z-index:2;pointer-events:none;
+ border:1px solid #8ac6ff31;border-radius:50%;
+ width:72%;height:24%;top:46%;left:14%;
+ transform:rotate(-14deg);
+ box-shadow:0 0 18px #4373c315;
+}
+.vault-spectral-orbit-b{transform:rotate(27deg);opacity:.48}
+.stage-initial .action-primary{
+ min-height:57px;
+ margin-top:auto;
+ background:linear-gradient(125deg,#e9efff 0%,#c4d2ff 59%,#95baff 100%);
+ color:#0a1736;
+ border:1px solid #f4f8ff;
+ box-shadow:0 6px 23px #576dc86b, inset 0 1px #ffffff;
+ border-radius:12px;
+ font-size:14px;font-weight:790;
+ text-shadow:none;
+}
+.stage-initial .action-primary:not(:disabled):hover{
+ box-shadow:0 8px 29px #7194f99b,inset 0 1px #fff;
+ background:linear-gradient(125deg,#fff,#dfebff 64%,#bfd1ff);
+}
+.stage-initial .button-help{
+ margin:12px 0 0;color:#c9d1ed;font-size:11px;
+}
+.checkout-footer{color:#9ba7c9;padding-top:14px}
+@keyframes sculptureDrift{
+ 0%,100%{transform:translateY(2px) rotate(-2deg)}
+ 50%{transform:translateY(-8px) rotate(2deg)}
+}
+@media(max-width:420px){
+ .checkout-shell{padding:10px 10px 14px}
+ .checkout-panel{border-radius:21px}
+ .checkout-brand{padding:17px 10px 4px}
+ .checkout-brand .logo{width:185px}
+ .stage-initial{min-height:439px;padding:7px 22px 24px}
+ .vault-scene{width:min(100%,260px);margin:6px auto 9px}
+ .stage-initial .amount{font-size:49px}
+ .stage-initial .action-primary{min-height:54px}
+}
+@media(max-width:360px){
+ .stage-initial{padding-inline:17px;min-height:420px}
+ .vault-scene{width:min(100%,239px)}
+ .stage-initial .amount{font-size:43px}
+}
+@media(max-height:670px){
+ .checkout-shell{padding-top:8px;padding-bottom:8px}
+ .checkout-brand{padding-top:13px}
+ .stage-initial{min-height:418px;padding-bottom:18px}
+ .vault-scene{width:min(100%,240px);margin:1px auto}
+}
+@media(prefers-reduced-motion:reduce){
+ .vault-art{animation:none!important;transform:none!important}
+ .vault-atmosphere{animation:none!important}
+}
+
 @media print{
  @page{size:A5;margin:12mm}
  body{background:#fff;color:#131927}
