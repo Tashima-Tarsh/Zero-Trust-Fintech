@@ -184,6 +184,11 @@ async function persistVaultEvidence(pg,body){
 function createVaultEvidenceRouter({getPool}){
   const router=express.Router();
   router.post('/evidence',async(req,res)=>{
+    // Express JSON parsing is registered after the global CSRF middleware;
+    // enforce this route's bound-token header here, after parsing the body.
+    const csrf=req.get('x-csrf-token');
+    if(!timingEqual(csrf,req.body?.token))
+      return res.status(403).json({success:false,error:'VAULT_CSRF_TOKEN_REQUIRED'});
     const pool=getPool();
     if(!pool)return res.status(503).json({success:false,error:'EVIDENCE_STORAGE_UNAVAILABLE'});
     try{
