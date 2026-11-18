@@ -130,9 +130,10 @@ body{isolation:isolate;overflow:hidden}
 [data-stage="methods"],[data-stage="qr"],[data-stage="checking"],[data-stage="receipt"]{
  width:100%;max-width:510px;margin:0 auto;
  text-align:center;
- background:linear-gradient(180deg,#101b35a3,#07102398)!important;
- border:1px solid #d4e9ff35;border-radius:19px;
- backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);
+ background:transparent!important;
+ border:0!important;border-radius:0!important;
+ box-shadow:none!important;
+ backdrop-filter:none!important;-webkit-backdrop-filter:none!important;
  padding:clamp(18px,3vh,25px)!important;
 }
 [data-stage="methods"] .app-choice{background:#d5e8ff0e}
