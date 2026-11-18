@@ -6,6 +6,7 @@
 
 const { join } = require('path');
 const crypto = require('crypto');
+const { prepareSqliteDatabasePath } = require('./utils/sqlite-storage');
 const VPARouter = require('./vpa-router');
 const { VPAImporter, parseCSV } = require('./vpa-importer');
 
@@ -33,7 +34,7 @@ async function initDb() {
   // 1. Native SQLite session store — always required.
   try {
     const { DatabaseSync } = require('node:sqlite');
-    const dbPath = join(__dirname, 'disha82.db');
+    const dbPath = prepareSqliteDatabasePath();
     sqliteDb = new DatabaseSync(dbPath);
     sqliteDb.exec('PRAGMA journal_mode = WAL;');
     sqliteDb.exec('PRAGMA busy_timeout = 5000;');
