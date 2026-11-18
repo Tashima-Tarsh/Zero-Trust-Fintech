@@ -12,8 +12,36 @@
  let session=null,vaultSessionId=null,authorized=false,handoffStarted=false;
  let loading=false,polling=false,evidenceSending=false,receiptShown=false;
  let qrUri=null,lastStage='initial',expiryTicker=null,ledgerTicker=null;
+ let missingBackgroundLogged=false,expiryLogged=false;
  const userAgent=navigator.userAgent||'';
  const orderId=()=>session?.orderId||null;
+ const debug=query.get('debug')==='1';
+ const device=/Android/i.test(userAgent)?'android':/iPhone|iPad|iPod/i.test(userAgent)?'ios':/Windows|Macintosh|Linux/i.test(userAgent)?'desktop':'other';
+ function debugCode(error){
+  const status=Number(error?.status);
+  if([400,401,403,404,409,429,500,503].includes(status))return 'BACKEND_'+status;
+  if(Number.isInteger(status)&&status>=400)return 'BACKEND_OTHER';
+  const name=String(error?.name||'');
+  if(name==='NotAllowedError')return 'NOT_ALLOWED_OR_TIMEOUT';
+  if(name==='SecurityError')return 'SECURITY_ERROR';
+  if(name==='NotSupportedError')return 'NOT_SUPPORTED';
+  if(name==='InvalidStateError')return 'INVALID_STATE';
+  if(name==='AbortError')return 'ABORTED';
+  if(name==='TypeError')return 'NETWORK_ERROR';
+  return 'UNKNOWN';
+ }
+ // Test-only, fire-and-forget. No raw browser error, UPI URI, PIN, passkey
+ // response, device identifier or transaction data are collected.
+ function trace(event,code='OK',app='none'){
+  if(!debug||!session?.token||!session?.orderId)return;
+  try{
+   void fetch('/api/checkout/trace',{method:'POST',cache:'no-store',keepalive:true,
+    credentials:'same-origin',headers:{'Content-Type':'application/json','X-CSRF-Token':session.token},
+    body:JSON.stringify({orderId:session.orderId,token:session.token,event,code,
+     app:['gpay','phonepe','paytm','cred','generic'].includes(app)?app:'none',device})
+   }).catch(()=>{});
+  }catch(_){}
+ }
 
  function showStage(stage){
   const next=stages.find(el=>el.dataset.stage===stage);
@@ -122,6 +150,7 @@
  function createReceipt(record){
   if(!model.isSettled(record)||receiptShown)return;
   receiptShown=true;
+  trace('LEDGER_CONFIRMED');
   get('receiptAmount').textContent=format(record.challengeAmount||session.amount);
   get('receiptOrder').textContent=session.orderId;
   get('receiptUtr').textContent=record.utr;
@@ -159,6 +188,7 @@
   node.textContent=remaining?'Session expires in '+mm+':'+ss:'Session expired · Request a new payment link';
   node.dataset.expired=String(remaining===0);
   if(remaining===0){
+   if(!expiryLogged){expiryLogged=true;trace('SESSION_EXPIRED')}
    get('btnOneTouch').disabled=true;
    document.querySelectorAll('[data-app]').forEach(button=>{button.disabled=true});
    const qrButton=get('showQr');if(qrButton)qrButton.disabled=true;
@@ -205,26 +235,31 @@
   // Desktop browsers cannot run a native mobile UPI intent. Use the QR stage
   // rather than attempting intent:// or upi:// navigation and showing an error.
   if(!model.supportsNativeUPI(userAgent)){
+   trace('QR_OPEN');
    showStage('qr');
    message('Scan the QR using a UPI app on your phone.');
    return;
   }
   try {
    const chosen=model.safeApp(app);
+   trace('APP_SELECTED','OK',chosen);
    const target=model.buildAppUrl(session.upiUri,chosen,userAgent);
    if(!handoffStarted){
     vault.beginHandoff(orderId(),vaultSessionId,session.token,chosen);
     handoffStarted=true;
    }
    savePreferred(chosen);
+   missingBackgroundLogged=false;
    showStage('methods');
    // Do not use the app-specific intent as the only fallback: an app may be
    // uninstalled or block that package. Offer the bank-standard generic UPI
    // URI with a separate, fresh user tap, preserving the same amount/payee.
    bindFallback(session.upiUri);
+   trace('APP_DISPATCH',target===session.upiUri?'APP_GENERIC':'APP_TARGETED',chosen);
    if(target===session.upiUri)vault.launchUPI(target);
    else location.assign(target);
   }catch(error){
+   trace('APP_ERROR',debugCode(error),app);
    message(model.userFacingError(error,'app'),'error');
   }
  }
@@ -234,16 +269,19 @@
   loading=true;const button=get('btnOneTouch');
   button.disabled=true;
   message('Confirm with your device to continue.');
+  trace('VAULT_BEGIN');
   try{
-   const verified=await vault.authorize(orderId());
+   const verified=await vault.authorize(orderId(),(event,code)=>trace(event,code));
    vaultSessionId=verified.sessionId;
    authorized=true;
+   trace('VAULT_AUTHORIZED');
    saveAuthorizedSession();
    // Chrome may deny an Android intent launched after an async passkey
    // ceremony because the original Pay tap's transient gesture has expired.
    // Give mobile users a fresh, explicit app tap. On desktop, show QR.
    showStage(model.supportsNativeUPI(userAgent)?'methods':'qr');
   }catch(err){
+   trace('VAULT_ERROR',debugCode(err));
    message(model.userFacingError(err,'device'),'error');
   }finally{button.disabled=false;loading=false}
  }
@@ -252,6 +290,7 @@
   const packet=vault.requestEvidence(orderId());
   if(!packet)return;
   evidenceSending=true;
+  trace('EVIDENCE_SUBMIT','OK',packet.evidence?.selectedApp||'generic');
   // A UPI app can reject before PIN. Keep retry choices visible while
   // securely recording what the browser actually observed.
   if(!preserveAppChoices)showStage('checking');
@@ -262,10 +301,16 @@
     body:JSON.stringify(packet)
    });
    const result=await response.json().catch(()=>({}));
-   if(!response.ok||!result.success)throw Error(result.error||'Evidence delivery was interrupted');
+   if(!response.ok||!result.success){
+    const error=Error('Evidence delivery was interrupted');error.status=response.status;
+    throw error;
+   }
    vault.acknowledgeEvidence(orderId(),packet.eventId,result);
+   trace('EVIDENCE_ACK',result.state==='CONFLICTING_EVIDENCE'?'EVIDENCE_CONFLICT':'EVIDENCE_UNVERIFIED',
+    packet.evidence?.selectedApp||'generic');
    get('checkingHelp').textContent='Your payment update is being checked. This page will refresh automatically.';
-  }catch(_){
+  }catch(err){
+   trace('EVIDENCE_ERROR',debugCode(err),packet.evidence?.selectedApp||'generic');
    get('checkingHelp').textContent='Still checking. Keep this page open; we will retry automatically.';
   }finally{evidenceSending=false;void pollLedger()}
  }
@@ -287,6 +332,7 @@
   if(session&&vault.getPendingOrderId()===orderId()&&observed){
    authorized=true;handoffStarted=true;
    const retry=model.needsPaymentMethodRetry(observed.evidence);
+   trace('BROWSER_RETURN',retry?'RETURN_FAST':'RETURN_NORMAL',observed.evidence?.selectedApp||'generic');
    if(retry&&lastStage!=='receipt'){
     showStage('methods');
     message('The UPI app returned without payment confirmation. If you paid, check your UPI history before trying again. Otherwise choose another app or scan QR.','info');
@@ -294,6 +340,9 @@
     showStage('checking');
    }
    void submitReturnEvidence(retry);
+  }else if(handoffStarted&&!missingBackgroundLogged){
+   missingBackgroundLogged=true;
+   trace('NO_BACKGROUND','NO_OBSERVATION');
   }
   void pollLedger();
  }
@@ -302,7 +351,7 @@
   document.querySelectorAll('[data-app]').forEach(el=>
    el.addEventListener('click',()=>openApp(el.dataset.app)));
   get('showQr').addEventListener('click',()=>{
-   if(authorized && !expired())showStage('qr');
+   if(authorized && !expired()){trace('QR_OPEN');showStage('qr')}
   });
   get('backToApps').addEventListener('click',()=>showStage('methods'));
   get('checkingApps').addEventListener('click',()=>showStage('methods'));
@@ -319,7 +368,7 @@
   });
   document.addEventListener('visibilitychange',()=>{
    if(document.visibilityState==='hidden'){
-    if(handoffStarted)vault.markBackgrounded(orderId());
+    if(handoffStarted){vault.markBackgrounded(orderId());trace('BROWSER_HIDDEN')}
    }else onReturn();
   });
   window.addEventListener('pagehide',()=>{if(handoffStarted)vault.markBackgrounded(orderId())});
@@ -331,6 +380,7 @@
   showStage('initial');
   try{
    session=await getSession();
+   trace('ORDER_READY');
    setMoney(session.amount);
    setPaymentKind();
    tickSessionTimer();
