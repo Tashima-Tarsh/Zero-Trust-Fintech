@@ -72,5 +72,7 @@ async function flush(){for(let i=0;i<20;i++)await Promise.resolve()}
  callbacks.focus();await flush();
  assert.equal(active(),'receipt','Server-confirmed ledger permits receipt');
  assert.equal(nodes.receiptUtr.textContent,'123456789012');
+ callbacks.focus();await flush();
+ assert.equal(active(),'receipt','Browser focus must never erase an authoritative completed receipt');
  console.log('COSMIC_INTERACTIONS_PASS: auth gate, QR, native app, browser evidence and ledger receipt');
 })().catch(e=>{console.error(e);process.exitCode=1});
