@@ -67,4 +67,52 @@ assert.deepEqual(parseVpaCsv('upi_id,account_holder,bank_name,account_type,mcc\n
 assert.equal(parseVpaCsv('upi_id,account_holder,bank_name,account_type,mcc\nshop@oksbi,"Shop, Owner",SBI,PERSONAL,')[0].holderName,'Shop, Owner');
 assert.throws(()=>parseVpaCsv('upi_id,account_holder,bank_name\ninvalid,Name,Bank'),/UPI|Invalid/i);
 assert.throws(()=>parseVpaCsv('upi_id,account_holder,bank_name\nshop@oksbi,N,Bank'),/holder/i);
+
+// Execute the real route controller with a minimal DOM surface and assert that
+// clicks, delegated actions and browser history expose only the selected view.
+const viewNames=['overview','payments','create','vpas','routing','risk','access','reports','notifications','soundbox','api','settings'];
+const makeClassList=()=>({
+ active:false,open:false,
+ toggle(name,flag){this[name]=flag===undefined?!this[name]:Boolean(flag);return this[name]},
+ add(name){this[name]=true},remove(name){this[name]=false},contains(name){return Boolean(this[name])}
+});
+const rendered=viewNames.map(name=>({id:'view-'+name,classList:makeClassList()}));
+const navNodes=viewNames.map(name=>({
+ dataset:{view:name},classList:makeClassList(),attributes:{},
+ addEventListener(event,fn){this[event]=fn},
+ setAttribute(name,val){this.attributes[name]=val},removeAttribute(name){delete this.attributes[name]}
+}));
+const bound={},callbacks={};
+const staticEl=Object.fromEntries(['#viewHeading','#viewSubtitle','#appSide','#sideBackdrop','#sideToggle'].map(key=>[key,{classList:makeClassList(),textContent:'',setAttribute(){},addEventListener(event,fn){this[event]=fn}}]));
+const fakeDocument={
+ querySelector(sel){return staticEl[sel]||null},
+ querySelectorAll(sel){if(sel==='.view')return rendered;if(sel==='#appSide [data-view]')return navNodes;return []},
+ addEventListener(event,fn){bound[event]=fn}
+};
+const fakeLocation={hash:'#overview'};
+const historyCalls=[];
+const fakeHistory={
+ pushState(a,b,hash){historyCalls.push(['push',hash]);fakeLocation.hash=hash},
+ replaceState(a,b,hash){historyCalls.push(['replace',hash]);fakeLocation.hash=hash}
+};
+const fakeWindow={scrollTo(){},addEventListener(event,fn){callbacks[event]=fn}};
+const testHarness=js.replace("document.addEventListener('DOMContentLoaded',init);","window.__merchantRouter={view,setupBindings};");
+assert.notEqual(testHarness,js,'Route test must expose the actual controller');
+vm.runInNewContext(testHarness,{
+ document:fakeDocument,window:fakeWindow,location:fakeLocation,history:fakeHistory,
+ console,Intl,URL,setTimeout,clearTimeout
+});
+fakeWindow.__merchantRouter.setupBindings();
+navNodes.find(n=>n.dataset.view==='settings').click();
+assert.equal(fakeLocation.hash,'#settings');
+assert.ok(rendered.find(n=>n.id==='view-settings').classList.active);
+assert.equal(rendered.filter(n=>n.classList.active).length,1,'Only selected page must remain visible');
+assert.ok(historyCalls.some(call=>call[0]==='push'&&call[1]==='#settings'));
+bound.click({target:{closest:sel=>sel==='[data-switch]'?{dataset:{switch:'soundbox'}}:null}});
+assert.equal(fakeLocation.hash,'#soundbox','Quick-action buttons must activate routed views');
+assert.equal(rendered.filter(n=>n.classList.active).length,1);
+fakeLocation.hash='#reports';
+callbacks.popstate();
+assert.equal(rendered.find(n=>n.id==='view-reports').classList.active,true,'Browser back must restore the route');
+assert.equal(rendered.filter(n=>n.classList.active).length,1);
 console.log('Merchant navigation, controls, white theme, auth, edge protection, checkout and no-demo invariants PASS');
