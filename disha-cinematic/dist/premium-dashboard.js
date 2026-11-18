@@ -13,7 +13,7 @@ const views = {
  intelligence:['Payment Intelligence','Order-bound UTR and evidence correlation'],
  payments:['Transactions','Track every payment request and recorded outcome'],
  create:['Create payment','Generate a customer-specific UPI link and QR'],
- vpas:['UPI accounts','Manage the UPI addresses that receive your payments'],
+ vpas:['UPI Accounts & Routing','Manage the UPI addresses that receive your payments'],
  routing:['Routing & accounts','Inspect the primary and active receiving accounts'],
  vault:['Vault & Evidence','Device observations and order-bound evidence'],
  ledger:['Reconciliation & Ledger','Qualified financial records and report status'],
