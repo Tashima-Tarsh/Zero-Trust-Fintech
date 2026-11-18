@@ -209,15 +209,33 @@ async function loadOverview(){
  }catch(e){notice('Unable to load live dashboard data: '+e.message)}
 }
 function renderChart(){
- const target=$('#activityChart'),values=orders.filter(o=>o.status==='COMPLETED').slice(0,14).reverse().map(o=>Number(o.amount)||0);
- if(!values.length){target.innerHTML='<div class="empty">No completed payments in this period.</div>';return}
- const points=values.length===1?[0,...values]:values,max=Math.max(1,...points);
- const coordinates=points.map((v,i)=>[(620*i/(points.length-1)).toFixed(1),(195-v*155/max).toFixed(1)]);
- const polyline=coordinates.map(p=>p.join(',')).join(' ');
- target.innerHTML='<svg class="chart" viewBox="0 0 620 220" role="img" aria-label="Completed payment amounts">'+
-  '<path class="gridline" d="M0 40 H620 M0 90 H620 M0 140 H620 M0 190 H620" />'+
-  '<polyline fill="none" stroke="#376ddd" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round" points="'+polyline+'"/>'+
-  '</svg>';
+ const target=$('#activityChart');
+ const values=trend.filter(point=>Number(point.volume)>0).slice(-30);
+ if(!values.length){
+  target.innerHTML='<div class="empty-state"><span class="empty-graphic" aria-hidden="true">↗</span><strong>Activity will appear here</strong><p>No completed payment records in this period. Create a payment request to begin tracking.</p><button type="button" class="btn tiny ghost" data-switch="create">Create payment ↗</button></div>';
+  return;
+ }
+ const width=680,top=24,bottom=182;
+ const max=Math.max(1,...values.map(p=>Number(p.volume)));
+ const points=values.map((p,i)=>{
+  const x=values.length===1?width/2:(i/(values.length-1))*width;
+  const y=bottom-(Number(p.volume)/max)*(bottom-top);
+  return {x,y,label:new Date(Number(p.day)).toLocaleDateString('en-IN',{day:'numeric',month:'short'}),amount:Number(p.volume)};
+ });
+ const line=points.map(p=>p.x.toFixed(2)+','+p.y.toFixed(2)).join(' ');
+ const area='0,'+bottom+' '+line+' '+width+','+bottom;
+ const grid=[0,1,2,3,4].map(i=>{
+  const y=bottom-i*(bottom-top)/4;
+  return '<line x1="0" y1="'+y+'" x2="'+width+'" y2="'+y+'" class="trend-grid"/>';
+ }).join('');
+ const ticks=[points[0],points[Math.floor(points.length/2)],points[points.length-1]]
+  .filter((point,i,array)=>array.indexOf(point)===i)
+  .map(point=>'<text class="trend-axis" x="'+point.x+'" y="217" text-anchor="middle">'+esc(point.label)+'</text>').join('');
+ target.innerHTML='<div class="chart-frame"><div class="chart-total"><span>Recorded volume</span><strong>'+money(values.reduce((sum,p)=>sum+Number(p.volume),0))+'</strong></div>'+
+  '<svg class="chart premium-trend" viewBox="0 0 680 226" role="img" aria-label="Actual completed payment volume by day">'+
+  '<defs><linearGradient id="dishaArea" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#7563d5" stop-opacity=".28"/><stop offset="1" stop-color="#7563d5" stop-opacity="0"/></linearGradient></defs>'+
+  grid+'<polygon points="'+area+'" fill="url(#dishaArea)"/><polyline points="'+line+'" fill="none" stroke="#7563d5" stroke-width="3.6" stroke-linecap="round" stroke-linejoin="round"/>'+
+  points.map(p=>'<circle cx="'+p.x+'" cy="'+p.y+'" r="4" fill="#7563d5" stroke="#fff" stroke-width="2"><title>'+esc(p.label+': '+money(p.amount))+'</title></circle>').join('')+ticks+'</svg></div>';
 }
 function miniPanels(){
  $('#overviewVpas').textContent=num(vpas.length);
@@ -282,6 +300,31 @@ async function addVpa(e){
   })});
   $('#addVpaForm').reset();await loadVpas();toast('Receiving UPI ID added');
  }catch(error){toast(error.message)}finally{busy(e.submitter,false)}
+}
+async function bulkImportVpas(event){
+ const button=event.currentTarget;
+ const input=$('#vpaCsvFile'),status=$('#importVpaStatus'),file=input?.files?.[0];
+ if(!file){toast('Choose a CSV file first');return}
+ if(file.size>256*1024){toast('CSV file must be smaller than 256 KB');return}
+ busy(button,true);
+ try{
+  if(!window.DISHAVpaImport)throw Error('UPI import tool is unavailable');
+  const source=await file.text();
+  const accounts=window.DISHAVpaImport.parseVpaCsv(source);
+  status.textContent='Validating '+accounts.length+' UPI account(s)…';
+  const result=await api('/api/merchant/vpas/import',{method:'POST',body:JSON.stringify({accounts})});
+  input.value='';
+  status.textContent=result.imported+' account(s) imported. All accounts belong to your merchant workspace.';
+  await loadVpas();toast(result.imported+' receiving UPI accounts imported');
+ }catch(error){status.textContent='Import not saved: '+error.message;toast(error.message)}
+ finally{busy(button,false)}
+}
+function downloadVpaTemplate(){
+ const csv='upi_id,account_holder,bank_name,account_type,mcc\n';
+ const blob=new Blob([csv],{type:'text/csv;charset=utf-8'});
+ const href=URL.createObjectURL(blob),a=document.createElement('a');
+ a.href=href;a.download='disha-upi-accounts-template.csv';document.body.appendChild(a);a.click();a.remove();
+ setTimeout(()=>URL.revokeObjectURL(href),2500);
 }
 async function updateVpa(id,action){
  try{
