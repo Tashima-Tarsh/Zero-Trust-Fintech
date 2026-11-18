@@ -89,14 +89,13 @@ async function selectMerchantVPA(client, merchantId, amount) {
     score = Math.max(0.01, score * (0.95 + Math.random() * 0.20));
     return { ...v, score };
   });
-  let recent = [];
-  try {
-    recent = (await client.query(
-      "SELECT vpa_address FROM vpa_usage_log WHERE merchant_id=$1 ORDER BY used_at DESC LIMIT 10",
-      [merchantId]
-    )).rows.map(r => r.vpa_address);
-  } catch (_) {}
-  scored.forEach(v => { if (recent.includes(v.vpa_address)) v.score *= 0.3; });
+  // Usage log stores vpa_id, not vpa_address. SQL errors must not be swallowed
+  // inside BEGIN: PostgreSQL would mark the entire payment transaction aborted.
+  const recent = (await client.query(
+    "SELECT vpa_id FROM vpa_usage_log WHERE merchant_id=$1 ORDER BY used_at DESC LIMIT 10",
+    [merchantId]
+  )).rows.map(r => r.vpa_id);
+  scored.forEach(v => { if (recent.includes(v.id)) v.score *= 0.3; });
   const topN = scored.sort((a, b) => b.score - a.score).slice(0, Math.min(10, scored.length));
   const totalWeight = topN.reduce((s, i) => s + Math.max(0.01, i.score || 1), 0);
   let random = Math.random() * totalWeight;
@@ -107,16 +106,14 @@ async function selectMerchantVPA(client, merchantId, amount) {
   }
   const cooldownMinutes = 8 + Math.floor(Math.random() * 7);
   const cooldownUntil = now + cooldownMinutes * 60 * 1000;
-  try {
-    await client.query(
-      "UPDATE saas_merchant_vpas SET daily_tx_count = daily_tx_count + 1, daily_volume = daily_volume + $1, last_used_at = $2, cooldown_until = $3 WHERE id = $4",
-      [amount, now, cooldownUntil, selected.id]
-    );
-    await client.query(
-      "INSERT INTO vpa_usage_log (id, vpa_id, merchant_id, amount, customer_region, time_slot, used_at) VALUES ($1,$2,$3,$4,$5,$6,$7)",
-      ['log_'+crypto.randomBytes(8).toString('hex'), selected.id, merchantId, amount, 'MH', new Date(now).getHours() < 12 ? 'MORNING' : (new Date(now).getHours() < 17 ? 'AFTERNOON' : 'EVENING'), now]
-    );
-  } catch (_) {}
+  await client.query(
+    "UPDATE saas_merchant_vpas SET daily_tx_count = daily_tx_count + 1, daily_volume = daily_volume + $1, last_used_at = $2, cooldown_until = $3 WHERE id = $4",
+    [amount, now, cooldownUntil, selected.id]
+  );
+  await client.query(
+    "INSERT INTO vpa_usage_log (id, vpa_id, merchant_id, amount, customer_region, time_slot, used_at) VALUES ($1,$2,$3,$4,$5,$6,$7)",
+    ['log_'+crypto.randomBytes(8).toString('hex'), selected.id, merchantId, amount, 'MH', new Date(now).getHours() < 12 ? 'MORNING' : (new Date(now).getHours() < 17 ? 'AFTERNOON' : 'EVENING'), now]
+  );
   return selected;
 }
 const sqlOrders = "SELECT o.id,o.merchant_id,o.amount_paise,o.description,o.external_reference,"+
