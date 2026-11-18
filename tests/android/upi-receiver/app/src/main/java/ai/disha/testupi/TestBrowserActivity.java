@@ -64,27 +64,30 @@ public final class TestBrowserActivity extends Activity {
         if (command == null || webView == null) return;
         if ("snapshot".equals(command)) snapshot();
         else if ("open".equals(command)) {
-            Log.i(TAG,"TAP_OPEN_UPI");
-            webView.evaluateJavascript("(function(){var a=document.getElementById('openUpi');if(a)a.click()})()",null);
+            Log.i(TAG,"TAP_TOUCH_TO_PAY");
+            webView.evaluateJavascript("(function(){var b=document.getElementById('btnOneTouch');if(b)b.click()})()",null);
         } else if ("refresh".equals(command)) {
-            Log.i(TAG,"TAP_REFRESH_STATUS");
-            webView.evaluateJavascript("(function(){var b=document.getElementById('refresh');if(b)b.click()})()",null);
+            Log.i(TAG,"RELOAD_CHECKOUT");
+            webView.reload();
         }
     }
 
     private void snapshot() {
         if(webView == null) return;
-        String js = "(function(){function v(id){var e=document.getElementById(id);return e?e.textContent:'';}" +
-            "var a=document.getElementById('openUpi');return JSON.stringify({" +
-            "business:v('business'),amount:v('amount'),vpa:v('vpa')," +
-            "status:v('status'),href:a?a.getAttribute('href'):''," +
-            "pointerEvents:a?a.style.pointerEvents:'',qr:!!document.querySelector('#qr img, #qr canvas')," +
-            "vaultHelp:v('vaultHelp'),readyState:document.readyState," +
-            "openTarget:target(a),fallbackTarget:target(document.getElementById('oneTouchFallback'))" +
-            "});function target(el){if(!el)return null;var r=el.getBoundingClientRect();" +
-            "return {x:Math.round((r.left+r.width/2)*devicePixelRatio)," +
-            "y:Math.round((r.top+r.height/2)*devicePixelRatio)," +
-            "visible:r.width>0&&r.height>0&&getComputedStyle(el).display!='none'};}})()";
+        String js = "(function(){" +
+            "function v(id){var e=document.getElementById(id);return e?e.textContent:'';}" +
+            "function target(el){if(!el)return null;var r=el.getBoundingClientRect();" +
+              "return {x:Math.round((r.left+r.width/2)*devicePixelRatio)," +
+              "y:Math.round((r.top+r.height/2)*devicePixelRatio)," +
+              "visible:r.width>0&&r.height>0&&getComputedStyle(el).display!='none'};}" +
+            "var b=document.getElementById('btnOneTouch');" +
+            "var app=document.getElementById('app-cred');" +
+            "var active=Array.from(document.querySelectorAll('[data-stage]')).find(function(e){return !e.hidden});" +
+            "return JSON.stringify({amount:v('payAmount'),stage:active?active.dataset.stage:'none'," +
+              "status:v('checkoutStatus'),checking:v('checkingHelp'),receiptUtr:v('receiptUtr')," +
+              "disabled:b?b.disabled:true,qr:!!document.querySelector('#paymentQr img, #paymentQr canvas')," +
+              "readyState:document.readyState,touchTarget:target(b),appTarget:target(app)});" +
+            "})()";
         webView.evaluateJavascript(js, data -> Log.i(TAG, "CHECKOUT_DOM "+data));
     }
 
