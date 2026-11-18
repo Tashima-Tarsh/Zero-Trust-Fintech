@@ -267,7 +267,7 @@ window.triggerDirectUpiPay = function(e) {
     // On mobile devices, launch the native UPI intent chooser directly
     dispatchUpiUri(activeSession.upiLink);
   } else {
-    // On desktop PC/Laptop, show clear guidance modal with instant copy & simulation
+    // On desktop PC/Laptop, show payment QR guidance and copy controls
     openDesktopModal();
   }
 };
@@ -308,13 +308,6 @@ window.copyUpiLink = function() {
     });
   } else {
     prompt('Copy your UPI payment link:', activeSession.upiLink);
-  }
-};
-
-window.simulatePaymentFromModal = function() {
-  closeDesktopModal();
-  if (typeof window.simulateTestPayment === 'function') {
-    window.simulateTestPayment();
   }
 };
 
@@ -360,34 +353,6 @@ function initFraudLayersAnimation() {
     current = (current + 1) % (dots.length + 1);
   }, 1200);
 }
-
-// 8. One-Click Payment Simulation (Testing & Demonstration)
-window.simulateTestPayment = async function() {
-  if (!activeSession) return;
-  const btn = document.getElementById('btnSimulatePay');
-  if (btn) {
-    btn.disabled = true;
-    btn.textContent = '⚡ Simulating Payment & Ledger Entry...';
-  }
-
-  try {
-    const res = await fetch('/api/simulate-payment', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({ orderId: activeSession.orderId })
-    });
-    const data = await res.json();
-    console.log('Simulation response:', data);
-  } catch (err) {
-    console.error('Simulation error:', err);
-    if (btn) {
-      btn.disabled = false;
-      btn.textContent = '⚡ Simulate Instant Payment (Tests WebSocket)';
-    }
-  }
-};
 
 // 9. Manual Receipt Submission Form (Fallback Testing)
 window.submitManualReceipt = async function() {

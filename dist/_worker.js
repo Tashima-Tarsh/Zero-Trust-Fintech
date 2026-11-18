@@ -1,11 +1,25 @@
-const ORIGIN = "https://disha8-2.thenitishkr.in";
+const ORIGIN = "https://zero-trust-fintech-production.up.railway.app";
 
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
 
-    // Static assets & HTML routes are served directly by Cloudflare CDN
-    if (!url.pathname.startsWith("/api/") && url.pathname !== "/health" && !url.pathname.startsWith("/ws")) {
+    // Disallow the legacy public diagnostics console on the Pages edge.
+    if (url.pathname === "/debug.html") {
+      return new Response("Not found", { status: 404, headers: {"Cache-Control":"no-store"} });
+    }
+
+    // Keep the canonical checkout consistent with the Railway Express route.
+    if (["/checkout", "/checkout/", "/pay", "/pay/"].includes(url.pathname)) {
+      const checkoutUrl = new URL("/checkout.html" + url.search, request.url);
+      return env.ASSETS.fetch(new Request(checkoutUrl, request));
+    }
+
+    // Authentication and dashboard routes must be resolved by the authenticated
+    // Railway app, never as unprotected static HTML on the Pages edge.
+    const protectedPath = ["/login", "/signup", "/dashboard", "/payments", "/analytics",
+      "/merchant-console.html", "/merchant-dashboard.html", "/auth-config.js"].includes(url.pathname);
+    if (!protectedPath && !url.pathname.startsWith("/api/") && url.pathname !== "/health" && !url.pathname.startsWith("/ws")) {
       return env.ASSETS.fetch(request);
     }
 

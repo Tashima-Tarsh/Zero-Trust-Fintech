@@ -12,6 +12,7 @@ const crypto = require('crypto');
 const QRCode = require('qrcode');
 const { clerkMiddleware, getAuth } = require('@clerk/express');
 const db = require('./db');
+const { createMerchantApi } = require('./merchant-api');
 const {
   buildNPCIIntentUri,
   sanitizeTransactionNote,
@@ -228,6 +229,20 @@ async function idempotencyMiddleware(req, res, next) {
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(idempotencyMiddleware);
+if (process.env.NODE_ENV === 'production') {
+  // No customer session dumps, debug consoles or test endpoints in production.
+  app.use((req, res, next) => {
+    if (req.path === '/debug.html' || /^\/api\/debug(?:\/|$)/.test(req.path)) {
+      return res.status(404).json({ success: false, error: 'NOT_FOUND' });
+    }
+    next();
+  });
+}
+const merchantApi = createMerchantApi({db, getAuth, buildUpiUri});
+// Merchant API is isolated: do NOT intercept public checkout APIs.
+app.use('/api', (req,res,next) =>
+  (/^\/(?:merchant(?:\/|$)|auth\/me(?:\/|$))/.test(req.path))
+    ? merchantApi.router(req,res,next) : next());
 // 1. Static Assets: Serve PhonePe marketing styles, console styles, scripts, videos, and icons
 // One canonical merchant dashboard; checkout and its APIs remain public.
 app.get('/merchant-console.html', (req, res) => res.redirect(302, '/dashboard'));
@@ -272,10 +287,15 @@ app.get('/auth-config.js', (req, res) => {
 app.get('/login', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'merchant-login.html'));
 });
+app.get('/signup', (req,res) => {
+  res.sendFile(path.join(__dirname, 'public', 'merchant-signup.html'));
+});
 app.get(['/dashboard', '/payments', '/analytics'], (req, res) => {
   if (!CLERK_ENABLED) return res.redirect('/login');
-  const { userId } = getAuth(req);
-  if (!userId) return res.redirect('/login');
+  // HTML shell has no tenant records: the Clerk SDK authorizes the browser and
+  // every merchant API call independently enforces its verified identity.
+  // Requiring server-side cookies here would reject valid bearer-token users.
+  res.setHeader('Cache-Control', 'no-store');
   res.sendFile(path.join(__dirname, 'public', 'merchant-console.html'));
 });
 // disha-cinematic (merchant SaaS) removed - P2P/P2M routing handled via /api/verify
@@ -1757,6 +1777,8 @@ app.post('/api/npci-callback', (req, res) => {
 });
 // Simulation helper for one-click developer testing (guarded against production abuse - OFF by default)
 app.post('/api/simulate-payment', async (req, res) => {
+  // Production never exposes a simulated payment or fabricated ledger posting.
+  if (process.env.NODE_ENV === 'production') return res.status(404).json({success:false,error:'NOT_FOUND'});
   const isProd = process.env.NODE_ENV === 'production';
   const simulationEnabled = process.env.ENABLE_PAYMENT_SIMULATION === 'true'; // OFF by default
   const headerKey = req.headers['x-admin-key'] ||
@@ -2010,6 +2032,7 @@ app.get('/failed', (req, res) => res.sendFile(path.join(__dirname, 'public', 'fa
 // Initialize database and start server
 (async () => {
   await db.initDb();
+  if (db.pgPool && CLERK_ENABLED) await merchantApi.init();
   // Daily cron at 00:05 to reset daily VPA limits
   setInterval(async () => {
     const d = new Date();

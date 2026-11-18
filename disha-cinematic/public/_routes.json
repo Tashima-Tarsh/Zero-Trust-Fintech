@@ -3,7 +3,16 @@
   "include": [
     "/api/*",
     "/health",
-    "/ws/*"
+    "/ws/*",
+    "/login",
+    "/signup",
+    "/dashboard",
+    "/payments",
+    "/analytics",
+    "/merchant-console.html",
+    "/merchant-dashboard.html",
+    "/auth-config.js",
+    "/debug.html"
   ],
   "exclude": [
     "/assets/*",

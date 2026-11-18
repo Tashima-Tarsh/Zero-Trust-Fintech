@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="theme-color" content="#f7f8fb">
+<title>Create your merchant workspace | DISHA 8.2</title>
+<link rel="icon" type="image/svg+xml" href="/assets/favicon.svg">
+<style>
+:root{color-scheme:light;font-family:-apple-system,BlinkMacSystemFont,"Inter","Segoe UI",sans-serif;color:#131925;background:#f7f8fb}
+*{box-sizing:border-box}body{margin:0;min-height:100svh;background:radial-gradient(circle at 17% 0%,#e9f0ff 0,transparent 37%),#f7f8fb}
+a{color:inherit;text-decoration:none}header{height:76px;max-width:1300px;margin:auto;padding:0 34px;display:flex;align-items:center;justify-content:space-between}
+.brand{display:flex;align-items:center;gap:12px;font-size:19px;font-weight:750;letter-spacing:-.9px}.mark{width:34px;height:34px;display:grid;place-items:center;border-radius:11px;background:#172238;color:white;box-shadow:0 7px 20px #19294220;font-size:15px}.back{font-size:13px;font-weight:600;color:#586273}
+main{display:grid;grid-template-columns:minmax(0,1fr) minmax(390px,500px);max-width:1160px;min-height:calc(100svh - 140px);align-items:center;gap:64px;margin:auto;padding:30px 34px 75px}
+.kicker{font-size:11px;text-transform:uppercase;letter-spacing:2.5px;color:#4168c5;font-weight:800}
+h1{font-size:clamp(39px,5vw,66px);letter-spacing:-.06em;line-height:1.04;font-weight:720;max-width:620px;margin:20px 0 24px}
+.copy{font-size:17px;line-height:1.76;max-width:510px;color:#647084}
+.facts{display:flex;gap:30px;flex-wrap:wrap;margin-top:45px}.fact{display:flex;align-items:center;gap:8px;color:#4a5669;font-weight:600;font-size:12px}.fact::before{content:"✓";width:22px;height:22px;display:grid;place-items:center;background:#e8f3ef;color:#127658;border-radius:50%;font-size:12px}
+.card{background:white;border:1px solid #e5e9f0;border-radius:24px;box-shadow:0 32px 90px #0c1b3210,0 1px 3px #0c1b3208;padding:34px 28px;min-height:430px}
+.card h2{font-size:24px;letter-spacing:-.9px;margin:0 0 6px}.muted{color:#748095;font-size:13px;line-height:1.6;margin:0 0 26px}
+#auth-slot{min-height:240px;display:flex;justify-content:center;align-items:flex-start}
+.status{margin:55px auto;text-align:center;color:#778196;font-size:14px}
+.small{font-size:13px;text-align:center;color:#6c7585;margin-top:23px}.small a{font-weight:700;color:#295bbc}
+footer{max-width:1300px;margin:auto;padding:16px 34px 25px;font-size:11px;color:#93a0b0;display:flex;justify-content:space-between;flex-wrap:wrap;gap:10px}
+@media(max-width:820px){main{grid-template-columns:1fr;gap:28px;padding:26px 22px 46px;min-height:unset}.copy{font-size:15px}.facts{margin-top:24px}.card{padding:24px 16px}header{height:64px;padding:0 22px}.back{font-size:12px}h1{font-size:40px}footer{padding:15px 22px 28px}}
+</style>
+</head>
+<body>
+<header><a class="brand" href="/"><span class="mark">D</span> DISHA <span style="color:#8391a7">8.2</span></a><a class="back" href="/">Return to website ↗</a></header>
+<main>
+<section><div class="kicker">Merchant operations · built for clarity</div>
+<h1>Create your merchant workspace<span style="color:#4777de">.</span></h1>
+<p class="copy">Your business, your receiving UPI accounts, and your payment operations in one place. No sample balances or simulated activity — every record belongs to your signed-in business.</p>
+<div class="facts"><span class="fact">Private workspace</span><span class="fact">UPI account controls</span><span class="fact">Transaction history</span></div></section>
+<section class="card"><h2>Begin with your business</h2><p class="muted">Create your secure account. Then add a business name and receiving UPI ID.</p>
+<div id="auth-slot"><div class="status" id="auth-status">Connecting securely…</div></div>
+<p class="small">Already have an account? <a href="/login">Sign in</a></p></section>
+</main><footer><span>© DISHA 8.2 · Merchant infrastructure</span><span>Secure account access · No preview mode</span></footer>
+<script src="/auth-config.js"></script>
+<script>
+(async function(){
+const status=document.getElementById('auth-status');
+try{
+const key=window.DISHA_CLERK_PUBLISHABLE_KEY;
+if(!key)throw Error('Merchant authentication is not configured. Contact platform support.');
+const part=key.split('_')[2];
+if(!part)throw Error('Invalid sign-in configuration');
+const domain=atob(part.replace(/-/g,'+').replace(/_/g,'/')).replace(/\0+$/g,'');
+if(!/^[a-z0-9.-]+$/i.test(domain))throw Error('Invalid authentication domain');
+function script(url,clerk=false){
+return new Promise((resolve,reject)=>{
+const s=document.createElement('script');s.src=url;s.crossOrigin='anonymous';
+if(clerk)s.dataset.clerkPublishableKey=key;
+s.onload=resolve;s.onerror=()=>reject(Error('Authentication service unavailable'));document.head.appendChild(s);
+});}
+await script('https://'+domain+'/npm/@clerk/ui@1/dist/ui.browser.js');
+await script('https://'+domain+'/npm/@clerk/clerk-js@6/dist/clerk.browser.js',true);
+await window.Clerk.load({ui:{ClerkUI:window.__internal_ClerkUICtor}});
+if(window.Clerk.isSignedIn){location.replace('/dashboard');return}
+status.remove();
+window.Clerk.mountSignUp(document.getElementById('auth-slot'),{
+afterSignUpUrl:'/dashboard',signInUrl:'/login',
+appearance:{variables:{colorPrimary:'#2a5ec8',borderRadius:'12px',fontFamily:'-apple-system,BlinkMacSystemFont,Inter,sans-serif'}}
+});
+}catch(err){status.textContent=err.message||'Unable to start authentication';status.style.color='#ba3749';}
+})();
+</script>
+</body></html>
