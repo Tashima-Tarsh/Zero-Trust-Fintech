@@ -12,6 +12,7 @@
     "/merchant-console.html",
     "/merchant-dashboard.html",
     "/auth-config.js",
+    "/vendor/simplewebauthn.umd.js",
     "/debug.html"
   ],
   "exclude": [

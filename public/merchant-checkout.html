@@ -27,6 +27,8 @@ footer{text-align:center;font-size:11px;color:#9ba7b7;padding:5px 20px 25px;line
 @media(max-width:550px){header{padding:20px}.container{margin:0 auto 40px}.card{padding:24px 18px}h1{font-size:24px}.amount{font-size:39px}}
 </style>
 <script src="/vendor/qrcode.min.js"></script>
+<script src="/vendor/simplewebauthn.umd.js"></script>
+<script src="/one-touch-vault.js"></script>
 </head><body>
 <header><a class="brand" href="/">DISHA <span>8.2</span></a><span class="fine">Protected payment request</span></header>
 <main class="container"><div class="card">
@@ -38,7 +40,9 @@ footer{text-align:center;font-size:11px;color:#9ba7b7;padding:5px 20px 25px;line
 <div class="line"><span>Payment reference</span><strong id="ref">—</strong></div>
 <div class="line"><span>Expires</span><strong id="expires">—</strong></div>
 <div id="status" class="state" role="status" aria-live="polite">Checking request…</div>
-<a id="openUpi" class="btn primary" href="#" style="pointer-events:none;opacity:.6">Open UPI app</a>
+<a id="openUpi" class="btn primary" href="#" style="pointer-events:none;opacity:.6">👆 Touch to Pay</a>
+<a id="oneTouchFallback" class="btn" href="#" style="display:none">Continue to UPI app</a>
+<p class="small" id="vaultHelp" style="text-align:center;margin-top:10px">One device confirmation, then your UPI app opens.</p>
 <button type="button" class="btn" id="copy" disabled>Copy payment URI</button>
 <button type="button" class="btn" id="refresh">Refresh payment status</button>
 <p class="fine" style="line-height:1.7;margin-top:20px">Only the merchant's recorded payment status is shown here. Opening an app or returning to this page does not by itself confirm payment.</p>
@@ -48,7 +52,7 @@ footer{text-align:center;font-size:11px;color:#9ba7b7;padding:5px 20px 25px;line
 'use strict';
 const $=id=>document.getElementById(id),params=new URLSearchParams(location.search);
 const orderId=params.get('orderId'),token=params.get('token');
-let uri='',timer=null;
+let uri='',timer=null,vaultBusy=false,vaultSessionId=null;
 const money=v=>new Intl.NumberFormat('en-IN',{style:'currency',currency:'INR'}).format(v);
 function status(msg,type=''){const el=$('status');el.textContent=msg;el.className='state '+type;}
 async function load(){
@@ -67,14 +71,14 @@ async function load(){
  $('expires').textContent=new Date(o.expires_at).toLocaleString('en-IN',{dateStyle:'medium',timeStyle:'short'});
  if(o.status==='COMPLETED'){
   status('This payment is recorded as completed.','success');$('openUpi').style.pointerEvents='none';
-  $('openUpi').style.opacity='.5';$('openUpi').textContent='Payment recorded';$('copy').disabled=true;return;
+  $('openUpi').style.opacity='.5';$('openUpi').textContent='Payment recorded';$('copy').disabled=true;$('oneTouchFallback').style.display='none';return;
  }
  if(o.status==='EXPIRED'||o.status==='FAILED'){
   status('This payment request is '+o.status.toLowerCase()+'. Ask the merchant for a new link.','error');
-  $('openUpi').style.pointerEvents='none';$('openUpi').style.opacity='.5';$('copy').disabled=true;return;
+  $('openUpi').style.pointerEvents='none';$('openUpi').style.opacity='.5';$('copy').disabled=true;$('oneTouchFallback').style.display='none';return;
  }
  uri=o.upi_uri;
- $('openUpi').href=uri;$('openUpi').textContent='Open UPI app';
+ $('openUpi').href=uri;$('openUpi').textContent='👆 Touch to Pay';
  $('openUpi').style.pointerEvents='auto';$('openUpi').style.opacity='1';$('copy').disabled=false;
  status('Payment request active. Complete payment in your UPI app, then refresh for its recorded status.');
  if(!$('qr').dataset.value||$('qr').dataset.value!==uri){
@@ -84,6 +88,31 @@ async function load(){
  }
  }catch(e){status(e.message||'Unable to load payment request','error');}
 }
+$('openUpi').addEventListener('click',async event=>{
+ event.preventDefault();
+ if(vaultBusy||!uri||!orderId||$('openUpi').style.pointerEvents==='none')return;
+ vaultBusy=true;
+ $('openUpi').style.pointerEvents='none';
+ $('openUpi').style.opacity='.6';
+ $('vaultHelp').textContent='Confirm once using fingerprint, face or device screen lock…';
+ try{
+  const result=await window.DISHAOneTouchVault.authorize(orderId);
+  vaultSessionId=result.sessionId;
+  try{sessionStorage.setItem('disha82:vault-session:'+orderId,vaultSessionId);}catch(_){}
+  const fallback=$('oneTouchFallback');
+  fallback.href=uri;fallback.style.display='flex';
+  $('vaultHelp').textContent='Vault verified. Opening your UPI app…';
+  status('Opening UPI app. Payment remains pending until its recorded status changes.');
+  window.DISHAOneTouchVault.launchUPI(uri);
+ }catch(error){
+  status(error.message||'Device verification was not completed.','error');
+  $('vaultHelp').textContent='Try again with your device vault.';
+ }finally{
+  vaultBusy=false;
+  $('openUpi').style.pointerEvents='auto';
+  $('openUpi').style.opacity='1';
+ }
+});
 $('copy').onclick=async()=>{if(!uri)return;try{await navigator.clipboard.writeText(uri);status('UPI payment URI copied.')}catch{status('Your browser blocked clipboard access.','error')}};
 $('refresh').onclick=load;
 load();timer=setInterval(load,5000);

@@ -18,7 +18,8 @@ export default {
     // Authentication and dashboard routes must be resolved by the authenticated
     // Railway app, never as unprotected static HTML on the Pages edge.
     const protectedPath = ["/login", "/signup", "/dashboard", "/payments", "/analytics",
-      "/merchant-console.html", "/merchant-dashboard.html", "/auth-config.js"].includes(url.pathname);
+      "/merchant-console.html", "/merchant-dashboard.html", "/auth-config.js",
+      "/vendor/simplewebauthn.umd.js"].includes(url.pathname);
     if (!protectedPath && !url.pathname.startsWith("/api/") && url.pathname !== "/health" && !url.pathname.startsWith("/ws")) {
       return env.ASSETS.fetch(request);
     }

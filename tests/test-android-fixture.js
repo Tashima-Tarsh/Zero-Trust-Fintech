@@ -36,7 +36,12 @@ const path=require('node:path');
   assert.equal(uri.searchParams.has('mc'),false,'P2P QR/URI must not include an MCC');
   assert.equal(data.order.status,'PENDING','opening link never settles payment');
   const html=await(await fetch(origin+'/merchant-checkout.html')).text();
-  assert.match(html,/Open UPI app/);
+  assert.match(html,/Touch to Pay/);
+  assert.match(html,/DISHAOneTouchVault\.authorize\(orderId\)/);
+  const passkey=await fetch(origin+'/vendor/simplewebauthn.umd.js');
+  assert.equal(passkey.status,200);
+  const oneTouch=await fetch(origin+'/one-touch-vault.js');
+  assert.equal(oneTouch.status,200);
   const qr=await fetch(origin+'/vendor/qrcode.min.js');
   assert.equal(qr.status,200);
   async function change(value){
