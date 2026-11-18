@@ -19,6 +19,9 @@
   if(!query.get('pa')||!query.get('am')||query.get('cu')!=='INR')throw Error('Incomplete UPI payment URI');
   return uri;
  }
+ function supportsNativeUPI(userAgent){
+  return /Android|iPhone|iPad|iPod/i.test(String(userAgent||''));
+ }
  function buildAppUrl(uri,app,userAgent){
   const valid=qrPayload(uri),selected=APPS[safeApp(app)];
   const params=valid.slice(valid.indexOf('?')+1);
@@ -49,7 +52,7 @@
   if(!Number.isFinite(n)||n<=0)throw Error('Invalid payment amount');
   return new Intl.NumberFormat('en-IN',{style:'currency',currency:'INR',maximumFractionDigits:2,minimumFractionDigits:2}).format(n);
  }
- const api=Object.freeze({safeApp,qrPayload,buildAppUrl,isSettled,stageAfterAuthorization,formatINR,userFacingError});
+ const api=Object.freeze({safeApp,qrPayload,buildAppUrl,supportsNativeUPI,isSettled,stageAfterAuthorization,formatINR,userFacingError});
  if(typeof module!=='undefined'&&module.exports)module.exports=api;
  root.DISHACosmicCheckoutModel=api;
 })(typeof window!=='undefined'?window:globalThis);

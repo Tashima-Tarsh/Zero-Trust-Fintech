@@ -178,3 +178,18 @@ body{isolation:isolate;overflow:hidden}
  .checkout-panel,.stage{max-height:none!important;overflow:visible!important}
  .checkout-footer:before{display:none}
 }
+
+
+/* Mobile intent reliability: provide a generic native-app chooser after Vault.
+   The first Pay tap authorizes; the subsequent UPI-app tap is the fresh user
+   gesture Chrome requires to launch an external payment application. */
+.app-choice-any{grid-column:1/-1;min-height:73px!important;flex-direction:row!important;gap:12px!important}
+.app-icon.any-upi{background:linear-gradient(140deg,#163f59,#27568d);color:#c4f5ff;font-size:25px;font-weight:800}
+#oneTouchFallback{display:flex;justify-content:center;width:100%;min-height:42px;color:#bde3ff;border:1px solid #6e91cd70;background:#10264591}
+#oneTouchFallback[hidden]{display:none!important}
+[data-stage="methods"] .inline-note{font-size:12px;line-height:1.55;color:#d3e5f9}
+@media(max-height:670px){
+ [data-stage="methods"] .app-choice{min-height:83px;gap:6px;padding:9px 6px}
+ [data-stage="methods"] .app-icon{width:38px;height:38px;border-radius:12px}
+ [data-stage="methods"] .app-icon img{width:25px;height:25px}
+}

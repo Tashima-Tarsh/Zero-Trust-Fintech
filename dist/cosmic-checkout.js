@@ -165,18 +165,26 @@
   if(!authorized||!session||expired()){
    message('Error — This payment request is no longer active.','error');return;
   }
+  // Desktop browsers cannot run a native mobile UPI intent. Use the QR stage
+  // rather than attempting intent:// or upi:// navigation and showing an error.
+  if(!model.supportsNativeUPI(userAgent)){
+   showStage('qr');
+   message('Scan the QR using a UPI app on your phone.');
+   return;
+  }
   try {
    const chosen=model.safeApp(app);
    const target=model.buildAppUrl(session.upiUri,chosen,userAgent);
-   // The customer can always tap this link if a browser blocks async launch.
-   bindFallback(target);
    if(!handoffStarted){
     vault.beginHandoff(orderId(),vaultSessionId,session.token);
     handoffStarted=true;
    }
    savePreferred(chosen);
    showStage('methods');
-   bindFallback(target);
+   // Do not use the app-specific intent as the only fallback: an app may be
+   // uninstalled or block that package. Offer the bank-standard generic UPI
+   // URI with a separate, fresh user tap, preserving the same amount/payee.
+   bindFallback(session.upiUri);
    if(target===session.upiUri)vault.launchUPI(target);
    else location.assign(target);
   }catch(error){
@@ -194,11 +202,10 @@
    vaultSessionId=verified.sessionId;
    authorized=true;
    saveAuthorizedSession();
-   showStage(model.stageAfterAuthorization(preferred()));
-   const app=preferred();
-   // Returning users can go directly to the preferred app; the choice remains visible
-   // if an operating system blocks post-passkey auto-launch.
-   if(app!=='generic')openApp(app);
+   // Chrome may deny an Android intent launched after an async passkey
+   // ceremony because the original Pay tap's transient gesture has expired.
+   // Give mobile users a fresh, explicit app tap. On desktop, show QR.
+   showStage(model.supportsNativeUPI(userAgent)?'methods':'qr');
   }catch(err){
    message(model.userFacingError(err,'device'),'error');
   }finally{button.disabled=false;loading=false}

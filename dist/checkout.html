@@ -16,8 +16,8 @@
 <script defer src="/vendor/qrcode.min.js"></script>
 <script defer src="/vendor/simplewebauthn.umd.js"></script>
 <script defer src="/one-touch-vault.js"></script>
-<script defer src="/cosmic-checkout-model.js"></script>
-<script defer src="/cosmic-checkout.js?v=one-rupee-20261118"></script>
+<script defer src="/cosmic-checkout-model.js?v=intent-gesture2"></script>
+<script defer src="/cosmic-checkout.js?v=intent-gesture2"></script>
 </head>
 <body data-checkout="generic">
 <div class="universe" aria-hidden="true">
@@ -53,10 +53,11 @@
     <button id="app-phonepe" type="button" class="app-choice" data-app="phonepe"><span class="app-icon phonepe"><img src="/assets/upi-phonepe.svg" alt="" width="31" height="31"></span><span>PhonePe</span></button>
     <button id="app-paytm" type="button" class="app-choice" data-app="paytm"><span class="app-icon paytm"><img src="/assets/upi-paytm.svg" alt="" width="31" height="31"></span><span>Paytm</span></button>
     <button id="app-cred" type="button" class="app-choice" data-app="cred"><span class="app-icon cred" aria-hidden="true">C</span><span>CRED / UPI</span></button>
+    <button id="app-any" type="button" class="app-choice app-choice-any" data-app="generic"><span class="app-icon any-upi" aria-hidden="true">₹</span><span>Any UPI app</span></button>
    </div>
-   <a id="oneTouchFallback" class="fallback-anchor" href="#" hidden>Open UPI app <span aria-hidden="true">↗</span></a>
+   <a id="oneTouchFallback" class="fallback-anchor" href="#" hidden>Try another UPI app <span aria-hidden="true">↗</span></a>
    <button id="showQr" type="button" class="action-secondary"><span class="mini-qr" aria-hidden="true">▦</span> Show dynamic QR <span class="action-arrow" aria-hidden="true">→</span></button>
-   <p class="inline-note">Your UPI app will show the payment details before you approve.</p>
+   <p class="inline-note">If an app does not open, try Any UPI app or scan the QR. Open this checkout in your phone's browser to use installed UPI apps.</p>
   </section>
 
   <section data-stage="qr" class="stage stage-qr" aria-label="Scan UPI QR" hidden>
