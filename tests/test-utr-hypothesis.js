@@ -75,8 +75,8 @@ test('Malformed UTR is rejected',()=>{
 });
 
 // Main counterexample. Text and status are supplied by a requester; no
-// authoritative payment credit has been observed. The code still assigns HIGH.
-test('P0 counterexample: fabricated UPI SUCCESS text scores HIGH without credit evidence',()=>{
+// authoritative payment credit has been observed. The fixed engine must reject HIGH.
+test('P0 regression: fabricated UPI SUCCESS text cannot reach HIGH or release money',()=>{
   const fabricatedText =
     'UPI Payment Successful\n' +
     'DISHA QA Merchant\n' +
@@ -91,25 +91,26 @@ test('P0 counterexample: fabricated UPI SUCCESS text scores HIGH without credit 
   assert.equal(extracted.layoutFieldsFound,4);
   assert.equal(extracted.looksLikeScreenshot,true);
   const result=score(ev);
-  assert.equal(result.tier,'HIGH',
-    'This diagnostic must be updated if the trust engine stops accepting self-reported evidence');
-  console.log('  P0_FINDING: HIGH score '+result.score+
-    ' reached from entirely client-origin text. No bank, no debit, no credit.');
+  assert.notEqual(result.tier,'HIGH');
+  assert.equal(result.verified,false);
+  assert.equal(result.gate,'UNVERIFIED_RECEIPT_SOURCE');
+  console.log('  FIX_VERIFIED: fabricated client receipt score '+result.score+' is non-settling.');
 });
 
-// The CFC path can settle with a UTR + knowledge of a public checkout session.
+// The CFC path must never settle with just a UTR and checkout session.
 // This is a static route-structure check, not a production exploit attempt.
-test('P0 CFC route calls atomicSettle using only UTR and session context',()=>{
+test('P0 regression: CFC route records UTR only without ledger posting',()=>{
   const a=server.indexOf("app.post('/api/verify-cfc',");
   const b=server.indexOf("app.post(",a+20);
   const route=server.slice(a,b===-1?undefined:b);
   assert.ok(a>=0 && route.includes('const { utr, orderId, token } = req.body'));
   assert.ok(route.includes('db.bindUtrToOrder(cleanUtr, session.orderId)'));
-  assert.ok(route.includes('db.atomicSettle('));
-  assert.ok(route.includes("await db.updateSessionStatus(session.orderId, 'SUCCESS', cleanUtr)"));
-  console.log('  P0_FINDING: Anti-replay proves reference ownership in this DB, not credited funds.');
+  assert.ok(!route.includes('db.atomicSettle('));
+  assert.ok(!route.includes("await db.updateSessionStatus(session.orderId, 'SUCCESS', cleanUtr)"));
+  assert.ok(route.includes("state: 'UTR_OBSERVED'"));
+  console.log('  FIX_VERIFIED: anti-replay correlates references without posting money.');
 });
 
 console.log('UTR_HYPOTHESIS_DIAGNOSTIC_PASS '+checks+' checks.');
 console.log('RESULT: Strong order correlation; UTR presence alone DOES NOT prove money credited.');
-console.log('RELEASE_BLOCKER: P0 self-reported receipt HIGH and CFC UTR-only financial posting.');
+console.log('UTR_P0_REGRESSION_PASS: forged receipts and UTR-only claims are no longer credited.');

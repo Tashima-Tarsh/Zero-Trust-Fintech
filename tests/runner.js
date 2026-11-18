@@ -22,7 +22,8 @@ const UNIT_TESTS = [
   'test-npci-intent.js',  // NPCI URI builder / parser / timestamp
   'test-checkout-production.js', // checkout routing, passkey and browser JS syntax
   'test-financial-money.js',
-  'test-utr-hypothesis.js', // no-bank-API falsification and P0 diagnostics
+  'test-utr-confidence-source.js', // forged UTR success receipts cannot release
+  'test-utr-hypothesis.js', // UTR anti-fraud and no-false-credit regression
   'test-saas-white-production.js', // no demo data; 12 live merchant routes and white layout
   'test-sqlite-storage.js', // fail-closed Railway SQLite path and storage guard
   'test-vpa-router.js',   // 5-factor anti-ban scoring

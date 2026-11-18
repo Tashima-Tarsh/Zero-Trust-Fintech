@@ -31,14 +31,14 @@ the following synthetic scenarios entirely locally, without payment traffic:
 5. UTR with incorrect amount.
 6. Reused UTR.
 7. Incorrectly formatted reference.
-8. Completely fabricated receipt text stating success that scores `HIGH`.
-9. Source-level CFC path: `/api/verify-cfc` can post a completed ledger entry
-   after UTR and checkout-token binding.
+8. Completely fabricated receipt text stating success must NOT score `HIGH`.
+9. Source-level CFC route must NOT post a completed ledger entry from a UTR
+   and checkout-token binding.
 
-**Expected diagnostic:** scenarios 1–7 are rejected by relevant guards; 8 and
-9 demonstrate why those guards do not prove money credited. The diagnostic
-**passes if it reproduces these findings**. A green diagnostic is not a
-security certification. Issue #32 remains a release blocker.
+**Expected after #34:** scenarios 1–7 are rejected by relevant guards;
+scenario 8 is restricted below HIGH and cannot release money; scenario 9
+records the UTR without a ledger posting. A passing diagnostic confirms these
+specific controls, not actual bank-credit confirmation.
 
 ## No-bank-API benchmark to test the proposed innovation
 
