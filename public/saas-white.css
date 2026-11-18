@@ -646,3 +646,18 @@ body.app-page .mobile-brand b{color:#818aa7;font-weight:560}
  body.app-page .side-wordmark{animation:none}
  body.app-page *,body.app-page *::before,body.app-page *::after{animation-duration:.01ms!important;transition-duration:.01ms!important}
 }
+
+/* Routing policy health cards are grounded in merchant API counters. */
+body.app-page .routing-entry{
+ display:block;padding:15px 15px 13px;border:1px solid #e7eaf4;border-radius:12px;
+ background:#fbfcff;margin-bottom:12px;
+}
+body.app-page .routing-entry-head{display:flex;align-items:start;justify-content:space-between;gap:12px}
+body.app-page .routing-entry-head strong{display:block;font-size:11.5px;color:#23334e;overflow-wrap:anywhere}
+body.app-page .routing-entry-head small{display:block;font-size:10px;color:#78869e;margin-top:3px;overflow-wrap:anywhere}
+body.app-page .routing-facts{display:grid;gap:6px;margin:13px 0 11px}
+body.app-page .routing-facts span{display:flex;gap:10px;justify-content:space-between;font-size:10.5px;color:#7a879d}
+body.app-page .routing-facts b{color:#26344f;font-weight:730}
+body.app-page .routing-meter{height:6px;background:#eceef7;border-radius:9px;overflow:hidden}
+body.app-page .routing-meter span{display:block;height:100%;border-radius:9px;background:linear-gradient(90deg,#5d6fd4,#8e77df)}
+body.app-page .routing-caption{display:block;margin-top:9px;font-size:9px;color:#8895aa;line-height:1.5}
