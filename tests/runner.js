@@ -20,6 +20,7 @@ const TESTS_DIR = path.join(__dirname);
 const UNIT_TESTS = [
   'test-disha.js',        // challenge math, session, NPCI link, double-entry ledger
   'test-npci-intent.js',  // NPCI URI builder / parser / timestamp
+  'test-upi-intent-handoff.js', // Android user gesture + desktop QR + generic fallback
   'test-cosmic-checkout-interactions.js', // Stage transitions and ledger receipt authority
   'test-checkout-one-rupee.js', // direct checkout default and saved-session amount
   'test-checkout-moonlight-ui.js', // NASA moon and compact Pay controls
