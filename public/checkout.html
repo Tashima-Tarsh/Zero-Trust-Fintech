@@ -303,7 +303,7 @@
   </script>
 
   <!-- Checkout Logic: WebAuthn + UPI -->
-  <script src="https://cdn.simplewebauthn.org/@simplewebauthn/browser@9.x/dist/umd/simpleWebAuthnBrowser.min.js"></script>
+  <script src="/vendor/simplewebauthn.umd.js"></script>
   <script>
     /* ========================================================================
        ELEMENTS
@@ -419,9 +419,7 @@
     }
 
     async function checkCooldownFromServer(orderId) {
-      // Cooldown is enforced client-side via cooldownUntil timestamp.
-      // Server-side cooldown is checked in /api/cfc/cancel and CFC endpoint.
-    }
+      // The cancellation endpoint remains authoritative for retries.
     }
 
     /* ========================================================================
@@ -471,7 +469,7 @@
         await checkPasskeyStatus(userId, userName);
 
         // Setup WebSocket listener
-        setupWebSocket(data.orderId);
+        setupWebSocket(data.orderId, data.sessionId);
       } catch (err) {
         console.error('Session error:', err);
         showStatus('error', 'Session Failed', err.message || 'Unable to connect to payment switch.', true);
@@ -546,11 +544,7 @@
 
         // browser-side WebAuthn registration
         const registration = await SimpleWebAuthnBrowser.startRegistration({
-          ...data.publicKey,
-          challenge: data.publicKey.challenge
-            ? Uint8Array.from(atob(data.publicKey.challenge), c => c.charCodeAt(0))
-            : Uint8Array.from(data.challenge, c => c.charCodeAt(0))
-          // simplewebauthn v9 accepts the publicKeyCredentialCreationOptions directly
+          optionsJSON: data.publicKey
         });
 
         const finishRes = await fetch('/api/webauthn/register/finish', {
@@ -594,10 +588,7 @@
 
         // browser-side WebAuthn authentication
         const credential = await SimpleWebAuthnBrowser.startAuthentication({
-          ...data.publicKey,
-          challenge: data.publicKey.challenge
-            ? Uint8Array.from(atob(data.publicKey.challenge), c => c.charCodeAt(0))
-            : Uint8Array.from(data.challenge, c => c.charCodeAt(0))
+          optionsJSON: data.publicKey
         });
 
         const finishRes = await fetch('/api/webauthn/authenticate/finish', {
@@ -705,10 +696,10 @@
     /* ========================================================================
        6. WEBSOCKET REAL-TIME
        ======================================================================== */
-    function setupWebSocket(orderId) {
+    function setupWebSocket(orderId, sessionToken) {
       try {
         const protocol = location.protocol === 'https:' ? 'wss:' : 'ws:';
-        const ws = new WebSocket(`${protocol}//${location.host}/ws/checkout?orderId=${encodeURIComponent(orderId)}`);
+        const ws = new WebSocket(`${protocol}//${location.host}/ws?orderId=${encodeURIComponent(orderId)}&token=${encodeURIComponent(sessionToken)}`);
         ws.onmessage = (event) => {
           try {
             const msg = JSON.parse(event.data);

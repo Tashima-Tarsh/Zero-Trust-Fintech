@@ -1,8 +1,14 @@
-const ORIGIN = "https://disha8-2.thenitishkr.in";
+const ORIGIN = "https://zero-trust-fintech-production.up.railway.app";
 
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
+
+    // Keep the canonical checkout consistent with the Railway Express route.
+    if (["/checkout", "/checkout/", "/pay", "/pay/"].includes(url.pathname)) {
+      const checkoutUrl = new URL("/checkout.html" + url.search, request.url);
+      return env.ASSETS.fetch(new Request(checkoutUrl, request));
+    }
 
     // Static assets & HTML routes are served directly by Cloudflare CDN
     if (!url.pathname.startsWith("/api/") && url.pathname !== "/health" && !url.pathname.startsWith("/ws")) {

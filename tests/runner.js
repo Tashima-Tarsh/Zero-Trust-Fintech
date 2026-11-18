@@ -20,6 +20,7 @@ const TESTS_DIR = path.join(__dirname);
 const UNIT_TESTS = [
   'test-disha.js',        // challenge math, session, NPCI link, double-entry ledger
   'test-npci-intent.js',  // NPCI URI builder / parser / timestamp
+  'test-checkout-production.js', // checkout routing, passkey and browser JS syntax
   'test-vpa-router.js',   // 5-factor anti-ban scoring
 ];
 
