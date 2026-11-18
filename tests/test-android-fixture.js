@@ -3,6 +3,20 @@
 const assert=require('node:assert/strict');
 const {spawn}=require('node:child_process');
 const path=require('node:path');
+const fs=require('node:fs');
+// Regression: never use Android ActivityManager's launch wait as a DOM poll.
+const harness=fs.readFileSync(path.join(__dirname,'android','verify_android_flow.py'),'utf8');
+const activity=fs.readFileSync(path.join(__dirname,'android','upi-receiver','app','src','main','java','ai','disha','testupi','TestBrowserActivity.java'),'utf8');
+assert.doesNotMatch(harness,/am start -W|["']-W["']/,
+  'ActivityManager -W must not be used to poll the WebView');
+assert.doesNotMatch(harness,/command\(["']snapshot["']\)/,
+  'State polling must not restart the Android Activity');
+assert.match(harness,/baseline=len\(states\(\)\)/,
+  'Waits must require a new DOM snapshot');
+assert.match(activity,/snapshotHandler\.postDelayed\(this, 1200\)/,
+  'WebView must emit periodic DOM snapshots itself');
+assert.match(activity,/WEBVIEW_RENDER_PROCESS_GONE/,
+  'WebView renderer failures must be visible in CI');
 (async()=>{
  const child=spawn(process.execPath,[path.join(__dirname,'android','fixture-server.js')],{
   cwd:path.join(__dirname,'..'),
