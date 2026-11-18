@@ -59,6 +59,29 @@ assert.match(backdrop,/data:image\/jpeg;base64,/,'Bundled photographic asset mus
 const assetData=backdrop.match(/data:image\/jpeg;base64,([A-Za-z0-9+/=]+)/)?.[1];
 assert.ok(assetData && Buffer.from(assetData,'base64').length>20000,'Magnific universe asset must contain raster image bytes');
 assert.match(read('cosmic-checkout.css'),/\/assets\/disha-universe-background\.svg/);
+
+// The photographic universe must actually render in front of the page body,
+// not disappear under an opaque panel and negative stacking context.
+for(const name of ['checkout.html','merchant-checkout.html']){
+ const page=read(name);
+ assert.match(page,/cosmic-checkout\.css\?v=cosmos2-20261118/);
+ assert.match(page,/class="vault-art" src="\/assets\/disha-vault-sculpture\.svg"/);
+ const card=page.indexOf('class="checkout-panel"');
+ const logo=page.indexOf('class="checkout-brand"');
+ assert.ok(card>=0&&logo>card,'Metallic logo must be inside visible payment card on mobile');
+ assert.doesNotMatch(page,/class="vault-core"/,
+  'Original CSS-only fingerprint sphere must be replaced by the new sculpted artwork');
+}
+const stylesheet=read('cosmic-checkout.css');
+assert.match(stylesheet,/DISHA COSMOS II/);
+assert.match(stylesheet,/\.universe\{[\s\S]*?z-index:0/);
+assert.match(stylesheet,/\.checkout-panel\{[\s\S]*?background-image:/);
+assert.match(stylesheet,/\.vault-art\{[\s\S]*?mix-blend-mode:screen/);
+const sculptedAsset=read('assets/disha-vault-sculpture.svg');
+assert.match(sculptedAsset,/data:image\/jpeg;base64,/);
+assert.ok(Buffer.from(sculptedAsset.match(/base64,([A-Za-z0-9+/=]+)/)[1],'base64').length>15000,
+ '3D art must contain actual rendered image data, not a decorative placeholder');
+
 assert.equal(model.safeApp('googlepay'),'gpay');
 assert.equal(model.safeApp('invalid'),'generic');
 const qr=model.qrPayload('upi://pay?pa=store%40oksbi&am=500.00&cu=INR');
