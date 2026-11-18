@@ -34,8 +34,8 @@ assert.ok(css.includes('color-scheme:light'),'Premium merchant shell must use li
 assert.ok(css.includes('body.app-page .btn.primary'),'Primary button style missing');
 assert.ok(css.includes('@media(max-width:620px)'),'Small-screen SaaS design missing');
 assert.ok(login.includes('mountSignIn') && signup.includes('mountSignUp'),'Clerk sign-up/sign-in missing');
-assert.ok(checkout.includes('/api/merchant/public/order/'),'Real merchant checkout endpoint missing');
-assert.ok(checkout.includes('upi_uri'),'Payee-specific UPI data binding missing');
+assert.ok(checkout.includes('/cosmic-checkout.js') && read('cosmic-checkout.js').includes('/api/merchant/public/order/'),'Real merchant checkout endpoint missing');
+assert.ok(read('cosmic-checkout.js').includes('upi_uri'),'Payee-specific UPI data binding missing');
 assert.ok(!/previewOrders|previewVpas|VISUAL PREVIEW|SAMPLE-240|isPreview/.test(js),
  'Never ship fake financial data or preview-mode branches');
 assert.ok(!page.includes('Execute Simulation'),'Live risk screen must not run fake security simulations');
