@@ -495,6 +495,16 @@ function createMerchantApi({db,getAuth,buildUpiUri,platformControl}) {
     if(!r.rowCount)throw fail(404,'Address not found');
     res.json({success:true});
   }));
+
+  router.get('/merchant/ledger',wrap(async(req,res)=>{
+    const present=await db.pgPool.query("SELECT to_regclass('public.disha_core_journals') IS NOT NULL AS ready");
+    if(!present.rows[0].ready)return res.set('Cache-Control','no-store').json({success:true,connected:false,journals:[],summary:null});
+    const [records,summary]=await Promise.all([
+      db.pgPool.query("SELECT journal_id,order_id,utr,amount_paise,state,created_at,posted_at FROM disha_core_journals WHERE merchant_id=$1 ORDER BY created_at DESC LIMIT 100",[req.merchant.id]),
+      db.pgPool.query("SELECT count(*) FILTER (WHERE state='POSTED')::int AS posted,count(*)::int AS total,COALESCE(sum(amount_paise) FILTER(WHERE state='POSTED'),0)::text AS posted_paise FROM disha_core_journals WHERE merchant_id=$1",[req.merchant.id])
+    ]);
+    res.set('Cache-Control','no-store').json({success:true,connected:true,journals:records.rows,summary:summary.rows[0]});
+  }));
   router.get('/merchant/risk',wrap(async(req,res)=>{
     const r=await db.pgPool.query(
       "SELECT COUNT(*) FILTER(WHERE s.status='EXPIRED' OR (s.status='PENDING' AND s.expires_at<$2))::int AS expired,"+
