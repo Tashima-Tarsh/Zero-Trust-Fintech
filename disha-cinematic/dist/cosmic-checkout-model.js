@@ -3,7 +3,7 @@
  'use strict';
  const APPS=Object.freeze({
    gpay:{package:'com.google.android.apps.nbu.paisa.user',ios:'gpay://upi/pay?'},
-   phonepe:{package:'com.phonepe.app',ios:'phonepe://pay?'},
+   phonepe:{package:'com.phonepe.app',ios:'phonepe://upi/pay?'},
    paytm:{package:'net.one97.paytm',ios:'paytmmp://pay?'},
    cred:{package:null,ios:null},
    generic:{package:null,ios:null}
@@ -46,13 +46,25 @@
    return 'Error — Could not open the UPI app. Choose another app or use QR.';
   return 'Error — Device verification could not be completed. Please try again.';
  }
+ // A quick app return may be a pre-PIN rejection, not payment failure.
+ // Preserve app/QR retry choices without granting any financial status.
+ function needsPaymentMethodRetry(evidence){
+  if(!evidence||typeof evidence!=='object')return false;
+  const params=evidence.returnParams||{};
+  const status=String(params.Status||params.status||'').toUpperCase();
+  if(['FAILURE','FAILED','CANCELLED','CANCELED'].includes(status))return true;
+  if(['SUCCESS','SUBMITTED','PENDING'].includes(status))return false;
+  const elapsed=Number(evidence.returnedAt)-Number(evidence.handoffAt);
+  return Number.isFinite(elapsed)&&elapsed>=0&&elapsed<12000&&
+   !params.txnId&&!params.ApprovalRefNo;
+ }
  function stageAfterAuthorization(){return 'methods'}
  function formatINR(value){
   const n=Number(value);
   if(!Number.isFinite(n)||n<=0)throw Error('Invalid payment amount');
   return new Intl.NumberFormat('en-IN',{style:'currency',currency:'INR',maximumFractionDigits:2,minimumFractionDigits:2}).format(n);
  }
- const api=Object.freeze({safeApp,qrPayload,buildAppUrl,supportsNativeUPI,isSettled,stageAfterAuthorization,formatINR,userFacingError});
+ const api=Object.freeze({safeApp,qrPayload,buildAppUrl,supportsNativeUPI,isSettled,stageAfterAuthorization,needsPaymentMethodRetry,formatINR,userFacingError});
  if(typeof module!=='undefined'&&module.exports)module.exports=api;
  root.DISHACosmicCheckoutModel=api;
 })(typeof window!=='undefined'?window:globalThis);

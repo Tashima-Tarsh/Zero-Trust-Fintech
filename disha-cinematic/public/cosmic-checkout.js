@@ -247,12 +247,14 @@
    message(model.userFacingError(err,'device'),'error');
   }finally{button.disabled=false;loading=false}
  }
- async function submitReturnEvidence(){
+ async function submitReturnEvidence(preserveAppChoices=false){
   if(!session||evidenceSending||receiptShown)return;
   const packet=vault.requestEvidence(orderId());
   if(!packet)return;
   evidenceSending=true;
-  showStage('checking');
+  // A UPI app can reject before PIN. Keep retry choices visible while
+  // securely recording what the browser actually observed.
+  if(!preserveAppChoices)showStage('checking');
   try{
    const response=await fetch('/api/vault/evidence',{
     method:'POST',credentials:'same-origin',cache:'no-store',
@@ -284,8 +286,14 @@
   const observed=typeof vault.requestEvidence==='function'?vault.requestEvidence(orderId()):null;
   if(session&&vault.getPendingOrderId()===orderId()&&observed){
    authorized=true;handoffStarted=true;
-   if(lastStage!=='receipt'&&lastStage!=='checking')showStage('checking');
-   void submitReturnEvidence();
+   const retry=model.needsPaymentMethodRetry(observed.evidence);
+   if(retry&&lastStage!=='receipt'){
+    showStage('methods');
+    message('The UPI app returned without payment confirmation. If you paid, check your UPI history before trying again. Otherwise choose another app or scan QR.','info');
+   }else if(lastStage!=='receipt'&&lastStage!=='checking'){
+    showStage('checking');
+   }
+   void submitReturnEvidence(retry);
   }
   void pollLedger();
  }
