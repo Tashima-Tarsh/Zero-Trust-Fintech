@@ -109,8 +109,26 @@ def test():
 
     print("A02: one physical tap authorizes Vault, then shows UPI methods",flush=True)
     tap_native(page["touchTarget"])
-    methods=wait_state(lambda s:s["stage"]=="methods" and s["appTarget"]["visible"],
-        "WebAuthn single prompt, native UPI choices")
+    def methods_ready(s):
+        return s["stage"]=="methods" and s["appTarget"]["visible"]
+    try:
+        methods=wait_state(methods_ready,
+            "WebAuthn single prompt, native UPI choices",timeout=12)
+    except AssertionError:
+        # API35 emulator sometimes drops the first ADB touch before WebView
+        # has registered an input target. Retry only when no credential
+        # ceremony completed; never permit a second Vault confirmation.
+        current=fixture_info()
+        if current["vaultPrompts"]!=0:
+            raise
+        latest=states()
+        candidate=latest[-1] if latest else page
+        if candidate["stage"]!="initial" or candidate["disabled"]:
+            raise
+        print("ANDROID_INPUT_RETRY: first physical tap not registered",flush=True)
+        tap_native(candidate["touchTarget"])
+        methods=wait_state(methods_ready,
+            "single Vault prompt after a retried physical touch",timeout=35)
     auth=fixture_info()
     assert auth["vaultRegistered"],"Test Vault must register this device"
     assert auth["vaultPrompts"]==1,"One Touch must not ask for a second credential prompt"
