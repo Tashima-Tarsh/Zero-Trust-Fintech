@@ -1,13 +1,22 @@
-**DISHA 8.2 | Product Knowledge Centre**
+<img src="../../public/assets/disha-8-2-wordmark-cropped.png" width="180" alt="DISHA 8.2">
 
-- [Home](Home.md)
-- [Product vision](Product-Vision-and-Value.md)
-- [End-to-end payment journey](End-to-End-Journey.md)
+**DISCOVER**
+
+- [Product home](Home.md)
+- [Vision and value](Product-Vision-and-Value.md)
+- [Platform architecture](Platform-Architecture.md)
+- [Complete payment journey](End-to-End-Journey.md)
+
+**TRUST & FINANCE**
+
 - [DISHA Vault](DISHA-Vault.md)
-- [Fraud and risk](Fraud-and-Risk-Protection.md)
-- [Merchant & owner workspaces](Merchant-and-Owner-Workspaces.md)
-- [P2P and P2M](P2P-P2M-and-Receiving-Accounts.md)
+- [Vault architecture](Vault-Architecture.md)
+- [Fraud intelligence](Fraud-and-Risk-Protection.md)
 - [Records and receipts](Records-Reconciliation-and-Receipts.md)
+
+**BUSINESS**
+
+- [Merchant and owner workspaces](Merchant-and-Owner-Workspaces.md)
+- [P2P / P2M receiving accounts](P2P-P2M-and-Receiving-Accounts.md)
 - [Commercial model](Commercial-Model-and-Savings.md)
-- [Roadmap and release](Release-Status-and-Roadmap.md)
-- [FAQ](FAQ.md)
+- [Frequently asked questions](FAQ.md)

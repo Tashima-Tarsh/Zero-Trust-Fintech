@@ -1,57 +1,48 @@
-# DISHA 8.2 — Product Knowledge Centre
+<div align="center">
+
+<img src="../../public/assets/disha-8-2-wordmark-cropped.png" width="330" alt="DISHA 8.2 official logo">
+
+# DISHA 8.2 Product Knowledge Centre
 
 **The money moves on UPI. The intelligence belongs to you.**
 
-Welcome to the product home for DISHA 8.2, merchant-owned payment software for direct UPI checkout, device evidence, fraud resistance, financial records and business operations.
+*Direct checkout · DISHA Vault · Fraud intelligence · Merchant operations · Financial records*
 
-DISHA helps a merchant answer four questions consistently: **Who was meant to receive the money? What did the customer attempt? What evidence exists? What credit, if any, can be accounted for?**
+</div>
 
-This knowledge centre documents the **active product as seen in repository code on 19 November 2026**, along with what remains a release goal. It is intentionally written for merchants, product evaluators, business partners and operators.
+---
 
-## Choose your starting point
+## Explore the DISHA universe
 
-| I want to understand… | Read |
+| Product experience | What you'll discover |
 | --- | --- |
-| What problem DISHA solves, and why it exists | [Product vision and value](Product-Vision-and-Value.md) |
-| The entire payment from creation to ledger | [End-to-end journey](End-to-End-Journey.md) |
-| What DISHA Vault remembers | [DISHA Vault](DISHA-Vault.md) |
-| How suspicious payments are challenged | [Fraud and risk protection](Fraud-and-Risk-Protection.md) |
-| What a merchant and the owner can manage | [Workspaces](Merchant-and-Owner-Workspaces.md) |
-| The difference between personal and merchant UPI | [P2P and P2M](P2P-P2M-and-Receiving-Accounts.md) |
-| When a receipt is issued and what a ledger means | [Records, reconciliation and receipts](Records-Reconciliation-and-Receipts.md) |
-| The proposed business model and savings | [Commercial model and savings](Commercial-Model-and-Savings.md) |
-| What is built, what is blocked, and delivery milestones | [Release status and roadmap](Release-Status-and-Roadmap.md) |
-| Straight answers to common questions | [FAQ](FAQ.md) |
+| [**Product vision and value**](Product-Vision-and-Value.md) | The payment-management problem DISHA solves |
+| [**Complete platform architecture**](Platform-Architecture.md) | The full customer, Vault, risk, payment and accounting system |
+| [**End-to-end customer journey**](End-to-End-Journey.md) | All eight moments from a merchant request to a recorded outcome |
+| [**DISHA Vault**](DISHA-Vault.md) | Why an authorized payment journey is more valuable than a screenshot |
+| [**Inside DISHA Vault**](Vault-Architecture.md) | Device authorization, evidence lifecycle, classification and merchant timeline |
+| [**Fraud intelligence**](Fraud-and-Risk-Protection.md) | Amount, recipient, reference, timing and exception decisions |
+| [**Merchant and owner workspaces**](Merchant-and-Owner-Workspaces.md) | Merchant operations and separately controlled platform administration |
+| [**P2P, P2M and receiving accounts**](P2P-P2M-and-Receiving-Accounts.md) | Personal versus bank-issued merchant UPI journeys |
+| [**Financial records and receipts**](Records-Reconciliation-and-Receipts.md) | Matching, accounting, exceptions and customer receipts |
+| [**Commercial model and savings**](Commercial-Model-and-Savings.md) | One-time software ownership and evidence-based operating economics |
+| [**Frequently asked questions**](FAQ.md) | Straight answers about how DISHA works |
 
-## Product principles
-
-**Merchant ownership.** Businesses control their own receiving account configuration and operational data rather than depending on a DISHA-controlled funds balance.
-
-**Evidence over appearance.** A green checkmark, device return or customer-provided UTR is not silently promoted into an account credit.
-
-**One order, one context.** Payee, amount, classification, time window and evidence remain connected to their original order.
-
-**Explain uncertainty.** When there is no qualified financial evidence, show pending, expired or under review rather than inventing payment success.
-
-**Operational clarity.** Merchant staff and platform operators see their relevant orders, issues and records in their own workspaces.
-
-## In one diagram
+## DISHA's central architecture
 
 ~~~mermaid
 flowchart LR
- A["Merchant order"] --> B["Customer checkout"]
- B --> C["Existing UPI app and banks"]
- B --> D["DISHA Vault observations"]
- C --> E["Qualified financial-credit evidence, when available"]
- D --> F["Risk and exception review"]
- E --> F
- F --> G["Merchant records and confirmed receipt"]
+ A["Merchant order"]:::blue --> B["Customer UPI checkout"]:::blue
+ B --> C["Vault evidence"]:::purple
+ C --> D["Risk intelligence"]:::orange
+ D --> E["Qualified financial matching"]:::green
+ E --> F["Merchant ledger and receipt"]:::green
+ classDef blue fill:#103453,stroke:#38BDF8,color:#fff,stroke-width:2px;
+ classDef purple fill:#30204F,stroke:#C084FC,color:#fff,stroke-width:2px;
+ classDef orange fill:#472D18,stroke:#FBBF24,color:#fff,stroke-width:2px;
+ classDef green fill:#103C31,stroke:#34D399,color:#fff,stroke-width:2px;
 ~~~
 
-The customer does not need a new DISHA wallet. DISHA surrounds the existing UPI journey with software for business operations and evidence interpretation.
+The customer keeps using their own UPI app. DISHA brings business order identity, permitted evidence, fraud analysis and financial records together in a merchant-owned experience.
 
-> **Current release gate:** The product is **NO-GO for external real-money merchant onboarding**, pending bank-app acceptance, merchant P2M validation, an authenticated financial-credit source and independent acceptance testing. This is a product maturity statement, not an assertion that checkout screens or source code do not exist.
-
-**Explore:** [Product README](../../README.md) · [Website](https://disha8-2.thenitishkr.in/) · [Roadmap](Release-Status-and-Roadmap.md)
-
-_These versioned Markdown pages are the repository's publishable wiki source. GitHub's separate /wiki site requires a separate Wiki-publishing action._
+**[Explore the DISHA website](https://disha8-2.thenitishkr.in/) · [Request merchant access](https://disha8-2.thenitishkr.in/request-access) · [Contact](mailto:nitish@thenitishkr.in)**
