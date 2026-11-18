@@ -7,6 +7,7 @@
  const mode=document.body.dataset.checkout==='merchant'?'merchant':'generic';
  const query=new URLSearchParams(location.search);
  const prefKey='disha82:preferred-upi-app';
+ const resumeKey='disha82:cosmic-authorized-checkout:v1';
  const stages=[...document.querySelectorAll('[data-stage]')];
  let session=null,vaultSessionId=null,authorized=false,handoffStarted=false;
  let loading=false,polling=false,evidenceSending=false,receiptShown=false;
@@ -47,6 +48,29 @@
    upiUri:model.qrPayload(raw.upiLink),amount:Number(raw.challengeAmount),
    expiresAt:Number(raw.expiresAt),initialStatus:'PENDING'};
  }
+ function saveAuthorizedSession(){
+  if(mode!=='generic'||!session)return;
+  try{
+   sessionStorage.setItem(resumeKey,JSON.stringify({
+    ...session,requestedAmount:query.get('amount')||'500',savedAt:Date.now()
+   }));
+  }catch(_){}
+ }
+ async function recoverAuthorizedSession(requestedAmount){
+  try{
+   const old=JSON.parse(sessionStorage.getItem(resumeKey)||'null');
+   if(!old||old.requestedAmount!==requestedAmount||
+      Date.now()-Number(old.savedAt)>900000||
+      !/^[A-Za-z0-9_-]{6,150}$/.test(old.orderId||'')||
+      !/^[a-f0-9]{24,64}$/i.test(old.token||'')||
+      !Number.isFinite(Number(old.amount))||
+      !Number.isFinite(Number(old.expiresAt)))return null;
+   model.qrPayload(old.upiUri);
+   const response=await fetch('/api/ledger/'+encodeURIComponent(old.orderId)+
+     '?token='+encodeURIComponent(old.token),{cache:'no-store',credentials:'same-origin'});
+   return response.ok?old:null;
+  }catch(_){return null}
+ }
  async function getSession(){
   let url;
   if(mode==='merchant'){
@@ -58,6 +82,8 @@
    const amount=Number(raw);
    if(!Number.isFinite(amount)||amount<=0||amount>100000)
     throw Error('Invalid payment amount. Open a valid payment link.');
+   const recovered=await recoverAuthorizedSession(raw);
+   if(recovered)return recovered;
    const userId=vault.getDeviceUserId();
    url='/api/session/new?amount='+encodeURIComponent(amount.toFixed(2))+
      '&description='+encodeURIComponent('DISHA checkout')+
@@ -167,6 +193,7 @@
    const verified=await vault.authorize(orderId());
    vaultSessionId=verified.sessionId;
    authorized=true;
+   saveAuthorizedSession();
    showStage(model.stageAfterAuthorization(preferred()));
    const app=preferred();
    // Returning users can go directly to the preferred app; the choice remains visible
@@ -242,6 +269,9 @@
   try{
    session=await getSession();
    setMoney(session.amount);
+   // Resolve a verified recorded credit even after the original checkout TTL.
+   await pollLedger();
+   if(receiptShown)return;
    if(session.initialStatus==='EXPIRED'||session.initialStatus==='FAILED'){
     locked('This payment request is no longer active.');return;
    }
@@ -253,7 +283,6 @@
     showStage('checking');
     void submitReturnEvidence();
    }
-   await pollLedger();
    ledgerTicker=setInterval(()=>{void pollLedger()},3500);
    expiryTicker=setInterval(handleQrExpiry,1000);
   }catch(err){locked(err?.message||'Could not load the payment link.')}
