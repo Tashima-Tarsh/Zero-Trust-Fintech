@@ -40,6 +40,25 @@ assert.equal(model.isSettled({status:'SUCCESS',utr:'123456789012'}),true);
 assert.equal(model.isSettled({status:'SUCCESS',utr:''}),false);
 assert.equal(model.isSettled({status:'PENDING',utr:'123456789012'}),false);
 assert.equal(model.isSettled({status:'SUCCESS'}),false);
+const originalBrowserError=Object.assign(new Error(
+ 'The operation either timed out or was not allowed. See: https://www.w3.org/TR/webauthn-2/#sctn-privacy-considerations-client.'
+),{name:'NotAllowedError'});
+for(const problem of [originalBrowserError,Object.assign(new Error('Private browser message'),{name:'SecurityError'}),new Error('secret server response')]){
+ const displayed=model.userFacingError(problem,'device');
+ assert.match(displayed,/^Error\b/);
+ assert.doesNotMatch(displayed,/w3\.org|webauthn|timed out|not allowed|Private browser|secret server/i,
+  'Private browser, policy and server diagnostics must not appear in checkout UI');
+}
+assert.match(model.userFacingError(new TypeError('fetch failed'),'device'),/^Error/);
+assert.match(model.userFacingError(new Error('HTTP 500'),'load'),/^Error/);
+assert.match(script,/message\(model\.userFacingError\(err,'device'\),'error'\)/);
+assert.match(script,/locked\(model\.userFacingError\(err,'load'\)\)/);
+assert.doesNotMatch(script,/message\(err\?\.message|locked\(err\?\.message/);
+const backdrop=read('assets/disha-universe-background.svg');
+assert.match(backdrop,/data:image\/jpeg;base64,/,'Bundled photographic asset must be self-contained');
+const assetData=backdrop.match(/data:image\/jpeg;base64,([A-Za-z0-9+/=]+)/)?.[1];
+assert.ok(assetData && Buffer.from(assetData,'base64').length>20000,'Magnific universe asset must contain raster image bytes');
+assert.match(read('cosmic-checkout.css'),/\/assets\/disha-universe-background\.svg/);
 assert.equal(model.safeApp('googlepay'),'gpay');
 assert.equal(model.safeApp('invalid'),'generic');
 const qr=model.qrPayload('upi://pay?pa=store%40oksbi&am=500.00&cu=INR');
