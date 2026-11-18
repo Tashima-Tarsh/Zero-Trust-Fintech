@@ -18,6 +18,9 @@ cleanup() {
   timeout 12s adb shell dumpsys package ai.disha.testupi > test-results/android/test-app-package.txt 2>&1 || true
   timeout 12s adb shell dumpsys webviewupdate > test-results/android/webview-provider.txt 2>&1 || true
   timeout 12s adb devices -l > test-results/android/adb-devices.txt 2>&1 || true
+  # Retain host-side OOM evidence when QEMU disappears before adb can report.
+  free -m > test-results/android/host-memory.txt 2>&1 || true
+  sudo dmesg -T 2>&1 | grep -Ei 'out of memory|oom|killed process|qemu' | tail -60 > test-results/android/host-oom.txt || true
   curl --silent --max-time 5 http://127.0.0.1:8765/health > test-results/android/fixture-health.json || true
   if [[ -n "$LOGCAT_PID" ]]; then kill "$LOGCAT_PID" 2>/dev/null || true; fi
   kill "$FIXTURE_PID" 2>/dev/null || true
