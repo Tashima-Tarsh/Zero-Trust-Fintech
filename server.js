@@ -45,6 +45,7 @@ const CLERK_ENABLED = Boolean(process.env.CLERK_PUBLISHABLE_KEY && process.env.C
 // Pony-tail observation window: policy limits, not a payment-success proof.
 // Timing alone cannot establish credit or prevent reuse of a supplied UTR.
 const {T_MIN_MS,T_MAX_MS,evaluateTemporalGate}=require('./utils/pony-tail-window');
+const {createChallengeStore,initializeChallengeStore}=require('./financial/webauthn-challenge-store');
 app.set('trust proxy', process.env.TRUST_PROXY === 'true');
 const server = http.createServer(app);
 const wss = new WebSocketServer({ server, path: '/ws' });
@@ -680,11 +681,23 @@ app.get('/api/session/:orderId', async (req, res) => {
 
 // Order state polling endpoint for checkout page (mathematical time window: 15s-180s)
 app.get('/api/order-state/:orderId', async (req, res) => {
-  const state = await db.getOrderState(req.params.orderId);
-  if (!state) {
-    return res.status(404).json({ success: false, error: 'Order not found' });
+  try {
+    const session=await db.findSessionByOrderId(req.params.orderId);
+    if(!session)return res.status(404).json({success:false,error:'Order not found'});
+    const token=req.query.token;
+    const received=typeof token==='string'?Buffer.from(token):Buffer.alloc(0);
+    const expected=Buffer.from(session.sessionId||'');
+    if(!received.length||received.length!==expected.length||
+       !crypto.timingSafeEqual(received,expected))
+      return res.status(401).set('Cache-Control','no-store')
+        .json({success:false,error:'SESSION_TOKEN_REQUIRED'});
+    const state=await db.getOrderState(req.params.orderId);
+    if(!state)return res.status(404).json({success:false,error:'Order not found'});
+    return res.set('Cache-Control','no-store').json({success:true,...state});
+  }catch(err){
+    console.error('[Order state]',err.message);
+    return res.status(500).json({success:false,error:'ORDER_STATE_UNAVAILABLE'});
   }
-  res.json({ success: true, ...state });
 });
 // ═══════════════════════════════════════════════════════════════════
 // ZERO-TRUST SERVER-SIDE RECEIPT EVIDENCE EXTRACTION
@@ -1101,8 +1114,8 @@ const RP_ORIGIN = new URL(
 ).origin;
 const RP_ID = process.env.WEBAUTHN_RP_ID || new URL(RP_ORIGIN).hostname;
 
-// In-memory challenge store (use Redis/DB in production)
-const authChallenges = new Map(); // sessionId -> { challenge, orderId, amount, expiresAt }
+// Durable single-use WebAuthn challenges, with a local-only memory fallback.
+const authChallenges=createChallengeStore(()=>db.pgPool);
 
 function generateSessionId() {
   return crypto.randomBytes(16).toString('hex');
@@ -1141,7 +1154,7 @@ app.post('/api/webauthn/register/start', async (req, res) => {
       }
     });
     const sessionId = generateSessionId();
-    authChallenges.set(sessionId, {
+    await authChallenges.set(sessionId, {
       type: 'registration',
       userId, userName, orderId,
       challenge: options.challenge,
@@ -1161,9 +1174,9 @@ app.post('/api/webauthn/register/finish', async (req, res) => {
     if (!sessionId || !credential) {
       return res.status(400).json({ success: false, error: 'sessionId and credential required' });
     }
-    const stored = authChallenges.get(sessionId);
+    const stored = await authChallenges.take(sessionId);
     if (!stored || stored.type !== 'registration' || Date.now() > stored.expiresAt) {
-      authChallenges.delete(sessionId);
+      await authChallenges.delete(sessionId);
       return res.status(400).json({ success: false, error: 'Invalid or expired session' });
     }
     const verification = await verifyRegistrationResponse({
@@ -1192,13 +1205,13 @@ app.post('/api/webauthn/register/finish', async (req, res) => {
     }
     const order = await db.findSessionByOrderId(stored.orderId);
     if (!order || order.status !== 'PENDING' || Date.now() > order.expiresAt) {
-      authChallenges.delete(sessionId);
+      await authChallenges.delete(sessionId);
       return res.status(409).json({ success:false, error:'ORDER_NOT_ACTIVE' });
     }
     // The OS has already verified the device owner during passkey creation.
     // Requiring an immediate second biometric challenge would duplicate the UX.
     // This authorizes only a UPI app handoff, NEVER financial settlement.
-    authChallenges.set(sessionId,{
+    await authChallenges.set(sessionId,{
       type:'authentication',
       status:'VAULT_VERIFIED_AWAITING_UPI',
       userId:stored.userId,orderId:stored.orderId,amount:order.challengeAmount,
@@ -1246,7 +1259,7 @@ app.post('/api/webauthn/authenticate/start', async (req, res) => {
       userVerification: 'required'
     });
     const sessionId = generateSessionId();
-    authChallenges.set(sessionId, {
+    await authChallenges.set(sessionId, {
       type: 'authentication', userId, orderId,
       amount: checkoutSession.challengeAmount,
       challenge: options.challenge,
@@ -1266,9 +1279,9 @@ app.post('/api/webauthn/authenticate/finish', async (req, res) => {
     if (!sessionId || !credential?.id) {
       return res.status(400).json({ success: false, error: 'sessionId and credential required' });
     }
-    const stored = authChallenges.get(sessionId);
+    const stored = await authChallenges.take(sessionId);
     if (!stored || stored.type !== 'authentication' || Date.now() > stored.expiresAt) {
-      authChallenges.delete(sessionId);
+      await authChallenges.delete(sessionId);
       return res.status(400).json({ success: false, error: 'Invalid or expired session' });
     }
     const existingKey = await db.findPasskeyByCredentialId(credential.id);
@@ -1292,7 +1305,7 @@ app.post('/api/webauthn/authenticate/finish', async (req, res) => {
       return res.status(401).json({ success: false, error: 'Vault signature rejected' });
     }
     await db.updatePasskeyCounter(existingKey.credential_id, verification.authenticationInfo.newCounter);
-    authChallenges.set(sessionId, {
+    await authChallenges.set(sessionId, {
       ...stored,
       status: 'VAULT_VERIFIED_AWAITING_UPI',
       verifiedAt: Date.now(),
@@ -1317,12 +1330,12 @@ app.post('/api/checkout/finalize-upi', verifyLimiter, async (req, res) => {
       return res.status(400).json({ success: false, error: 'sessionId, orderId, txnRef required' });
     }
 
-    const stored = authChallenges.get(sessionId);
+    const stored = await authChallenges.get(sessionId);
     if (!stored || stored.orderId !== orderId) {
       return res.status(400).json({ success: false, error: 'Invalid session or Order ID mismatch' });
     }
     if (Date.now() > stored.expiresAt) {
-      authChallenges.delete(sessionId);
+      await authChallenges.delete(sessionId);
       return res.status(403).json({ success: false, error: 'VAULT_SESSION_EXPIRED' });
     }
     if (stored.status !== 'VAULT_VERIFIED_AWAITING_UPI') {
@@ -1349,7 +1362,7 @@ app.post('/api/checkout/finalize-upi', verifyLimiter, async (req, res) => {
     // A WebAuthn assertion authenticates the user/device, NOT a bank credit.
     // Preserve the UTR correlation; do not post SUCCESS or financial entries.
     await db.updateSessionState(orderId, 'VERIFY_WINDOW');
-    authChallenges.delete(sessionId);
+    await authChallenges.delete(sessionId);
     return res.status(202).json({
       success:true,verified:false,settled:false,
       orderId,utr:txnRef,state:'UTR_OBSERVED',
@@ -1377,7 +1390,7 @@ app.get('/api/debug/flow/:orderId', async (req, res) => {
       });
     }
 
-    const stored = authChallenges.get(session.sessionId);
+    const stored = await authChallenges.get(session.sessionId);
     const cooldown = await db.checkSessionCooldown(orderId);
     const velocity = await db.checkVpaVelocity(session.vpaAddress);
     const boundOrder = await db.getUtrBoundOrder(session.utr || '');
@@ -1816,6 +1829,7 @@ app.get('/failed', (req, res) => res.sendFile(path.join(__dirname, 'public', 'fa
 // Initialize database and start server
 (async () => {
   await db.initDb();
+  await initializeChallengeStore(db.pgPool);
   if (db.pgPool && CLERK_ENABLED) await merchantApi.init();
   if(db.pgPool) {
     await initializeVaultEvidenceSchema(db.pgPool);
