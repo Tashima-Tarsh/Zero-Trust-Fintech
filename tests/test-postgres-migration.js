@@ -45,6 +45,16 @@ const {Pool}=require('pg');
   const pk=await pool.query('SELECT * FROM passkeys WHERE id=$1',[pkId]);
   assert.equal(pk.rows.length,1);
   assert.equal(pk.rows[0].credential_id,'cred_'+orderId);
+  const marker=await pool.query("SELECT payload FROM disha_migration_control WHERE name='sqlite_to_postgres_verified'");
+  assert.equal(marker.rowCount,1);
+  const archive=await pool.query('SELECT sha256,byte_size,sqlite_bytes FROM disha_sqlite_archives WHERE archive_id=$1',
+   [marker.rows[0].payload.archiveId]);
+  assert.equal(archive.rowCount,1);
+  assert.equal(archive.rows[0].byte_size,String(archive.rows[0].sqlite_bytes.length));
+  assert.equal(archive.rows[0].sha256,
+   crypto.createHash('sha256').update(archive.rows[0].sqlite_bytes).digest('hex'));
+  assert.equal(marker.rows[0].payload.sha256,archive.rows[0].sha256);
+
   const importedAccount=await pool.query("SELECT name FROM accounts WHERE id='acc_bank_01'");
   assert.equal(importedAccount.rows[0].name,'Original source asset');
   const importedVpa=await pool.query("SELECT holder_name FROM vpa_pool WHERE id='vpa_axis_01'");
