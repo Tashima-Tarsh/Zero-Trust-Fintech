@@ -44,7 +44,7 @@ const key=window.DISHA_CLERK_PUBLISHABLE_KEY;
 if(!key || window.DISHA_CLERK_CONFIG_READY===false)throw Error('Secure merchant sign-in is unavailable. Please contact platform support.');
 const part=key.split('_')[2];
 if(!part)throw Error('Invalid sign-in configuration');
-const domain=atob(part.replace(/-/g,'+').replace(/_/g,'/')).replace(/\0+$/g,'');
+const domain=atob(part.replace(/-/g,'+').replace(/_/g,'/')).replace(/(?:\$|\0+)$/, '');
 if(!/^[a-z0-9.-]+$/i.test(domain))throw Error('Invalid authentication domain');
 function script(url,clerk=false){
 return new Promise((resolve,reject)=>{

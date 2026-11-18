@@ -37,7 +37,7 @@ async function authInit(){
  if(!key)throw Error('Merchant authentication is unavailable');
  const part=key.split('_')[2];
  if(!part)throw Error('Invalid authentication configuration');
- const host=atob(part.replace(/-/g,'+').replace(/_/g,'/')).replace(/\0+$/g,'');
+ const host=atob(part.replace(/-/g,'+').replace(/_/g,'/')).replace(/(?:\$|\0+)$/, '');
  if(!/^[a-z0-9.-]+$/i.test(host))throw Error('Authentication host invalid');
  if(!window.Clerk){
   await new Promise((resolve,reject)=>{
