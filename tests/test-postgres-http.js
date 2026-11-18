@@ -34,7 +34,7 @@ const crypto=require('node:crypto');
   assert.equal(checkout.status,200);
   assert.match(await checkout.text(),/DISHA/i);
   const newSession=await fetch(base+'/api/session/new?amount=500.01&vpa=disha82@okaxis');
-  assert.equal(newSession.status,200,await newSession.text().catch(()=>'')); 
+  if(newSession.status!==200)throw Error('SESSION_CREATE_HTTP_'+newSession.status+': '+await newSession.text());
   const data=await newSession.json();
   assert.equal(data.success,true);
   assert.ok(data.sessionId&&data.orderId);
