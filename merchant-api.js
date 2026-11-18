@@ -554,7 +554,7 @@ function createMerchantApi({db,getAuth,buildUpiUri,platformControl}) {
   router.use((err,req,res,next)=>{
     if(res.headersSent)return next(err);
     if(!err.status || err.status>=500)console.error('[Merchant SaaS]',err.message);
-    res.status(err.status||500).json({success:false,error:err.status?err.message:'Merchant service unavailable'});
+    res.status(err.status||500).json({success:false,error:err.status?err.message:'Merchant service unavailable',code:err.code||null});
   });
   return {router,init};
 }
