@@ -428,10 +428,12 @@
           })
         });
         const data = await res.json();
-        if (res.status === 200 && data.success) {
+        if (res.status === 200 && data.success && data.verified === true && data.state === 'VERIFIED') {
           onPaymentSuccess(utr, currentSession.challengeAmount);
+        } else if (res.status === 202 && data.state === 'UTR_OBSERVED') {
+          showStatus('processing', 'UPI Reference Recorded', 'UTR matched to the order but bank credit is not independently confirmed; payment remains pending.');
         } else {
-          showStatus('error', 'Verification Failed', data.reason || data.error || 'UTR verification failed. Ensure payment was made for the exact challenge amount.');
+          showStatus('error', 'Reference Not Accepted', data.reason || data.error || 'Unable to match the UPI reference to this order.');
         }
       } catch (err) {
         showStatus('error', 'Network Error', err.message || 'Unable to contact verification service.');
