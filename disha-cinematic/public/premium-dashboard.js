@@ -184,6 +184,8 @@ async function init(){
   const result=await api('/api/auth/me');
   merchant=result.merchant;
   if(!merchant)throw Error('Merchant identity is missing');
+  // Owner-only shortcut is revealed exclusively after protected server authorization.
+  api('/api/platform/owner/me').then(r=>{if(r.role==='PLATFORM_OWNER'&&$('#platformOwnerLink'))$('#platformOwnerLink').style.display='block'}).catch(()=>{});
   merchantHeader();
   await Promise.allSettled([loadVpas(),loadOverview(),loadNotifications()]);
   view(views[location.hash.slice(1)]?location.hash.slice(1):'overview',true);
