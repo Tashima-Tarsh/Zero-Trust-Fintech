@@ -11,6 +11,17 @@ const root=path.join(__dirname,'..','public');
 const worker=fs.readFileSync(path.join(root,'_worker.js'),'utf8');
 const routes=JSON.parse(fs.readFileSync(path.join(root,'_routes.json'),'utf8'));
 const checkout=fs.readFileSync(path.join(root,'checkout.html'),'utf8');
+
+const checkoutAssets=['checkout.html','merchant-checkout.html','cosmic-checkout.css','cosmic-checkout.js','cosmic-checkout-model.js','one-touch-vault.js','assets/disha-vault-sculpture.svg','assets/upi-googlepay.svg','assets/upi-phonepe.svg','assets/upi-paytm.svg'];
+for(const name of checkoutAssets){
+ const canonical=fs.readFileSync(path.join(root,name));
+ for(const dir of ['dist','disha-cinematic/public','disha-cinematic/dist']){
+   const file=path.join(__dirname,'..',dir,name);
+   assert.ok(fs.existsSync(file),'Checkout asset missing from '+dir+': '+name);
+   assert.ok(fs.readFileSync(file).equals(canonical),'Stale checkout asset in '+dir+': '+name);
+ }
+}
+
 assert.ok(checkout.length>1000,'Static checkout HTML must be present');
 assert.ok(fs.existsSync(path.join(root,'cosmic-checkout.js')),'Checkout script must be present');
 assert.ok(!routes.include.includes('/checkout'),'Checkout must be local to Cloudflare and not forced to Railway');
