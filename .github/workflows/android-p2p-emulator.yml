@@ -49,8 +49,12 @@ jobs:
         include:
           - api-level: '35'
             target: google_apis
+            profile: pixel_2
+            ram: 2048M
           - api-level: '37.0'
             target: google_apis_ps16k
+            profile: pixel_6
+            ram: 4096M
     steps:
       - name: Checkout application and test harness
         uses: actions/checkout@v4
@@ -78,8 +82,10 @@ jobs:
           api-level: ${{ matrix.api-level }}
           target: ${{ matrix.target }}
           arch: x86_64
-          profile: pixel_6
-          ram-size: 4096M
+          # API 35 previously lost the entire emulator after WebView startup.
+          # Use a smaller AVD to stay within the hosted runner's RAM budget.
+          profile: ${{ matrix.profile }}
+          ram-size: ${{ matrix.ram }}
           emulator-options: -no-snapshot -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
           disable-animations: true
           script: bash tests/android/run-emulator-tests.sh

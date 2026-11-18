@@ -2,9 +2,13 @@ package ai.disha.testupi;
 
 import android.app.Activity;
 import android.os.Bundle;
+import android.os.Handler;
+import android.os.Looper;
 import android.webkit.WebView;
 import android.webkit.WebViewClient;
 import android.webkit.WebResourceRequest;
+import android.webkit.WebResourceError;
+import android.webkit.RenderProcessGoneDetail;
 import android.webkit.WebChromeClient;
 import android.content.Intent;
 import android.net.Uri;
@@ -15,6 +19,16 @@ import android.view.ViewGroup;
 public final class TestBrowserActivity extends Activity {
     private static final String TAG = "DISHA_UPI_TEST";
     private WebView webView;
+    // Sample the DOM directly: ActivityManager -W is not a safe polling API in CI.
+    private final Handler snapshotHandler = new Handler(Looper.getMainLooper());
+    private final Runnable periodicSnapshot = new Runnable() {
+        @Override public void run() {
+            if (webView != null) {
+                snapshot();
+                snapshotHandler.postDelayed(this, 1200);
+            }
+        }
+    };
 
     @Override public void onCreate(Bundle state) {
         super.onCreate(state);
@@ -31,7 +45,25 @@ public final class TestBrowserActivity extends Activity {
                 return false;
             }
             @Override public void onPageFinished(WebView view, String url) {
+                Uri page = Uri.parse(url);
+                // Never write bearer query parameters to public CI artifacts.
+                Log.i(TAG, "WEBVIEW_PAGE_FINISHED " + page.getPath());
                 snapshot();
+            }
+            @Override public void onReceivedError(WebView view, WebResourceRequest request,
+                    WebResourceError error) {
+                if (request.isForMainFrame()) {
+                    Log.e(TAG, "WEBVIEW_MAINFRAME_ERROR " + error.getErrorCode()
+                        + " " + error.getDescription());
+                }
+            }
+            @Override public boolean onRenderProcessGone(WebView view, RenderProcessGoneDetail detail) {
+                Log.e(TAG, "WEBVIEW_RENDER_PROCESS_GONE crashed=" + detail.didCrash());
+                snapshotHandler.removeCallbacks(periodicSnapshot);
+                webView = null;
+                view.destroy();
+                finish();
+                return true;
             }
         });
         webView.setWebChromeClient(new WebChromeClient() {
@@ -51,7 +83,15 @@ public final class TestBrowserActivity extends Activity {
             setContentView(blocked);
             return;
         }
-        Log.i(TAG,"OPEN_CHECKOUT_FIXTURE");
+        String token = Uri.parse(url).getQueryParameter("token");
+        if (token == null || token.length() != 48) {
+            Log.e(TAG, "CHECKOUT_FIXTURE_TOKEN_MISSING");
+            TextView blocked = new TextView(this);
+            blocked.setText("INVALID TEST CHECKOUT TOKEN");
+            setContentView(blocked);
+            return;
+        }
+        Log.i(TAG,"OPEN_CHECKOUT_FIXTURE_TOKEN_PRESENT");
         webView.loadUrl(url);
     }
 
@@ -94,16 +134,25 @@ public final class TestBrowserActivity extends Activity {
     // Mirror a real Android browser host: when the UPI app covers this
     // activity, WebView receives the normal activity visibility lifecycle.
     @Override protected void onPause() {
+        snapshotHandler.removeCallbacks(periodicSnapshot);
         if (webView != null) webView.onPause();
         super.onPause();
     }
     @Override protected void onResume() {
         super.onResume();
-        if (webView != null) webView.onResume();
+        if (webView != null) {
+            webView.onResume();
+            snapshotHandler.removeCallbacks(periodicSnapshot);
+            snapshotHandler.post(periodicSnapshot);
+        }
     }
 
     @Override protected void onDestroy() {
-        if (webView != null) webView.destroy();
+        snapshotHandler.removeCallbacks(periodicSnapshot);
+        if (webView != null) {
+            webView.destroy();
+            webView = null;
+        }
         super.onDestroy();
     }
 }
