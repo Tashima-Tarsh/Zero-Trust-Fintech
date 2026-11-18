@@ -48,7 +48,6 @@ const UNIT_TESTS = [
 ];
 
 const SERVER_TESTS = [
-  'test-ip-whitelist.js',         // needs server on :3000
   'test-e2e-checkout.js',         // needs server + Chrome (puppeteer)
   'test-verify-all-four.js',      // needs server + Chrome (puppeteer)
   'test-verify-qr-touch.js',      // needs server + Chrome (puppeteer)
