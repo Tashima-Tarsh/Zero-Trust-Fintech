@@ -8,6 +8,7 @@
 const crypto = require('node:crypto');
 const express = require('express');
 const {rupeesToPaise} = require('./money');
+const {evaluateTemporalGate}=require('../utils/pony-tail-window');
 
 const validId=v=>typeof v==='string'&&/^[A-Za-z0-9_-]{6,150}$/.test(v);
 const validHex=v=>typeof v==='string'&&/^[a-f0-9]{24,64}$/i.test(v);
@@ -90,6 +91,10 @@ function validatePacket(body){
 
 function classify(order,e,previousUtrOrder,now){
   const p=e.returnParams;
+  // Server clock, not browser-supplied return time, controls Pony-tail state.
+  const temporal=evaluateTemporalGate({
+    createdAt:Number(order.created_at),expiresAt:Number(order.expires_at)
+  },now);
   const candidates=[p.txnId,p.ApprovalRefNo].filter(Boolean);
   const validCandidates=candidates.filter(v=>/^[0-9]{12}$/.test(v));
   const utr=validCandidates.length?validCandidates[0]:null;
@@ -102,7 +107,10 @@ function classify(order,e,previousUtrOrder,now){
     amountMatches:p.am===undefined?null:false,
     payeeMatches:p.pa===undefined?null:String(p.pa).toLowerCase()===String(order.vpa_address).toLowerCase(),
     transactionRefMatches:(p.tr===undefined&&p.txnRef===undefined)?null:false,
-    withinCheckoutWindow:now<=Number(order.expires_at),
+    temporalGate:temporal.state,
+    elapsedMs:temporal.elapsedMs,
+    withinCheckoutWindow:temporal.state==='WAITING'||
+      temporal.state==='OBSERVATION_WINDOW',
     existingUtrOrder:previousUtrOrder||null
   };
   if(p.am!==undefined){
