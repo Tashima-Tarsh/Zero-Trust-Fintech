@@ -16,6 +16,58 @@ function createPlatformControl({db,getAuth,clerkEmailResolver=getClerkVerifiedEm
  let pool=db.pgPool;
  const active=()=>process.env.DISHA_INVITE_ONLY_ENABLED==='true';
  const ownerId=()=>process.env.DISHA_OWNER_CLERK_USER_ID||'';
+ const ownerEmail=()=>String(process.env.DISHA_OWNER_EMAIL||'').trim().toLowerCase();
+ const ownerKey=()=>crypto.createHash('sha256').update(ownerEmail()||ownerId()||'unconfigured').digest('hex').slice(0,20);
+ const ownerTenantId=()=> 'mer_internal_'+ownerKey();
+ const companyTenantId=()=> 'mer_company_'+ownerKey();
+ const companyVpa=()=>val(process.env.DISHA_COMPANY_P2M_VPA||'',150).toLowerCase();
+ async function verifiedOwner(userId){
+   if(!active()||!userId)return false;
+   if(ownerId())return userId===ownerId();
+   if(!EMAIL.test(ownerEmail()))return false;
+   return (await clerkEmailResolver(userId))===ownerEmail();
+ }
+ async function ensureOwnerTestTenant(){
+   if(!active()||!EMAIL.test(ownerEmail()))return null;
+   const now=Date.now(),ownerName=val(process.env.DISHA_OWNER_DISPLAY_NAME||'',150);
+   const phone=val(process.env.DISHA_OWNER_PHONE||'',30);
+   const business=val(process.env.DISHA_OWNER_BUSINESS||'',150)||'DISHA Internal Testing';
+   const alias='internal:owner:'+ownerKey();
+   await pool.query(
+    "INSERT INTO saas_merchants(id,clerk_user_id,business_name,email,contact_phone,setup_completed,access_status,is_internal_test,approved_by,approved_at,created_at,updated_at) "+
+    "VALUES($1,$2,$3,$4,$5,TRUE,'ACTIVE',TRUE,$2,$6,$6,$6) "+
+    "ON CONFLICT(id) DO UPDATE SET business_name=EXCLUDED.business_name,email=EXCLUDED.email,"+
+    "contact_phone=EXCLUDED.contact_phone,setup_completed=TRUE,access_status='ACTIVE',is_internal_test=TRUE,updated_at=EXCLUDED.updated_at",
+    [ownerTenantId(),alias,business,ownerEmail(),phone,now]);
+   await pool.query(
+    "INSERT INTO disha_owner_profile(owner_key,display_name,email,phone,business_name,professional_title,updated_at) "+
+    "VALUES($1,$2,$3,$4,$5,$6,$7) ON CONFLICT(owner_key) DO UPDATE SET "+
+    "display_name=EXCLUDED.display_name,email=EXCLUDED.email,phone=EXCLUDED.phone,"+
+    "business_name=EXCLUDED.business_name,professional_title=EXCLUDED.professional_title,updated_at=EXCLUDED.updated_at",
+    [ownerKey(),ownerName,ownerEmail(),phone,business,val(process.env.DISHA_OWNER_TITLE||'',100),now]);
+   const accounts=String(process.env.DISHA_OWNER_P2P_VPAS||'').split(',').map(x=>x.trim().toLowerCase()).filter(x=>/^[a-z0-9._-]{2,100}@[a-z0-9._-]{2,40}$/.test(x));
+   for(const [i,account] of [...new Set(accounts)].entries()){
+     const primary=i===0;
+     await pool.query(
+      "INSERT INTO saas_merchant_vpas(id,merchant_id,vpa_address,bank_name,holder_name,status,is_default,account_type,created_at) "+
+      "VALUES($1,$2,$3,'', $4,'ACTIVE',$5,'PERSONAL',$6) ON CONFLICT(vpa_address) DO NOTHING",
+      ['vpa_owner_'+crypto.createHash('sha256').update(account).digest('hex').slice(0,20),ownerTenantId(),account,ownerName,primary,now]);
+   }
+   const company=val(process.env.DISHA_COMPANY_BUSINESS||'',150);
+   const mcc=val(process.env.DISHA_COMPANY_MCC||'',4);
+   if(company&&companyVpa()){
+     await pool.query(
+      "INSERT INTO saas_merchants(id,clerk_user_id,business_name,email,setup_completed,access_status,is_internal_test,created_at,updated_at) "+
+      "VALUES($1,NULL,$2,'',FALSE,'PENDING',FALSE,$3,$3) ON CONFLICT(id) DO NOTHING",
+      [companyTenantId(),company,now]);
+     if(/^\\d{4}$/.test(mcc)&&/^[a-z0-9._-]{2,100}@[a-z0-9._-]{2,40}$/.test(companyVpa()))
+       await pool.query(
+        "INSERT INTO saas_merchant_vpas(id,merchant_id,vpa_address,holder_name,bank_name,status,is_default,account_type,mcc,created_at) "+
+        "VALUES($1,$2,$3,$4,'','PAUSED',TRUE,'MERCHANT',$5,$6) ON CONFLICT(vpa_address) DO NOTHING",
+        ['vpa_company_'+ownerKey(),companyTenantId(),companyVpa(),company,mcc,now]);
+   }
+   return (await pool.query("SELECT * FROM saas_merchants WHERE id=$1 AND is_internal_test=TRUE",[ownerTenantId()])).rows[0]||null;
+ }
  const limiter=new Map();
  const wrap=f=>(req,res,next)=>Promise.resolve().then(()=>f(req,res)).catch(next);
  const audit=async(client,actor,action,target,details={})=>client.query(
@@ -26,7 +78,8 @@ function createPlatformControl({db,getAuth,clerkEmailResolver=getClerkVerifiedEm
    // Resolve it at startup; all handlers reference this same refreshed closure variable.
    pool=db.pgPool||pool;
    if(!pool)throw Error('Platform control requires PostgreSQL');
-   // Do not break public checkout startup for missing owner bootstrap configuration.\n   // Invite-only remains enabled: no user may access or auto-provision a merchant.\n   if(active()&&!ownerId())console.error('[Platform Control] OWNER CLERK USER ID MISSING — merchant access denied until configured');
+   // Never grant platform access without a server-configured and verified owner identity.
+   if(active()&&!ownerId()&&!EMAIL.test(ownerEmail()))console.error('[Platform Control] OWNER IDENTITY MISSING — access denied');
    await pool.query(
     "CREATE TABLE IF NOT EXISTS disha_access_requests ("+
     "id TEXT PRIMARY KEY,business_name TEXT NOT NULL,contact_name TEXT NOT NULL,email TEXT NOT NULL,"+
@@ -49,25 +102,23 @@ function createPlatformControl({db,getAuth,clerkEmailResolver=getClerkVerifiedEm
     "ALTER TABLE saas_merchants ADD COLUMN IF NOT EXISTS approved_email TEXT;"+
     "ALTER TABLE saas_merchants ADD COLUMN IF NOT EXISTS is_internal_test BOOLEAN NOT NULL DEFAULT FALSE;"+
     "ALTER TABLE saas_merchants ADD COLUMN IF NOT EXISTS approved_by TEXT;"+
+    "CREATE TABLE IF NOT EXISTS disha_owner_profile ("+
+    "owner_key TEXT PRIMARY KEY,display_name TEXT NOT NULL,email TEXT NOT NULL,"+
+    "phone TEXT NOT NULL DEFAULT '',business_name TEXT NOT NULL,professional_title TEXT NOT NULL DEFAULT '',updated_at BIGINT NOT NULL);"+
     "ALTER TABLE saas_merchants ADD COLUMN IF NOT EXISTS approved_at BIGINT;"+
     "CREATE UNIQUE INDEX IF NOT EXISTS uq_disha_approved_email ON saas_merchants(lower(approved_email)) WHERE approved_email IS NOT NULL;"
    );
-   // Never manufacture a platform owner identity: it must be configured out-of-band.
-   if(active()&&ownerId()){
-     await pool.query("INSERT INTO saas_merchants(id,clerk_user_id,business_name,email,access_status,is_internal_test,approved_by,approved_at,created_at,updated_at) "+
-       "VALUES($1,$2,'DISHA Internal Testing','', 'ACTIVE',TRUE,$2,$3,$3,$3) "+
-       "ON CONFLICT(clerk_user_id) DO UPDATE SET access_status='ACTIVE',is_internal_test=TRUE,approved_by=$2,approved_at=$3",
-       [id('mer_internal_'),ownerId(),Date.now()]);
-   }
+   // Idempotent configuration: never erase or reassign historical transactions.
+   if(active()&&EMAIL.test(ownerEmail()))await ensureOwnerTestTenant();
    console.log('[Platform Control] initialized; controlled access '+(active()?'ENABLED':'not yet activated'));
  }
- function isOwner(userId){return active()&&userId===ownerId();}
+ function isOwner(userId){return active()&&Boolean(ownerId())&&userId===ownerId();}
  async function verifyMerchant(userId,auth){
-   if(!active())return null; // gated policy activates only with explicit configuration
-   if(isOwner(userId)){
-     const r=await pool.query("SELECT * FROM saas_merchants WHERE clerk_user_id=$1 AND is_internal_test=TRUE AND access_status='ACTIVE'",[userId]);
-     if(!r.rowCount)throw err(403,'Owner test tenant is not provisioned');
-     return r.rows[0];
+   if(!active())return null;
+   if(await verifiedOwner(userId)){
+     const r=await ensureOwnerTestTenant();
+     if(!r)throw err(503,'Owner test tenant is not ready');
+     return r;
    }
    let r=await pool.query("SELECT * FROM saas_merchants WHERE clerk_user_id=$1",[userId]);
    if(r.rowCount){
@@ -110,14 +161,18 @@ function createPlatformControl({db,getAuth,clerkEmailResolver=getClerkVerifiedEm
    res.status(202).set('Cache-Control','no-store').json({success:true,message:'Access request received. Our team will review your application.',reference:request});
  }));
  router.use((req,res,next)=>{
-   if(!active())return next(err(503,'Platform owner access is not activated'));
-   const subject=getAuth(req)?.userId;
-   if(!subject)return next(err(401,'Sign in to your account'));
-   if(subject!==ownerId())return next(err(403,'Platform owner permission required'));
-   req.ownerUserId=subject;next();
+   (async()=>{
+     if(!active())throw err(503,'Platform owner access is not activated');
+     const subject=getAuth(req)?.userId;
+     if(!subject)throw err(401,'Sign in to your account');
+     if(!await verifiedOwner(subject))throw err(403,'Platform owner permission required');
+     req.ownerUserId=subject;
+     await ensureOwnerTestTenant();
+     next();
+   })().catch(next);
  });
  router.get('/owner/me',wrap(async(req,res)=>{
-   const t=await pool.query("SELECT id,business_name,is_internal_test FROM saas_merchants WHERE clerk_user_id=$1 AND is_internal_test=TRUE",[req.ownerUserId]);
+   const t=await pool.query("SELECT id,business_name,is_internal_test FROM saas_merchants WHERE id=$1 AND is_internal_test=TRUE",[ownerTenantId()]);
    res.set('Cache-Control','no-store').json({success:true,role:'PLATFORM_OWNER',testTenant:t.rows[0]||null});
  }));
  router.get('/owner/overview',wrap(async(req,res)=>{
