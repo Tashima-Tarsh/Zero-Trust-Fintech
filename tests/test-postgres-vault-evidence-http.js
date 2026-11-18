@@ -49,7 +49,7 @@ const {Pool}=require('pg');
     const now=Date.now();
     return {orderId:o.orderId,vaultSessionId:o.vault,token:o.token,eventId:'event_'+rand(),
       evidence:{browserEvent:'APP_RESUME',handoffAt:now-15000,hiddenAt:now-10000,
-        returnedAt:now,returnParams:{...fields}}};
+        returnedAt:now,selectedApp:'phonepe',returnParams:{...fields}}};
   };
   async function send(p,csrf=p.token){
     const r=await fetch(base+'/api/vault/evidence',{
@@ -83,6 +83,8 @@ const {Pool}=require('pg');
     assert.equal(r.data.verified,false);
     assert.equal(r.data.settled,false);
     assert.equal(r.data.correlation.temporalGate,'OBSERVATION_WINDOW');
+    assert.equal(r.data.correlation.selectedApp,'phonepe');
+    assert.equal(r.data.correlation.browserAppReturnMs,15000);
     assert.equal(r.data.correlation.withinCheckoutWindow,true);
     r=await send(claim);
     assert.equal(r.data.replayed,true);
