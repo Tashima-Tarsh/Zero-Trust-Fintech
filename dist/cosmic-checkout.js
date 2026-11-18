@@ -52,7 +52,7 @@
   if(mode!=='generic'||!session)return;
   try{
    sessionStorage.setItem(resumeKey,JSON.stringify({
-    ...session,requestedAmount:query.get('amount')||'500',savedAt:Date.now()
+    ...session,requestedAmount:query.get('amount')||'1',savedAt:Date.now()
    }));
   }catch(_){}
  }
@@ -78,7 +78,7 @@
    if(!id||!token)throw Error('This payment link is incomplete. Request a new link.');
    url='/api/merchant/public/order/'+encodeURIComponent(id)+'?token='+encodeURIComponent(token);
   }else{
-   const raw=query.get('amount')||'500';
+   const raw=query.get('amount')||'1';
    const amount=Number(raw);
    if(!Number.isFinite(amount)||amount<=0||amount>100000)
     throw Error('Invalid payment amount. Open a valid payment link.');
