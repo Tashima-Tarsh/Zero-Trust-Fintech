@@ -3,13 +3,14 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="theme-color" content="#06080d">
-  <title>Executive Command Center — DISHA 8.2</title>
+  <meta name="theme-color" content="#f7f9fc">
+  <title>Merchant Workspace — DISHA 8.2</title>
   <link rel="icon" href="/assets/disha-8-2-wordmark.png">
   <link rel="stylesheet" href="/premium.css?v=8.2.5">
+  <link rel="stylesheet" href="/saas-white.css?v=20261118">
   <script src="/vendor/qrcode.min.js" defer></script>
   <script src="/auth-config.js"></script>
-  <script src="/premium-dashboard.js?v=8.2.5" defer></script>
+  <script src="/premium-dashboard.js?v=20261118" defer></script>
 </head>
 <body class="app-page">
   <!-- Living Ambient Aurora Mesh -->
@@ -24,7 +25,7 @@
     <!-- Executive Dark Sidebar -->
     <aside class="side" id="appSide">
       <a href="/" class="brand">
-        <img class="brand-logo official-wordmark" src="/assets/disha-8-2-wordmark.png" alt="DISHA 8.2">
+        <span class="wordmark-symbol" aria-hidden="true">D</span><span>DISHA <span class="wordmark-sub">8.2</span></span>
       </a>
 
       <div class="merchant-chip">
@@ -33,7 +34,7 @@
         </div>
         <div>
           <b id="merchantSideName">Merchant Workspace</b>
-          <small id="merchantSideSub">Direct Settlement Node</small>
+          <small id="merchantSideSub">Merchant account</small>
         </div>
       </div>
 
@@ -94,7 +95,7 @@
       </nav>
 
       <div class="side-end">
-        Direct Bank Rail Active<br>
+        Merchant operations<br>
         <span style="color:var(--emerald-light);font-weight:600;">DISHA 8.2 Production</span>
         <div style="margin-top:14px;">
           <button type="button" class="btn tiny ghost" id="signOut" style="width:100%;">
@@ -113,7 +114,7 @@
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="3" y1="12" x2="21" y2="12"></line><line x1="3" y1="6" x2="21" y2="6"></line><line x1="3" y1="18" x2="21" y2="18"></line></svg>
           </button>
           <a class="brand mobile-brand" href="/" aria-label="DISHA 8.2 Home">
-            <img class="brand-logo official-wordmark" src="/assets/disha-8-2-wordmark.png" alt="">
+            <span class="sr-only">DISHA 8.2</span>
           </a>
           <div class="search-wrap">
             <input class="search" id="globalSearch" placeholder="Search reference, UTR, amount… (Press Enter)" aria-label="Search orders">
@@ -122,7 +123,7 @@
 
         <div class="app-top-right">
           <span class="env" id="environmentLabel">
-            <span class="dot"></span> Production Node · 12ms
+            <span class="dot"></span> Live workspace
           </span>
           <button class="icon-button" type="button" data-switch="notifications" title="Notifications" aria-label="Notifications">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path><path d="M13.73 21a2 2 0 0 1-3.46 0"></path></svg>
@@ -134,9 +135,9 @@
       <!-- View Title Row -->
       <div class="app-title-row">
         <div>
-          <div class="overline">DISHA 8.2 · EXECUTIVE COMMAND CENTER</div>
+          <div class="overline">DISHA 8.2 / MERCHANT OPERATIONS</div>
           <h1 id="viewHeading">Your Business, In Real-Time.</h1>
-          <p id="viewSubtitle">Monitor live collections, settlements, and bank telemetry.</p>
+          <p id="viewSubtitle">Your orders, receiving accounts, and operational activity.</p>
         </div>
         <div class="app-title-actions">
           <select id="periodSelect" class="search" style="max-width:140px;" aria-label="Date Range">
@@ -156,7 +157,7 @@
       <div id="merchantSetup" class="module" style="display:none;margin-bottom:24px;">
         <div class="overline">INITIALIZE WORKSPACE</div>
         <h2>Complete Merchant Account Setup</h2>
-        <p>Register your verified business name and primary receiving UPI ID.</p>
+        <p>Enter your business name and the receiving UPI ID you control.</p>
         <form id="setupMerchantForm" class="form-grid" style="margin-top:16px;">
           <label class="field">
             Registered Business Name
@@ -178,22 +179,22 @@
           <div class="stat">
             <small>Recorded UPI Turnover</small>
             <strong id="metricVolume">₹0</strong>
-            <div class="note">Direct bank settlement</div>
+            <div class="note">Completed payment records</div>
           </div>
           <div class="stat">
             <small>Completed Transactions</small>
             <strong id="metricCompleted">0</strong>
-            <div class="note">100% verified via UTR</div>
+            <div class="note">Recorded completed orders</div>
           </div>
           <div class="stat">
             <small>Awaiting Authorization</small>
             <strong id="metricPending">0</strong>
-            <div class="note" style="color:var(--amber);">Active checkout sessions</div>
+            <div class="note">Requests currently pending</div>
           </div>
           <div class="stat">
-            <small>DISHA Commission Taken</small>
-            <strong style="color:var(--emerald-light);">0%</strong>
-            <div class="note">100% margin retained</div>
+            <small>Total Payment Requests</small>
+            <strong id="metricOrders">0</strong>
+            <div class="note">Requests during this period</div>
           </div>
         </div>
 
@@ -210,7 +211,7 @@
 
           <div class="module">
             <div class="module-head">
-              <h2>Settlement Health</h2>
+              <h2>Order Completion</h2>
               <button type="button" class="btn linkish" data-switch="payments">Details →</button>
             </div>
             <div class="flexrow" style="display:flex;align-items:center;gap:18px;">
@@ -224,7 +225,7 @@
               </div>
             </div>
             <p class="fine" style="margin-top:16px;">
-              Direct-to-bank settlement records verified cryptographically via unique 12-digit UTR.
+              Completion reflects records in your merchant workspace; it is not a bank statement.
             </p>
           </div>
         </div>
@@ -364,7 +365,7 @@
           <div class="stat"><small>Total Accounts</small><strong id="vpaTotal">0</strong></div>
           <div class="stat"><small>Active Receiving</small><strong id="vpaActive" style="color:var(--emerald-light);">0</strong></div>
           <div class="stat"><small>Paused</small><strong id="vpaPaused">0</strong></div>
-          <div class="stat"><small>In Cooldown</small><strong id="vpaCooldown">0</strong></div>
+          <div class="stat"><small>Primary UPI ID</small><strong id="vpaDefault">0</strong></div>
         </div>
 
         <div class="module">
@@ -435,27 +436,13 @@
       <section id="view-risk" class="view">
         <div class="module">
           <div class="module-head">
-            <h2>Cryptographic Anti-Fraud Engine</h2>
-            <span class="pill">Active Protection</span>
+            <h2>Payment Security &amp; Order States</h2>
+            <span class="pill">Live data</span>
           </div>
-          <p>
-            DISHA's anti-replay engine validates the 12-digit bank UTR and session challenge window to prevent screenshot fraud. Test scenarios below:
-          </p>
-          <div class="form-grid" style="margin-top:16px;">
-            <label class="field">
-              Select Test Scenario
-              <select id="riskScenario">
-                <option value="duplicate_utr">Replayed / Duplicate Bank UTR</option>
-                <option value="expired_session">Expired Time-Bounded Session</option>
-                <option value="amount_mismatch">Amount Challenge Mismatch</option>
-                <option value="legitimate">Legitimate Valid Transaction</option>
-              </select>
-            </label>
-            <div class="form-actions" style="align-items:flex-end;">
-              <button type="button" class="btn primary" id="runRiskTest">Execute Simulation</button>
-            </div>
+          <p>These counts are calculated from your merchant's actual payment records. There are no simulated transactions in this workspace.</p>
+          <div id="riskResult" aria-live="polite">
+            <div class="empty">Loading current payment states…</div>
           </div>
-          <div id="riskResult" class="module" style="margin-top:20px;display:none;"></div>
         </div>
       </section>
 
@@ -466,7 +453,7 @@
             <h2>Allowed Server IPs</h2>
             <button type="button" class="btn small" id="refreshAccess">Refresh ↻</button>
           </div>
-          <p>Restrict server-side payment challenge creation to approved IP addresses.</p>
+          <p>Manage the IP directory for your integration planning. These entries do not block public checkout requests.</p>
           <div class="table-scroller" style="margin-top:16px;">
             <table>
               <thead>
@@ -505,8 +492,8 @@
       <!-- VIEW 8: REPORTS & EXPORTS -->
       <section id="view-reports" class="view">
         <div class="module">
-          <h2>Financial Transaction Reports</h2>
-          <p>Export operational transaction ledger for accounting and audit.</p>
+          <h2>Payment Activity Reports</h2>
+          <p>Export your recorded payment request register for review and reconciliation.</p>
           <div class="stat-grid" style="margin-top:20px;">
             <div class="stat"><small>Turnover in Period</small><strong id="reportVolume">₹0</strong></div>
             <div class="stat"><small>Completed Records</small><strong id="reportCompleted">0</strong></div>
@@ -515,7 +502,7 @@
           </div>
           <div class="form-actions" style="margin-top:24px;">
             <button class="btn primary" id="exportReport" type="button">
-              Download Full Ledger (CSV) ↗
+              Export Payment Register (CSV)
             </button>
           </div>
         </div>
@@ -537,8 +524,8 @@
       <!-- VIEW 10: VOICE SOUNDBOX -->
       <section id="view-soundbox" class="view">
         <div class="module">
-          <h2>Virtual Voice Soundbox</h2>
-          <p>Zero-cost instant audio announcements on incoming payments via browser speech synthesis.</p>
+          <h2>Payment Voice Alerts</h2>
+          <p>Use browser audio to announce the latest transaction recorded as completed.</p>
           <div class="form-grid" style="margin-top:18px;">
             <label class="field">
               Announcement Language
@@ -555,7 +542,7 @@
           </div>
           <div class="form-actions" style="margin-top:20px;">
             <button class="btn primary" id="playVoice" type="button">
-              Play Sample Voice Confirmation 🔊
+              Announce Latest Completed Payment
             </button>
           </div>
         </div>
@@ -564,8 +551,8 @@
       <!-- VIEW 11: DEVELOPER API -->
       <section id="view-api" class="view">
         <div class="module">
-          <h2>Backend API Endpoints</h2>
-          <p>Integrate your self-hosted instance with any custom web app or ERP.</p>
+          <h2>Connected Merchant API</h2>
+          <p>These APIs are protected by your signed-in merchant session.</p>
           <pre class="code-preview" style="background:rgba(6,9,16,0.8);border-radius:12px;padding:16px;font-family:var(--mono);font-size:0.8rem;color:var(--emerald-light);border:1px solid var(--border);">
 GET  /api/auth/me              - Merchant authentication
 GET  /api/merchant/dashboard   - Real-time telemetry & volume
@@ -575,8 +562,24 @@ GET  /api/merchant/vpas        - Manage receiving UPI accounts
 POST /api/merchant/vpas        - Register new VPA
 GET  /api/merchant/reports     - Download CSV ledger
           </pre>
+          <div class="form-grid" style="margin-top:16px;">
+            <label class="field">Read-only API inspector
+              <select id="apiExplorerEndpoint">
+                <option value="/api/auth/me">Account identity</option>
+                <option value="/api/merchant/dashboard">Merchant overview</option>
+                <option value="/api/merchant/vpas">Receiving UPI accounts</option>
+                <option value="/api/merchant/notifications">Notifications</option>
+                <option value="/health">Service health</option>
+              </select>
+            </label>
+            <div class="form-actions" style="align-items:flex-end;">
+              <button type="button" class="btn" id="runApiExplorer">Inspect Endpoint</button>
+            </div>
+          </div>
+          <pre id="apiExplorerResult" aria-live="polite" style="margin-top:14px;">Choose an endpoint to inspect its real response.</pre>
           <div class="form-actions" style="margin-top:16px;">
-            <button type="button" class="btn small ghost" id="testHealth">Test Rail Health Check</button>
+            <button type="button" class="btn small ghost" id="copyEndpoints">Copy Endpoint List</button>
+            <button type="button" class="btn small ghost" id="testHealth">Check Backend Health</button>
             <span id="healthResult" class="fine" style="margin-left:12px;"></span>
           </div>
         </div>
