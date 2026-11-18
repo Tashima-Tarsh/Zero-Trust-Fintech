@@ -2011,7 +2011,7 @@ app.get('/failed', (req, res) => res.sendFile(path.join(__dirname, 'public', 'fa
 (async () => {
   await db.initDb();
   // Daily cron at 00:05 to reset daily VPA limits
-  setInterval(() => {
+  setInterval(async () => {
     const d = new Date();
     if (d.getHours() === 0 && d.getMinutes() === 5) {
       await db.resetDailyVPAs();
