@@ -37,6 +37,7 @@ const UNIT_TESTS = [
   'test-financial-money.js',
   'test-utr-confidence-source.js', // forged UTR success receipts cannot release
   'test-clerk-merchant-auth.js', // Clerk FAPI CSP, signup and login bootstrapping
+  'test-merchant-fetch-resilience.js', // SaaS fetch retry, 403 approval and no write replay
   'test-one-touch-vault.js', // one biometric to vault register/authenticate, then UPI intent
   'test-vault-browser-evidence.js', // automatic post-UPI browser evidence packet and idempotent retries
   'test-utr-hypothesis.js', // UTR anti-fraud and no-false-credit regression

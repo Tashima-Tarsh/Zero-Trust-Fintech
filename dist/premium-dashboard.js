@@ -68,9 +68,29 @@ async function authHeaders(withBody=false){
 }
 async function api(path,options={}){
  const headers={...(await authHeaders(Boolean(options.body))),...(options.headers||{})};
- const r=await fetch(path,{credentials:'same-origin',cache:'no-store',...options,headers});
- let data;try{data=await r.json()}catch{data={}}
- if(!r.ok){const error=Error(data.error||data.message||'Request failed ('+r.status+')');error.status=r.status;error.code=data.code||null;throw error}
+ const method=String(options.method||'GET').toUpperCase();
+ let response;
+ // Only safe reads may retry transient proxy/network failures.
+ // Never replay payment creation or an account/ledger mutation.
+ for(let attempt=0;attempt<(method==='GET'?2:1);attempt++){
+  try{response=await fetch(path,{credentials:'same-origin',cache:'no-store',...options,headers})}
+  catch(_){
+   if(method==='GET'&&attempt===0){await new Promise(done=>setTimeout(done,250));continue}
+   const error=Error('Cannot reach the merchant API. Check your connection and try again.');
+   error.code='MERCHANT_API_NETWORK_FAILURE';throw error;
+  }
+  if(method==='GET'&&attempt===0&&[502,503,504].includes(response.status)){
+   await new Promise(done=>setTimeout(done,250));continue;
+  }
+  break;
+ }
+ let data;try{data=await response.json()}catch{data={}}
+ if(!response.ok){
+  const fallback=[502,503,504].includes(response.status)?
+   'Merchant API temporarily unavailable':'Merchant request failed ('+response.status+')';
+  const error=Error(data.error||data.message||fallback);
+  error.status=response.status;error.code=data.code||null;throw error;
+ }
  return data;
 }
 function view(name,replaceHistory=false){
@@ -198,30 +218,31 @@ async function init(){
  }catch(error){
   if(error.status===401){location.replace('/login');return}
   if(error.status===403){
-   const pending=error.code==='MERCHANT_APPROVAL_PENDING'||error.code==='MERCHANT_APPROVAL_REQUIRED';
+   const pending=['MERCHANT_APPROVAL_PENDING','MERCHANT_APPROVAL_REQUIRED'].includes(error.code);
    const signedInEmail=String(clerk?.user?.primaryEmailAddress?.emailAddress||'').trim().toLowerCase();
-   notice(signedInEmail==='nitish@thenitishkr.in'?
-    'Clerk shows the Super Admin email, but the server refused owner access. Check that your primary email is verified in Clerk.':
-    'Signed in as '+(signedInEmail||'unknown')+
-    '. This is not the authorized Super Admin account. Owner access requires the verified primary Clerk email nitish@thenitishkr.in.');
+   const ownerCandidate=signedInEmail==='nitish@thenitishkr.in';
+   // Treat 403 as the actual API authorization error; ordinary merchants
+   // should never be told they attempted an unauthorized Super Admin login.
+   notice('Merchant access denied: '+error.message+
+     (signedInEmail?' (Signed in as '+signedInEmail+')':'')+
+     (ownerCandidate?' Verify your Clerk primary email before owner sign-in.':''));
    const area=$('#appNotice');
-   if(area){
+   if(area&&ownerCandidate){
     const switchButton=document.createElement('button');
     switchButton.type='button';switchButton.textContent='Switch to Super Admin sign-in';
     switchButton.style.cssText='margin:8px 10px 0 0;padding:9px 12px;border-radius:7px;border:1px solid #f6aa81;background:transparent;color:#f6aa81;cursor:pointer';
     switchButton.addEventListener('click',async()=>{
-      if(clerk?.signOut)await clerk.signOut();
-      location.assign('/login?owner=1');
+     if(clerk?.signOut)await clerk.signOut();
+     location.assign('/login?owner=1');
     });
     area.appendChild(switchButton);
-    const ownerLink=document.createElement('a');ownerLink.href='/owner#requests';
-    ownerLink.textContent='Owner approval inbox';
-    ownerLink.style.cssText='display:inline-block;margin-top:8px;color:#f6aa81;text-decoration:underline';
-    area.appendChild(ownerLink);
+    const link=document.createElement('a');link.href='/owner#requests';
+    link.textContent='Owner approval inbox';
+    link.style.cssText='display:inline-block;margin-top:8px;color:#f6aa81;text-decoration:underline';
+    area.appendChild(link);
    }
    if(area&&pending){
-    const link=document.createElement('a');
-    link.href='/request-access';
+    const link=document.createElement('a');link.href='/request-access';
     link.textContent='Request merchant approval';
     link.style.cssText='display:inline-block;margin-left:10px;color:#f6aa81;text-decoration:underline;font-weight:700';
     area.appendChild(link);
