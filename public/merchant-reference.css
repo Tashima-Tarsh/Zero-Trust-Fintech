@@ -39,7 +39,7 @@ body.app-page::before{
 .celestial-moon:after{inset:-80%;background:radial-gradient(circle,#9cd6ff37 5%,transparent 48%)}
 .celestial-clouds{right:0;top:93px;width:87%;height:112px;opacity:.74;filter:blur(18px)}
 .celestial-earth{
- background:url("/assets/earth-night-horizon.svg") center bottom/contain no-repeat!important;
+ background:none!important; /* NASA satellite image is an <img> child, not drawn CSS geography */
  border:0!important;border-radius:0!important;opacity:.97;
  width:min(95vw,1540px);height:min(68vh,710px);aspect-ratio:auto;
  right:-17%;bottom:-2%;overflow:visible;
