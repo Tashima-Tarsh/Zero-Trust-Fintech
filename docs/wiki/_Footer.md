@@ -1,0 +1,1 @@
+**DISHA 8.2** · Merchant-owned payment intelligence · [Website](https://disha8-2.thenitishkr.in/) · [Repository](https://github.com/Tashima-Tarsh/Zero-Trust-Fintech) · Product documentation dated 19 November 2026.

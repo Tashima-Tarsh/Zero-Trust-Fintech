@@ -1,5 +1,6 @@
 <div align="center">
-  <img src="assets/disha-logo.svg" width="84" alt="DISHA 8.2 symbol">
+  <img src="public/assets/disha-8-2-wordmark-cropped.png" width="370" alt="DISHA 8.2 premium wordmark">
+  <p><img src="public/assets/disha-universe-background.svg" width="920" alt="DISHA 8.2 universe brand artwork"></p>
   <h1>DISHA 8.2</h1>
   <h3>Merchant-owned payment intelligence for direct UPI</h3>
   <p><strong>The money moves on UPI. The intelligence belongs to you.</strong></p>
