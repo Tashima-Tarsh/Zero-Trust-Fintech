@@ -16,6 +16,18 @@
  const userAgent=navigator.userAgent||'';
  const orderId=()=>session?.orderId||null;
  const debug=query.get('debug')==='1';
+ const intentFallback=query.get('upi_intent_fallback')==='1';
+ const merchantFallbackKey=id=>'disha82:merchant-intent-fallback:'+id;
+ // Only the original checkout tab can restore its order bearer on fallback.
+ function merchantFallbackToken(id){
+  if(!intentFallback||!id)return null;
+  try{
+   const saved=JSON.parse(sessionStorage.getItem(merchantFallbackKey(id))||'null');
+   if(saved&&Date.now()<Number(saved.expiresAt)&&
+      /^[a-f0-9]{24,64}$/i.test(saved.token||''))return saved.token;
+  }catch(_){}
+  return null;
+ }
  const debugHistory=[];
  function debugStatus(phase,server=''){
   if(!debug)return;
@@ -96,7 +108,7 @@
   if(mode==='merchant'){
    const o=raw.order;
    if(!o?.id||!o.upi_uri||!Number(o.amount))throw Error('Payment link is incomplete');
-   return {orderId:o.id,token:query.get('token'),upiUri:model.qrPayload(o.upi_uri),
+   return {orderId:o.id,token:query.get('token')||merchantFallbackToken(o.id),upiUri:model.qrPayload(o.upi_uri),
      amount:Number(o.amount),expiresAt:Number(o.expires_at),initialStatus:o.status,
      paymentType:o.payment_type,payeeVpa:o.vpa_address};
   }
@@ -137,7 +149,7 @@
  async function getSession(){
   let url;
   if(mode==='merchant'){
-   const id=query.get('orderId'),token=query.get('token');
+   const id=query.get('orderId'),token=query.get('token')||merchantFallbackToken(id);
    if(!id||!token)throw Error('This payment link is incomplete. Request a new link.');
    url='/api/merchant/public/order/'+encodeURIComponent(id)+'?token='+encodeURIComponent(token);
   }else{
@@ -256,6 +268,9 @@
   anchor.hidden=false;
  }
  function openApp(app){
+  if(evidenceSending){
+   message('Recording the previous app attempt. Please try again.','info');return;
+  }
   if(!authorized||!session||expired()){
    message('Error — This payment request is no longer active.','error');return;
   }
@@ -270,7 +285,19 @@
   try {
    const chosen=model.safeApp(app);
    trace('APP_SELECTED','OK',chosen);
-   const target=model.buildAppUrl(session.upiUri,chosen,userAgent);
+   let checkoutHref=location.href;
+   if(mode==='merchant'){
+    let stored=false;
+    try{
+     sessionStorage.setItem(merchantFallbackKey(orderId()),JSON.stringify({
+      token:session.token,expiresAt:session.expiresAt
+     }));
+     stored=true;
+    }catch(_){}
+    // No browser-local recovery means no fallback extra; never embed a token.
+    if(!stored)checkoutHref='';
+   }
+   const target=model.buildAppUrl(session.upiUri,chosen,userAgent,checkoutHref);
    if(!handoffStarted){
     vault.beginHandoff(orderId(),vaultSessionId,session.token,chosen);
     handoffStarted=true;
@@ -344,6 +371,8 @@
  function onReturn(){
   if(document.visibilityState==='hidden'||receiptShown)return;
   tickSessionTimer();
+  // A Chrome launch fallback is not a UPI app return.
+  if(intentFallback&&!handoffStarted){void pollLedger();return;}
   // Returning to a cancelled/expired checkout cannot resurrect its
   // one-touch authorization or expose native app / QR controls.
   if(session&&(session.initialStatus==='EXPIRED'||
@@ -413,6 +442,9 @@
   showStage('initial');
   try{
    session=await getSession();
+   if(intentFallback&&mode==='merchant'&&session?.orderId){
+    try{sessionStorage.removeItem(merchantFallbackKey(session.orderId))}catch(_){}
+   }
    if(debug){
     try{
      const prior=JSON.parse(sessionStorage.getItem('disha82:diag:'+session.orderId)||'[]');
@@ -437,11 +469,31 @@
    if(expired()){locked('This payment request has expired.');return}
    get('btnOneTouch').disabled=false;
    // A returning browser can recover its own existing Vault handoff.
-   const returnEvidence=typeof vault.requestEvidence==='function'?vault.requestEvidence(orderId()):null;
-   if(vault.getPendingOrderId()===orderId()&&returnEvidence){
-    authorized=true;handoffStarted=true;
-    showStage('checking');
-    void submitReturnEvidence();
+   if(intentFallback){
+    const p=typeof vault.markIntentFallback==='function'?vault.markIntentFallback(orderId()):null;
+    trace('INTENT_FALLBACK','APP_NAVIGATION_ERROR',p?.evidence?.selectedApp||'none');
+    if(p){
+     authorized=true;
+     vaultSessionId=p.vaultSessionId;
+     showStage('methods');
+     // Keep this event frozen during upload; a new app tap starts a new event.
+     void submitReturnEvidence(true);
+    }
+    message('Selected UPI app did not open. Try another app or scan the QR.','info');
+    if(typeof history!=='undefined'&&typeof history.replaceState==='function'&&location.href){
+     try{
+      const clean=new URL(location.href);
+      clean.searchParams.delete('upi_intent_fallback');
+      history.replaceState(null,'',clean.pathname+clean.search+clean.hash);
+     }catch(_){}
+    }
+   }else{
+    const returnEvidence=typeof vault.requestEvidence==='function'?vault.requestEvidence(orderId()):null;
+    if(vault.getPendingOrderId()===orderId()&&returnEvidence){
+     authorized=true;handoffStarted=true;
+     showStage('checking');
+     void submitReturnEvidence();
+    }
    }
    ledgerTicker=setInterval(()=>{void pollLedger()},3500);
    expiryTicker=setInterval(tickSessionTimer,1000);

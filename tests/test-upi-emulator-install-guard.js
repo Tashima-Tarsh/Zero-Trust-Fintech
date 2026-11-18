@@ -1,0 +1,18 @@
+'use strict';
+const assert=require('node:assert/strict');
+const fs=require('node:fs'),path=require('node:path');
+const root=path.resolve(__dirname,'..');
+const ps=fs.readFileSync(path.join(root,'scripts/Test-UPI-PlayStore-Emulator.ps1'),'utf8');
+assert.match(ps,/google_apis_playstore/,'Use official Google Play system image');
+assert.match(ps,/com\.android\.vending/,'Verify Play Store exists');
+assert.match(ps,/com\.google\.android\.apps\.nbu\.paisa\.user/,'Inspect correct India app package');
+assert.match(ps,/com\.phonepe\.app/);
+assert.match(ps,/market:\/\/details\?id=com\.google\.android\.apps\.nbu\.paisa\.user/);
+assert.doesNotMatch(ps,/adb\s+install\s+.*\.apk|apkpure|apkmirror/i,'Only official Play Store sources');
+assert.match(ps,/transactionValidated=\$false/);
+const reporter=fs.readFileSync(path.join(root,'tests/android/report-installed-upi-apps.py'),'utf8');
+assert.match(reporter,/"financialTransferTested": False/);
+assert.match(reporter,/"upiBankAccountValidated": False/);
+const cli=fs.readFileSync(path.join(root,'tests/android/run-emulator-tests.sh'),'utf8');
+assert.match(cli,/python3 tests\/android\/report-installed-upi-apps\.py/);
+console.log('UPI_EMULATOR_INSTALL_GUARD_PASS: official Google Play only; real bank acceptance unverified');

@@ -37,11 +37,14 @@ const UNIT_TESTS = [
   'test-financial-money.js',
   'test-utr-confidence-source.js', // forged UTR success receipts cannot release
   'test-clerk-merchant-auth.js', // Clerk FAPI CSP, signup and login bootstrapping
+  'test-platform-clerk-identity.js', // distinguish Clerk upstream failure from owner 403
+  'test-merchant-fetch-resilience.js', // SaaS fetch retry, 403 approval and no write replay
   'test-one-touch-vault.js', // one biometric to vault register/authenticate, then UPI intent
   'test-vault-browser-evidence.js', // automatic post-UPI browser evidence packet and idempotent retries
   'test-utr-hypothesis.js', // UTR anti-fraud and no-false-credit regression
   'test-pony-tail-window.js', // Pony-tail 15s/180s temporal invariants and no UTR poisoning
   'test-android-fixture.js', // no-money P2P URL and UTR intent fixture
+  'test-upi-emulator-install-guard.js', // Play Store AVD install is separate from real bank-acceptance testing
   'test-owner-production-provisioning.js', // verified owner, P2P/P2M isolation and no database wipe
   'test-platform-control-startup.js', // database connection assigned after owner service constructor
   'test-merchant-reference-ui.js', // matches approved premium lunar dashboard and frontend assets

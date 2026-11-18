@@ -13,6 +13,8 @@ const source=path.join(root,'public'),files=listFiles(source);
 assert.ok(files.length>=65,'Canonical frontend appears incomplete');
 for(const output of ['dist','disha-cinematic/public','disha-cinematic/dist']){
  const dir=path.join(root,output);
+ assert.deepEqual(listFiles(dir),files,
+  output+' must exactly mirror public; stale removed assets must not survive');
  for(const file of files){
   const target=path.join(dir,file),origin=path.join(source,file);
   assert.ok(fs.existsSync(target),output+'/'+file+' is missing: run npm run build');

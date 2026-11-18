@@ -28,7 +28,7 @@ function createPlatformControl({db,getAuth,clerkEmailResolver=getClerkVerifiedEm
    // Verified PRIMARY Clerk email is the only owner credential.
    // An old Clerk user ID, unverified email, or browser field is never enough.
    let verifiedEmail=null;
-   try{verifiedEmail=await clerkEmailResolver(userId)}catch(_){return false}
+   try{verifiedEmail=await clerkEmailResolver(userId)}catch(e){if(e.code==='CLERK_IDENTITY_UNAVAILABLE')throw e;return false}
    return verifiedEmail===SUPER_ADMIN_EMAIL;
  }
  async function ensureOwnerTestTenant(userId){
@@ -191,7 +191,7 @@ function createPlatformControl({db,getAuth,clerkEmailResolver=getClerkVerifiedEm
      // Super Admin identity is independent of merchant invite-only state.
      const subject=getAuth(req)?.userId;
      if(!subject)throw err(401,'Sign in to your account');
-     if(!await verifiedOwner(subject))throw err(403,'Platform owner permission required');
+     if(!await verifiedOwner(subject))throw Object.assign(err(403,'Platform owner permission requires a verified primary Clerk email'),{code:'OWNER_PRIMARY_EMAIL_NOT_VERIFIED'});
      req.ownerUserId=subject;
      await ensureOwnerTestTenant();
      next();

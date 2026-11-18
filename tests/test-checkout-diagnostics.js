@@ -5,6 +5,7 @@ const {createCheckoutDiagnostics,validEvent}=require('../financial/checkout-diag
 const token='a'.repeat(48),orderId='ORD_TRACE_TEST_123';
 const valid={orderId,token,event:'VAULT_AUTH_PROMPT',code:'OK',app:'phonepe',device:'android'};
 assert.ok(validEvent(valid));
+assert.ok(validEvent({...valid,event:'INTENT_FALLBACK',code:'APP_NAVIGATION_ERROR'}));
 const fs=require('node:fs'),path=require('node:path');
 const checkoutScript=fs.readFileSync(path.join(__dirname,'../public/cosmic-checkout.js'),'utf8');
 for(const p of ['checkout.html','merchant-checkout.html']){

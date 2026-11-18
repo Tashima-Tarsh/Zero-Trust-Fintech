@@ -110,5 +110,27 @@ assert.doesNotMatch(cosmic,/finalizePayment\(orderId, txnRef/,
   assert.equal(directReceipt.state,'RETURN_OBSERVED_NO_UTR');
   assert.equal(directReceipt.verified,false);
   assert.equal(v.requestEvidence(order),null);
+  v.beginHandoff(order,vault,token,'phonepe');
+  const unresolved=v.markIntentFallback(order);
+  assert.equal(unresolved.evidence.browserEvent,'INTENT_FALLBACK');
+  assert.equal(unresolved.evidence.selectedApp,'phonepe');
+  assert.equal(unresolved.evidence.returnParams.txnId,undefined);
+  const ack=v.acknowledgeEvidence(order,unresolved.eventId,
+    {success:true,state:'INTENT_LAUNCH_UNRESOLVED',utrCandidate:null});
+  assert.equal(ack.verified,false);
+  assert.equal(ack.settled,false);
+  const {validatePacket,classify}=require('../financial/vault-evidence');
+  const received=validatePacket({orderId:order,vaultSessionId:vault,token,
+    eventId:unresolved.eventId,evidence:unresolved.evidence});
+  const current=Date.now();
+  const classified=classify({created_at:current-20000,expires_at:current+120000,
+    challenge_amount:1,vpa_address:'receiver@oksbi',txn_ref:'TXN_OK',order_id:order},
+    received,null,current);
+  assert.equal(classified.outcome,'INTENT_LAUNCH_UNRESOLVED');
+  assert.equal(classified.utrCandidate,null);
+  assert.equal(classified.correlation.intentLaunchFallbackObserved,true);
+  assert.throws(()=>validatePacket({orderId:order,vaultSessionId:vault,token,
+    eventId:unresolved.eventId,evidence:{...unresolved.evidence,returnParams:{txnId:'123456789012'}}}),
+    /FALLBACK_CANNOT_CARRY_PAYMENT_RESULT/);
   console.log('VAULT_BROWSER_EVIDENCE_PASS: one-tap handoff, automatic observed return, UTR extraction, retry idempotency and no fake settlement.');
 })().catch(e=>{console.error(e);process.exitCode=1});

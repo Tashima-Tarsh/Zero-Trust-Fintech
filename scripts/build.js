@@ -13,6 +13,13 @@ function copyDirRecursive(src, dest) {
     fs.mkdirSync(dest, { recursive: true });
   }
   const entries = fs.readdirSync(src, { withFileTypes: true });
+  // Build outputs are exact mirrors, not append-only copies.
+  const sourceNames = new Set(entries.map(entry => entry.name));
+  for (const stale of fs.readdirSync(dest, { withFileTypes: true })) {
+    if (!sourceNames.has(stale.name)) {
+      fs.rmSync(path.join(dest, stale.name), { recursive: true, force: true });
+    }
+  }
   for (const entry of entries) {
     const srcPath = path.join(src, entry.name);
     const destPath = path.join(dest, entry.name);

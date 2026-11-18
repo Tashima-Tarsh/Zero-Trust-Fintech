@@ -15,7 +15,15 @@ function harness(userAgent,initialPreferred){
  const state={qr:null,opened:null,beginCount:0,verified:false};
  const document={body:{dataset:{checkout:'merchant'}},visibilityState:'visible',getElementById:node,
   querySelectorAll:s=>s==='[data-stage]'?stages:apps,addEventListener(k,fn){cb[k]=fn}};
- const location={search:'?orderId='+order+'&token='+token,assign(url){state.opened=url}};
+ const location={search:'?orderId='+order+'&token='+token,
+  href:'https://disha8-2.thenitishkr.in/merchant-checkout.html?orderId='+order+'&token='+token,
+  assign(url){state.opened=url}};
+ const tabStore=new Map();
+ const sessionStorage={
+  setItem:(k,v)=>tabStore.set(k,v),
+  getItem:k=>tabStore.get(k)||null,
+  removeItem:k=>tabStore.delete(k)
+ };
  const vault={getPendingOrderId:()=>state.beginCount?order:null,requestEvidence:()=>null,authorize:async()=>{state.verified=true;return {sessionId}},
   beginHandoff:()=>{state.beginCount++},launchUPI:url=>{state.opened=url}};
  const window={DISHACosmicCheckoutModel:model,DISHAOneTouchVault:vault,
@@ -28,8 +36,8 @@ function harness(userAgent,initialPreferred){
  };
  const localStorage={getItem:()=>initialPreferred,setItem(){}};
  vm.runInNewContext(code,{window,document,location,navigator:{userAgent},localStorage,fetch,
-  URLSearchParams,Date,Intl,console,setInterval:()=>1,clearInterval(){}});
- return {nodes,apps,state,stages,windowFocus:()=>cb.focus?.()};
+  URLSearchParams,Date,Intl,console,sessionStorage,setInterval:()=>1,clearInterval(){}});
+ return {nodes,apps,state,stages,sessionStorage,windowFocus:()=>cb.focus?.()};
 }
 async function flush(){for(let i=0;i<30;i++)await Promise.resolve()}
 (async()=>{
@@ -48,6 +56,11 @@ async function flush(){for(let i=0;i<30;i++)await Promise.resolve()}
  assert.match(android.nodes.checkoutTimer.textContent,/Session expires in 0[0-3]:[0-5][0-9]/,'Live TTL must be visible across payment stages');
  android.apps.find(x=>x.dataset.app==='phonepe').events.click();
  assert.match(android.state.opened,/^intent:\/\/pay\?/);
+ assert.match(android.state.opened,/S\.browser_fallback_url=/);
+ const fallbackParam=android.state.opened.split('S.browser_fallback_url=')[1].split(';end')[0];
+ const recoveredUrl=new URL(decodeURIComponent(fallbackParam));
+ assert.equal(recoveredUrl.searchParams.get('token'),null,'UPI app must not receive merchant bearer');
+ assert.equal(recoveredUrl.searchParams.get('upi_intent_fallback'),'1');
  assert.equal(android.state.beginCount,1);
  assert.equal(android.stages.find(x=>!x.hidden).dataset.stage,'methods');
  android.state.opened=null;

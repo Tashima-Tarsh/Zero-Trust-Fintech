@@ -28,9 +28,26 @@ async function authInit(){
 async function api(path,options={}){
  const token=await clerk.session.getToken();if(!token)throw Error('Session expired');
  const headers={Authorization:'Bearer '+token,'X-CSRF-Token':'Bearer '+token,Accept:'application/json',...(options.body?{'Content-Type':'application/json'}:{})};
- const r=await fetch('/api/platform'+path,{...options,headers,cache:'no-store',credentials:'same-origin'});let result;
- try{result=await r.json()}catch{result={}}
- if(!r.ok){const e=Error(result.error||'Platform request failed ('+r.status+')');e.status=r.status;throw e}return result;
+ const method=String(options.method||'GET').toUpperCase();
+ let response;
+ for(let attempt=0;attempt<(method==='GET'?2:1);attempt++){
+  try{response=await fetch('/api/platform'+path,{...options,headers,cache:'no-store',credentials:'same-origin'})}
+  catch(_){
+   if(method==='GET'&&attempt===0){await new Promise(done=>setTimeout(done,250));continue}
+   const e=Error('Unable to connect to the platform API. Check your connection and retry.');
+   e.code='PLATFORM_API_NETWORK_FAILURE';throw e;
+  }
+  if(method==='GET'&&attempt===0&&[502,503,504].includes(response.status)){
+   await new Promise(done=>setTimeout(done,250));continue;
+  }
+  break;
+ }
+ let result;try{result=await response.json()}catch{result={}}
+ if(!response.ok){
+  const e=Error(result.error||'Platform request failed ('+response.status+')');
+  e.status=response.status;e.code=result.code||null;throw e;
+ }
+ return result;
 }
 const titles={overview:'Platform Overview',requests:'Access Requests',tenants:'Tenant Management',onboarding:'Merchant Onboarding',transactions:'All Transactions',trust:'Trust & Evidence',ledger:'Reconciliation & Ledger',analytics:'Platform Analytics',incidents:'Errors & Bugs',infrastructure:'Infrastructure Health',integrations:'Automation & Integrations',settings:'Platform Settings'};
 function select(screen){if(!titles[screen])screen='overview';$$('.owner-screen').forEach(x=>x.classList.toggle('active',x.id==='screen-'+screen));$$('[data-screen]').forEach(b=>b.classList.toggle('active',b.dataset.screen===screen));$('#screen-title').textContent=titles[screen];if(location.hash!=='#'+screen)history.replaceState(null,'','#'+screen);$('#console-nav').classList.remove('open');$('#nav-backdrop').classList.remove('open');window.scrollTo(0,0);load(screen).catch(e=>notice(e.message))}

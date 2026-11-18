@@ -282,9 +282,8 @@ app.use('/api', (req,res,next) =>
 // 1. Static Assets: Serve PhonePe marketing styles, console styles, scripts, videos, and icons
 // One canonical merchant dashboard; checkout and its APIs remain public.
 app.get('/merchant-console.html', (req, res) => res.redirect(302, '/dashboard'));
-// Canonical checkout must run before static middleware, which otherwise serves
-// the obsolete public/checkout/index.html at /checkout/.
-app.get(['/checkout', '/checkout/', '/pay', '/pay/'], (req, res) => {
+// All public checkout aliases must use the live payment UI, even legacy index paths.
+app.get(['/checkout', '/checkout/', '/pay', '/pay/', '/checkout/index.html', '/pay/index.html'], (req, res) => {
   res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
   res.sendFile(path.join(__dirname, 'public', 'checkout.html'));
 });
