@@ -204,6 +204,31 @@ const {buildUpiUri}=require('../utils/upi-intent');
     [result.data.merchant.id])).rows[0].n;
   assert.equal(afterInvalid,beforeInvalid,'Invalid merchant intent must not persist an order');
   await pg.query("UPDATE saas_merchant_vpas SET account_type='MERCHANT',mcc='5411' WHERE vpa_address=$1",[merchantVpa]);
+  // An owner re-running setup must not keep the previous P2P/P2M category
+  // and must not retroactively change already issued order snapshots.
+  const reconfigure=await call('/api/merchant/setup',alice,'POST',{
+    businessName:'Acme '+nonce,primaryVpa:'acme'+nonce+'@oksbi',
+    primaryHolderName:'Acme Treasury',primaryBankName:'SBI',
+    accountType:'MERCHANT',mcc:'5411'
+  });
+  assert.equal(reconfigure.status,200);
+  let classified=await call('/api/merchant/vpas',alice);
+  let configured=classified.data.vpas.find(v=>v.vpa_address==='acme'+nonce+'@oksbi');
+  assert.equal(configured.account_type,'MERCHANT');
+  assert.equal(configured.mcc,'5411');
+  const historical=await call('/api/merchant/public/order/'+encodeURIComponent(order.id)+'?token='+encodeURIComponent(token));
+  assert.equal(historical.data.order.upi_uri,initialUri,'Previously issued personal orders cannot mutate on setup');
+  const backToPersonal=await call('/api/merchant/setup',alice,'POST',{
+    businessName:'Acme '+nonce,primaryVpa:'acme'+nonce+'@oksbi',
+    primaryHolderName:'Acme Treasury',primaryBankName:'SBI',
+    accountType:'PERSONAL'
+  });
+  assert.equal(backToPersonal.status,200);
+  classified=await call('/api/merchant/vpas',alice);
+  configured=classified.data.vpas.find(v=>v.vpa_address==='acme'+nonce+'@oksbi');
+  assert.equal(configured.account_type,'PERSONAL');
+  assert.equal(configured.mcc,null,'Personal receiving accounts must not retain old MCC');
+  console.log('MERCHANT_RECONFIGURE_PASS: existing VPA classification updates; issued snapshots remain immutable');
   console.log('Merchant payment snapshot: immutable P2P/P2M payee identity, MCC, transaction reference and invalid-category fail-closed PASS');
   console.log('Merchant integration: Clerk boundary, onboarding, VPA, payment QR, tenant isolation, metrics, risk, IP, CSV and state PASS');
  }finally{
