@@ -72,6 +72,9 @@ function validatePacket(body){
      (e.hiddenAt!==null&&!Number.isSafeInteger(e.hiddenAt))||
      !e.returnParams||typeof e.returnParams!=='object'||Array.isArray(e.returnParams))
     throw invalid(400,'INVALID_VAULT_EVIDENCE');
+  const selectedApp=String(e.selectedApp||'generic').toLowerCase();
+  if(!['gpay','phonepe','paytm','cred','generic'].includes(selectedApp))
+    throw invalid(400,'INVALID_UPI_APP_SELECTION');
   const params={};
   for(const [key,value] of Object.entries(e.returnParams)){
     if(!fields.includes(key)||typeof value!=='string'||value.length>100)
@@ -86,7 +89,7 @@ function validatePacket(body){
   if(!e.hiddenAt && Object.keys(params).length===0)
     throw invalid(400,'NO_RETURN_OBSERVATION');
   return {browserEvent:e.browserEvent,handoffAt:e.handoffAt,
-    hiddenAt:e.hiddenAt,returnedAt:e.returnedAt,returnParams:params};
+    hiddenAt:e.hiddenAt,returnedAt:e.returnedAt,selectedApp,returnParams:params};
 }
 
 function classify(order,e,previousUtrOrder,now){
@@ -101,6 +104,9 @@ function classify(order,e,previousUtrOrder,now){
   const flags={
     vaultAuthorization:true,
     browserReturnOnly:true,
+    // Diagnostic context from browser only; not a bank payment signal.
+    selectedApp:e.selectedApp,
+    browserAppReturnMs:e.returnedAt-e.handoffAt,
     backgroundObserved:e.hiddenAt!==null,
     utrObserved:Boolean(utr),
     sameUtrFields:validCandidates.length<2||validCandidates.every(v=>v===validCandidates[0]),
