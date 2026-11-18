@@ -1,0 +1,75 @@
+name: Android P2P UPI emulator E2E (no real transfer)
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - '.github/workflows/android-p2p-emulator.yml'
+      - 'tests/android/**'
+      - 'public/merchant-checkout.html'
+      - 'public/vendor/qrcode.min.js'
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/android-p2p-emulator.yml'
+      - 'tests/android/**'
+      - 'public/merchant-checkout.html'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: android-p2p-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  android-p2p-e2e:
+    name: Android ${{ matrix.api-level }} - browser to UPI intent
+    runs-on: ubuntu-latest
+    timeout-minutes: 55
+    strategy:
+      fail-fast: false
+      matrix:
+        api-level: [35, 37]
+    steps:
+      - name: Checkout application and test harness
+        uses: actions/checkout@v4
+
+      - name: Set up Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up reproducible Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.11.1'
+
+      - name: Enable Linux KVM for Android
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+
+      - name: Boot Android emulator and test UPI app handoff
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: ${{ matrix.api-level }}
+          target: google_apis
+          arch: x86_64
+          profile: pixel_6
+          ram-size: 4096M
+          emulator-options: -no-snapshot -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
+          disable-animations: true
+          script: bash tests/android/run-emulator-tests.sh
+
+      - name: Upload screenshots and emulator logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-p2p-api-${{ matrix.api-level }}-evidence
+          path: |
+            test-results/android/**
+          retention-days: 7
+          if-no-files-found: warn
