@@ -21,7 +21,8 @@ const UNIT_TESTS = [
   'test-disha.js',        // challenge math, session, NPCI link, double-entry ledger
   'test-npci-intent.js',  // NPCI URI builder / parser / timestamp
   'test-checkout-production.js', // checkout routing, passkey and browser JS syntax
-  'test-financial-money.js', // exact integer-paise currency arithmetic
+  'test-financial-money.js',
+  'test-sqlite-storage.js', // fail-closed Railway SQLite path and storage guard
   'test-vpa-router.js',   // 5-factor anti-ban scoring
 ];
 
