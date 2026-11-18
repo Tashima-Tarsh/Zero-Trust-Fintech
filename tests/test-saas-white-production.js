@@ -14,7 +14,7 @@ const login=read('merchant-login.html');
 const signup=read('merchant-signup.html');
 const checkout=read('merchant-checkout.html');
 new vm.Script(js);
-new vm.Script(worker.replace(/^export default/,'const edge ='),{filename:'cloudflare-worker.js'});
+new vm.Script(worker.replace(/\bexport\s+default\b/,'const edge ='),{filename:'cloudflare-worker.js'});
 const nav=[...page.matchAll(/data-view="([a-z]+)"/g)].map(x=>x[1]);
 assert.equal(new Set(nav).size,12,'All 12 merchant workspace destinations should exist');
 for(const name of nav){
