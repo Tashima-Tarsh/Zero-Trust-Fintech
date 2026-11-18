@@ -200,6 +200,9 @@
   if(document.visibilityState==='hidden')return;
   if(session&&vault.getPendingOrderId()===orderId()){
    authorized=true;handoffStarted=true;
+   // Even when an app returns no callback fields, show a neutral checking
+   // state and keep polling the authoritative ledger; do not claim success.
+   if(lastStage!=='receipt'&&lastStage!=='checking')showStage('checking');
    void submitReturnEvidence();
   }
   void pollLedger();
