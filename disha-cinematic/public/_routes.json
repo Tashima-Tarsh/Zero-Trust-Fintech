@@ -3,6 +3,7 @@
   "include": [
     "/api/*",
     "/health",
+    "/ws",
     "/ws/*",
     "/login",
     "/signup",

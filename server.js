@@ -184,7 +184,15 @@ const idempotencyCache = new Map(); // fallback: key -> { response, expiresAt }
 async function idempotencyMiddleware(req, res, next) {
   const key = req.header('Idempotency-Key');
   if (!key || req.method !== 'POST') return next();
-  const cacheKey = `idem:${key}`;
+  // Scope the idempotency key by authenticated tenant + endpoint path so that
+  // reusing a key across merchants or routes cannot return another request's
+  // cached response (including sensitive payment-link data).
+  let tenantId = 'mer_default';
+  try {
+    const auth = getAuth(req);
+    if (auth && auth.userId) tenantId = auth.userId;
+  } catch (_) {}
+  const cacheKey = `idem:${tenantId}:${req.path}:${key}`;
   // Redis path
   if (redis) {
     try {
@@ -490,6 +498,56 @@ app.use('/api/vault',createVaultEvidenceRouter({getPool:()=>db.pgPool}));
 app.use('/api/reconciliation',createReconciliationRouter({
   getPool:()=>db.pgPool,onSettled:broadcastOrderSuccess
 }));
+// P0 #1: Admin-gated settlement confirmation. Completes the financial outcome loop
+// by posting the double-entry ledger via the same reconciliation engine used by the
+// bank-statement webhook. Fail-closed: 503 when RECONCILIATION_WEBHOOK_SECRET /
+// RECONCILIATION_SOURCE_ID are not configured (no false credits).
+app.post('/api/settlement/confirm', requireAdminAuth, async (req, res) => {
+  const secret = process.env.RECONCILIATION_WEBHOOK_SECRET;
+  const source = process.env.RECONCILIATION_SOURCE_ID;
+  if (!secret || secret.length < 32 || !source) {
+    return res.status(503).json({ success: false, error: 'RECONCILIATION_NOT_CONFIGURED' });
+  }
+  const pool = db.pgPool;
+  if (!pool) return res.status(503).json({ success: false, error: 'POSTGRES_REQUIRED' });
+  const { orderId, utr, amount, payeeVpa, eventId, statementEntryId, creditedAt } = req.body || {};
+  if (!orderId || !utr || !amount || !payeeVpa || !eventId || !statementEntryId) {
+    return res.status(400).json({ success: false, error: 'SETTLEMENT_REQUIRED_FIELDS' });
+  }
+  if (!/^\d{12}$/.test(String(utr))) {
+    return res.status(400).json({ success: false, error: 'UTR_FORMAT_INVALID' });
+  }
+  const session = await db.findSessionByOrderId(orderId);
+  if (!session) {
+    return res.status(404).json({ success: false, error: 'SESSION_NOT_FOUND' });
+  }
+  const amountPaise = String(Math.round(Number(amount) * 100));
+  if (!/^[1-9][0-9]{0,15}$/.test(amountPaise)) {
+    return res.status(400).json({ success: false, error: 'AMOUNT_INVALID' });
+  }
+  const now = Date.now();
+  const creditTs = creditedAt ? Number(creditedAt) : now;
+  const payloadHash = require('node:crypto').createHash('sha256')
+    .update(JSON.stringify({ source, eventId, orderId, merchantId: session.merchantId || 'mer_default', utr, amountPaise, payeeVpa, creditTs }))
+    .digest('hex');
+  const payload = {
+    source, eventId, statementEntryId, orderId,
+    merchantId: session.merchantId || 'mer_default',
+    direction: 'CREDIT', status: 'POSTED',
+    bankEvidence: 'VERIFIED_STATEMENT',
+    utr, payeeVpa, amountPaise, creditedAt: creditTs
+  };
+  try {
+    const result = await reconcileCredit(pool, payload, source, payloadHash);
+    if (result.state === 'POSTED' && !result.replayed) {
+      try { broadcastOrderSuccess(orderId, { amount: session.baseAmount, baseAmount: session.baseAmount, vpaAddress: result.vpaAddress || payeeVpa, senderVpa: null, utr, txId: result.txId, timestamp: now }); } catch (_) {}
+    }
+    return res.status(result.state === 'QUARANTINED' ? 202 : 200).json({ success: true, ...result });
+  } catch (err) {
+    if (!err.status) console.error('[Settlement confirm]', err.code || err.message);
+    return res.status(err.status || 500).json({ success: false, error: err.status ? err.code : 'SETTLEMENT_UNAVAILABLE' });
+  }
+});
 // TASK 3: SESSION TOKEN GENERATION
 // ═══════════════════════════════════════════════════════════════════
 async function generateSession(baseAmount = 100, description = '', customVpa = null) {
@@ -1824,7 +1882,17 @@ app.post('/api/gaming/verify-payment', (req,res) => {
   });
 });
 // Route fallbacks
-app.get('/success', (req, res) => res.sendFile(path.join(__dirname, 'public', 'success.html')));
+app.get('/success', async (req, res) => {
+  const { orderId, token } = req.query;
+  if (!orderId || !token) {
+    return res.redirect('/failed?reason=missing_session_token');
+  }
+  const session = await db.findSessionByOrderId(orderId);
+  if (!session || !safeCompareKeys(token, session.sessionId)) {
+    return res.redirect('/failed?reason=invalid_session_token');
+  }
+  res.sendFile(path.join(__dirname, 'public', 'success.html'));
+});
 app.get('/failed', (req, res) => res.sendFile(path.join(__dirname, 'public', 'failed.html')));
 // Initialize database and start server
 (async () => {
