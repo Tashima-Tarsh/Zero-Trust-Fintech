@@ -3,14 +3,15 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="theme-color" content="#f7f9fc">
+  <meta name="theme-color" content="#101827">
   <title>Merchant Workspace — DISHA 8.2</title>
   <link rel="icon" href="/assets/disha-8-2-wordmark.png">
   <link rel="stylesheet" href="/premium.css?v=8.2.5">
-  <link rel="stylesheet" href="/saas-white.css?v=20261118">
+  <link rel="stylesheet" href="/saas-white.css?v=20261118-premium2">
   <script src="/vendor/qrcode.min.js" defer></script>
   <script src="/auth-config.js"></script>
-  <script src="/premium-dashboard.js?v=20261118" defer></script>
+  <script src="/merchant-vpa-import.js" defer></script>
+  <script src="/premium-dashboard.js?v=20261118-premium2" defer></script>
 </head>
 <body class="app-page">
   <!-- Living Ambient Aurora Mesh -->
@@ -25,7 +26,7 @@
     <!-- Executive Dark Sidebar -->
     <aside class="side" id="appSide">
       <a href="/" class="brand">
-        <span class="wordmark-symbol" aria-hidden="true">D</span><span>DISHA <span class="wordmark-sub">8.2</span></span>
+        <img class="side-wordmark" src="/assets/disha-8-2-wordmark-cropped.png" alt="DISHA 8.2" width="205" height="48">
       </a>
 
       <div class="merchant-chip">
@@ -114,7 +115,7 @@
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="3" y1="12" x2="21" y2="12"></line><line x1="3" y1="6" x2="21" y2="6"></line><line x1="3" y1="18" x2="21" y2="18"></line></svg>
           </button>
           <a class="brand mobile-brand" href="/" aria-label="DISHA 8.2 Home">
-            <span class="sr-only">DISHA 8.2</span>
+            <span class="mobile-brand-icon" aria-hidden="true">D</span><span>DISHA <b>8.2</b></span>
           </a>
           <div class="search-wrap">
             <input class="search" id="globalSearch" placeholder="Search reference, UTR, amount… (Press Enter)" aria-label="Search orders">
@@ -136,8 +137,8 @@
       <div class="app-title-row">
         <div>
           <div class="overline">DISHA 8.2 / MERCHANT OPERATIONS</div>
-          <h1 id="viewHeading">Your Business, In Real-Time.</h1>
-          <p id="viewSubtitle">Your orders, receiving accounts, and operational activity.</p>
+          <h1 id="viewHeading">Merchant overview</h1>
+          <p id="viewSubtitle">Your payment operations, receiving accounts and activity in one workspace.</p>
         </div>
         <div class="app-title-actions">
           <select id="periodSelect" class="search" style="max-width:140px;" aria-label="Date Range">
@@ -154,54 +155,45 @@
 
       <div id="appNotice" class="alert-bar" role="status" style="display:none;"></div>
 
-      <div id="merchantSetup" class="module" style="display:none;margin-bottom:24px;">
-        <div class="overline">INITIALIZE WORKSPACE</div>
-        <h2>Complete Merchant Account Setup</h2>
-        <p>Enter your business name and the receiving UPI ID you control.</p>
-        <form id="setupMerchantForm" class="form-grid" style="margin-top:16px;">
-          <label class="field">
-            Registered Business Name
-            <input id="setupBusinessName" required maxlength="150" placeholder="e.g. Ramesh Enterprises">
-          </label>
-          <label class="field">
-            Receiving Bank VPA (UPI ID)
-            <input id="setupPrimaryVpa" required placeholder="business@oksbi or merchant@okhdfcbank">
-          </label>
-          <label class="field">UPI account type
-            <select id="setupAccountType">
-              <option value="PERSONAL">Personal / P2P receiving UPI</option>
-              <option value="MERCHANT">Bank-issued merchant UPI / P2M</option>
-            </select>
-          </label>
-          <label class="field">Bank-issued MCC (required for P2M)
-            <input id="setupMcc" maxlength="4" inputmode="numeric" placeholder="Four digits from your bank QR">
-          </label>
-          <div class="form-actions" style="grid-column:1/-1;">
-            <button type="submit" class="btn primary">Save Merchant Workspace</button>
-          </div>
-        </form>
-      </div>
-
       <!-- VIEW 1: OVERVIEW -->
       <section id="view-overview" class="view active" aria-labelledby="viewHeading">
+        <div id="merchantSetup" class="module onboarding-module" style="display:none;">
+          <div class="onboarding-top"><span class="overline">GET STARTED / 01</span><span class="onboarding-stage">New workspace</span></div>
+          <div class="onboarding-title-row"><div><h2>Make DISHA your workspace.</h2><p>Connect an account you control. Your payment requests and operating data will appear here.</p></div><div class="onboarding-progress" aria-label="Step one of three"><span class="current"></span><span></span><span></span></div></div>
+          <form id="setupMerchantForm" class="form-grid onboarding-form">
+            <label class="field">Business / trading name<input id="setupBusinessName" autocomplete="organization" required minlength="3" maxlength="150" placeholder="Your registered business name"></label>
+            <label class="field">UPI account holder name<input id="setupHolderName" autocomplete="name" required minlength="2" maxlength="100" placeholder="Name linked to the receiving UPI ID"></label>
+            <label class="field">Receiving UPI ID<input id="setupPrimaryVpa" required autocapitalize="none" spellcheck="false" placeholder="yourbusiness@bank"></label>
+            <label class="field">Bank / UPI provider<input id="setupBankName" maxlength="100" placeholder="e.g. HDFC Bank, SBI, ICICI"></label>
+            <label class="field">Account category<select id="setupAccountType"><option value="PERSONAL">Personal receiving UPI / P2P</option><option value="MERCHANT">Bank-issued merchant UPI / P2M</option></select></label>
+            <label class="field">Bank-issued MCC (P2M only)<input id="setupMcc" maxlength="4" inputmode="numeric" placeholder="Four-digit bank-issued MCC"></label>
+            <div class="form-actions"><button type="submit" class="btn primary">Activate merchant workspace <span aria-hidden="true">→</span></button><small>These details are merchant-provided, not independently bank-verified.</small></div>
+          </form>
+        </div>
+        <div class="command-hero">
+          <div class="command-copy"><div class="overline">OPERATIONS / LIVE</div><h2>Every payment.<br><span>One clear view.</span></h2><p>Manage payment links, receiving UPI IDs and real recorded outcomes in one place. No sample balances or simulated transactions.</p>
+            <div class="command-actions"><button type="button" class="btn primary" data-switch="create">Create a payment ↗</button><button type="button" class="btn ghost" data-switch="vpas">Manage UPI accounts</button></div>
+          </div>
+          <div class="command-orbit" aria-hidden="true"><span>₹</span><div>UPI <small>DIRECT</small></div></div>
+        </div>
         <div class="stat-grid">
           <div class="stat">
-            <small>Recorded UPI Turnover</small>
+            <small>Recorded payment volume</small><span class="stat-mark" aria-hidden="true">₹</span>
             <strong id="metricVolume">₹0</strong>
             <div class="note">Completed payment records</div>
           </div>
           <div class="stat">
-            <small>Completed Transactions</small>
+            <small>Completed records</small><span class="stat-mark" aria-hidden="true">↗</span>
             <strong id="metricCompleted">0</strong>
             <div class="note">Recorded completed orders</div>
           </div>
           <div class="stat">
-            <small>Awaiting Authorization</small>
+            <small>Pending requests</small><span class="stat-mark" aria-hidden="true">◷</span>
             <strong id="metricPending">0</strong>
             <div class="note">Requests currently pending</div>
           </div>
           <div class="stat">
-            <small>Total Payment Requests</small>
+            <small>All requests</small><span class="stat-mark" aria-hidden="true">▦</span>
             <strong id="metricOrders">0</strong>
             <div class="note">Requests during this period</div>
           </div>
@@ -210,11 +202,11 @@
         <div class="dash-grid">
           <div class="module">
             <div class="module-head">
-              <h2>Payment Volume Trend</h2>
-              <small>Completed orders timeline</small>
+              <h2>Daily payment volume</h2>
+              <small>Recorded completed orders only</small>
             </div>
             <div id="activityChart">
-              <div class="empty">Connect your merchant workspace to view payment trends.</div>
+              <div class="empty">No completed payment records in this period. Your chart will appear here when records exist.</div>
             </div>
           </div>
 
@@ -242,7 +234,7 @@
         <div class="dash-grid">
           <div class="module">
             <div class="module-head">
-              <h2>Recent Live Transactions</h2>
+              <h2>Recent payment activity</h2>
               <button class="btn linkish" type="button" data-switch="payments">View All →</button>
             </div>
             <div class="table-scroller">
@@ -379,38 +371,37 @@
 
         <div class="module">
           <div class="module-head">
-            <h2>Configured Receiving VPAs</h2>
+            <h2>Your receiving UPI accounts</h2>
             <button type="button" class="btn small" id="refreshVpas">Refresh ↻</button>
           </div>
           <div class="table-scroller">
             <table>
               <thead>
                 <tr>
-                  <th>UPI Address</th>
-                  <th>Bank / Rail</th>
+                  <th>UPI ID</th>
+                  <th>Account holder</th>
+                  <th>Bank / type</th>
                   <th>Status</th>
                   <th>Role</th>
                   <th>Controls</th>
                 </tr>
               </thead>
               <tbody id="vpaTable">
-                <tr><td colspan="5" class="empty">No receiving UPI IDs configured. Add one below.</td></tr>
+                <tr><td colspan="6" class="empty">No receiving UPI IDs configured. Add your first account below.</td></tr>
               </tbody>
             </table>
           </div>
         </div>
 
         <div class="module" style="margin-top:20px;">
-          <h2>Add New Receiving Bank VPA</h2>
+          <h2>Add a receiving UPI account</h2><p class="module-intro">Record the receiving UPI ID, account holder and bank. These are merchant-provided details, not bank ownership verification.</p>
           <form id="addVpaForm" class="form-grid" style="margin-top:16px;">
             <label class="field">
               UPI Address
-              <input id="vpaAddress" placeholder="business@oksbi or merchant@okhdfcbank" required>
+              <input id="vpaAddress" placeholder="yourbusiness@bank" spellcheck="false" autocapitalize="none" required>
             </label>
-            <label class="field">
-              Bank / Rail Name
-              <input id="vpaBank" placeholder="e.g. State Bank of India">
-            </label>
+            <label class="field">Account holder / display name<input id="vpaHolder" required minlength="2" maxlength="100" placeholder="Name linked to this UPI ID"></label>
+            <label class="field">Bank / UPI provider<input id="vpaBank" maxlength="100" placeholder="e.g. State Bank of India"></label>
             <label class="field">UPI account type
               <select id="vpaAccountType">
                 <option value="PERSONAL">Personal / P2P</option>
@@ -421,9 +412,15 @@
               <input id="vpaMcc" maxlength="4" inputmode="numeric" placeholder="Four digits from your bank QR">
             </label>
             <div class="form-actions" style="grid-column:1/-1;">
-              <button class="btn primary" type="submit">Add Receiving VPA</button>
+              <button class="btn primary" type="submit">Add receiving account</button>
             </div>
           </form>
+        </div>
+        <div class="module import-module" style="margin-top:20px;">
+          <div class="module-head"><div><div class="overline">BULK IMPORT</div><h2>Upload UPI accounts</h2></div><button type="button" class="btn ghost small" id="downloadVpaTemplate">Download CSV template</button></div>
+          <p class="module-intro">Import up to 50 UPI accounts in one CSV, including holder name, bank, account type and MCC. A duplicate or invalid record cancels the entire import.</p>
+          <div class="import-actions"><label for="vpaCsvFile" class="file-picker"><span class="file-icon" aria-hidden="true">⇪</span><span><strong>Choose CSV file</strong><small>50 accounts maximum · 256 KB</small></span><input id="vpaCsvFile" type="file" accept=".csv,text/csv"></label><button type="button" id="importVpaCsv" class="btn primary">Import accounts</button></div>
+          <p class="fine" id="importVpaStatus" role="status" aria-live="polite">Expected columns: upi_id, account_holder, bank_name, account_type, mcc.</p>
         </div>
       </section>
 
