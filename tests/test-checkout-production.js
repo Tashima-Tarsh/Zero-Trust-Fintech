@@ -35,7 +35,7 @@ for(const html of [generic,merchant]){
 for(const [name,src] of [['cosmic-checkout.js',script],['cosmic-checkout-model.js',model]])
  new vm.Script(src,{filename:name});
 assert.match(script,/vault\.authorize\(orderId\(\)\)/);
-assert.match(script,/vault\.beginHandoff\(orderId\(\),vaultSessionId,session\.token\)/);
+assert.match(script,/vault\.beginHandoff\(orderId\(\),vaultSessionId,session\.token,chosen\)/,'Vault must capture selected UPI app without implying a bank credit');
 assert.match(script,/\?token=/);
 assert.match(script,/\/api\/ledger\//);
 assert.match(script,/model\.isSettled\(/);
