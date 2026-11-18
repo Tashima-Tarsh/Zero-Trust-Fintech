@@ -1109,8 +1109,12 @@ app.post('/api/webauthn/register/start', async (req, res) => {
     if (!userId || !userName || !orderId) {
       return res.status(400).json({ success: false, error: 'userId, userName and orderId required' });
     }
-    if (!await db.findSessionByOrderId(orderId)) {
+    const checkoutSession = await db.findSessionByOrderId(orderId);
+    if (!checkoutSession) {
       return res.status(404).json({ success: false, error: 'SESSION_NOT_FOUND' });
+    }
+    if (checkoutSession.status !== 'PENDING' || Date.now() > checkoutSession.expiresAt) {
+      return res.status(409).json({ success: false, error: 'ORDER_NOT_ACTIVE' });
     }
     const existingKeys = await db.findPasskeysByUserId(userId);
     const options = await generateRegistrationOptions({
@@ -1180,9 +1184,22 @@ app.post('/api/webauthn/register/finish', async (req, res) => {
     if (!saved) {
       return res.status(409).json({ success: false, error: 'Could not store credential' });
     }
-    authChallenges.delete(sessionId);
+    const order = await db.findSessionByOrderId(stored.orderId);
+    if (!order || order.status !== 'PENDING' || Date.now() > order.expiresAt) {
+      authChallenges.delete(sessionId);
+      return res.status(409).json({ success:false, error:'ORDER_NOT_ACTIVE' });
+    }
+    // The OS has already verified the device owner during passkey creation.
+    // Requiring an immediate second biometric challenge would duplicate the UX.
+    // This authorizes only a UPI app handoff, NEVER financial settlement.
+    authChallenges.set(sessionId,{
+      type:'authentication',
+      status:'VAULT_VERIFIED_AWAITING_UPI',
+      userId:stored.userId,orderId:stored.orderId,amount:order.challengeAmount,
+      verifiedAt:Date.now(),expiresAt:Math.min(Date.now()+180000,order.expiresAt)
+    });
     return res.json({
-      success: true, credentialId: verifiedCredential.id,
+      success: true, sessionId, credentialId: verifiedCredential.id,
       userId: stored.userId, orderId: stored.orderId
     });
   } catch (err) {
@@ -1201,6 +1218,9 @@ app.post('/api/webauthn/authenticate/start', async (req, res) => {
     const checkoutSession = await db.findSessionByOrderId(orderId);
     if (!checkoutSession) {
       return res.status(404).json({ success: false, error: 'SESSION_NOT_FOUND' });
+    }
+    if (checkoutSession.status !== 'PENDING' || Date.now() > checkoutSession.expiresAt) {
+      return res.status(409).json({success:false,error:'ORDER_NOT_ACTIVE'});
     }
     const existingKeys = await db.findPasskeysByUserId(userId);
     if (!existingKeys.length) {
