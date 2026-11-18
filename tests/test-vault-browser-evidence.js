@@ -8,21 +8,19 @@ const vm=require('node:vm');
 const script=fs.readFileSync(path.join(__dirname,'../public/one-touch-vault.js'),'utf8');
 const merchant=fs.readFileSync(path.join(__dirname,'../public/merchant-checkout.html'),'utf8');
 const checkout=fs.readFileSync(path.join(__dirname,'../public/checkout.html'),'utf8');
-assert.match(merchant,/DISHAOneTouchVault\.beginHandoff\(orderId,vaultSessionId,token\)/);
-assert.match(merchant,/const packet=vault\.requestEvidence\(orderId\)/);
-assert.match(merchant,/vault\.acknowledgeEvidence\(orderId,packet\.eventId,result\)/);
-assert.match(checkout,/DISHAOneTouchVault\.beginHandoff\(currentSession\.orderId,vaultSessionId,currentSession\.sessionId\)/);
-assert.match(checkout,/const packet=vault\.requestEvidence\(\)/);
-assert.match(checkout,/vault\.acknowledgeEvidence\(packet\.orderId,packet\.eventId,result\)/);
-for(const page of [merchant,checkout]){
-  assert.match(page,/fetch\('\/api\/vault\/evidence'/);
-  assert.ok(page.indexOf('vault.requestEvidence(')<page.indexOf("fetch('/api/vault/evidence'"),
-    'Browser must request evidence from Vault before transmitting');
-  assert.ok(page.indexOf("fetch('/api/vault/evidence'")<page.indexOf('vault.acknowledgeEvidence('),
-    'Browser must acknowledge only after server storage');
+const cosmic=fs.readFileSync(path.join(__dirname,'../public/cosmic-checkout.js'),'utf8');
+assert.match(cosmic,/vault\.beginHandoff\(orderId\(\),vaultSessionId,session\.token\)/);
+assert.match(cosmic,/const packet=vault\.requestEvidence\(orderId\(\)\)/);
+assert.match(cosmic,/vault\.acknowledgeEvidence\(orderId\(\),packet\.eventId,result\)/);
+for(const page of [cosmic]){
+ assert.match(page,/fetch\('\/api\/vault\/evidence'/);
+ assert.ok(page.indexOf('vault.requestEvidence(')<page.indexOf("fetch('/api/vault/evidence'"),
+ 'Browser must request evidence before transmitting');
+ assert.ok(page.indexOf("fetch('/api/vault/evidence'")<page.indexOf('vault.acknowledgeEvidence('),
+ 'Browser must acknowledge only after server storage');
 }
-assert.doesNotMatch(checkout,/finalizePayment\(orderId, txnRef/,
-  'A URL status must not directly finalize settlement');
+assert.doesNotMatch(cosmic,/finalizePayment\(orderId, txnRef/,
+ 'Browser return can never finalize a financial transfer');
 (async()=>{
   const memory=new Map();
   const calls=[];

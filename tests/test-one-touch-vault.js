@@ -9,19 +9,20 @@ const dir=path.join(__dirname,'..');
 const script=fs.readFileSync(path.join(dir,'public','one-touch-vault.js'),'utf8');
 const page=fs.readFileSync(path.join(dir,'public','checkout.html'),'utf8');
 const merchant=fs.readFileSync(path.join(dir,'public','merchant-checkout.html'),'utf8');
+const cosmic=fs.readFileSync(path.join(dir,'public','cosmic-checkout.js'),'utf8');
 const server=fs.readFileSync(path.join(dir,'server.js'),'utf8');
 const edge=fs.readFileSync(path.join(dir,'public','_worker.js'),'utf8');
 const routes=fs.readFileSync(path.join(dir,'public','_routes.json'),'utf8');
 
 assert.match(page,/id="btnOneTouch"/);
-assert.match(page,/DISHAOneTouchVault\.authorize\(currentSession\.orderId\)/);
+assert.match(cosmic,/vault\.authorize\(orderId\(\)\)/);
 assert.match(page,/id="oneTouchFallback"/);
-assert.doesNotMatch(page,/await checkPasskeyStatus\(userId, userName\)/,
+assert.doesNotMatch(cosmic,/await checkPasskeyStatus\(userId, userName\)/,
   'Page must not ask a biometric before the user presses Touch to Pay');
 assert.doesNotMatch(page,/window\.addEventListener\('pagehide', async/,
   'Switching to the UPI app must not trigger a fake cancellation');
 assert.match(merchant,/id="oneTouchFallback"/);
-assert.match(merchant,/DISHAOneTouchVault\.authorize\(orderId\)/);
+assert.match(cosmic,/vault\.authorize\(orderId\(\)\)/);
 assert.match(edge,/\/vendor\/simplewebauthn\.umd\.js/);
 assert.match(routes,/\/vendor\/simplewebauthn\.umd\.js/);
 assert.match(server,/status:'VAULT_VERIFIED_AWAITING_UPI'/);

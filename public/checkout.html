@@ -1,803 +1,107 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>DISHA 8.2 — WebAuthn Secured UPI Checkout</title>
-  <meta name="description" content="Hardware-vault secured UPI Checkout. WebAuthn Passkey + UPI Intent. Zero-fee, fraud-proof.">
-  <meta name="theme-color" content="#0f172a">
-  <link rel="icon" type="image/svg+xml" href="/assets/favicon.svg">
-  <link rel="shortcut icon" href="/assets/favicon.svg">
-
-  <!-- Typography -->
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;600;700&family=Noto+Serif:wght@600;700&display=swap" rel="stylesheet">
-
-  <!-- Tailwind CSS -->
-  <script src="https://cdn.tailwindcss.com"></script>
-  <script>
-    tailwind.config = {
-      theme: {
-        extend: {
-          fontFamily: {
-            sans: ['Inter', '-apple-system', 'BlinkMacSystemFont', 'Segoe UI', 'Roboto', 'sans-serif'],
-            mono: ['JetBrains Mono', 'monospace'],
-            serif: ['Noto Serif', 'serif']
-          },
-          colors: {
-            brand: {
-              50: '#eff6ff',
-              100: '#dbeafe',
-              500: '#3b82f6',
-              600: '#2563eb',
-              700: '#1d4ed8',
-              800: '#1e40af',
-              900: '#1e3a8a'
-            }
-          }
-        }
-      }
-    };
-  </script>
-
-  <style>
-    #math-canvas {
-      position: fixed;
-      inset: 0;
-      width: 100%;
-      height: 100%;
-      pointer-events: none;
-      z-index: 0;
-      opacity: 0.18;
-    }
-    input::-webkit-outer-spin-button,
-    input::-webkit-inner-spin-button {
-      -webkit-appearance: none;
-      margin: 0;
-    }
-    input[type=number] {
-      -moz-appearance: textfield;
-    }
-    .hidden { display: none !important; }
-  </style>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="color-scheme" content="dark">
+<meta name="theme-color" content="#070d21">
+<title>DISHA 8.2 — Checkout</title>
+<meta name="description" content="Complete a UPI payment with DISHA 8.2.">
+<link rel="icon" href="/assets/favicon.svg" type="image/svg+xml">
+<link rel="preload" href="/assets/disha-8-2-wordmark-cropped.png" as="image">
+<link rel="stylesheet" href="/cosmic-checkout.css">
+<script defer src="/vendor/qrcode.min.js"></script>
+<script defer src="/vendor/simplewebauthn.umd.js"></script>
+<script defer src="/one-touch-vault.js"></script>
+<script defer src="/cosmic-checkout-model.js"></script>
+<script defer src="/cosmic-checkout.js"></script>
 </head>
-<body class="min-h-screen bg-gradient-to-b from-slate-100 via-slate-50 to-slate-200 text-slate-900 font-sans flex flex-col items-center justify-center p-3 sm:p-5 relative overflow-x-hidden antialiased">
-
-  <!-- Floating Mathematical Equations Particle Canvas -->
-  <canvas id="math-canvas"></canvas>
-
-  <main class="w-full max-w-[420px] relative z-10 mx-auto my-auto">
-    <div class="w-full bg-white rounded-3xl border border-slate-200/90 shadow-[0_20px_50px_-15px_rgba(15,23,42,0.14)] overflow-hidden backdrop-blur-md">
-
-      <!-- Header -->
-      <header class="px-5 py-4 flex items-center justify-between border-b border-slate-100 bg-white/95">
-        <a href="/" class="flex items-center gap-2.5 text-decoration-none group">
-          <div class="w-9 h-9 rounded-xl bg-gradient-to-tr from-blue-700 to-indigo-600 flex items-center justify-center text-white font-serif font-bold text-lg shadow-sm">
-            D
-          </div>
-          <div class="flex flex-col">
-            <span class="font-sans text-[15px] font-extrabold text-slate-900 tracking-tight leading-none group-hover:text-blue-700 transition-colors">DISHA 8.2</span>
-            <span class="text-[10px] font-mono font-bold text-emerald-600 uppercase tracking-wider mt-0.5">WebAuthn + UPI Rail</span>
-          </div>
-        </a>
-
-        <a href="https://wa.me/919142197135?text=Hi%2C%20I%20have%20questions%20about%20my%20DISHA%20checkout" target="_blank" rel="noopener noreferrer" class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-50 border border-emerald-200/80 text-emerald-700 text-[11px] font-medium hover:bg-emerald-100 transition-colors shadow-2xs" title="WhatsApp: +91 91421 97135">
-          <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
-          <span>WhatsApp</span>
-        </a>
-      </header>
-
-      <!-- Amount Section -->
-      <section class="px-5 py-4 text-center bg-gradient-to-b from-slate-50/80 to-white border-b border-slate-100">
-        <div class="text-[11px] font-mono uppercase tracking-wider text-slate-500 font-semibold mb-1">Amount to Pay</div>
-        <div class="text-3xl sm:text-4xl font-extrabold text-slate-950 tracking-tight leading-none font-sans" id="challengeAmountEl">₹500.00</div>
-        <div class="mt-2 inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 text-[11px] font-medium">
-          <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
-          <span>Hardware Vault Secured</span>
-        </div>
-      </section>
-
-      <!-- QR & UPI Intent Section -->
-      <section class="p-5 text-center flex flex-col items-center">
-
-        <!-- Dynamic QR Wrapper -->
-        <div class="relative w-[210px] h-[210px] p-2 bg-white rounded-2xl border-2 border-slate-200/90 shadow-sm flex items-center justify-center mb-3">
-          <div id="qrLoading" class="flex flex-col items-center justify-center gap-2 text-slate-500 text-xs">
-            <svg class="animate-spin h-6 w-6 text-blue-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-              <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-              <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-            </svg>
-            <span class="font-medium">Generating Dynamic QR...</span>
-          </div>
-          <img id="qrImg" class="w-full h-full object-contain rounded-lg hidden" alt="UPI Dynamic QR">
-        </div>
-
-        <!-- VPA Pill (Click to copy) -->
-        <button type="button" id="vpaPill" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200 text-xs font-mono font-medium transition-all mb-4 active:scale-95 cursor-pointer" title="Tap to copy Payee VPA">
-          <span id="vpaAddress">disha82@okaxis</span>
-          <span class="text-[13px]">📋</span>
-        </button>
-
-        <!-- Fast UPI App Intent Deep Links Grid -->
-        <div class="w-full grid grid-cols-4 gap-2 mb-4">
-          <a id="linkGPay" href="#" class="flex flex-col items-center justify-center py-2.5 px-1 rounded-xl bg-slate-50 hover:bg-slate-100 border border-slate-200 text-slate-800 text-[11px] font-semibold transition-all hover:border-blue-500 hover:text-blue-700 active:scale-95">
-            <span class="text-lg mb-0.5">💳</span>
-            <span>GPay</span>
-          </a>
-          <a id="linkPhonePe" href="#" class="flex flex-col items-center justify-center py-2.5 px-1 rounded-xl bg-slate-50 hover:bg-slate-100 border border-slate-200 text-slate-800 text-[11px] font-semibold transition-all hover:border-purple-500 hover:text-purple-700 active:scale-95">
-            <span class="text-lg mb-0.5">🟣</span>
-            <span>PhonePe</span>
-          </a>
-          <a id="linkPaytm" href="#" class="flex flex-col items-center justify-center py-2.5 px-1 rounded-xl bg-slate-50 hover:bg-slate-100 border border-slate-200 text-slate-800 text-[11px] font-semibold transition-all hover:border-sky-500 hover:text-sky-700 active:scale-95">
-            <span class="text-lg mb-0.5">🔷</span>
-            <span>Paytm</span>
-          </a>
-          <a id="linkCred" href="#" class="flex flex-col items-center justify-center py-2.5 px-1 rounded-xl bg-slate-50 hover:bg-slate-100 border border-slate-200 text-slate-800 text-[11px] font-semibold transition-all hover:border-amber-500 hover:text-amber-700 active:scale-95">
-            <span class="text-lg mb-0.5">⚡</span>
-            <span>CRED</span>
-          </a>
-        </div>
-
-        <!-- Section Divider -->
-        <div class="w-full relative flex items-center justify-center my-2">
-          <div class="w-full border-t border-slate-200 absolute"></div>
-          <span class="relative bg-white px-3 text-[10px] font-mono uppercase tracking-wider font-bold text-slate-400">
-            WebAuthn Vault → UPI Intent
-          </span>
-        </div>
-
-        <!-- ============================================================
-             WEBAUTHN / PASSKEY SECTION
-             ============================================================ -->
-
-        <!-- The only checkout action. A verified new passkey registers and authorizes
-             this one handoff; an existing passkey prompts for a single verification. -->
-        <section id="oneTouchSection" class="w-full mb-3 text-center" aria-label="One-touch device vault">
-          <button type="button" id="btnOneTouch" disabled
-            class="w-full min-h-14 rounded-2xl bg-gradient-to-r from-blue-700 to-indigo-700 hover:from-blue-800 hover:to-indigo-800 text-white font-bold text-base shadow-lg transition-all active:scale-[0.99] disabled:opacity-50 disabled:cursor-not-allowed">
-            👆 Touch to Pay
-          </button>
-          <p id="oneTouchHelp" class="text-xs text-slate-600 mt-2 leading-relaxed">One device confirmation, then your UPI app opens. Your UPI app will request its normal payment authorization.</p>
-          <a id="oneTouchFallback" href="#" class="hidden mt-3 w-full min-h-12 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold flex items-center justify-center" rel="noopener">Continue to UPI app</a>
-        </section>
-
-        <!-- Retained but hidden for compatibility while legacy vault handlers are phased out. -->
-        <div id="legacyVaultFlow" class="hidden" aria-hidden="true">
-        <!-- Passkey Status -->
-        <div id="passkeyStatus" class="w-full mb-3 p-3 rounded-xl bg-blue-50 border border-blue-200 text-blue-900 text-xs hidden">
-          <div class="flex items-center gap-2 mb-1">
-            <span class="w-2 h-2 rounded-full bg-blue-600"></span>
-            <span id="passkeyStatusText">Checking passkey...</span>
-          </div>
-        </div>
-
-        <!-- Register Passkey (first time only) -->
-        <div id="registerSection" class="w-full mb-3 hidden">
-          <div class="text-center mb-2">
-            <p class="text-[11px] font-mono text-slate-500 mb-2">No passkey found on this device.</p>
-            <p class="text-[11px] font-sans text-slate-700 mb-3">Register your device vault (fingerprint/FaceID) to authorize payments.</p>
-          </div>
-          <input type="text" id="regUserId" class="w-full h-10 px-3 rounded-xl bg-slate-50 border border-slate-200 text-slate-900 font-sans text-sm focus:border-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-100 mb-2" placeholder="Your user ID (e.g., user_123)">
-          <input type="text" id="regUserName" class="w-full h-10 px-3 rounded-xl bg-slate-50 border border-slate-200 text-slate-900 font-sans text-sm focus:border-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-100 mb-3" placeholder="Your display name (e.g., Nitish Kumar)">
-          <button type="button" id="btnRegisterPasskey" class="w-full h-11 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-700 hover:from-blue-700 hover:to-indigo-800 text-white font-bold text-sm shadow-md hover:shadow-lg transition-all active:scale-[0.99]">
-            🔐 Register Device Vault
-          </button>
-        </div>
-
-        <!-- Authenticate with Passkey (returning user) -->
-        <div id="authSection" class="w-full mb-3 hidden">
-          <div class="text-center mb-2">
-            <p class="text-[11px] font-mono text-slate-500 mb-2">Device vault found.</p>
-            <p class="text-[11px] font-sans text-slate-700 mb-3">Verify with fingerprint/FaceID to authorize payment.</p>
-          </div>
-          <button type="button" id="btnAuthenticatePasskey" class="w-full h-11 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-700 hover:from-emerald-600 hover:to-teal-800 text-white font-bold text-sm shadow-md hover:shadow-lg transition-all active:scale-[0.99]">
-            👆 Verify Vault (Biometric)
-          </button>
-        </div>
-
-        <!-- Vault Verified → Launch UPI -->
-        <div id="vaultVerifiedSection" class="w-full mb-3 hidden">
-          <div class="text-center mb-2">
-            <p class="text-[11px] font-mono text-emerald-700 mb-2">✅ Vault verified — order locked.</p>
-            <p class="text-[11px] font-sans text-slate-700 mb-3">Tap your UPI app to complete payment.</p>
-          </div>
-
-          <!-- P2P Merchant Prompt Guidance -->
-          <div class="w-full mb-3 p-3 rounded-xl bg-amber-50 border border-amber-200 text-amber-900 text-xs">
-            <p class="font-bold mb-1">📋 Important — When your UPI app asks:</p>
-            <p class="mb-2">Select <strong>"Pay to Friend"</strong> or <strong>"Personal Payment"</strong>. <br>
-            Do <strong>not</strong> select "Merchant Payment" — your VPA is personal, not a registered merchant terminal.</p>
-          </div>
-
-          <!-- Cancellation Cooldown UI -->
-          <div id="cooldownBanner" class="w-full mb-3 p-3 rounded-xl bg-rose-50 border border-rose-200 text-rose-900 text-xs hidden">
-            <p class="font-bold mb-1">⏳ Cooldown Active</p>
-            <p id="cooldownText" class="mb-2">Please wait <span id="cooldownSeconds">120</span>s before retrying.</p>
-            <button type="button" id="btnRetryAfterCooldown" class="w-full h-10 rounded-xl bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs shadow-sm transition-all active:scale-[0.99]">
-              Check if Cooldown Expired
-            </button>
-          </div>
-
-          <div class="w-full grid grid-cols-4 gap-2 mb-3">
-            <button type="button" id="btnLaunchGPay" class="h-11 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-sm shadow-sm transition-all active:scale-[0.99]" title="Google Pay">
-              <span class="text-lg">💳</span>
-            </button>
-            <button type="button" id="btnLaunchPhonePe" class="h-11 rounded-xl bg-purple-600 hover:bg-purple-700 text-white font-bold text-sm shadow-sm transition-all active:scale-[0.99]" title="PhonePe">
-              <span class="text-lg">🟣</span>
-            </button>
-            <button type="button" id="btnLaunchPaytm" class="h-11 rounded-xl bg-sky-500 hover:bg-sky-600 text-white font-bold text-sm shadow-sm transition-all active:scale-[0.99]" title="Paytm">
-              <span class="text-lg">🔷</span>
-            </button>
-            <button type="button" id="btnLaunchGeneric" class="h-11 rounded-xl bg-amber-500 hover:bg-amber-600 text-white font-bold text-sm shadow-sm transition-all active:scale-[0.99]" title="Generic UPI">
-              <span class="text-lg">🔗</span>
-            </button>
-          </div>
-        </div>
-
-        </div>
-
-        <!-- Status Card -->
-        <div id="statusCard" class="w-full mt-3 p-3.5 rounded-xl text-left hidden transition-all text-xs">
-          <div class="font-bold mb-0.5" id="statusTitle"></div>
-          <div class="leading-relaxed opacity-90" id="statusDesc"></div>
-          <button type="button" id="btnRetrySession" class="mt-2 px-3 py-1 rounded-md bg-red-100 hover:bg-red-200 text-red-800 font-semibold text-xs hidden cursor-pointer">
-            🔄 Retry Session Creation
-          </button>
-        </div>
-
-      </section>
-
-      <!-- Footer -->
-      <footer class="px-5 py-3 bg-slate-50/90 border-t border-slate-100 flex items-center justify-between text-[11px] text-slate-500">
-        <div class="flex items-center gap-1.5 font-medium">
-          <span class="text-emerald-600">🔒</span>
-          <span>WebAuthn Hardware Vault + Direct NPCI Clearing</span>
-        </div>
-        <div class="font-mono text-slate-400">
-          T+0 Settlement
-        </div>
-      </footer>
-
+<body data-checkout="generic">
+<div class="universe" aria-hidden="true">
+ <div class="starfield starfield-a"></div><div class="starfield starfield-b"></div>
+ <div class="nebula nebula-one"></div><div class="nebula nebula-two"></div>
+ <div class="horizon"></div>
+</div>
+<main class="checkout-shell" aria-label="DISHA payment checkout">
+ <header class="checkout-brand">
+  <img src="/assets/disha-8-2-wordmark-cropped.png" width="240" height="60" alt="DISHA 8.2" class="logo">
+ </header>
+ <article class="checkout-panel" aria-label="UPI payment">
+  <div class="panel-topline" aria-hidden="true"><span></span><span></span><span></span></div>
+  <section data-stage="initial" class="stage stage-initial" aria-label="Begin payment">
+   <p class="eyebrow">PAYMENT</p>
+   <div id="payAmount" class="amount" aria-label="Amount to pay">—</div>
+   <div class="vault-scene" aria-hidden="true">
+    <div class="vault-aura"></div>
+    <div class="orbit orbit-one"></div><div class="orbit orbit-two"></div><div class="orbit orbit-three"></div>
+    <div class="vault-core">
+     <svg viewBox="0 0 100 100" width="98" height="98" fill="none">
+      <circle cx="50" cy="50" r="43" stroke="#AFBBFF" stroke-opacity=".48" stroke-width="1.4"/>
+      <path d="M29 61c-4-15 1-35 21-35s25 20 21 35M36 64c-3-13-1-30 14-30s17 18 14 31M43 68c-3-12-1-26 7-26s11 12 7 27M50 77c-2-10-1-20 0-24" stroke="#D8E8FF" stroke-width="3" stroke-linecap="round"/>
+     </svg>
     </div>
-  </main>
+    <span class="orbital-dot dot-a"></span><span class="orbital-dot dot-b"></span>
+   </div>
+   <button id="btnOneTouch" type="button" class="action-primary" disabled>
+    <span class="touch-icon" aria-hidden="true">◈</span><span>Touch to Pay</span><span class="action-arrow" aria-hidden="true">↗</span>
+   </button>
+   <p class="button-help">Continue securely with your device</p>
+  </section>
 
-  <!-- Background Mathematical Equations Animation -->
-  <script>
-    (function () {
-      const canvas = document.getElementById('math-canvas');
-      if (!canvas) return;
-      const ctx = canvas.getContext('2d');
-      const EQ = [
-        'WebAuthn → Titan M2', 'P(fraud) → 0', 'H(UTR) = SHA-256',
-        'Secure Enclave → Signed', 'ΣFee = ₹0', 'T+0 IMPS',
-        'Anti-Replay UTR', 'VPA · sig ≡ NPCI', 'idempotency_key',
-        'Passkey → Biometric'
-      ];
-      let p = [];
-      function resize() {
-        canvas.width = window.innerWidth;
-        canvas.height = window.innerHeight;
-      }
-      function spawn() {
-        return {
-          x: Math.random() * canvas.width,
-          y: canvas.height + 20,
-          text: EQ[Math.floor(Math.random() * EQ.length)],
-          speed: 0.25 + Math.random() * 0.4,
-          opacity: 0,
-          maxOpacity: 0.35,
-          life: 0,
-          maxLife: 260,
-          color: Math.random() > 0.5 ? '#059669' : '#2563eb'
-        };
-      }
-      function loop() {
-        ctx.clearRect(0, 0, canvas.width, canvas.height);
-        if (p.length < 20 && Math.random() < 0.06) p.push(spawn());
-        p = p.filter(item => {
-          item.life++;
-          item.y -= item.speed;
-          if (item.life < 30) item.opacity = (item.life / 30) * item.maxOpacity;
-          else if (item.life > item.maxLife - 30) item.opacity = ((item.maxLife - item.life) / 30) * item.maxOpacity;
-          if (item.opacity <= 0 || item.y < -20) return false;
-          ctx.save();
-          ctx.globalAlpha = item.opacity;
-          ctx.font = '12px "JetBrains Mono", monospace';
-          ctx.fillStyle = item.color;
-          ctx.fillText(item.text, item.x, item.y);
-          ctx.restore();
-          return true;
-        });
-        requestAnimationFrame(loop);
-      }
-      window.addEventListener('resize', resize);
-      resize();
-      loop();
-    })();
-  </script>
+  <section data-stage="methods" class="stage" aria-label="Choose payment app" hidden>
+   <p class="eyebrow">CONTINUE PAYMENT</p><h1>Pay with your UPI app.</h1>
+   <p class="stage-copy">Choose the app you prefer, or scan the QR code.</p>
+   <div class="app-grid" aria-label="UPI applications">
+    <button id="app-gpay" type="button" class="app-choice" data-app="gpay"><span class="app-icon google"><img src="/assets/upi-googlepay.svg" alt="" width="31" height="31"></span><span>Google Pay</span></button>
+    <button id="app-phonepe" type="button" class="app-choice" data-app="phonepe"><span class="app-icon phonepe"><img src="/assets/upi-phonepe.svg" alt="" width="31" height="31"></span><span>PhonePe</span></button>
+    <button id="app-paytm" type="button" class="app-choice" data-app="paytm"><span class="app-icon paytm"><img src="/assets/upi-paytm.svg" alt="" width="31" height="31"></span><span>Paytm</span></button>
+    <button id="app-cred" type="button" class="app-choice" data-app="cred"><span class="app-icon cred" aria-hidden="true">C</span><span>CRED / UPI</span></button>
+   </div>
+   <a id="oneTouchFallback" class="fallback-anchor" href="#" hidden>Open UPI app <span aria-hidden="true">↗</span></a>
+   <button id="showQr" type="button" class="action-secondary"><span class="mini-qr" aria-hidden="true">▦</span> Show dynamic QR <span class="action-arrow" aria-hidden="true">→</span></button>
+   <p class="inline-note">Your UPI app will show the payment details before you approve.</p>
+  </section>
 
-  <!-- Checkout Logic: WebAuthn + UPI -->
-  <script src="/vendor/simplewebauthn.umd.js"></script>
-  <script src="/one-touch-vault.js"></script>
-  <script>
-    /* ========================================================================
-       ELEMENTS
-       ======================================================================== */
-    const challengeAmountEl = document.getElementById('challengeAmountEl');
-    const qrLoading = document.getElementById('qrLoading');
-    const qrImg = document.getElementById('qrImg');
-    const vpaPill = document.getElementById('vpaPill');
-    const vpaAddress = document.getElementById('vpaAddress');
+  <section data-stage="qr" class="stage stage-qr" aria-label="Scan UPI QR" hidden>
+   <p class="eyebrow">SCAN TO PAY</p><h1>Scan with a UPI app.</h1>
+   <p class="stage-copy">Use your UPI app on another device.</p>
+   <div class="qr-visual">
+    <span class="qr-scan-line" aria-hidden="true"></span>
+    <div class="qr-paper"><div id="paymentQr" role="img" aria-label="Order-specific UPI QR"></div></div>
+   </div>
+   <p class="qr-expiry" id="qrExpiry">Preparing your payment code…</p>
+   <button id="backToApps" type="button" class="action-secondary">Choose a UPI app <span class="action-arrow" aria-hidden="true">→</span></button>
+   <p class="inline-note">Complete the payment in your UPI app.</p>
+  </section>
 
-    const linkGPay = document.getElementById('linkGPay');
-    const linkPhonePe = document.getElementById('linkPhonePe');
-    const linkPaytm = document.getElementById('linkPaytm');
-    const linkCred = document.getElementById('linkCred');
+  <section data-stage="checking" class="stage stage-checking" aria-label="Checking payment" hidden>
+   <p class="eyebrow">PAYMENT STATUS</p>
+   <div class="receipt-sculpture" aria-hidden="true"><div class="paper-back"></div><div class="paper-front"><span></span><span></span><span></span><i></i></div><div class="receipt-halo"></div></div>
+   <h1>Checking your payment.</h1>
+   <p class="stage-copy" id="checkingHelp">We’ll update this page when your payment is confirmed.</p>
+   <div class="indeterminate" aria-label="Waiting for payment status"><span></span></div>
+   <button id="checkingApps" type="button" class="action-secondary">Choose another payment method <span class="action-arrow" aria-hidden="true">→</span></button>
+  </section>
 
-    // WebAuthn elements
-    const passkeyStatus = document.getElementById('passkeyStatus');
-    const passkeyStatusText = document.getElementById('passkeyStatusText');
-    const registerSection = document.getElementById('registerSection');
-    const authSection = document.getElementById('authSection');
-    const vaultVerifiedSection = document.getElementById('vaultVerifiedSection');
-    const regUserId = document.getElementById('regUserId');
-    const regUserName = document.getElementById('regUserName');
-    const btnRegisterPasskey = document.getElementById('btnRegisterPasskey');
-    const btnAuthenticatePasskey = document.getElementById('btnAuthenticatePasskey');
-    const btnLaunchGPay = document.getElementById('btnLaunchGPay');
-    const btnLaunchPhonePe = document.getElementById('btnLaunchPhonePe');
-    const btnLaunchPaytm = document.getElementById('btnLaunchPaytm');
-    const btnLaunchGeneric = document.getElementById('btnLaunchGeneric');
-
-    // Cooldown UI elements
-    const cooldownBanner = document.getElementById('cooldownBanner');
-    const cooldownSeconds = document.getElementById('cooldownSeconds');
-    const btnRetryAfterCooldown = document.getElementById('btnRetryAfterCooldown');
-    const btnOneTouch = document.getElementById('btnOneTouch');
-    const oneTouchHelp = document.getElementById('oneTouchHelp');
-    const oneTouchFallback = document.getElementById('oneTouchFallback');
-
-    const statusCard = document.getElementById('statusCard');
-    const statusTitle = document.getElementById('statusTitle');
-    const statusDesc = document.getElementById('statusDesc');
-    const btnRetrySession = document.getElementById('btnRetrySession');
-
-    /* ========================================================================
-       STATE
-       ======================================================================== */
-    let currentSession = null;
-    let currentUpIUri = null;
-    let vaultSessionId = null;
-    let cooldownUntil = 0;
-    let cooldownTimer = null;
-
-    /* ========================================================================
-       UTILITIES
-       ======================================================================== */
-    function formatINR(val) {
-      return '₹' + Number(val).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-    }
-
-    function showStatus(type, title, desc, showRetry = false) {
-      statusCard.className = 'w-full mt-3 p-3.5 rounded-xl text-left block text-xs ';
-      if (type === 'success') {
-        statusCard.className += 'bg-emerald-50 border border-emerald-200 text-emerald-900';
-      } else if (type === 'error') {
-        statusCard.className += 'bg-rose-50 border border-rose-200 text-rose-900';
-      } else {
-        statusCard.className += 'bg-blue-50 border border-blue-200 text-blue-900';
-      }
-      statusTitle.textContent = title;
-      statusDesc.textContent = desc || '';
-      btnRetrySession.style.display = showRetry ? 'inline-block' : 'none';
-      statusCard.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-    }
-
-    function setButtonLoading(btn, isLoading, loadingText, normalText) {
-      if (!btn) return;
-      btn.disabled = isLoading;
-      btn.textContent = isLoading ? loadingText : normalText;
-      btn.classList.toggle('opacity-70', isLoading);
-      btn.classList.toggle('cursor-not-allowed', isLoading);
-    }
-
-    /* ========================================================================
-       COOLDOWN UTILITIES
-       ======================================================================== */
-    function startCooldown(seconds) {
-      cooldownUntil = Date.now() + seconds * 1000;
-      cooldownBanner.classList.remove('hidden');
-      // Disable all launch buttons
-      [btnLaunchGPay, btnLaunchPhonePe, btnLaunchPaytm, btnLaunchGeneric].forEach(btn => {
-        btn.disabled = true;
-        btn.classList.add('opacity-50', 'cursor-not-allowed');
-      });
-      if (cooldownTimer) clearInterval(cooldownTimer);
-      cooldownTimer = setInterval(() => {
-        const remaining = Math.ceil((cooldownUntil - Date.now()) / 1000);
-        if (remaining <= 0) {
-          endCooldown();
-        } else {
-          cooldownSeconds.textContent = remaining;
-        }
-      }, 1000);
-    }
-
-    function endCooldown() {
-      if (cooldownTimer) {
-        clearInterval(cooldownTimer);
-        cooldownTimer = null;
-      }
-      cooldownBanner.classList.add('hidden');
-      cooldownUntil = 0;
-      [btnLaunchGPay, btnLaunchPhonePe, btnLaunchPaytm, btnLaunchGeneric].forEach(btn => {
-        btn.disabled = false;
-        btn.classList.remove('opacity-50', 'cursor-not-allowed');
-      });
-    }
-
-    async function checkCooldownFromServer(orderId) {
-      // The cancellation endpoint remains authoritative for retries.
-    }
-
-    /* ========================================================================
-       1. INITIALIZE CHECKOUT SESSION
-       ======================================================================== */
-    async function initSession() {
-      try {
-        qrLoading.classList.remove('hidden');
-        qrImg.classList.add('hidden');
-        statusCard.classList.add('hidden');
-        hideAllWebAuthnSections();
-
-        const urlParams = new URLSearchParams(window.location.search);
-        const amount = urlParams.get('amount') || 500;
-        // The customer vault uses a stable private random ID in first-party storage.
-        // Never generate a new timestamp user ID on each visit.
-        const userId = window.DISHAOneTouchVault.getDeviceUserId();
-        const userName = 'DISHA Device Vault';
-        btnOneTouch.disabled = true;
-
-        const res = await fetch(`/api/session/new?amount=${encodeURIComponent(amount)}&description=Checkout+Order&userId=${encodeURIComponent(userId)}&userName=${encodeURIComponent(userName)}`);
-        if (!res.ok) {
-          const errData = await res.json().catch(() => ({}));
-          throw new Error(errData.message || errData.error || 'Session creation failed: HTTP ' + res.status);
-        }
-        const data = await res.json();
-        if (!data.success) {
-          throw new Error(data.message || data.error || 'Failed to initialize session');
-        }
-
-        currentSession = data;
-        challengeAmountEl.textContent = formatINR(data.challengeAmount);
-        vpaAddress.textContent = data.vpaAddress;
-
-        if (data.qrDataUrl) {
-          qrImg.src = data.qrDataUrl;
-          qrImg.classList.remove('hidden');
-          qrLoading.classList.add('hidden');
-        }
-
-        if (data.upiLink) {
-          currentUpIUri = data.upiLink;
-          linkGPay.href = data.appLinks?.android?.gpay || data.upiLink;
-          linkPhonePe.href = data.appLinks?.android?.phonepe || data.upiLink;
-          linkPaytm.href = data.appLinks?.android?.paytm || data.upiLink;
-          linkCred.href = data.upiLink;
-        }
-
-        // Pre-render the payment request. Prompt only after a customer tap.
-        regUserId.value = userId;
-        regUserName.value = userName;
-        btnOneTouch.disabled = !currentUpIUri;
-        oneTouchHelp.textContent = 'One touch registers or verifies your device vault, then opens your UPI app.';
-
-        // Setup WebSocket listener
-        setupWebSocket(data.orderId, data.sessionId);
-      } catch (err) {
-        console.error('Session error:', err);
-        showStatus('error', 'Session Failed', err.message || 'Unable to connect to payment switch.', true);
-      }
-    }
-
-    async function checkPasskeyStatus(userId, userName) {
-      try {
-        const res = await fetch('/api/webauthn/authenticate/start', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ userId, orderId: currentSession.orderId, amount: currentSession.challengeAmount })
-        });
-        const data = await res.json();
-
-        if (data.needsRegistration) {
-          // No passkey — show registration
-          passkeyStatus.classList.add('hidden');
-          registerSection.classList.remove('hidden');
-          authSection.classList.add('hidden');
-          vaultVerifiedSection.classList.add('hidden');
-          regUserId.value = userId;
-          regUserName.value = userName;
-          showStatus('processing', 'Register Device Vault', 'No passkey found. Register your fingerprint/FaceID to authorize payments.');
-        } else if (data.success) {
-          // Has passkey — show authenticate
-          passkeyStatus.classList.remove('hidden');
-          passkeyStatus.className = 'w-full mb-3 p-3 rounded-xl bg-blue-50 border border-blue-200 text-blue-900 text-xs';
-          passkeyStatusText.textContent = 'Device vault ready — verify with biometric';
-          registerSection.classList.add('hidden');
-          authSection.classList.remove('hidden');
-          vaultVerifiedSection.classList.add('hidden');
-          vaultSessionId = data.sessionId;
-          showStatus('processing', 'Vault Verification Required', 'Tap "Verify Vault" to authorize with fingerprint/FaceID.');
-        } else {
-          showStatus('error', 'Passkey Check Failed', data.error || 'Unknown error');
-        }
-      } catch (err) {
-        console.error('Passkey check error:', err);
-        showStatus('error', 'Passkey Check Failed', err.message);
-      }
-    }
-
-    function hideAllWebAuthnSections() {
-      passkeyStatus.classList.add('hidden');
-      registerSection.classList.add('hidden');
-      authSection.classList.add('hidden');
-      vaultVerifiedSection.classList.add('hidden');
-    }
-
-    /* ========================================================================
-       2. WEBAUTHN REGISTRATION (first time)
-       ======================================================================== */
-    btnRegisterPasskey.addEventListener('click', async () => {
-      const userId = regUserId.value.trim();
-      const userName = regUserName.value.trim();
-      if (!userId || !userName) {
-        showStatus('error', 'Missing Info', 'Please enter user ID and display name.');
-        return;
-      }
-
-      setButtonLoading(btnRegisterPasskey, true, 'Registering…', '🔐 Register Device Vault');
-
-      try {
-        const res = await fetch('/api/webauthn/register/start', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ userId, userName, orderId: currentSession.orderId })
-        });
-        const data = await res.json();
-        if (!res.ok || !data.sessionId) throw new Error(data.error || 'Registration start failed');
-
-        // browser-side WebAuthn registration
-        const registration = await SimpleWebAuthnBrowser.startRegistration({
-          optionsJSON: data.publicKey
-        });
-
-        const finishRes = await fetch('/api/webauthn/register/finish', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ sessionId: data.sessionId, credential: registration })
-        });
-        const finishData = await finishRes.json();
-        if (!finishRes.ok || !finishData.success) throw new Error(finishData.error || 'Registration finish failed');
-
-        showStatus('success', 'Device Vault Registered', 'Your fingerprint/FaceID is now bound to this device.');
-        setTimeout(() => {
-          // Re-check to move to auth section
-          checkPasskeyStatus(userId, userName);
-        }, 1000);
-      } catch (err) {
-        console.error('Registration error:', err);
-        showStatus('error', 'Registration Failed', err.message || 'Could not register device vault.');
-      } finally {
-        setButtonLoading(btnRegisterPasskey, false, 'Registering…', '🔐 Register Device Vault');
-      }
-    });
-
-    /* ========================================================================
-       3. WEBAUTHN AUTHENTICATION (vault verify)
-       ======================================================================== */
-    btnAuthenticatePasskey.addEventListener('click', async () => {
-      const userId = regUserId.value.trim() || 'user_' + Date.now();
-      setButtonLoading(btnAuthenticatePasskey, true, 'Verifying Vault…', '👆 Verify Vault (Biometric)');
-
-      try {
-        const res = await fetch('/api/webauthn/authenticate/start', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ userId, orderId: currentSession.orderId, amount: currentSession.challengeAmount })
-        });
-        const data = await res.json();
-        if (!res.ok || !data.sessionId) throw new Error(data.error || 'Authentication start failed');
-
-        vaultSessionId = data.sessionId;
-
-        // browser-side WebAuthn authentication
-        const credential = await SimpleWebAuthnBrowser.startAuthentication({
-          optionsJSON: data.publicKey
-        });
-
-        const finishRes = await fetch('/api/webauthn/authenticate/finish', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ sessionId: data.sessionId, credential })
-        });
-        const finishData = await finishRes.json();
-        if (!finishRes.ok || !finishData.success) throw new Error(finishData.error || 'Vault verification failed');
-
-        // Vault verified — show UPI launch buttons
-        authSection.classList.add('hidden');
-        vaultVerifiedSection.classList.remove('hidden');
-        passkeyStatus.classList.add('hidden');
-        showStatus('success', 'Vault Verified ✅', 'Order locked by hardware vault. Tap your UPI app to pay.');
-      } catch (err) {
-        console.error('Authentication error:', err);
-        showStatus('error', 'Vault Verification Failed', err.message || 'Biometric verification cancelled or failed.');
-      } finally {
-        setButtonLoading(btnAuthenticatePasskey, false, 'Verifying Vault…', '👆 Verify Vault (Biometric)');
-      }
-    });
-
-    /* ========================================================================
-       4. LAUNCH UPI INTENT (after vault verify)
-       ======================================================================== */
-    /* ========================================================================
-       4. LAUNCH UPI INTENT (after vault verify)
-       ======================================================================== */
-    function launchUPIIntent(app) {
-      // Cooldown check: block if cancellation cooldown is active
-      if (Date.now() < cooldownUntil) {
-        showStatus('error', 'Cooldown Active', `Please wait ${Math.ceil((cooldownUntil - Date.now()) / 1000)}s before retrying.`);
-        return;
-      }
-      if (!vaultSessionId) {
-        showStatus('error', 'Vault Not Verified', 'Please verify the device vault first.');
-        return;
-      }
-      if (!currentUpIUri) {
-        showStatus('error', 'No UPI Link', 'Session missing UPI link. Please refresh.');
-        return;
-      }
-
-      let intent = currentUpIUri;
-      if (app === 'gpay') intent = linkGPay.href || currentUpIUri;
-      if (app === 'phonepe') intent = linkPhonePe.href || currentUpIUri;
-      if (app === 'paytm') intent = linkPaytm.href || currentUpIUri;
-
-      window.location.href = intent;
-    }
-
-    // One customer click: OS passkey registration OR passkey verification (not both).
-    // Asynchronous browser navigation may be blocked, so reveal a genuine
-    // continue link *before* attempting to open the UPI app.
-    btnOneTouch.addEventListener('click', async () => {
-      if(!currentSession?.orderId || !currentUpIUri) {
-        showStatus('error','Payment not ready','Please refresh your payment request.');
-        return;
-      }
-      if(Date.now() < cooldownUntil) {
-        showStatus('error','Please retry shortly','This payment request is temporarily paused.');
-        return;
-      }
-      btnOneTouch.disabled=true;
-      oneTouchHelp.textContent='Confirm once with your device fingerprint, face or screen lock…';
-      try {
-        const verified=await window.DISHAOneTouchVault.authorize(currentSession.orderId);
-        vaultSessionId=verified.sessionId;
-        try{sessionStorage.setItem('disha82:vault-session:'+currentSession.orderId,vaultSessionId);}catch(_){}
-        window.DISHAOneTouchVault.beginHandoff(currentSession.orderId,vaultSessionId,currentSession.sessionId);
-        oneTouchFallback.href=currentUpIUri;
-        oneTouchFallback.classList.remove('hidden');
-        oneTouchHelp.textContent='Vault verified. Opening your UPI app…';
-        showStatus('processing','Opening UPI app','The vault authorizes app launch, not a completed payment.');
-        window.DISHAOneTouchVault.launchUPI(currentUpIUri);
-      } catch(err) {
-        oneTouchHelp.textContent='You can retry the device confirmation.';
-        showStatus('error','Device verification not completed',err.message||'Try again with your device vault.');
-      } finally {
-        btnOneTouch.disabled=false;
-      }
-    });
-    oneTouchFallback.addEventListener('click', e => {
-      if(!vaultSessionId || !currentUpIUri){e.preventDefault();return;}
-    });
-
-    btnLaunchGPay.addEventListener('click', () => launchUPIIntent('gpay'));
-    btnLaunchPhonePe.addEventListener('click', () => launchUPIIntent('phonepe'));
-    btnLaunchPaytm.addEventListener('click', () => launchUPIIntent('paytm'));
-    btnLaunchGeneric.addEventListener('click', () => launchUPIIntent('generic'));
-
-    btnRetryAfterCooldown.addEventListener('click', () => {
-      // Check if cooldown has expired
-      if (Date.now() >= cooldownUntil) {
-        endCooldown();
-      } else {
-        showStatus('error', 'Still in Cooldown', `Please wait ${Math.ceil((cooldownUntil - Date.now()) / 1000)}s.`);
-      }
-    });
-
-    /* ========================================================================
-       5. UPI RETURN / FINALIZE
-       ======================================================================== */
-    // Browser asks the Vault for the event evidence, receives an immutable
-    // handoff packet, submits it to DISHA, and acknowledges persisted receipt.
-    let vaultEvidenceSending=false;
-    async function submitVaultReturn(){
-      if(vaultEvidenceSending)return;
-      const vault=window.DISHAOneTouchVault;
-      const packet=vault.requestEvidence();
-      if(!packet)return;
-      vaultEvidenceSending=true;
-      try{
-        const response=await fetch('/api/vault/evidence',{
-          method:'POST',credentials:'same-origin',cache:'no-store',
-          headers:{'Content-Type':'application/json','X-CSRF-Token':packet.token},
-          body:JSON.stringify(packet)
-        });
-        const result=await response.json().catch(()=>({}));
-        if(!response.ok||!result.success)
-          throw Error(result.error||'VAULT_EVIDENCE_NOT_STORED');
-        const receipt=vault.acknowledgeEvidence(packet.orderId,packet.eventId,result);
-        oneTouchHelp.textContent=receipt.utrCandidate?
-          'Vault supplied UPI reference evidence to your browser.':
-          'Vault supplied the browser-return event evidence.';
-        showStatus('processing','Vault evidence received',
-          'Evidence was recorded against this order. Payment remains pending.');
-      }catch(err){
-        oneTouchHelp.textContent='Vault evidence delivery will retry on browser resume.';
-      }finally{vaultEvidenceSending=false}
-    }
-    window.addEventListener('load',()=>{void submitVaultReturn()});
-    window.addEventListener('pageshow',()=>{void submitVaultReturn()});
-    window.addEventListener('focus',()=>{void submitVaultReturn()});
-
-    /* ========================================================================
-       6. WEBSOCKET REAL-TIME
-       ======================================================================== */
-    function setupWebSocket(orderId, sessionToken) {
-      try {
-        const protocol = location.protocol === 'https:' ? 'wss:' : 'ws:';
-        const ws = new WebSocket(`${protocol}//${location.host}/ws?orderId=${encodeURIComponent(orderId)}&token=${encodeURIComponent(sessionToken)}`);
-        ws.onmessage = (event) => {
-          try {
-            const msg = JSON.parse(event.data);
-            if (msg.type === 'SUCCESS' || msg.type === 'SETTLED') {
-              showStatus('success', '✅ Payment Settled (T+0)', `Real-time notification: UTR ${msg.utr || 'DIRECT_SETTLED'}. Settled at 0% fee.`);
-            }
-          } catch (e) {}
-        };
-      } catch (e) {
-        console.log('WS not connected');
-      }
-    }
-
-    /* ========================================================================
-       EVENT LISTENERS
-       ======================================================================== */
-    vpaPill.addEventListener('click', () => {
-      if (currentSession && currentSession.vpaAddress) {
-        navigator.clipboard.writeText(currentSession.vpaAddress).then(() => {
-          const orig = vpaAddress.textContent;
-          vpaAddress.textContent = 'Copied to Clipboard!';
-          setTimeout(() => vpaAddress.textContent = orig, 1200);
-        });
-      }
-    });
-
-    btnRetrySession.addEventListener('click', initSession);
-
-    // App switching is NOT a cancellation; Android sends pagehide/visibility
-    // when the UPI app opens. Never punish the user with a 120-second cooldown.
-    document.addEventListener('visibilitychange', () => {
-      if(document.visibilityState==='hidden'){
-        window.DISHAOneTouchVault.markBackgrounded();
-      }else{
-        void submitVaultReturn();
-      }
-    });
-    window.addEventListener('pagehide',()=>window.DISHAOneTouchVault.markBackgrounded());
-
-    // Start
-    initSession();
-  </script>
+  <section data-stage="receipt" class="stage stage-receipt" aria-label="Payment receipt" hidden>
+   <p class="eyebrow">PAYMENT RECEIPT</p>
+   <div class="receipt-seal" aria-hidden="true">✓</div>
+   <h1>Payment confirmed.</h1>
+   <div id="receiptAmount" class="receipt-amount">—</div>
+   <p class="receipt-subline">Recorded payment</p>
+   <div class="receipt-details">
+    <div><span>Payment reference</span><strong id="receiptOrder">—</strong></div>
+    <div><span>UPI reference</span><strong id="receiptUtr">—</strong></div>
+    <div><span>Status</span><strong class="receipt-confirmed">Completed</strong></div>
+   </div>
+   <div class="receipt-actions">
+    <button id="saveReceipt" type="button" class="action-primary">Save / print receipt <span class="action-arrow" aria-hidden="true">↗</span></button>
+    <button id="shareReceipt" type="button" class="action-secondary">Share receipt <span class="action-arrow" aria-hidden="true">→</span></button>
+   </div>
+  </section>
+  <div id="checkoutStatus" role="status" aria-live="polite" class="checkout-status" hidden></div>
+ </article>
+ <footer class="checkout-footer"><span class="footer-pin" aria-hidden="true">✦</span> DISHA 8.2 <span aria-hidden="true">·</span> Made for direct payments</footer>
+</main>
 </body>
 </html>

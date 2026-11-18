@@ -37,7 +37,7 @@ const path=require('node:path');
   assert.equal(data.order.status,'PENDING','opening link never settles payment');
   const html=await(await fetch(origin+'/merchant-checkout.html')).text();
   assert.match(html,/Touch to Pay/);
-  assert.match(html,/DISHAOneTouchVault\.authorize\(orderId\)/);
+  assert.match(html,/cosmic-checkout\.js/);
   const passkey=await fetch(origin+'/vendor/simplewebauthn.umd.js');
   assert.equal(passkey.status,200);
   const oneTouch=await fetch(origin+'/one-touch-vault.js');
