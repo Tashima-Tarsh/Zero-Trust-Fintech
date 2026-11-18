@@ -35,6 +35,16 @@ async function load(screen){
  $('#owner-ledger-body').innerHTML=r.connected&&r.journals.length?r.journals.map(j=>'<tr><td>'+esc(j.journal_id)+'</td><td>'+esc(j.business_name||j.merchant_id)+'</td><td>'+esc(j.order_id)+'</td><td>'+money(j.amount_paise)+'</td><td><span class="state">'+esc(j.state)+'</span></td></tr>').join(''):'<tr><td colspan="5">'+(r.connected?'No journals recorded.':'Financial core schema not provisioned.')+'</td></tr>';}
  if(screen==='trust'){const r=await api('/owner/evidence');$('#owner-evidence-body').innerHTML=r.connected&&r.evidence.length?r.evidence.map(v=>'<tr><td>'+esc(v.order_id)+'</td><td>'+esc(v.business_name)+'</td><td>'+esc(v.outcome||'Observed')+(v.selected_app?'<span class="sub">App: '+esc(v.selected_app)+' · Return: '+esc(v.return_ms||'—')+'ms</span>':'')+'</td><td>'+esc(v.utr_candidate||'—')+'</td><td>'+esc(v.status)+'</td></tr>').join(''):'<tr><td colspan="5">'+(r.connected?'No order-bound Vault events recorded.':'Vault reporting is not available.')+'</td></tr>';}
 
+ if(screen==='trust'){
+   const tbody=$('#owner-checkout-traces');
+   try{
+     const traces=await api('/owner/checkout-diagnostics');
+     const rows=traces.events||[];
+     tbody.innerHTML=!traces.connected?'<tr><td colspan="5">Diagnostics database is not configured.</td></tr>':
+       !rows.length?'<tr><td colspan="5">No opted-in tests yet. Open the debug=1 test link above, then refresh this view.</td></tr>':
+       rows.map(e=>'<tr><td>'+esc(e.created_at?new Date(e.created_at).toLocaleString('en-IN'):'—')+'</td><td>'+esc(e.order_id)+'</td><td>'+esc(e.app)+' / '+esc(e.device)+'</td><td>'+esc(e.event)+'</td><td>'+esc(e.code)+'</td></tr>').join('');
+   }catch(_){tbody.innerHTML='<tr><td colspan="5">Checkout diagnostics could not be retrieved. Retry after confirming backend availability.</td></tr>';}
+ }
  if(screen==='incidents'){const r=await api('/owner/incidents');incidents=r.incidents||[];$('#incident-kpis').innerHTML=field(incidents.filter(x=>x.status==='OPEN').length,'Open recorded incidents')+field(incidents.filter(x=>x.severity==='CRITICAL').length,'Critical incidents')+field('Unavailable','Frontend monitoring')+field('Unavailable','Deployment monitoring');
  $('#incidents-body').innerHTML=incidents.length?incidents.map(i=>'<tr><td><span class="state">'+esc(i.severity)+'</span></td><td>'+esc(i.service)+'</td><td>'+esc(i.summary)+'</td><td>'+esc(i.status)+'</td><td>'+when(i.created_at)+'</td><td>'+(i.status==='RESOLVED'?'Resolved':'<button data-incident="'+esc(i.id)+'" data-inc-status="'+(i.status==='OPEN'?'ACKNOWLEDGED':'RESOLVED')+'">'+(i.status==='OPEN'?'Acknowledge':'Resolve')+'</button>')+'</td></tr>').join(''):'<tr><td colspan="6">No incidents recorded in the platform incident store. External telemetry is not connected.</td></tr>';
  $('#telemetry-body').innerHTML=Object.entries(r.telemetry||{}).map(([k,v])=>'<div><b>'+esc(k)+'</b><span>'+esc(v)+'</span></div>').join('');}
