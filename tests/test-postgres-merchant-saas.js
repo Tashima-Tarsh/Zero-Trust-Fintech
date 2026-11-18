@@ -161,6 +161,50 @@ const {buildUpiUri}=require('../utils/upi-intent');
   assert.equal(r.data.trend.reduce((total,point)=>total+point.volume,0),500.01);
   r=await call('/api/merchant/public/order/'+encodeURIComponent(order.id)+'?token='+encodeURIComponent(token));
   assert.equal(r.data.order.status,'COMPLETED');
+  // Snapshot contract: changing a VPA later must not mutate a customer's
+  // already-issued payee identity or downgrade a P2P intent into P2M.
+  let earlier=await call('/api/merchant/public/order/'+encodeURIComponent(order.id)+'?token='+encodeURIComponent(token));
+  const initialUri=earlier.data.order.upi_uri;
+  let initialParams=new URL(initialUri).searchParams;
+  assert.equal(initialParams.get('pn'),'Acme Treasury','Personal UPI shows actual account holder');
+  assert.equal(initialParams.get('mc'),null);
+  assert.equal(initialParams.get('tr'),null);
+  await pg.query("UPDATE saas_merchant_vpas SET account_type='MERCHANT',mcc='5411',holder_name='Renamed Payee' WHERE vpa_address=$1",
+    ['acme'+nonce+'@oksbi']);
+  earlier=await call('/api/merchant/public/order/'+encodeURIComponent(order.id)+'?token='+encodeURIComponent(token));
+  assert.equal(earlier.status,200);
+  assert.equal(earlier.data.order.upi_uri,initialUri,'Existing P2P payment must not mutate after VPA modification');
+  await pg.query("UPDATE saas_merchant_vpas SET account_type='PERSONAL',mcc=NULL,holder_name='Acme Treasury' WHERE vpa_address=$1",
+    ['acme'+nonce+'@oksbi']);
+  const merchantVpa='counter'+nonce+'@ybl';
+  let p2m=await call('/api/merchant/payments',alice,'POST',{
+    amount:'1.00',vpaAddress:merchantVpa,description:'Company receipt'});
+  assert.equal(p2m.status,201,'Validated P2M receiving VPA creates a merchant payment');
+  const p2mLink=new URL(p2m.data.order.checkout_url,base);
+  const p2mParams=new URL(p2m.data.order.upi_uri_dynamic).searchParams;
+  assert.equal(p2mParams.get('pa'),merchantVpa);
+  assert.equal(p2mParams.get('mc'),'5411');
+  assert.ok(p2mParams.get('tr'),'Merchant payment has stable unique transaction reference');
+  assert.equal(p2mParams.get('pn'),result.data.merchant.business_name==='Acme '+nonce?'Acme '+nonce:'Acme '+nonce);
+  const recorded=await pg.query('SELECT payee_name,payee_account_type,payee_mcc FROM saas_merchant_orders WHERE id=$1',
+    [p2m.data.order.id]);
+  assert.equal(recorded.rows[0].payee_account_type,'MERCHANT');
+  assert.equal(recorded.rows[0].payee_mcc,'5411');
+  await pg.query("UPDATE saas_merchant_vpas SET account_type='PERSONAL',mcc=NULL,holder_name='Modified Payee' WHERE vpa_address=$1",[merchantVpa]);
+  const p2mFetched=await call('/api/merchant/public/order/'+encodeURIComponent(p2m.data.order.id)+'?token='+encodeURIComponent(p2mLink.searchParams.get('token')));
+  assert.equal(p2mFetched.status,200);
+  assert.equal(p2mFetched.data.order.upi_uri,p2m.data.order.upi_uri_dynamic,'P2M MCC and payee must not change on account edits');
+  await pg.query("UPDATE saas_merchant_vpas SET account_type='MERCHANT',mcc=NULL WHERE vpa_address=$1",[merchantVpa]);
+  const beforeInvalid=(await pg.query('SELECT count(*)::int AS n FROM saas_merchant_orders WHERE merchant_id=$1',
+    [result.data.merchant.id])).rows[0].n;
+  const invalid=await call('/api/merchant/payments',alice,'POST',{
+    amount:'1.00',vpaAddress:merchantVpa,description:'Invalid merchant category'});
+  assert.equal(invalid.status,409,'Invalid MCC must reject P2M before creating a payment session');
+  const afterInvalid=(await pg.query('SELECT count(*)::int AS n FROM saas_merchant_orders WHERE merchant_id=$1',
+    [result.data.merchant.id])).rows[0].n;
+  assert.equal(afterInvalid,beforeInvalid,'Invalid merchant intent must not persist an order');
+  await pg.query("UPDATE saas_merchant_vpas SET account_type='MERCHANT',mcc='5411' WHERE vpa_address=$1",[merchantVpa]);
+  console.log('Merchant payment snapshot: immutable P2P/P2M payee identity, MCC, transaction reference and invalid-category fail-closed PASS');
   console.log('Merchant integration: Clerk boundary, onboarding, VPA, payment QR, tenant isolation, metrics, risk, IP, CSV and state PASS');
  }finally{
   if(server)await new Promise(resolve=>server.close(resolve));
