@@ -9,7 +9,8 @@
 <meta name="description" content="Complete a UPI payment with DISHA 8.2.">
 <link rel="icon" href="/assets/favicon.svg" type="image/svg+xml">
 <link rel="preload" href="/assets/disha-8-2-wordmark-cropped.png" as="image">
-<link rel="stylesheet" href="/cosmic-checkout.css">
+<link rel="preload" href="/assets/disha-vault-sculpture.svg" as="image">
+<link rel="stylesheet" href="/cosmic-checkout.css?v=cosmos2-20261118">
 <script defer src="/vendor/qrcode.min.js"></script>
 <script defer src="/vendor/simplewebauthn.umd.js"></script>
 <script defer src="/one-touch-vault.js"></script>
@@ -23,24 +24,18 @@
  <div class="horizon"></div>
 </div>
 <main class="checkout-shell" aria-label="DISHA payment checkout">
- <header class="checkout-brand">
-  <img src="/assets/disha-8-2-wordmark-cropped.png" width="240" height="60" alt="DISHA 8.2" class="logo">
- </header>
  <article class="checkout-panel" aria-label="UPI payment">
-  <div class="panel-topline" aria-hidden="true"><span></span><span></span><span></span></div>
+  <header class="checkout-brand">
+   <img src="/assets/disha-8-2-wordmark-cropped.png" width="240" height="60" alt="DISHA 8.2" class="logo">
+  </header>
   <section data-stage="initial" class="stage stage-initial" aria-label="Begin payment">
    <p class="eyebrow">PAYMENT</p>
    <div id="payAmount" class="amount" aria-label="Amount to pay">—</div>
    <div class="vault-scene" aria-hidden="true">
-    <div class="vault-aura"></div>
-    <div class="orbit orbit-one"></div><div class="orbit orbit-two"></div><div class="orbit orbit-three"></div>
-    <div class="vault-core">
-     <svg viewBox="0 0 100 100" width="98" height="98" fill="none">
-      <circle cx="50" cy="50" r="43" stroke="#AFBBFF" stroke-opacity=".48" stroke-width="1.4"/>
-      <path d="M29 61c-4-15 1-35 21-35s25 20 21 35M36 64c-3-13-1-30 14-30s17 18 14 31M43 68c-3-12-1-26 7-26s11 12 7 27M50 77c-2-10-1-20 0-24" stroke="#D8E8FF" stroke-width="3" stroke-linecap="round"/>
-     </svg>
-    </div>
-    <span class="orbital-dot dot-a"></span><span class="orbital-dot dot-b"></span>
+    <div class="vault-atmosphere"></div>
+    <img class="vault-art" src="/assets/disha-vault-sculpture.svg" width="320" height="320" alt="" decoding="async">
+    <span class="vault-spectral-orbit vault-spectral-orbit-a"></span>
+    <span class="vault-spectral-orbit vault-spectral-orbit-b"></span>
    </div>
    <button id="btnOneTouch" type="button" class="action-primary" disabled>
     <span class="touch-icon" aria-hidden="true">◈</span><span>Touch to Pay</span><span class="action-arrow" aria-hidden="true">↗</span>
