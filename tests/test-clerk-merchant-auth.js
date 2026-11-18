@@ -91,7 +91,7 @@ async function testBrowserMount(file,method){
  // Premium layout is shared while Clerk owns the complete auth lifecycle.
  for(const [page,mode] of [['merchant-login.html','signin'],['merchant-signup.html','signup']]){
   const html=read('public/'+page);
-  assert.match(html,/href="\/merchant-auth\.css"/,'Use shared production auth design');
+  assert.match(html,/href="\/merchant-auth\.css\?v=[a-zA-Z0-9._-]+"/,'Use cache-versioned production auth design');
   assert.match(html,/class="auth-shell"/,'Use accessible split-screen layout');
   assert.match(html,/data-mode="/,'Expose the selected auth mode');
   assert.match(html,new RegExp('data-mode="'+mode+'"'),'Page must have correct mode');
@@ -111,25 +111,22 @@ async function testBrowserMount(file,method){
   assert.match(html,/class="auth-logo-stage"/);
   assert.match(html,/src="\/assets\/disha-8-2-wordmark-cropped\.png"/);
   assert.match(html,/alt="DISHA 8\.2"/);
-  assert.match(html,/class="payment-journey"/);
-  assert.match(html,/class="journey-flow"/);
+  assert.match(html,/class="auth-network-art"/,'Licensed galaxy photography region must exist');
  }
  assert.ok(fs.statSync(path.join(root,'public/assets/disha-8-2-wordmark-cropped.png')).size>10000,
    'Real metallic logo must be present in the public asset directory');
- // The sign-in screen uses the chosen realistic merchant/customer artwork,
- // while the right side is the standard Clerk component without a boxed shell.
+ // Merchant sign-in and signup use real Clerk widgets and a separately licensed photo.
  for(const page of ['merchant-login.html','merchant-signup.html']){
   const html=read('public/'+page);
-  assert.match(html,/src="\/assets\/merchant-direct-3d\.webp"/);
-  assert.doesNotMatch(html,/src="\/assets\/merchant-direct-scene\.svg"/);
+  assert.match(html,/class="auth-network-art"/);
+  assert.doesNotMatch(html,/src="\/assets\/merchant-direct-3d\.webp"/);
   assert.match(html,/id="auth-slot"/);
   assert.match(html,/class="auth-content"/);
-  assert.doesNotMatch(html,/class="auth-footnote"/,'Clerk owns login/signup navigation; avoid duplicated links');
-  assert.doesNotMatch(html,/class="auth-divider"/,'No second card-like framing');
+  assert.doesNotMatch(html,/class="auth-footnote"/,'Clerk owns auth navigation');
   assert.match(html,/window\.Clerk\.mountSign/);
  }
- assert.ok(fs.statSync(path.join(root,'public/assets/merchant-direct-3d.webp')).size>7000,
-  'Use the actual generated realistic merchant/customer image, not the old flat SVG');
+ assert.match(styles,/merchant-network-galaxy\.jpg/,'Photo is provided as licensed optional asset');
+ assert.match(styles,/height:100dvh/,'Viewport-height layout required');
  assert.match(styles,/\.auth-content\{[^}]*background:transparent/s,'Do not frame Clerk in an outer white card');
  assert.match(styles,/\.auth-action\{[^}]*background:#fff/s,'Right surface should remain a seamless white column');
  assert.match(styles,/\.auth-story\{[^}]*min-width:0/s,'Prevent hero heading overflow');
