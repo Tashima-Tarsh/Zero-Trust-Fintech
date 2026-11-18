@@ -224,7 +224,14 @@
   }finally{evidenceSending=false;void pollLedger()}
  }
  function onReturn(){
-  if(document.visibilityState==='hidden')return;
+  if(document.visibilityState==='hidden'||receiptShown)return;
+  // Returning to a cancelled/expired checkout cannot resurrect its
+  // one-touch authorization or expose native app / QR controls.
+  if(session&&(session.initialStatus==='EXPIRED'||
+      session.initialStatus==='FAILED'||expired())){
+   void pollLedger(); // A previously established ledger credit still wins.
+   return;
+  }
   if(session&&vault.getPendingOrderId()===orderId()){
    authorized=true;handoffStarted=true;
    // Even when an app returns no callback fields, show a neutral checking
