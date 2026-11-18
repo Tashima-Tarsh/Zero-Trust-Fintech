@@ -277,3 +277,49 @@ body{background:#040817}
  [data-stage]:not([data-stage="receipt"]){display:none!important}
  .receipt-seal{box-shadow:none}.receipt-details span,.receipt-details strong{color:#101529}
 }
+
+/* Viewport-fit checkout: mobile, tablet, desktop; keep active stage in view. */
+@media screen{
+ html,body{width:100%;height:100%;overflow:hidden;overscroll-behavior:none}
+ body{min-height:0}
+ .checkout-shell{height:100vh;height:100dvh;min-height:0;max-height:100dvh;padding:clamp(6px,1.6dvh,18px) clamp(9px,2.5vw,20px);justify-content:center}
+ .checkout-panel{min-height:0;max-height:calc(100dvh - 30px);overflow:hidden;display:flex;flex-direction:column}
+ .checkout-brand{flex-shrink:0;padding:clamp(7px,1.7dvh,17px) 10px clamp(2px,.6dvh,6px)}
+ .checkout-brand .logo{width:clamp(125px,22dvh,205px);max-height:clamp(28px,6dvh,45px)}
+ .stage{min-height:0!important;overflow:hidden;flex:1 1 auto;padding:clamp(8px,1.8dvh,22px) clamp(12px,4vw,35px)}
+ .stage-initial{display:flex;flex-direction:column;align-items:center;justify-content:space-between;padding-top:clamp(6px,1.3dvh,12px);padding-bottom:clamp(9px,1.8dvh,19px)}
+ .stage-initial .eyebrow{margin:0 0 3px}
+ .stage-initial .amount{font-size:clamp(30px,min(8vw,7dvh),59px);margin:0}
+ .vault-scene{flex:0 1 auto;min-height:0;width:min(100%,30dvh,300px)!important;max-height:min(30dvh,300px);margin:clamp(1px,1dvh,10px) auto!important}
+ .stage-initial .action-primary{flex:none;margin-top:auto;min-height:clamp(44px,7dvh,58px)}
+ .stage-initial .button-help{margin:clamp(4px,.9dvh,10px) 0 0}
+ .checkout-footer{flex-shrink:0;padding:clamp(3px,.8dvh,10px) 0 0;font-size:10px;line-height:1.2}
+ .stage h1{font-size:clamp(19px,4.3dvh,32px);margin:clamp(3px,.8dvh,10px) 0 5px}
+ .stage-copy{font-size:clamp(11px,1.8dvh,13px);line-height:1.4;margin:0 auto clamp(5px,1.4dvh,18px)}
+ .app-grid{gap:clamp(5px,1dvh,12px);margin:clamp(5px,1.5dvh,20px) 0 clamp(5px,1dvh,11px)}
+ .app-choice{min-height:clamp(55px,11dvh,110px);gap:3px;padding:5px}
+ .app-icon{width:clamp(30px,5dvh,48px);height:clamp(30px,5dvh,48px);border-radius:12px}
+ .app-icon img{width:65%;height:65%}
+ .action-secondary,.fallback-anchor{min-height:clamp(38px,6dvh,52px);padding:7px 12px}
+ .inline-note{font-size:11px;margin-top:clamp(4px,1dvh,12px)}
+ .qr-visual{width:min(100%,36dvh,310px);max-width:100%;padding:clamp(5px,1dvh,11px);margin:clamp(4px,1dvh,14px) auto}
+ .qr-paper{min-height:0;aspect-ratio:1;display:grid;place-items:center;padding:5px}
+ #paymentQr{min-height:0;display:grid;place-items:center;width:100%;height:100%}
+ #paymentQr img,#paymentQr canvas{max-width:100%!important;max-height:100%!important;width:100%!important;height:auto!important;object-fit:contain}
+ .receipt-sculpture{transform:scale(.75);transform-origin:center;margin-block:-12px}
+ .receipt-details{margin-top:clamp(5px,1dvh,16px);padding:clamp(7px,1.5dvh,16px)}
+ .receipt-details>div{padding:clamp(4px,.8dvh,10px) 0}
+ .receipt-actions{margin-top:clamp(7px,1.5dvh,18px)}
+ .receipt-actions .action-secondary{margin-top:6px}
+ .checkout-status{flex-shrink:0;margin:0 12px 8px;padding:7px 10px;max-height:16dvh;overflow:auto}
+ #btnOneTouch{position:relative;isolation:isolate;justify-content:center;gap:12px;border-radius:16px;border:1px solid #e4ecff;background:linear-gradient(115deg,#f7f9ff 0%,#cbd9ff 48%,#94b8ff 100%);box-shadow:inset 0 1px 0 #fff,0 8px 29px #537bed55;color:#081734;font-size:clamp(15px,2.5dvh,18px);font-weight:800;letter-spacing:-.025em;transition:transform .2s,box-shadow .2s,filter .2s}
+ #btnOneTouch:before{content:"";position:absolute;inset:1px;border-radius:inherit;pointer-events:none;background:linear-gradient(145deg,#fff9,transparent 35%,#fff2 80%);z-index:-1}
+ #btnOneTouch .touch-icon{font-size:19px;opacity:.8}
+ #btnOneTouch .action-arrow{position:absolute;right:18px;font-size:19px}
+ #btnOneTouch:not(:disabled):hover{transform:translateY(-1px);filter:brightness(1.06);box-shadow:0 11px 35px #7194f999,inset 0 1px #fff}
+ #btnOneTouch:focus-visible{outline:3px solid #fff;outline-offset:3px}
+ #btnOneTouch:active:not(:disabled){transform:scale(.99)}
+ @media(max-height:680px){.checkout-panel{max-height:calc(100dvh - 12px)}.checkout-shell{padding:4px 8px}.checkout-brand{padding:5px 8px 0}.checkout-brand .logo{max-height:30px}.checkout-footer{padding-top:3px}.stage{padding-top:6px;padding-bottom:7px}.stage-initial .amount{font-size:clamp(26px,6dvh,40px)}.vault-scene{width:min(100%,24dvh,220px)!important;max-height:24dvh}.app-choice{min-height:clamp(48px,10dvh,80px)}.app-grid{gap:5px;margin:5px 0}.qr-visual{width:min(100%,30dvh,235px)}}
+ @media(max-height:510px){.checkout-footer{display:none}.checkout-brand{padding:3px 8px 0}.checkout-brand .logo{max-height:24px}.stage h1{font-size:19px}.stage-copy{margin-bottom:5px}.vault-scene{width:min(100%,17dvh,125px)!important;max-height:17dvh}.stage-initial .action-primary{min-height:38px}.stage-initial .button-help{display:none}.app-choice{min-height:45px}.app-icon{width:25px;height:25px}.qr-visual{width:min(100%,24dvh,160px)}}
+ @media(min-width:700px){.checkout-shell{width:min(100%,620px)}.checkout-panel{border-radius:27px}}
+}
