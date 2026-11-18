@@ -30,7 +30,11 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        api-level: [35, 37]
+        include:
+          - api-level: '35'
+            target: google_apis
+          - api-level: '37.0'
+            target: google_apis_ps16k
     steps:
       - name: Checkout application and test harness
         uses: actions/checkout@v4
@@ -56,7 +60,7 @@ jobs:
         uses: reactivecircus/android-emulator-runner@v2
         with:
           api-level: ${{ matrix.api-level }}
-          target: google_apis
+          target: ${{ matrix.target }}
           arch: x86_64
           profile: pixel_6
           ram-size: 4096M
