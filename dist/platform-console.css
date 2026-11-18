@@ -5,3 +5,10 @@
 @media(max-width:860px){.console-shell{display:block}.console-nav{position:fixed;left:0;z-index:100;transform:translateX(-110%);width:265px;transition:transform .24s}.console-nav.open{transform:none}.nav-backdrop.open{display:block;position:fixed;inset:0;background:#0009;z-index:90}#owner-menu-toggle{display:block}.console-top{height:75px}.two-panel{grid-template-columns:1fr}.top-actions .action-btn{display:none}}
 @media(max-width:550px){.metric-row{gap:8px}.metric{padding:13px}.metric strong{font-size:25px}.panel{padding:14px}.pipeline{grid-template-columns:1fr 1fr}.explain-grid{grid-template-columns:1fr}.console-top{padding:12px 15px}.console-top h1{font-size:18px}.console-body{padding:19px 13px}.outline-btn{padding:9px}.owner-screen h2{margin-bottom:17px}}
 @media(prefers-reduced-motion:reduce){*,*:before,*:after{animation:none!important;transition:none!important}}
+
+/* Private owner invitation: actionable, accessible controls */
+.owner-invite-form{display:grid;grid-template-columns:1fr 1fr auto;align-items:end;gap:12px;margin:19px 0 12px}
+.owner-invite-form label{display:grid;gap:7px;color:#d9d4d6;font-size:12px;font-weight:700}
+.owner-invite-form input{width:100%;min-width:0;min-height:42px;border:1px solid #b6b0c477;border-radius:9px;background:#0c121f;color:#fff;padding:10px 12px}
+.owner-invite-form .action-btn{min-height:42px}
+@media(max-width:800px){.owner-invite-form{grid-template-columns:1fr}}

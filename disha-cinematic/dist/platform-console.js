@@ -57,6 +57,18 @@ document.addEventListener('click',async event=>{
    await load(decision?'requests':incident?'incidents':'tenants');notice('Action recorded in platform audit.');
  }catch(e){notice(e.message)}finally{button.disabled=false}
 });
+$('#owner-invite-form')?.addEventListener('submit',async event=>{
+ event.preventDefault();
+ const form=event.currentTarget,submit=form.querySelector('button[type="submit"]'),out=$('#owner-invite-result');
+ if(submit.disabled)return;
+ submit.disabled=true;out.textContent='Creating approved tenant…';
+ try{
+  const businessName=$('#invite-business').value.trim(),email=$('#invite-email').value.trim().toLowerCase();
+  const result=await api('/owner/invite-merchant',{method:'POST',body:JSON.stringify({businessName,email})});
+  out.textContent='Tenant approved. Use “Send Clerk invite” in the row below to issue its invitation.';
+  form.reset();await load('tenants');
+ }catch(e){out.textContent=e.message}finally{submit.disabled=false}
+});
 $('#owner-menu-toggle').addEventListener('click',()=>{let open=!$('#console-nav').classList.contains('open');$('#console-nav').classList.toggle('open',open);$('#nav-backdrop').classList.toggle('open',open);$('#owner-menu-toggle').setAttribute('aria-expanded',String(open))});
 $('#nav-backdrop').addEventListener('click',()=>{$('#console-nav').classList.remove('open');$('#nav-backdrop').classList.remove('open')});
 $('#refresh-data').addEventListener('click',()=>load(location.hash.slice(1)||'overview').catch(e=>notice(e.message)));
