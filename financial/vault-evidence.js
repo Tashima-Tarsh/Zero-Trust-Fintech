@@ -14,7 +14,7 @@ const validId=v=>typeof v==='string'&&/^[A-Za-z0-9_-]{6,150}$/.test(v);
 const validHex=v=>typeof v==='string'&&/^[a-f0-9]{24,64}$/i.test(v);
 const invalid=(status,code)=>Object.assign(new Error(code),{status,code});
 const fields=['Status','status','txnId','txnRef','ApprovalRefNo','responseCode','tr','am','pa'];
-const validEvent=new Set(['APP_RESUME','PAGESHOW_RETURN','RETURN_QUERY_OBSERVED']);
+const validEvent=new Set(['APP_RESUME','PAGESHOW_RETURN','RETURN_QUERY_OBSERVED','INTENT_FALLBACK']);
 const timingEqual=(a,b)=>{
   if(typeof a!=='string'||typeof b!=='string')return false;
   const aa=Buffer.from(a),bb=Buffer.from(b);
@@ -86,7 +86,9 @@ function validatePacket(body){
      e.returnedAt<e.handoffAt||e.returnedAt>Date.now()+300000||
      (e.hiddenAt!==null&&(e.hiddenAt<e.handoffAt||e.hiddenAt>e.returnedAt)))
     throw invalid(400,'INVALID_HANDOFF_TIMELINE');
-  if(!e.hiddenAt && Object.keys(params).length===0)
+  if(e.browserEvent==='INTENT_FALLBACK'&&Object.keys(params).length>0)
+    throw invalid(400,'FALLBACK_CANNOT_CARRY_PAYMENT_RESULT');
+  if(!e.hiddenAt && Object.keys(params).length===0 && e.browserEvent!=='INTENT_FALLBACK')
     throw invalid(400,'NO_RETURN_OBSERVATION');
   return {browserEvent:e.browserEvent,handoffAt:e.handoffAt,
     hiddenAt:e.hiddenAt,returnedAt:e.returnedAt,selectedApp,returnParams:params};
@@ -103,7 +105,8 @@ function classify(order,e,previousUtrOrder,now){
   const utr=validCandidates.length?validCandidates[0]:null;
   const flags={
     vaultAuthorization:true,
-    browserReturnOnly:true,
+    browserReturnOnly:e.browserEvent!=='INTENT_FALLBACK',
+    intentLaunchFallbackObserved:e.browserEvent==='INTENT_FALLBACK',
     // Diagnostic context from browser only; not a bank payment signal.
     selectedApp:e.selectedApp,
     browserAppReturnMs:e.returnedAt-e.handoffAt,
@@ -129,6 +132,7 @@ function classify(order,e,previousUtrOrder,now){
   const claimedStatus=String(p.Status||p.status||'').toUpperCase().slice(0,20)||null;
   let outcome=utr?'UTR_CANDIDATE_UNVERIFIED':'RETURN_OBSERVED_NO_UTR';
   if(claimedStatus==='FAILURE'||claimedStatus==='FAILED')outcome='FAILURE_CLAIM_UNVERIFIED';
+  if(e.browserEvent==='INTENT_FALLBACK')outcome='INTENT_LAUNCH_UNRESOLVED';
   if(!flags.sameUtrFields||flags.amountMatches===false||flags.payeeMatches===false||
      flags.transactionRefMatches===false||(previousUtrOrder&&previousUtrOrder!==order.order_id))
     outcome='CONFLICTING_EVIDENCE';

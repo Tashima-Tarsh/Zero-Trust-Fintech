@@ -22,11 +22,25 @@
  function supportsNativeUPI(userAgent){
   return /Android|iPhone|iPad|iPod/i.test(String(userAgent||''));
  }
- function buildAppUrl(uri,app,userAgent){
+ // Browser fallback is only for intents that cannot be launched.
+ function checkoutFallbackUrl(href){
+  if(typeof href!=='string'||!href)return '';
+  try{
+   const u=new URL(href);
+   if(!['https:','http:'].includes(u.protocol))return '';
+   u.hash='';
+   u.searchParams.set('upi_intent_fallback','1');
+   return u.href;
+  }catch(_){return ''}
+ }
+ function buildAppUrl(uri,app,userAgent,checkoutHref){
   const valid=qrPayload(uri),selected=APPS[safeApp(app)];
   const params=valid.slice(valid.indexOf('?')+1);
-  if(/Android/i.test(userAgent||'') && selected.package)
-   return 'intent://pay?'+params+'#Intent;scheme=upi;package='+selected.package+';end';
+  if(/Android/i.test(userAgent||'') && selected.package){
+   const url=checkoutFallbackUrl(checkoutHref);
+   return 'intent://pay?'+params+'#Intent;scheme=upi;package='+selected.package+
+     (url?';S.browser_fallback_url='+encodeURIComponent(url):'')+';end';
+  }
   if(/iPhone|iPad|iPod/i.test(userAgent||'')&&selected.ios)
    return selected.ios+params;
   return valid;
@@ -64,7 +78,7 @@
   if(!Number.isFinite(n)||n<=0)throw Error('Invalid payment amount');
   return new Intl.NumberFormat('en-IN',{style:'currency',currency:'INR',maximumFractionDigits:2,minimumFractionDigits:2}).format(n);
  }
- const api=Object.freeze({safeApp,qrPayload,buildAppUrl,supportsNativeUPI,isSettled,stageAfterAuthorization,needsPaymentMethodRetry,formatINR,userFacingError});
+ const api=Object.freeze({safeApp,qrPayload,buildAppUrl,checkoutFallbackUrl,supportsNativeUPI,isSettled,stageAfterAuthorization,needsPaymentMethodRetry,formatINR,userFacingError});
  if(typeof module!=='undefined'&&module.exports)module.exports=api;
  root.DISHACosmicCheckoutModel=api;
 })(typeof window!=='undefined'?window:globalThis);

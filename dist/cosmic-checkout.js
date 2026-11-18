@@ -16,6 +16,7 @@
  const userAgent=navigator.userAgent||'';
  const orderId=()=>session?.orderId||null;
  const debug=query.get('debug')==='1';
+ const intentFallback=query.get('upi_intent_fallback')==='1';
  const debugHistory=[];
  function debugStatus(phase,server=''){
   if(!debug)return;
@@ -256,6 +257,9 @@
   anchor.hidden=false;
  }
  function openApp(app){
+  if(evidenceSending){
+   message('Recording the previous app attempt. Please try again.','info');return;
+  }
   if(!authorized||!session||expired()){
    message('Error — This payment request is no longer active.','error');return;
   }
@@ -270,7 +274,7 @@
   try {
    const chosen=model.safeApp(app);
    trace('APP_SELECTED','OK',chosen);
-   const target=model.buildAppUrl(session.upiUri,chosen,userAgent);
+   const target=model.buildAppUrl(session.upiUri,chosen,userAgent,location.href);
    if(!handoffStarted){
     vault.beginHandoff(orderId(),vaultSessionId,session.token,chosen);
     handoffStarted=true;
@@ -344,6 +348,8 @@
  function onReturn(){
   if(document.visibilityState==='hidden'||receiptShown)return;
   tickSessionTimer();
+  // A Chrome launch fallback is not a UPI app return.
+  if(intentFallback&&!handoffStarted){void pollLedger();return;}
   // Returning to a cancelled/expired checkout cannot resurrect its
   // one-touch authorization or expose native app / QR controls.
   if(session&&(session.initialStatus==='EXPIRED'||
@@ -437,11 +443,31 @@
    if(expired()){locked('This payment request has expired.');return}
    get('btnOneTouch').disabled=false;
    // A returning browser can recover its own existing Vault handoff.
-   const returnEvidence=typeof vault.requestEvidence==='function'?vault.requestEvidence(orderId()):null;
-   if(vault.getPendingOrderId()===orderId()&&returnEvidence){
-    authorized=true;handoffStarted=true;
-    showStage('checking');
-    void submitReturnEvidence();
+   if(intentFallback){
+    const p=typeof vault.markIntentFallback==='function'?vault.markIntentFallback(orderId()):null;
+    trace('INTENT_FALLBACK','APP_NAVIGATION_ERROR',p?.evidence?.selectedApp||'none');
+    if(p){
+     authorized=true;
+     vaultSessionId=p.vaultSessionId;
+     showStage('methods');
+     // Keep this event frozen during upload; a new app tap starts a new event.
+     void submitReturnEvidence(true);
+    }
+    message('Selected UPI app did not open. Try another app or scan the QR.','info');
+    if(typeof history!=='undefined'&&typeof history.replaceState==='function'&&location.href){
+     try{
+      const clean=new URL(location.href);
+      clean.searchParams.delete('upi_intent_fallback');
+      history.replaceState(null,'',clean.pathname+clean.search+clean.hash);
+     }catch(_){}
+    }
+   }else{
+    const returnEvidence=typeof vault.requestEvidence==='function'?vault.requestEvidence(orderId()):null;
+    if(vault.getPendingOrderId()===orderId()&&returnEvidence){
+     authorized=true;handoffStarted=true;
+     showStage('checking');
+     void submitReturnEvidence();
+    }
    }
    ledgerTicker=setInterval(()=>{void pollLedger()},3500);
    expiryTicker=setInterval(tickSessionTimer,1000);

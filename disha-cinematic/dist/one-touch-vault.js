@@ -137,6 +137,18 @@
     }
     return observed;
   }
+  // Only a browser navigation observation, not a payment result.
+  function markIntentFallback(orderId=getPendingOrderId()){
+    const data=readAttempt(orderId);
+    if(!data||data.receipt)return null;
+    if(!data.evidence){
+      data.evidence={browserEvent:'INTENT_FALLBACK',
+        handoffAt:data.handoffAt,hiddenAt:data.hiddenAt,returnedAt:Date.now(),
+        selectedApp:data.selectedApp||'generic',returnParams:{}};
+      saveAttempt(data);
+    }
+    return requestEvidence(orderId);
+  }
   // The checkout browser asks the Vault for the evidence packet. The Vault
   // returns the observations for this particular authorized handoff without
   // sending or inventing any financial outcome itself.
@@ -176,6 +188,7 @@
     const safeStates=new Set([
       'UTR_CANDIDATE_UNVERIFIED',
       'RETURN_OBSERVED_NO_UTR',
+      'INTENT_LAUNCH_UNRESOLVED',
       'FAILURE_CLAIM_UNVERIFIED',
       'CONFLICTING_EVIDENCE',
       'LATE_RETURN_OBSERVATION'
@@ -216,6 +229,6 @@
   }
 
   root.DISHAOneTouchVault=Object.freeze({getDeviceUserId,authorize,launchUPI,
-    beginHandoff,markBackgrounded,requestEvidence,acknowledgeEvidence,
+    beginHandoff,markBackgrounded,markIntentFallback,requestEvidence,acknowledgeEvidence,
     submitReturnEvidence,getPendingOrderId});
 })(window);
