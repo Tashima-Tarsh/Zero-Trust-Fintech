@@ -277,7 +277,7 @@ function createMerchantApi({db,getAuth,buildUpiUri}) {
 
   router.get('/merchant/vpas',wrap(async(req,res)=>{
     const rows=await db.pgPool.query(
-      'SELECT id,vpa_address,holder_name,bank_name,status,is_default,account_type,mcc,created_at FROM saas_merchant_vpas WHERE merchant_id=$1 ORDER BY is_default DESC,created_at ASC',
+      'SELECT id,vpa_address,holder_name,bank_name,status,is_default,account_type,mcc,health_score,daily_tx_count,daily_tx_limit,daily_volume,daily_volume_limit,cooldown_until,created_at FROM saas_merchant_vpas WHERE merchant_id=$1 ORDER BY is_default DESC,created_at ASC',
       [req.merchant.id]);
     res.json({success:true,vpas:rows.rows});
   }));
@@ -369,7 +369,7 @@ function createMerchantApi({db,getAuth,buildUpiUri}) {
     const dateFilter=String(req.query.dateFilter||'30d');
     const [m,orders,vpas,notifications,volumeTrend]=await Promise.all([
       metrics(req.merchant.id,dateFilter),getOrders(req.merchant.id,dateFilter,20),
-      db.pgPool.query('SELECT id,vpa_address,holder_name,bank_name,status,is_default,account_type,mcc FROM saas_merchant_vpas WHERE merchant_id=$1 ORDER BY is_default DESC',[req.merchant.id]),
+      db.pgPool.query('SELECT id,vpa_address,holder_name,bank_name,status,is_default,account_type,mcc,health_score,daily_tx_count,daily_tx_limit,daily_volume,daily_volume_limit,cooldown_until FROM saas_merchant_vpas WHERE merchant_id=$1 ORDER BY is_default DESC',[req.merchant.id]),
       db.pgPool.query('SELECT id,title,message,created_at,read_at FROM saas_merchant_notifications WHERE merchant_id=$1 ORDER BY created_at DESC LIMIT 10',[req.merchant.id]),
       db.pgPool.query(
         "SELECT (o.created_at / 86400000)*86400000 AS day,SUM(o.amount_paise) AS volume_paise,COUNT(*)::int AS orders "+
