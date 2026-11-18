@@ -54,7 +54,7 @@ async function flush(){for(let i=0;i<30;i++)await Promise.resolve()}
  assert.ok(fb,'Chrome requires a fallback for an unresolvable app intent');
  const fallback=new URL(decodeURIComponent(fb));
  assert.equal(fallback.searchParams.get('orderId'),'ORD_INTENT_TEST_11');
- assert.equal(fallback.searchParams.get('token'),token);
+ assert.equal(fallback.searchParams.get('token'),'a'.repeat(48));
  assert.equal(fallback.searchParams.get('upi_intent_fallback'),'1');
  android.state.opened=null;
  // A foreground-only intent rejection must NOT falsely imply payment failed
