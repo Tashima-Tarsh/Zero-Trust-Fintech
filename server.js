@@ -33,6 +33,7 @@ const { getClientIP } = require('./utils/ip-utils');
 const { IPWhitelistMiddleware } = require('./middleware/ip-whitelist');
 const adminRoutes = require('./routes/admin/ip-whitelist');
 // disha-cinematic server removed - merchant SaaS deprecated
+const {buildContentSecurityPolicy, clerkFrontendApiOrigin} = require('./utils/clerk-csp');
 const app = express();
 const CLERK_ENABLED = Boolean(process.env.CLERK_PUBLISHABLE_KEY && process.env.CLERK_SECRET_KEY);
 // Trust proxy only when explicitly opted in (e.g. behind Render/Cloudflare).
@@ -60,13 +61,7 @@ app.use((req, res, next) => {
   res.setHeader('X-Frame-Options', 'SAMEORIGIN');
   res.setHeader('X-XSS-Protection', '1; mode=block');
   res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
-  res.setHeader(
-    'Content-Security-Policy',
-    // The checkout is a static HTML application that deliberately includes
-    // embedded styles and scripts. Keep third-party sources narrow while
-    // permitting those first-party inline assets to render in production.
-    "default-src 'self'; script-src 'self' 'unsafe-inline' https://cdn.tailwindcss.com https://cdn.jsdelivr.net https://cdnjs.cloudflare.com https://clerk.thenitishkr.in; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com data:; img-src 'self' data: blob: https://lh3.googleusercontent.com https://lh4.googleusercontent.com; connect-src 'self' ws: wss: https://clerk.thenitishkr.in;"
-  );
+  res.setHeader('Content-Security-Policy', buildContentSecurityPolicy(process.env.CLERK_PUBLISHABLE_KEY));
   if (process.env.NODE_ENV === 'production') {
     res.setHeader('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
   }
@@ -282,7 +277,14 @@ app.get(['/', '/home'], (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 app.get('/auth-config.js', (req, res) => {
-  res.type('application/javascript').send(`window.DISHA_CLERK_PUBLISHABLE_KEY=${JSON.stringify(process.env.CLERK_PUBLISHABLE_KEY || '')};`);
+  // Public browser key only. Never expose CLERK_SECRET_KEY.
+  // no-store ensures Cloudflare and clients cannot reuse a stale empty key
+  // after configuration or environment switching.
+  const key = process.env.CLERK_PUBLISHABLE_KEY || '';
+  res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate');
+  res.type('application/javascript').send(
+    `window.DISHA_CLERK_PUBLISHABLE_KEY=${JSON.stringify(key)};window.DISHA_CLERK_CONFIG_READY=${Boolean(CLERK_ENABLED && clerkFrontendApiOrigin(key))};`
+  );
 });
 app.get('/login', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'merchant-login.html'));
