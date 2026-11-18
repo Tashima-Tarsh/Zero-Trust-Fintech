@@ -14,7 +14,10 @@
     "/merchant-dashboard.html",
     "/auth-config.js",
     "/vendor/simplewebauthn.umd.js",
-    "/debug.html"
+    "/debug.html",
+    "/request-access",
+    "/owner",
+    "/owner-console.html"
   ],
   "exclude": [
     "/assets/*",
