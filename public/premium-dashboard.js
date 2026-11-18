@@ -70,7 +70,7 @@ async function api(path,options={}){
  const headers={...(await authHeaders(Boolean(options.body))),...(options.headers||{})};
  const r=await fetch(path,{credentials:'same-origin',cache:'no-store',...options,headers});
  let data;try{data=await r.json()}catch{data={}}
- if(!r.ok){const error=Error(data.error||data.message||'Request failed ('+r.status+')');error.status=r.status;throw error}
+ if(!r.ok){const error=Error(data.error||data.message||'Request failed ('+r.status+')');error.status=r.status;error.code=data.code||null;throw error}
  return data;
 }
 function view(name,replaceHistory=false){
@@ -181,6 +181,12 @@ async function init(){
  setupBindings();
  try{
   if(!await authInit())return;
+  // A verified owner lands on merchant approvals by default.
+  // The owner can still open their test merchant via ?merchant=1.
+  if(!new URLSearchParams(location.search).has('merchant')){
+   const owner=await api('/api/platform/owner/me').catch(()=>null);
+   if(owner?.role==='PLATFORM_OWNER'){location.replace('/owner#requests');return}
+  }
   const result=await api('/api/auth/me');
   merchant=result.merchant;
   if(!merchant)throw Error('Merchant identity is missing');
@@ -191,6 +197,19 @@ async function init(){
   view(views[location.hash.slice(1)]?location.hash.slice(1):'overview',true);
  }catch(error){
   if(error.status===401){location.replace('/login');return}
+  if(error.status===403){
+   const pending=error.code==='MERCHANT_APPROVAL_PENDING'||error.code==='MERCHANT_APPROVAL_REQUIRED';
+   notice(pending?'Your merchant account is awaiting approval from the DISHA platform owner.':error.message);
+   const area=$('#appNotice');
+   if(area&&pending){
+    const link=document.createElement('a');
+    link.href='/request-access';
+    link.textContent='Request merchant approval';
+    link.style.cssText='display:inline-block;margin-left:10px;color:#f6aa81;text-decoration:underline;font-weight:700';
+    area.appendChild(link);
+   }
+   return;
+  }
   notice('Unable to load your merchant workspace: '+error.message);
   toast('Connection needs attention');
  }
