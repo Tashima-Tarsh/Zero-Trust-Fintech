@@ -60,7 +60,7 @@ function createPlatformControl({db,getAuth,clerkEmailResolver=getClerkVerifiedEm
       "INSERT INTO saas_merchants(id,clerk_user_id,business_name,email,setup_completed,access_status,is_internal_test,created_at,updated_at) "+
       "VALUES($1,NULL,$2,'',FALSE,'PENDING',FALSE,$3,$3) ON CONFLICT(id) DO NOTHING",
       [companyTenantId(),company,now]);
-     if(/^\\d{4}$/.test(mcc)&&/^[a-z0-9._-]{2,100}@[a-z0-9._-]{2,40}$/.test(companyVpa()))
+     if(/^\d{4}$/.test(mcc)&&/^[a-z0-9._-]{2,100}@[a-z0-9._-]{2,40}$/.test(companyVpa()))
        await pool.query(
         "INSERT INTO saas_merchant_vpas(id,merchant_id,vpa_address,holder_name,bank_name,status,is_default,account_type,mcc,created_at) "+
         "VALUES($1,$2,$3,$4,'','PAUSED',TRUE,'MERCHANT',$5,$6) ON CONFLICT(vpa_address) DO NOTHING",
