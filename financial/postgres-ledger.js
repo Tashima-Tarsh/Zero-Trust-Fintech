@@ -61,6 +61,15 @@ async function postBalancedJournal(pool, input, maxRetries = 3) {
             row.state !== 'POSTED') {
           throw new Error('IDEMPOTENCY_KEY_CONFLICT');
         }
+        const postingAccounts = await client.query(
+          'SELECT account_id, side FROM disha_core_postings WHERE journal_id = $1',
+          [row.journal_id]
+        );
+        if (postingAccounts.rowCount !== 2 ||
+            !postingAccounts.rows.some(p => p.side === 'DEBIT' && p.account_id === debitAccountId) ||
+            !postingAccounts.rows.some(p => p.side === 'CREDIT' && p.account_id === creditAccountId)) {
+          throw new Error('IDEMPOTENCY_KEY_CONFLICT');
+        }
         await client.query('COMMIT');
         begun = false;
         return { journalId: row.journal_id, amountPaise, replayed: true };
