@@ -22,7 +22,7 @@ const views = {
  api:['Developer connections','Check your authenticated merchant API connectivity'],
  settings:['Business settings','Manage your company profile and access']
 };
-let merchant=null,metrics={},orders=[],vpas=[],notifications=[],filter='ALL',clerk=null;
+let merchant=null,metrics={},orders=[],vpas=[],notifications=[],trend=[],filter='ALL',clerk=null;
 let created=null,loading=false;
 function toast(message){
  const el=$('#toast');if(!el)return;el.textContent=message;el.classList.remove('hidden');
@@ -69,7 +69,7 @@ async function api(path,options={}){
  if(!r.ok){const error=Error(data.error||data.message||'Request failed ('+r.status+')');error.status=r.status;throw error}
  return data;
 }
-function view(name){
+function view(name,replaceHistory=false){
  if(!views[name])name='overview';
  $$('.view').forEach(el=>el.classList.toggle('active',el.id==='view-'+name));
  $$('#appSide [data-view]').forEach(el=>{
@@ -78,12 +78,16 @@ function view(name){
   else el.removeAttribute('aria-current');
  });
  $('#viewHeading').textContent=views[name][0];$('#viewSubtitle').textContent=views[name][1];
- if(location.hash!=='#'+name)history.replaceState(null,'','#'+name);
+ if(location.hash!=='#'+name)history[replaceHistory?'replaceState':'pushState'](null,'','#'+name);
  closeMenu();
+ if(typeof window.scrollTo==='function')window.scrollTo(0,0);
  const actions={overview:loadOverview,payments:loadPayments,create:loadVpas,vpas:loadVpas,
  routing:loadVpas,risk:loadRisk,access:loadAccess,reports:loadReports,
  notifications:loadNotifications,api:showApiStatus};
- if(actions[name])actions[name]();
+ if(actions[name]) {
+  const work=actions[name]();
+  if(work&&typeof work.catch==='function')work.catch(error=>toast(error.message));
+ }
 }
 function closeMenu(){
  $('#appSide')?.classList.remove('open');$('#sideBackdrop')?.classList.remove('open');
@@ -91,14 +95,19 @@ function closeMenu(){
 }
 function setupBindings(){
  $$('#appSide [data-view]').forEach(button=>button.addEventListener('click',()=>view(button.dataset.view)));
- $$('[data-switch]').forEach(button=>button.addEventListener('click',()=>view(button.dataset.switch)));
+ document.addEventListener('click',event=>{
+  const target=event.target.closest('[data-switch]');
+  if(target)view(target.dataset.switch);
+ });
  $('#sideToggle')?.addEventListener('click',()=>{
   $('#appSide').classList.toggle('open');$('#sideBackdrop').classList.toggle('open');
   $('#sideToggle').setAttribute('aria-expanded',String($('#appSide').classList.contains('open')));
  });
  $('#sideBackdrop')?.addEventListener('click',closeMenu);
  document.addEventListener('keydown',e=>{if(e.key==='Escape')closeMenu()});
- window.addEventListener('hashchange',()=>{const target=location.hash.slice(1);if(views[target])view(target)});
+ const routeFromUrl=()=>{const target=location.hash.slice(1);if(views[target])view(target,true)};
+ window.addEventListener('hashchange',routeFromUrl);
+ window.addEventListener('popstate',routeFromUrl);
  $('#periodSelect')?.addEventListener('change',()=>{loadOverview();loadReports()});
  $('#globalSearch')?.addEventListener('keydown',e=>{
   if(e.key==='Enter'){view('payments');$('#paymentsSearch').value=e.target.value;loadPayments()}
@@ -115,6 +124,7 @@ function setupBindings(){
    addAccessForm:addAccess,settingsForm:saveSettings};
  Object.entries(forms).forEach(([key,fn])=>$('#'+key)?.addEventListener('submit',fn));
  const actions={exportTop:exportCsv,exportReport:exportCsv,refreshVpas:loadVpas,
+   importVpaCsv:bulkImportVpas,downloadVpaTemplate:downloadVpaTemplate,
    refreshAccess:loadAccess,markRead:markRead,runApiExplorer:showApiStatus,
    testHealth:testHealth,playVoice:announceLatest,signOut:logout,settingsLogout:logout};
  Object.entries(actions).forEach(([key,fn])=>$('#'+key)?.addEventListener('click',fn));
@@ -143,10 +153,8 @@ function merchantHeader(){
  $('#settingsPhone').value=merchant.contact_phone||'';
  $('#settingsCity').value=merchant.city||'';
  $('#merchantSetup').style.display=merchant.setup_completed?'none':'block';
- if(!merchant.setup_completed){
-  $('#setupBusinessName').value=merchant.business_name||'';
-  notice('Complete business setup and add your receiving UPI ID to start.');
- }else notice('');
+ if(!merchant.setup_completed)$('#setupBusinessName').value=merchant.business_name||'';
+ notice('');
 }
 async function init(){
  setupBindings();
@@ -157,7 +165,7 @@ async function init(){
   if(!merchant)throw Error('Merchant identity is missing');
   merchantHeader();
   await Promise.allSettled([loadVpas(),loadOverview(),loadNotifications()]);
-  view(views[location.hash.slice(1)]?location.hash.slice(1):'overview');
+  view(views[location.hash.slice(1)]?location.hash.slice(1):'overview',true);
  }catch(error){
   if(error.status===401){location.replace('/login');return}
   notice('Unable to load your merchant workspace: '+error.message);
@@ -169,8 +177,8 @@ async function setupMerchant(event){
  try{
   const d=await api('/api/merchant/setup',{method:'POST',
    body:JSON.stringify({businessName:plain($('#setupBusinessName').value),
-     primaryVpa:plain($('#setupPrimaryVpa').value),accountType:$('#setupAccountType').value,mcc:$('#setupMcc').value.trim()})});
-  merchant=d.merchant;merchantHeader();await loadVpas();await loadOverview();toast('Workspace activated');
+     primaryVpa:plain($('#setupPrimaryVpa').value),primaryHolderName:plain($('#setupHolderName').value),primaryBankName:plain($('#setupBankName').value),accountType:$('#setupAccountType').value,mcc:$('#setupMcc').value.trim()})});
+  merchant=d.merchant;merchantHeader();await loadVpas();await loadOverview();view('overview');toast('Workspace activated');
  }catch(error){toast(error.message)}finally{busy(button,false)}
 }
 function orderTable(rows,compact=false){
@@ -184,7 +192,7 @@ function orderTable(rows,compact=false){
 async function loadOverview(){
  try{
   const d=await api('/api/merchant/dashboard?dateFilter='+encodeURIComponent($('#periodSelect').value));
-  metrics=d.metrics||{};orders=d.recentTransactions||[];if(d.vpas)vpas=d.vpas;
+  metrics=d.metrics||{};orders=d.recentTransactions||[];trend=d.trend||[];if(d.vpas)vpas=d.vpas;
   if(d.notifications)notifications=d.notifications;
   $('#metricVolume').textContent=money(metrics.totalVolume);
   $('#metricCompleted').textContent=num(metrics.completedTransactions);
@@ -197,7 +205,7 @@ async function loadOverview(){
   $('#statusCompleted').textContent=num(metrics.completedTransactions);
   $('#statusPending').textContent=num(metrics.pendingTransactions);
   $('#statusTotal').textContent=num(metrics.totalTransactions);
-  renderChart();miniPanels();notice(merchant.setup_completed?'':'Complete business setup and add your receiving UPI ID to start.');
+  renderChart();miniPanels();
  }catch(e){notice('Unable to load live dashboard data: '+e.message)}
 }
 function renderChart(){
@@ -246,13 +254,13 @@ async function loadVpas(){
   $('#vpaPaused').textContent=num(vpas.filter(v=>v.status==='PAUSED').length);
   $('#vpaDefault').textContent=num(vpas.filter(v=>v.is_default).length);
   $('#vpaTable').innerHTML=vpas.length?vpas.map(v=>
-   '<tr><td><strong>'+esc(v.vpa_address)+'</strong></td><td>'+esc((v.bank_name||'—')+' · '+(v.account_type==='MERCHANT'?'P2M':'P2P'))+'</td>'+
+   '<tr><td><strong>'+esc(v.vpa_address)+'</strong></td><td>'+esc(v.holder_name||'Not entered')+'</td><td>'+esc((v.bank_name||'—')+' · '+(v.account_type==='MERCHANT'?'P2M':'P2P'))+'</td>'+
    '<td><span class="state '+(v.status==='ACTIVE'?'active':'paused')+'">'+esc(v.status)+'</span></td>'+
    '<td>'+(v.is_default?'Primary':'—')+'</td><td>'+
    (v.is_default?'':'<button type="button" class="btn-inline" data-vpa-action="set_default" data-vpa-id="'+esc(v.id)+'">Make primary</button>')+
    '<button type="button" class="btn-inline" data-vpa-action="'+(v.status==='ACTIVE'?'pause':'resume')+
    '" data-vpa-id="'+esc(v.id)+'">'+(v.status==='ACTIVE'?'Pause':'Resume')+'</button></td></tr>').join(''):
-   '<tr><td colspan="5" class="empty">No receiving UPI IDs. Add one after merchant setup.</td></tr>';
+   '<tr><td colspan="6" class="empty">No UPI accounts yet. Add your own receiving UPI ID below, or import a CSV.</td></tr>';
   $('#routingAccounts').innerHTML=vpas.length?vpas.map(v=>
    '<span>'+esc(v.vpa_address)+' <strong>'+esc(v.status)+(v.is_default?' · Primary':'')+'</strong></span>').join(''):
    '<div class="empty">No receiving accounts configured.</div>';
@@ -270,7 +278,7 @@ async function addVpa(e){
  e.preventDefault();busy(e.submitter,true);
  try{
   await api('/api/merchant/vpas',{method:'POST',body:JSON.stringify({
-   vpaAddress:$('#vpaAddress').value.trim(),bankName:$('#vpaBank').value.trim(),accountType:$('#vpaAccountType').value,mcc:$('#vpaMcc').value.trim()
+   vpaAddress:$('#vpaAddress').value.trim(),holderName:$('#vpaHolder').value.trim(),bankName:$('#vpaBank').value.trim(),accountType:$('#vpaAccountType').value,mcc:$('#vpaMcc').value.trim()
   })});
   $('#addVpaForm').reset();await loadVpas();toast('Receiving UPI ID added');
  }catch(error){toast(error.message)}finally{busy(e.submitter,false)}
