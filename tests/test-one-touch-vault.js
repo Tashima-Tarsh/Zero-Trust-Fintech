@@ -15,14 +15,14 @@ const edge=fs.readFileSync(path.join(dir,'public','_worker.js'),'utf8');
 const routes=fs.readFileSync(path.join(dir,'public','_routes.json'),'utf8');
 
 assert.match(page,/id="btnOneTouch"/);
-assert.match(cosmic,/vault\.authorize\(orderId\(\)\)/);
+assert.match(cosmic,/vault\.authorize\(orderId\(\),\(event,code\)=>trace\(event,code\)\)/);
 assert.match(page,/id="oneTouchFallback"/);
 assert.doesNotMatch(cosmic,/await checkPasskeyStatus\(userId, userName\)/,
   'Page must not ask a biometric before the user presses Touch to Pay');
 assert.doesNotMatch(page,/window\.addEventListener\('pagehide', async/,
   'Switching to the UPI app must not trigger a fake cancellation');
 assert.match(merchant,/id="oneTouchFallback"/);
-assert.match(cosmic,/vault\.authorize\(orderId\(\)\)/);
+assert.match(cosmic,/vault\.authorize\(orderId\(\),\(event,code\)=>trace\(event,code\)\)/);
 assert.match(edge,/\/vendor\/simplewebauthn\.umd\.js/);
 assert.match(routes,/\/vendor\/simplewebauthn\.umd\.js/);
 assert.match(server,/status:'VAULT_VERIFIED_AWAITING_UPI'/);
