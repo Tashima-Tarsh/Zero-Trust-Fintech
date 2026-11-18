@@ -16,7 +16,7 @@ function harness(userAgent,initialPreferred){
  const document={body:{dataset:{checkout:'merchant'}},visibilityState:'visible',getElementById:node,
   querySelectorAll:s=>s==='[data-stage]'?stages:apps,addEventListener(k,fn){cb[k]=fn}};
  const location={search:'?orderId='+order+'&token='+token,assign(url){state.opened=url}};
- const vault={getPendingOrderId:()=>null,authorize:async()=>{state.verified=true;return {sessionId}},
+ const vault={getPendingOrderId:()=>state.beginCount?order:null,requestEvidence:()=>null,authorize:async()=>{state.verified=true;return {sessionId}},
   beginHandoff:()=>{state.beginCount++},launchUPI:url=>{state.opened=url}};
  const window={DISHACosmicCheckoutModel:model,DISHAOneTouchVault:vault,
   QRCode:function(_,params){state.qr=params.text;},addEventListener(k,fn){cb[k]=fn}};
@@ -29,7 +29,7 @@ function harness(userAgent,initialPreferred){
  const localStorage={getItem:()=>initialPreferred,setItem(){}};
  vm.runInNewContext(code,{window,document,location,navigator:{userAgent},localStorage,fetch,
   URLSearchParams,Date,Intl,console,setInterval:()=>1,clearInterval(){}});
- return {nodes,apps,state,stages};
+ return {nodes,apps,state,stages,windowFocus:()=>cb.focus?.()};
 }
 async function flush(){for(let i=0;i<30;i++)await Promise.resolve()}
 (async()=>{
@@ -43,9 +43,17 @@ async function flush(){for(let i=0;i<30;i++)await Promise.resolve()}
  assert.equal(android.state.opened,null,'Do not automatically launch preferred UPI app after passkey');
  assert.equal(android.stages.find(x=>!x.hidden).dataset.stage,'methods');
  assert.equal(android.state.beginCount,0,'Handoff must start only when app actually selected');
+ assert.match(android.nodes.checkoutTimer.textContent,/Session expires in 0[0-3]:[0-5][0-9]/,'Live TTL must be visible across payment stages');
  android.apps.find(x=>x.dataset.app==='phonepe').events.click();
  assert.match(android.state.opened,/^intent:\/\/pay\?/);
  assert.equal(android.state.beginCount,1);
+ assert.equal(android.stages.find(x=>!x.hidden).dataset.stage,'methods');
+ android.state.opened=null;
+ // A foreground-only intent rejection must NOT falsely imply payment failed
+ // or imply the bank accepted payment. It must preserve app selection.
+ android.windowFocus();
+ assert.equal(android.stages.find(x=>!x.hidden).dataset.stage,'methods','Focus alone must not move into checking');
+
  assert.equal(android.nodes.oneTouchFallback.href,uri,'Unresolved targeted intent must offer generic UPI fallback');
  const desktop=harness('Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/157','gpay');
  await flush();
