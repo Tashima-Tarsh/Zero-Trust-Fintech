@@ -252,6 +252,7 @@
  }
  function onReturn(){
   if(document.visibilityState==='hidden'||receiptShown)return;
+  tickSessionTimer();
   // Returning to a cancelled/expired checkout cannot resurrect its
   // one-touch authorization or expose native app / QR controls.
   if(session&&(session.initialStatus==='EXPIRED'||
