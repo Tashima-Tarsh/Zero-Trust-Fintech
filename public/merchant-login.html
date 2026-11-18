@@ -41,7 +41,7 @@ footer{max-width:1300px;margin:auto;padding:16px 34px 25px;font-size:11px;color:
 const status=document.getElementById('auth-status');
 try{
 const key=window.DISHA_CLERK_PUBLISHABLE_KEY;
-if(!key)throw Error('Merchant authentication is not configured. Contact platform support.');
+if(!key || window.DISHA_CLERK_CONFIG_READY===false)throw Error('Secure merchant sign-in is unavailable. Please contact platform support.');
 const part=key.split('_')[2];
 if(!part)throw Error('Invalid sign-in configuration');
 const domain=atob(part.replace(/-/g,'+').replace(/_/g,'/')).replace(/\0+$/g,'');
@@ -58,10 +58,10 @@ await window.Clerk.load({ui:{ClerkUI:window.__internal_ClerkUICtor}});
 if(window.Clerk.isSignedIn){location.replace('/dashboard');return}
 status.remove();
 window.Clerk.mountSignIn(document.getElementById('auth-slot'),{
-afterSignInUrl:'/dashboard',signUpUrl:'/signup',
+routing:'hash',forceRedirectUrl:'/dashboard',fallbackRedirectUrl:'/dashboard',signUpUrl:'/signup',
 appearance:{variables:{colorPrimary:'#2a5ec8',borderRadius:'12px',fontFamily:'-apple-system,BlinkMacSystemFont,Inter,sans-serif'}}
 });
-}catch(err){status.textContent=err.message||'Unable to start authentication';status.style.color='#ba3749';}
+}catch(err){console.error('[Merchant authentication] Startup failed:',err);status.textContent=err.message||'Unable to start authentication';status.style.color='#ba3749';}
 })();
 </script>
 </body></html>
