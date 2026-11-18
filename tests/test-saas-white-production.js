@@ -90,6 +90,7 @@ const navNodes=viewNames.map(name=>({
 const bound={},callbacks={};
 const staticEl=Object.fromEntries(['#viewHeading','#viewSubtitle','#appSide','#sideBackdrop','#sideToggle'].map(key=>[key,{classList:makeClassList(),textContent:'',setAttribute(){},addEventListener(event,fn){this[event]=fn}}]));
 const fakeDocument={
+ body:{dataset:{}}, // real merchant views set body data-current-view
  querySelector(sel){return staticEl[sel]||null},
  querySelectorAll(sel){if(sel==='.view')return rendered;if(sel==='#appSide [data-view]')return navNodes;return []},
  addEventListener(event,fn){bound[event]=fn}
@@ -110,6 +111,7 @@ vm.runInNewContext(testHarness,{
 fakeWindow.__merchantRouter.setupBindings();
 navNodes.find(n=>n.dataset.view==='settings').click();
 assert.equal(fakeLocation.hash,'#settings');
+assert.equal(fakeDocument.body.dataset.currentView,'settings');
 assert.ok(rendered.find(n=>n.id==='view-settings').classList.active);
 assert.equal(rendered.filter(n=>n.classList.active).length,1,'Only selected page must remain visible');
 assert.ok(historyCalls.some(call=>call[0]==='push'&&call[1]==='#settings'));
