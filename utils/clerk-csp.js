@@ -34,7 +34,7 @@ function buildContentSecurityPolicy(publishableKey) {
       fapi + ' https://challenges.cloudflare.com https://*.protect.clerk.com',
     "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
     "font-src 'self' https://fonts.gstatic.com data:",
-    "img-src 'self' data: blob: https://lh3.googleusercontent.com https://lh4.googleusercontent.com https://img.clerk.com https://assets.science.nasa.gov https://astro4edu.org https://eoimages.gsfc.nasa.gov",
+    "img-src 'self' data: blob: https://lh3.googleusercontent.com https://lh4.googleusercontent.com https://img.clerk.com https://assets.science.nasa.gov https://astro4edu.org https://eoimages.gsfc.nasa.gov https://svs.gsfc.nasa.gov",
     "connect-src 'self' ws: wss:" + fapi +
       ' https://*.protect.clerk.com:* https://clerk-telemetry.com https://*.clerk-telemetry.com',
     "frame-src 'self' https://challenges.cloudflare.com https://*.protect.clerk.com",
