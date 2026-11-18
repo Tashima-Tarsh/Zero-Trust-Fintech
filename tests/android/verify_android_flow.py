@@ -6,6 +6,7 @@ never returns a fabricated success, and never contacts a bank.
 """
 import json
 import re
+import shlex
 import subprocess
 import time
 import urllib.parse
@@ -75,7 +76,9 @@ def state():
 
 def test():
     print("A01 Loading the real merchant checkout HTML in Android WebView",flush=True)
-    adb("shell","am","start","-W","-n","ai.disha.testupi/.TestBrowserActivity","--es","url",CHECKOUT)
+    # The Android adb shell interprets '&' unless the entire query URL is quoted
+    # inside the remote shell. Preserve the token, not just the orderId.
+    adb("shell","am start -W -n ai.disha.testupi/.TestBrowserActivity --es url "+shlex.quote(CHECKOUT))
     wait_for("DISHA QA Merchant")
     wait_for("499.01")
     wait_for("qa-receiver@oksbi")
