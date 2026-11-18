@@ -87,7 +87,7 @@ assert.equal(model.safeApp('invalid'),'generic');
 const qr=model.qrPayload('upi://pay?pa=store%40oksbi&am=500.00&cu=INR');
 assert.match(qr,/^upi:\/\/pay\?/);
 assert.throws(()=>model.qrPayload('https://example.com/bogus'),/UPI/i);
-assert.match(script,/vault\.authorize\(orderId\(\)\)/);
+assert.match(script,/vault\.authorize\(orderId\(\),\(event,code\)=>trace\(event,code\)\)/);
 assert.match(script,/vault\.beginHandoff\(orderId\(\),vaultSessionId,session\.token,chosen\)/,'Vault must capture selected UPI app without implying a bank credit');
 assert.match(script,/requestEvidence\(orderId\(\)\)/);
 assert.match(script,/fetch\('\/api\/vault\/evidence'/);
