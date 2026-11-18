@@ -34,7 +34,7 @@ const {Pool}=require('pg');
  const pool=new Pool({connectionString:url});
  try {
   const before=execFileSync(process.execPath,[script],{env,encoding:'utf8'});
-  assert.match(before,/DRY RUN/);
+  assert.match(before,/DRY_RUN_ONLY/);
   let r=await pool.query('SELECT 1 FROM sessions WHERE order_id=$1',[orderId]).catch(()=>({rows:[]}));
   assert.equal(r.rows.length,0,'Dry-run must not import data');
   const output=execFileSync(process.execPath,[script,'--apply'],{env,encoding:'utf8'});
