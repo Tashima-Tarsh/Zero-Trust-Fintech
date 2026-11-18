@@ -413,6 +413,17 @@ function createPlatformControl({db,getAuth,clerkEmailResolver=getClerkVerifiedEm
       "ORDER BY v.created_at DESC LIMIT 150");
    res.set('Cache-Control','no-store').json({success:true,connected:true,evidence:r.rows});
  }));
+ router.get('/owner/checkout-diagnostics',wrap(async(req,res)=>{
+   const present=await pool.query("SELECT to_regclass('public.disha_checkout_diagnostics') IS NOT NULL AS ready");
+   if(!present.rows[0]?.ready)
+     return res.set('Cache-Control','no-store').json({success:true,connected:false,events:[]});
+   // Read-only, Clerk-verified Super Admin; no client-supplied order bearer.
+   const r=await pool.query(
+     "SELECT order_id,event,code,app,device,created_at "+
+     "FROM disha_checkout_diagnostics ORDER BY created_at DESC LIMIT 180");
+   return res.set('Cache-Control','no-store').json({success:true,connected:true,events:r.rows,
+     retentionDays:7,financialEvidence:false});
+ }));
  router.post('/owner/incidents/:id/status',wrap(async(req,res)=>{
    const status=val(req.body?.status,20).toUpperCase();
    if(!['ACKNOWLEDGED','RESOLVED','OPEN'].includes(status))throw err(400,'Invalid incident status');
