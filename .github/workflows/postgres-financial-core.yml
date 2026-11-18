@@ -5,6 +5,9 @@ on:
     paths:
       - 'financial/**'
       - 'merchant-api.js'
+      - 'server.js'
+      - 'utils/trust-score.js'
+      - 'tests/test-postgres-utr-evidence-http.js'
       - 'tests/test-postgres-merchant-saas.js'
       - 'migrations/001_financial_core.sql'
       - 'tests/test-postgres-financial-core.js'
@@ -69,5 +72,7 @@ jobs:
         run: node tests/test-postgres-switch.js
       - name: Test real checkout HTTP against PostgreSQL
         run: node tests/test-postgres-http.js
+      - name: Prove untrusted UTR cannot create financial postings
+        run: node tests/test-postgres-utr-evidence-http.js
       - name: Test authenticated tenant merchant SaaS end to end
         run: node tests/test-postgres-merchant-saas.js
