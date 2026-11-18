@@ -41,7 +41,7 @@ async function load(screen){
  if(screen==='settings'){
    const c=await api('/owner/configuration');
    const output=[];
-   if(c.owner){output.push('<div><b>Platform Owner</b><span>'+esc(c.owner.display_name)+' · '+esc(c.owner.email)+'</span></div>');output.push('<div><b>Personal business</b><span>'+esc(c.owner.business_name)+' · '+esc(c.owner.professional_title)+'</span></div>')}
+   if(c.owner){output.push('<div><b>Super Admin</b><span>'+esc(c.owner.display_name)+' · '+esc(c.owner.email)+'</span></div>');output.push('<div><b>Personal business</b><span>'+esc(c.owner.business_name)+' · '+esc(c.owner.professional_title)+'</span></div>')}
    output.push('<div><b>Owner test tenant</b><span>'+esc(c.personalTenant?.id||'Not created')+'</span></div>');
    for(const a of c.personalTenant?.upiAccounts||[])output.push('<div><b>'+esc(a.is_default?'Primary P2P':'Secondary P2P')+'</b><span>'+esc(a.vpa_address)+' · '+esc(a.status)+'</span></div>');
    if(c.companyTenant)output.push('<div><b>Company tenant</b><span>'+esc(c.companyTenant.business_name)+' · '+esc(c.companyTenant.access_status)+'</span></div>');
