@@ -116,7 +116,27 @@ async function testBrowserMount(file,method){
  }
  assert.ok(fs.statSync(path.join(root,'public/assets/disha-8-2-wordmark-cropped.png')).size>10000,
    'Real metallic logo must be present in the public asset directory');
- const policy=require('../public/merchant-password-policy.js');
+ // The sign-in screen uses the chosen realistic merchant/customer artwork,
+ // while the right side is the standard Clerk component without a boxed shell.
+ for(const page of ['merchant-login.html','merchant-signup.html']){
+  const html=read('public/'+page);
+  assert.match(html,/src="\/assets\/merchant-direct-3d\.webp"/);
+  assert.doesNotMatch(html,/src="\/assets\/merchant-direct-scene\.svg"/);
+  assert.match(html,/id="auth-slot"/);
+  assert.match(html,/class="auth-content"/);
+  assert.doesNotMatch(html,/class="auth-footnote"/,'Clerk owns login/signup navigation; avoid duplicated links');
+  assert.doesNotMatch(html,/class="auth-divider"/,'No second card-like framing');
+  assert.match(html,/window\.Clerk\.mountSign/);
+ }
+ assert.ok(fs.statSync(path.join(root,'public/assets/merchant-direct-3d.webp')).size>7000,
+  'Use the actual generated realistic merchant/customer image, not the old flat SVG');
+ assert.match(styles,/\.auth-content\{[^}]*background:transparent/s,'Do not frame Clerk in an outer white card');
+ assert.match(styles,/\.auth-action\{[^}]*background:#fff/s,'Right surface should remain a seamless white column');
+ assert.match(styles,/\.auth-story\{[^}]*min-width:0/s,'Prevent hero heading overflow');
+ assert.match(styles,/\.auth-slot-wrap\{[^}]*min-width:0/s,'Prevent Clerk form clipping');
+ assert.match(styles,/@media\(max-width:800px\)/,'Use tablet layout breakpoint');
+ assert.match(styles,/@media\(max-width:480px\)/,'Use mobile layout breakpoint');
+  const policy=require('../public/merchant-password-policy.js');
  assert.equal(policy.MIN_PASSWORD_LENGTH,10);
  assert.equal(policy.isAllowedPassword('123456789'),false,'Reject 9 characters');
  assert.equal(policy.isAllowedPassword('1234567890'),true,'Accept exactly 10 characters');
