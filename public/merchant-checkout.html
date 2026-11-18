@@ -99,6 +99,8 @@ $('openUpi').addEventListener('click',async event=>{
   const result=await window.DISHAOneTouchVault.authorize(orderId);
   vaultSessionId=result.sessionId;
   try{sessionStorage.setItem('disha82:vault-session:'+orderId,vaultSessionId);}catch(_){}
+  // Preserve one authorized attempt before opening the external UPI app.
+  window.DISHAOneTouchVault.beginHandoff(orderId,vaultSessionId,token);
   const fallback=$('oneTouchFallback');
   fallback.href=uri;fallback.style.display='flex';
   $('vaultHelp').textContent='Vault verified. Opening your UPI app…';
@@ -115,8 +117,28 @@ $('openUpi').addEventListener('click',async event=>{
 });
 $('copy').onclick=async()=>{if(!uri)return;try{await navigator.clipboard.writeText(uri);status('UPI payment URI copied.')}catch{status('Your browser blocked clipboard access.','error')}};
 $('refresh').onclick=load;
+// Vault observation is delivered automatically upon browser return.
+// This is not an assertion that the payer app completed a payment.
+async function submitVaultReturn(){
+ try{
+  const receipt=await window.DISHAOneTouchVault.submitReturnEvidence(orderId);
+  if(!receipt)return;
+  $('vaultHelp').textContent=receipt.utrCandidate
+    ? 'Vault captured a UPI reference and submitted evidence to the browser.'
+    : 'Vault submitted browser-return evidence automatically.';
+  status('Evidence submitted. Payment is pending until independently established.','');
+ }catch(err){
+  $('vaultHelp').textContent='Evidence delivery will retry when you return to this page.';
+ }
+}
 load();timer=setInterval(load,5000);
-document.addEventListener('visibilitychange',()=>{if(!document.hidden)load()});
+document.addEventListener('visibilitychange',()=>{
+ if(document.hidden)window.DISHAOneTouchVault.markBackgrounded(orderId);
+ else{void submitVaultReturn();void load();}
+});
+window.addEventListener('pagehide',()=>window.DISHAOneTouchVault.markBackgrounded(orderId));
+window.addEventListener('pageshow',()=>{void submitVaultReturn()});
+window.addEventListener('focus',()=>{void submitVaultReturn()});
 })();
 </script>
 </body></html>

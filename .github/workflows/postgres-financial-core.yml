@@ -8,6 +8,8 @@ on:
       - 'server.js'
       - 'utils/trust-score.js'
       - 'tests/test-postgres-utr-evidence-http.js'
+      - 'tests/test-postgres-vault-evidence-http.js'
+      - 'tests/test-vault-browser-evidence.js'
       - 'tests/test-postgres-merchant-saas.js'
       - 'migrations/001_financial_core.sql'
       - 'tests/test-postgres-financial-core.js'
@@ -78,3 +80,5 @@ jobs:
         run: node tests/test-postgres-merchant-saas.js
       - name: Prove authenticated statement reconciliation and no false ledger credits
         run: node tests/test-postgres-reconciliation-http.js
+      - name: Prove Vault evidence handoff cannot fabricate payment success
+        run: node tests/test-postgres-vault-evidence-http.js
