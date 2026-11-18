@@ -32,6 +32,7 @@ const UNIT_TESTS = [
   'test-utr-hypothesis.js', // UTR anti-fraud and no-false-credit regression
   'test-pony-tail-window.js', // Pony-tail 15s/180s temporal invariants and no UTR poisoning
   'test-android-fixture.js', // no-money P2P URL and UTR intent fixture
+  'test-platform-control-startup.js', // database connection assigned after owner service constructor
   'test-saas-white-production.js', // no demo data; 12 live merchant routes and white layout
   'test-sqlite-storage.js', // fail-closed Railway SQLite path and storage guard
   'test-vpa-router.js',   // 5-factor anti-ban scoring
