@@ -254,7 +254,9 @@ function createMerchantApi({db,getAuth,buildUpiUri,platformControl}) {
       const merchantUserId=auth.userId;
       // Invite-only mode: Clerk authentication is identity, NEVER tenant approval.
       // Bootstrap owner/test merchant is provisioned by Platform Control at startup.
-      if(platformControl?.active()){
+      if(platformControl?.active()||
+         (platformControl?.verifiedOwner&&await platformControl.verifiedOwner(merchantUserId))){
+        // Verified Super Admin bypasses merchant approval, not Clerk sign-in.
         req.merchant=await platformControl.verifyMerchant(merchantUserId,auth);
       }else{
         // Backward-compatibility during a controlled rollout. Disable via
