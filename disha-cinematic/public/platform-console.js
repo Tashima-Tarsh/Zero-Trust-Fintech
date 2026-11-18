@@ -27,7 +27,7 @@ async function load(screen){
  notice('');
  if(screen==='overview'||screen==='analytics'){const r=await api('/owner/overview');overview=r.metrics;const t=r.metrics.tenants,q=r.metrics.requests,o=r.metrics.orders,i=r.metrics.incidents;const html=field(t.active,'Active external tenants')+field(q.pending,'Awaiting approval')+field(o.total,'Payment requests')+field(i.open,'Open recorded incidents');$('#owner-kpis').innerHTML=html;$('#analytics-kpis').innerHTML=html;}
  if(screen==='requests'){requests=(await api('/owner/requests')).requests||[];$('#requests-body').innerHTML=requests.length?requests.map(r=>'<tr><td><strong>'+esc(r.business_name)+'</strong><span class="sub">'+esc(r.category)+'</span></td><td>'+esc(r.contact_name)+'<span class="sub">'+esc(r.email)+'</span></td><td>'+when(r.created_at)+'</td><td><span class="state">'+esc(r.status)+'</span></td><td>'+(r.status==='REQUESTED'?'<button data-decision="APPROVE" data-id="'+esc(r.id)+'">Approve</button><button data-decision="REJECT" data-id="'+esc(r.id)+'">Reject</button>':'Reviewed')+'</td></tr>').join(''):'<tr><td colspan="5">No access requests received yet.</td></tr>';}
- if(screen==='tenants'||screen==='onboarding'){tenants=(await api('/owner/tenants')).tenants||[];$('#tenants-body').innerHTML=tenants.length?tenants.map(t=>'<tr><td><strong>'+esc(t.business_name||'Unconfigured')+'</strong>'+(t.is_internal_test?'<span class="sub">INTERNAL PRODUCTION TEST</span>':'')+'</td><td>'+esc(t.email||'Owner account')+'</td><td><span class="state">'+esc(t.access_status)+'</span></td><td>'+esc(t.setup_completed?'Complete':'Pending')+'</td><td>'+(t.is_internal_test?'Owner only':t.access_status==='APPROVED'?'<button data-invite="'+esc(t.id)+'">Send Clerk invite</button>':t.access_status==='ACTIVE'?'<button data-status="SUSPENDED" data-tenant="'+esc(t.id)+'">Suspend</button>':t.access_status==='SUSPENDED'?'<button data-status="ACTIVE" data-tenant="'+esc(t.id)+'">Reactivate</button>':'—')+'</td></tr>').join(''):'<tr><td colspan="5">No merchants provisioned.</td></tr>';
+ if(screen==='tenants'||screen==='onboarding'){tenants=(await api('/owner/tenants')).tenants||[];$('#tenants-body').innerHTML=tenants.length?tenants.map(t=>'<tr><td><strong>'+esc(t.business_name||'Unconfigured')+'</strong>'+(t.is_internal_test?'<span class="sub">INTERNAL PRODUCTION TEST</span>':'')+'</td><td>'+esc(t.email||'Owner account')+'</td><td><span class="state">'+esc(t.access_status)+'</span></td><td>'+esc(t.setup_completed?'Complete':'Pending')+'</td><td>'+(t.is_internal_test?'Owner only':t.access_status==='PENDING'?'<button data-approve="'+esc(t.id)+'">Approve merchant</button>':t.access_status==='APPROVED'?(t.identity_connected?'Approved — sign-in activates':'<button data-invite="'+esc(t.id)+'">Send Clerk invite</button>'):t.access_status==='INVITED'?'Invitation sent — awaiting sign-in':t.access_status==='ACTIVE'?'<button data-status="SUSPENDED" data-tenant="'+esc(t.id)+'">Suspend</button>':t.access_status==='SUSPENDED'?'<button data-status="ACTIVE" data-tenant="'+esc(t.id)+'">Reactivate</button>':'—')+'</td></tr>').join(''):'<tr><td colspan="5">No merchants provisioned.</td></tr>';
  $('#onboarding-body').innerHTML=tenants.map(t=>'<div><b>'+esc(t.business_name||t.email||'Merchant')+'</b><span>'+esc(t.access_status)+' · '+(t.setup_completed?'Setup complete':'Setup pending')+'</span></div>').join('')||'No tenant applications approved yet.';}
  if(screen==='transactions'){transactions=(await api('/owner/transactions')).transactions||[];$('#transactions-body').innerHTML=transactions.length?transactions.map(t=>'<tr><td>'+esc(t.id)+'</td><td>'+esc(t.business_name)+'</td><td>'+money(t.amount_paise)+'</td><td><span class="state">'+esc(t.status)+'</span></td><td>'+when(t.created_at)+'</td></tr>').join(''):'<tr><td colspan="5">No payment requests recorded.</td></tr>';}
 
@@ -61,18 +61,19 @@ async function load(screen){
 }
 document.addEventListener('click',async event=>{
  const nav=event.target.closest('[data-screen]');if(nav){select(nav.dataset.screen);return}
- const decision=event.target.closest('[data-decision]'),invite=event.target.closest('[data-invite]'),status=event.target.closest('[data-status]'),incident=event.target.closest('[data-incident]');
- if(!decision&&!invite&&!status&&!incident)return;
- const button=decision||invite||status||incident;if(button.disabled)return;
+ const decision=event.target.closest('[data-decision]'),approve=event.target.closest('[data-approve]'),invite=event.target.closest('[data-invite]'),status=event.target.closest('[data-status]'),incident=event.target.closest('[data-incident]');
+ if(!decision&&!approve&&!invite&&!status&&!incident)return;
+ const button=decision||approve||invite||status||incident;if(button.disabled)return;
  const action=decision?decision.dataset.decision:status?status.dataset.status:incident?incident.dataset.incStatus:'INVITE';
  if(!confirm('Confirm '+action.toLowerCase()+' for this merchant?'))return;
  button.disabled=true;
  try{
    if(decision)await api('/owner/requests/'+encodeURIComponent(decision.dataset.id)+'/decision',{method:'POST',body:JSON.stringify({decision:action})});
+   if(approve)await api('/owner/tenants/'+encodeURIComponent(approve.dataset.approve)+'/approve',{method:'POST',body:'{}'});
    if(invite)await api('/owner/tenants/'+encodeURIComponent(invite.dataset.invite)+'/invite',{method:'POST',body:'{}'});
    if(status)await api('/owner/tenants/'+encodeURIComponent(status.dataset.tenant)+'/status',{method:'POST',body:JSON.stringify({status:action})});
    if(incident)await api('/owner/incidents/'+encodeURIComponent(incident.dataset.incident)+'/status',{method:'POST',body:JSON.stringify({status:action})});
-   await load(decision?'requests':incident?'incidents':'tenants');notice('Action recorded in platform audit.');
+   await load(decision?'requests':incident?'incidents':'tenants');notice('Merchant action saved. Review Tenant Management for current approval and sign-in status.');
  }catch(e){notice(e.message)}finally{button.disabled=false}
 });
 $('#owner-invite-form')?.addEventListener('submit',async event=>{
