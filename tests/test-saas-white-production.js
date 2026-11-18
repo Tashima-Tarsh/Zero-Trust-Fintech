@@ -8,6 +8,7 @@ const read=file=>fs.readFileSync(path.join(root,'public',file),'utf8');
 const page=read('merchant-console.html');
 const js=read('premium-dashboard.js');
 const css=read('saas-white.css');
+const mars=read('merchant-mars.css');
 const worker=read('_worker.js');
 const routes=JSON.parse(read('_routes.json'));
 const login=read('merchant-login.html');
@@ -30,10 +31,11 @@ for(const pathName of ['/dashboard','/login','/signup','/auth-config.js','/merch
  assert.ok(routes.include.includes(pathName),'Route missing from Cloudflare edge: '+pathName);
  assert.ok(worker.includes(pathName),'Worker must forward protected route '+pathName);
 }
-assert.ok(css.includes('color-scheme:light'),'Premium merchant shell must use light mode');
+assert.ok(mars.includes('color-scheme:dark'),'Merchant console must load premium dark Mars skin');
 assert.ok(css.includes('body.app-page .btn.primary'),'Primary button style missing');
 assert.ok(css.includes('@media(max-width:620px)'),'Small-screen SaaS design missing');
-assert.ok(login.includes('mountSignIn') && signup.includes('mountSignUp'),'Clerk sign-up/sign-in missing');
+assert.ok(login.includes('mountSignIn') && login.includes("signUpUrl:'/request-access'"),'Clerk sign-in must point new merchants to Request Access');
+assert.ok(signup.includes('/request-access'),'Legacy public signup must redirect to approval flow');
 assert.ok(checkout.includes('/cosmic-checkout.js') && read('cosmic-checkout.js').includes('/api/merchant/public/order/'),'Real merchant checkout endpoint missing');
 assert.ok(read('cosmic-checkout.js').includes('upi_uri'),'Payee-specific UPI data binding missing');
 assert.ok(!/previewOrders|previewVpas|VISUAL PREVIEW|SAMPLE-240|isPreview/.test(js),
@@ -73,7 +75,7 @@ assert.throws(()=>parseVpaCsv('upi_id,account_holder,bank_name\nshop@oksbi,N,Ban
 
 // Execute the real route controller with a minimal DOM surface and assert that
 // clicks, delegated actions and browser history expose only the selected view.
-const viewNames=['overview','payments','create','vpas','routing','risk','access','reports','notifications','soundbox','api','settings'];
+const viewNames=['overview','intelligence','payments','create','vpas','vault','risk','ledger','reports','notifications','integrations','settings','routing','access','soundbox','api'];
 const makeClassList=()=>({
  active:false,open:false,
  toggle(name,flag){this[name]=flag===undefined?!this[name]:Boolean(flag);return this[name]},
@@ -118,4 +120,4 @@ fakeLocation.hash='#reports';
 callbacks.popstate();
 assert.equal(rendered.find(n=>n.id==='view-reports').classList.active,true,'Browser back must restore the route');
 assert.equal(rendered.filter(n=>n.classList.active).length,1);
-console.log('Merchant navigation, controls, white theme, auth, edge protection, checkout and no-demo invariants PASS');
+console.log('Merchant twelve-destination Mars theme, controls, auth, edge protection, checkout and no-demo invariants PASS');
