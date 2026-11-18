@@ -6,6 +6,10 @@ on:
       - 'financial/**'
       - 'migrations/001_financial_core.sql'
       - 'tests/test-postgres-financial-core.js'
+      - 'tests/test-postgres-checkout-store.js'
+      - 'financial/postgres-store.js'
+      - 'migrations/002_postgres_checkout.sql'
+      - 'schema.sql'
       - 'tests/test-financial-money.js'
       - '.github/workflows/postgres-financial-core.yml'
   push:
@@ -48,3 +52,5 @@ jobs:
         run: node tests/test-financial-money.js
       - name: Prove PostgreSQL transaction invariants
         run: node tests/test-postgres-financial-core.js
+      - name: Exercise PostgreSQL checkout state
+        run: node tests/test-postgres-checkout-store.js
