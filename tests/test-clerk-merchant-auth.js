@@ -99,6 +99,23 @@ async function testBrowserMount(file,method){
   assert.match(html,/forceRedirectUrl:'\/dashboard'/);
   assert.match(html,/window\.Clerk\.mountSign/,'Clerk must own sign-in and signup');
  }
+ // Uploaded metallic wordmark must be used, not rebuilt with generic text.
+ const styles=read('public/merchant-auth.css');
+ assert.match(styles,/\/assets\/disha-8-2-wordmark-cropped\.png/);
+ assert.match(styles,/@keyframes\s+logoReveal/);
+ assert.match(styles,/@media\s*\(prefers-reduced-motion:\s*reduce\)/);
+ assert.match(styles,/@media\s*\(max-width:\s*1100px\)/);
+ assert.match(styles,/@media\s*\(max-width:\s*620px\)/);
+ for(const page of ['merchant-login.html','merchant-signup.html']){
+  const html=read('public/'+page);
+  assert.match(html,/class="auth-logo-stage"/);
+  assert.match(html,/src="\/assets\/disha-8-2-wordmark-cropped\.png"/);
+  assert.match(html,/alt="DISHA 8\.2"/);
+  assert.match(html,/class="payment-journey"/);
+  assert.match(html,/class="journey-flow"/);
+ }
+ assert.ok(fs.statSync(path.join(root,'public/assets/disha-8-2-wordmark-cropped.png')).size>10000,
+   'Real metallic logo must be present in the public asset directory');
  const policy=require('../public/merchant-password-policy.js');
  assert.equal(policy.MIN_PASSWORD_LENGTH,10);
  assert.equal(policy.isAllowedPassword('123456789'),false,'Reject 9 characters');
