@@ -11,7 +11,8 @@
     "/analytics",
     "/merchant-console.html",
     "/merchant-dashboard.html",
-    "/auth-config.js"
+    "/auth-config.js",
+    "/debug.html"
   ],
   "exclude": [
     "/assets/*",

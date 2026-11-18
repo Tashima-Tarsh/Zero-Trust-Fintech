@@ -4,6 +4,11 @@ export default {
   async fetch(request, env) {
     const url = new URL(request.url);
 
+    // Disallow the legacy public diagnostics console on the Pages edge.
+    if (url.pathname === "/debug.html") {
+      return new Response("Not found", { status: 404, headers: {"Cache-Control":"no-store"} });
+    }
+
     // Keep the canonical checkout consistent with the Railway Express route.
     if (["/checkout", "/checkout/", "/pay", "/pay/"].includes(url.pathname)) {
       const checkoutUrl = new URL("/checkout.html" + url.search, request.url);
