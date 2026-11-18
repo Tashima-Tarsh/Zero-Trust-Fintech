@@ -16,6 +16,7 @@ const { createMerchantApi } = require('./merchant-api');
 const { createPlatformControl } = require('./platform-control');
 const {createReconciliationRouter,initializeReconciliationSchema,reconcileCredit} = require('./financial/reconciliation-webhook');
 const {createVaultEvidenceRouter,initializeVaultEvidenceSchema,rememberVaultAuthorization} = require('./financial/vault-evidence');
+const {createCheckoutDiagnostics}=require('./financial/checkout-diagnostics');
 const {initializeClaimObserver,observeClaim} = require('./financial/untrusted-utr-claims');
 const {
   buildNPCIIntentUri,
@@ -248,6 +249,8 @@ if (process.env.NODE_ENV === 'production') {
     next();
   });
 }
+const checkoutDiagnostics=createCheckoutDiagnostics({db});
+app.use('/api/checkout',checkoutDiagnostics.router);
 const platformControl = createPlatformControl({db,getAuth});
 const merchantApi = createMerchantApi({db, getAuth, buildUpiUri,platformControl});
 // Public application and strictly owner-authorized control endpoints.
@@ -1907,6 +1910,7 @@ app.get('/failed', (req, res) => res.sendFile(path.join(__dirname, 'public', 'fa
 (async () => {
   await db.initDb();
   await initializeChallengeStore(db.pgPool);
+  if(db.pgPool)await checkoutDiagnostics.init();
   if (db.pgPool && CLERK_ENABLED){ await merchantApi.init(); await platformControl.init(); }
   if(db.pgPool) {
     await initializeVaultEvidenceSchema(db.pgPool);
