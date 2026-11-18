@@ -684,6 +684,7 @@
         const verified=await window.DISHAOneTouchVault.authorize(currentSession.orderId);
         vaultSessionId=verified.sessionId;
         try{sessionStorage.setItem('disha82:vault-session:'+currentSession.orderId,vaultSessionId);}catch(_){}
+        window.DISHAOneTouchVault.beginHandoff(currentSession.orderId,vaultSessionId,currentSession.sessionId);
         oneTouchFallback.href=currentUpIUri;
         oneTouchFallback.classList.remove('hidden');
         oneTouchHelp.textContent='Vault verified. Opening your UPI app…';
@@ -717,43 +718,23 @@
     /* ========================================================================
        5. UPI RETURN / FINALIZE
        ======================================================================== */
-    window.addEventListener('load', () => {
-      const urlParams = new URLSearchParams(window.location.search);
-      const status = urlParams.get('Status');
-      const txnRef = urlParams.get('txnRef') || urlParams.get('tr');
-      const orderId = urlParams.get('orderId') || (currentSession ? currentSession.orderId : null);
-      const savedVaultSession = orderId && (()=>{try{return sessionStorage.getItem('disha82:vault-session:'+orderId);}catch(_){return null}})();
-
-      if (status === 'SUCCESS' && txnRef && orderId && (vaultSessionId || savedVaultSession)) {
-        finalizePayment(orderId, txnRef, vaultSessionId || savedVaultSession);
-      } else if (status === 'FAILURE') {
-        showStatus('error', 'Payment Failed', 'The UPI app reported failure. Please try again.');
-      }
-    });
-
-    async function finalizePayment(orderId, txnRef, sessionId) {
-      try {
-        showStatus('processing', 'Finalizing Settlement', 'Verifying UPI transaction with server…');
-
-        const res = await fetch('/api/checkout/finalize-upi', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ sessionId, orderId, txnRef })
-        });
-        const data = await res.json();
-
-        if (res.status === 200 && data.verified === true && data.state === 'VERIFIED') {
-          showStatus('success', 'Payment Confirmed', 'Payment confirmation was recorded by the backend.');
-        } else if (res.status === 202 && data.state === 'UTR_OBSERVED') {
-          showStatus('processing', 'UPI Reference Recorded', 'The app reference was matched, but a credited-payment confirmation is not available. This order is still pending.');
-        } else {
-          showStatus('error', 'Reference Not Accepted', data.reason || data.error || 'Unable to record this UPI reference.');
-        }
-      } catch (err) {
-        console.error('Finalize error:', err);
-        showStatus('error', 'Network Error', err.message || 'Unable to contact verification service.');
+    // Vault -> browser: a return is evidence, not a payment confirmation.
+    async function submitVaultReturn(){
+      try{
+        const receipt=await window.DISHAOneTouchVault.submitReturnEvidence();
+        if(!receipt)return;
+        oneTouchHelp.textContent=receipt.utrCandidate?
+          'Vault captured a UPI reference and submitted it to DISHA.':
+          'Vault submitted browser-return evidence to DISHA.';
+        showStatus('processing','Vault evidence recorded',
+          'The device handoff was correlated. Payment remains pending.');
+      }catch(err){
+        oneTouchHelp.textContent='Vault evidence will retry when this page resumes.';
       }
     }
+    window.addEventListener('load',()=>{void submitVaultReturn()});
+    window.addEventListener('pageshow',()=>{void submitVaultReturn()});
+    window.addEventListener('focus',()=>{void submitVaultReturn()});
 
     /* ========================================================================
        6. WEBSOCKET REAL-TIME
@@ -793,10 +774,13 @@
     // App switching is NOT a cancellation; Android sends pagehide/visibility
     // when the UPI app opens. Never punish the user with a 120-second cooldown.
     document.addEventListener('visibilitychange', () => {
-      if(document.visibilityState==='visible' && vaultSessionId){
-        showStatus('processing','Returned from UPI','The transaction remains pending until its recorded status changes.');
+      if(document.visibilityState==='hidden'){
+        window.DISHAOneTouchVault.markBackgrounded();
+      }else{
+        void submitVaultReturn();
       }
     });
+    window.addEventListener('pagehide',()=>window.DISHAOneTouchVault.markBackgrounded());
 
     // Start
     initSession();

@@ -14,6 +14,7 @@ const { clerkMiddleware, getAuth } = require('@clerk/express');
 const db = require('./db');
 const { createMerchantApi } = require('./merchant-api');
 const {createReconciliationRouter,initializeReconciliationSchema} = require('./financial/reconciliation-webhook');
+const {createVaultEvidenceRouter,initializeVaultEvidenceSchema,rememberVaultAuthorization} = require('./financial/vault-evidence');
 const {
   buildNPCIIntentUri,
   sanitizeTransactionNote,
@@ -480,6 +481,8 @@ function broadcastOrderSuccess(orderId, payload) {
   }
 }
 // ════════════════════════════════════════════════════════════════════
+// Vault evidence: verified passkey authorization + observed browser return, never settlement.
+app.use('/api/vault',createVaultEvidenceRouter({getPool:()=>db.pgPool}));
 // Authenticated internal account-credit boundary; disabled without explicit connector config.
 // It never accepts customer-origin callbacks as bank-confirmed funds.
 app.use('/api/reconciliation',createReconciliationRouter({
@@ -1206,6 +1209,7 @@ app.post('/api/webauthn/register/finish', async (req, res) => {
       userId:stored.userId,orderId:stored.orderId,amount:order.challengeAmount,
       verifiedAt:Date.now(),expiresAt:Math.min(Date.now()+180000,order.expiresAt)
     });
+    await rememberVaultAuthorization(db.pgPool,stored.orderId,sessionId);
     return res.json({
       success: true, sessionId, credentialId: verifiedCredential.id,
       userId: stored.userId, orderId: stored.orderId
@@ -1299,6 +1303,7 @@ app.post('/api/webauthn/authenticate/finish', async (req, res) => {
       verifiedAt: Date.now(),
       expiresAt: Date.now() + 5 * 60 * 1000
     });
+    await rememberVaultAuthorization(db.pgPool,stored.orderId,sessionId);
     return res.json({
       success: true, sessionId, orderId: stored.orderId,
       amount: stored.amount, message: 'Hardware vault verified. Proceed to UPI.'
@@ -1820,6 +1825,7 @@ app.get('/failed', (req, res) => res.sendFile(path.join(__dirname, 'public', 'fa
 (async () => {
   await db.initDb();
   if (db.pgPool && CLERK_ENABLED) await merchantApi.init();
+  if(db.pgPool) await initializeVaultEvidenceSchema(db.pgPool);
   if(process.env.RECONCILIATION_WEBHOOK_SECRET && process.env.RECONCILIATION_SOURCE_ID){
     if(!db.pgPool || !CLERK_ENABLED)throw new Error('Reconciliation requires PostgreSQL and merchant tenant tables');
     await initializeReconciliationSchema(db.pgPool);
