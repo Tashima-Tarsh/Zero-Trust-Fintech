@@ -19,7 +19,11 @@ const {Pool}=require('pg');
  const db=new DatabaseSync(sqlitePath);
  db.exec('CREATE TABLE sessions (session_id TEXT PRIMARY KEY,order_id TEXT,challenge_amount REAL,base_amount REAL,txn_ref TEXT,vpa_address TEXT,status TEXT,state TEXT,customer_id TEXT,utr TEXT,created_at INTEGER,expires_at INTEGER,qr_refresh_at INTEGER)');
  db.exec('CREATE TABLE passkeys (id TEXT PRIMARY KEY,user_id TEXT,credential_id TEXT,public_key TEXT,counter INTEGER,device_type TEXT,backed_up INTEGER,transports TEXT,created_at INTEGER,sign_count INTEGER)');
+ db.exec('CREATE TABLE accounts (id TEXT PRIMARY KEY,code TEXT,name TEXT,type TEXT,merchant_id TEXT,created_at INTEGER)');
+ db.exec('CREATE TABLE vpa_pool (id TEXT PRIMARY KEY,vpa_address TEXT,holder_name TEXT,bank_name TEXT,status TEXT,health_score INTEGER,merchant_id TEXT,created_at INTEGER)');
  const now=Date.now();
+ db.prepare('INSERT INTO accounts VALUES (?,?,?,?,?,?)').run('acc_bank_01','1010-BANK','Original source asset','ASSET','mer_default',now);
+ db.prepare('INSERT INTO vpa_pool VALUES (?,?,?,?,?,?,?,?)').run('vpa_axis_01','disha82@okaxis','Recovered source VPA','Axis Bank','ACTIVE',97,'mer_default',now);
  db.prepare('INSERT INTO sessions VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)').run(sessionId,orderId,501.02,501.02,
   'ref_'+orderId,'testing@upi','PENDING','WAITING',null,null,now,now+180000,now+15000);
  db.prepare('INSERT INTO passkeys VALUES (?,?,?,?,?,?,?,?,?,?)').run(pkId,'user_'+orderId,
@@ -41,6 +45,10 @@ const {Pool}=require('pg');
   const pk=await pool.query('SELECT * FROM passkeys WHERE id=$1',[pkId]);
   assert.equal(pk.rows.length,1);
   assert.equal(pk.rows[0].credential_id,'cred_'+orderId);
+  const importedAccount=await pool.query("SELECT name FROM accounts WHERE id='acc_bank_01'");
+  assert.equal(importedAccount.rows[0].name,'Original source asset');
+  const importedVpa=await pool.query("SELECT holder_name FROM vpa_pool WHERE id='vpa_axis_01'");
+  assert.equal(importedVpa.rows[0].holder_name,'Recovered source VPA');
   assert.equal(fs.existsSync(sqlitePath),true,'Source SQLite file must remain untouched');
   assert.equal(fs.readdirSync(root).some(x=>x.startsWith('disha82-pre-postgres-')),true,
     'Consistent preserved snapshot must exist');
