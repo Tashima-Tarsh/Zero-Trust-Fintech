@@ -932,7 +932,7 @@ app.post('/api/verify', verifyLimiter, async (req, res) => {
     }
     // No customer-origin receipt or UTR can authorize ledger SUCCESS.
     // Retain the order/UTR mapping for future correlation without granting funds.
-    await db.updateSessionState(session.orderId, 'UTR_OBSERVED');
+    await db.updateSessionState(session.orderId, 'VERIFY_WINDOW');
     return res.status(202).json({
       success: true,
       verified: false,
@@ -1046,7 +1046,7 @@ app.post('/api/verify-cfc', verifyLimiter, async (req, res) => {
     }
     // A customer-entered UTR may be correlated to the order but cannot itself
     // establish funds credited. Do not manufacture a ledger credit.
-    await db.updateSessionState(session.orderId, 'UTR_OBSERVED');
+    await db.updateSessionState(session.orderId, 'VERIFY_WINDOW');
     return res.status(202).json({
       success: true, verified: false, state: 'UTR_OBSERVED',
       orderId: session.orderId, utr: cleanUtr,
@@ -1322,7 +1322,7 @@ app.post('/api/checkout/finalize-upi', verifyLimiter, async (req, res) => {
 
     // A WebAuthn assertion authenticates the user/device, NOT a bank credit.
     // Preserve the UTR correlation; do not post SUCCESS or financial entries.
-    await db.updateSessionState(orderId, 'UTR_OBSERVED');
+    await db.updateSessionState(orderId, 'VERIFY_WINDOW');
     authChallenges.delete(sessionId);
     return res.status(202).json({
       success:true,verified:false,settled:false,
@@ -1567,7 +1567,7 @@ app.post('/handle-share', shareLimiter, async (req, res) => {
     }
     // Web Share Target text is untrusted, even when its layout looks genuine.
     // It may update the order's reference-observed state, never the money ledger.
-    await db.updateSessionState(session.orderId, 'UTR_OBSERVED');
+    await db.updateSessionState(session.orderId, 'VERIFY_WINDOW');
     if (req.accepts('json') && !req.accepts('html')) {
       return res.status(202).json({
         success:true,verified:false,state:'UTR_OBSERVED',
