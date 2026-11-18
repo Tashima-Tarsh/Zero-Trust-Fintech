@@ -70,7 +70,13 @@
    model.qrPayload(old.upiUri);
    const response=await fetch('/api/ledger/'+encodeURIComponent(old.orderId)+
      '?token='+encodeURIComponent(old.token),{cache:'no-store',credentials:'same-origin'});
-   return response.ok?old:null;
+   if(!response.ok)return null;
+   // A cached device authorization may survive longer than the three-minute
+   // bank payment window. Never resurrect an expired, unpaid payment intent.
+   // Preserve an already confirmed receipt even after the original expiry.
+   const state=await response.json().catch(()=>({}));
+   if(Date.now()>=Number(old.expiresAt)&&!model.isSettled(state))return null;
+   return old;
   }catch(_){return null}
  }
  async function getSession(){
