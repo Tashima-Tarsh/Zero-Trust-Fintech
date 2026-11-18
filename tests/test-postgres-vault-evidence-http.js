@@ -82,6 +82,8 @@ const {Pool}=require('pg');
     assert.equal(r.data.utrCandidate,claim.evidence.returnParams.txnId);
     assert.equal(r.data.verified,false);
     assert.equal(r.data.settled,false);
+    assert.equal(r.data.correlation.temporalGate,'OBSERVATION_WINDOW');
+    assert.equal(r.data.correlation.withinCheckoutWindow,true);
     r=await send(claim);
     assert.equal(r.data.replayed,true);
     r=await send({...claim,evidence:{...claim.evidence,returnParams:{Status:'SUCCESS'}}});
