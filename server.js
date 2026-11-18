@@ -716,7 +716,7 @@ function extractReceiptEvidence(receiptText, sessionContext) {
   }
   // Shown time is never accepted from the client; authentic receipts carry
   // their own time and this parser does not extract it from image text.
-  foundShownTime = null;
+  const foundShownTime = null;
   // 4. Layout fields presence check (4 standard UPI layout fields)
   let layoutFieldsFound = 0;
   if (foundPayeeVpa || foundPayeeName || (sessionContext && lower.includes((sessionContext.payeeVpa || '').toLowerCase()))) {
