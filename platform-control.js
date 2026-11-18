@@ -15,24 +15,27 @@ function createPlatformControl({db,getAuth,clerkEmailResolver=getClerkVerifiedEm
  const router=express.Router();
  let pool=db.pgPool;
  const active=()=>process.env.DISHA_INVITE_ONLY_ENABLED==='true';
- const ownerId=()=>process.env.DISHA_OWNER_CLERK_USER_ID||'';
- const ownerEmail=()=>String(process.env.DISHA_OWNER_EMAIL||'').trim().toLowerCase();
- const ownerKey=()=>crypto.createHash('sha256').update(ownerEmail()||ownerId()||'unconfigured').digest('hex').slice(0,20);
+ // Single Super Admin policy. Legacy owner email/user ID deployment variables
+ // cannot confer access, even if a stale Clerk ID remains configured.
+ const SUPER_ADMIN_EMAIL='nitish@thenitishkr.in';
+ const ownerEmail=()=>SUPER_ADMIN_EMAIL;
+ const ownerKey=()=>crypto.createHash('sha256').update(SUPER_ADMIN_EMAIL).digest('hex').slice(0,20);
  const ownerTenantId=()=> 'mer_internal_'+ownerKey();
  const companyTenantId=()=> 'mer_company_'+ownerKey();
  const companyVpa=()=>val(process.env.DISHA_COMPANY_P2M_VPA||'',150).toLowerCase();
  async function verifiedOwner(userId){
-   if(!active()||!userId)return false;
-   if(ownerId()&&userId===ownerId())return true;
-   // Verified Clerk email is an independent configured owner identity, so
-   // an outdated Clerk user ID cannot accidentally lock out the real owner.
-   if(!EMAIL.test(ownerEmail()))return false;
-   return (await clerkEmailResolver(userId))===ownerEmail();
+   if(!userId)return false;
+   // Verified PRIMARY Clerk email is the only owner credential.
+   // An old Clerk user ID, unverified email, or browser field is never enough.
+   let verifiedEmail=null;
+   try{verifiedEmail=await clerkEmailResolver(userId)}catch(_){return false}
+   return verifiedEmail===SUPER_ADMIN_EMAIL;
  }
  async function ensureOwnerTestTenant(userId){
-   const email=EMAIL.test(ownerEmail())?ownerEmail():
-     (userId&&userId===ownerId()?await clerkEmailResolver(userId):null);
-   if(!active()||!EMAIL.test(email||''))return null;
+   // Owner's merchant workspace requires no merchant approval.
+   if(userId&&!await verifiedOwner(userId))return null;
+   const email=SUPER_ADMIN_EMAIL;
+   if(!EMAIL.test(email))return null;
    const now=Date.now(),ownerName=val(process.env.DISHA_OWNER_DISPLAY_NAME||'',150);
    const phone=val(process.env.DISHA_OWNER_PHONE||'',30);
    const business=val(process.env.DISHA_OWNER_BUSINESS||'',150)||'DISHA Internal Testing';
@@ -82,8 +85,7 @@ function createPlatformControl({db,getAuth,clerkEmailResolver=getClerkVerifiedEm
    // Resolve it at startup; all handlers reference this same refreshed closure variable.
    pool=db.pgPool||pool;
    if(!pool)throw Error('Platform control requires PostgreSQL');
-   // Never grant platform access without a server-configured and verified owner identity.
-   if(active()&&!ownerId()&&!EMAIL.test(ownerEmail()))console.error('[Platform Control] OWNER IDENTITY MISSING — access denied');
+   // Clerk verifies the owner's primary email; legacy owner IDs are ignored.
    await pool.query(
     "CREATE TABLE IF NOT EXISTS disha_access_requests ("+
     "id TEXT PRIMARY KEY,business_name TEXT NOT NULL,contact_name TEXT NOT NULL,email TEXT NOT NULL,"+
@@ -116,15 +118,16 @@ function createPlatformControl({db,getAuth,clerkEmailResolver=getClerkVerifiedEm
    if(active()&&EMAIL.test(ownerEmail()))await ensureOwnerTestTenant();
    console.log('[Platform Control] initialized; controlled access '+(active()?'ENABLED':'not yet activated'));
  }
- function isOwner(userId){return active()&&Boolean(ownerId())&&userId===ownerId();}
+ // Legacy synchronous shortcut must never bypass verified Clerk identity.
+ function isOwner(userId){return false;}
  const accessError=(code,message)=>Object.assign(err(403,message),{code});
  async function verifyMerchant(userId,auth){
-   if(!active())return null;
    if(await verifiedOwner(userId)){
      const r=await ensureOwnerTestTenant(userId);
      if(!r)throw err(503,'Platform owner workspace is not configured');
      return r;
    }
+   if(!active())return null;
    const current=await pool.query('SELECT * FROM saas_merchants WHERE clerk_user_id=$1',[userId]);
    if(current.rowCount&&current.rows[0].access_status==='ACTIVE')return current.rows[0];
    if(current.rowCount&&current.rows[0].access_status==='SUSPENDED')
@@ -187,7 +190,7 @@ function createPlatformControl({db,getAuth,clerkEmailResolver=getClerkVerifiedEm
  }));
  router.use((req,res,next)=>{
    (async()=>{
-     if(!active())throw err(503,'Platform owner access is not activated');
+     // Super Admin identity is independent of merchant invite-only state.
      const subject=getAuth(req)?.userId;
      if(!subject)throw err(401,'Sign in to your account');
      if(!await verifiedOwner(subject))throw err(403,'Platform owner permission required');
@@ -410,6 +413,6 @@ function createPlatformControl({db,getAuth,clerkEmailResolver=getClerkVerifiedEm
    res.set('Cache-Control','no-store').json({success:true,events:r.rows});
  }));
  router.use((error,req,res,next)=>{if(res.headersSent)return next(error);if(!error.status||error.status>=500)console.error('[Platform Control]',error.message);res.status(error.status||500).set('Cache-Control','no-store').json({success:false,error:error.status?error.message:'Platform service unavailable',code:error.code||null});});
- return {router,init,verifyMerchant,isOwner,active};
+ return {router,init,verifyMerchant,verifiedOwner,isOwner,active};
 }
 module.exports={createPlatformControl};
