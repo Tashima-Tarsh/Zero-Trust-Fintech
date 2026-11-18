@@ -1,94 +1,103 @@
 <!doctype html>
-<html lang="en"><head>
+<html lang="en">
+<head>
 <link rel="icon" type="image/png" href="/assets/disha-8-2-wordmark-cropped.png?v=brand20261118"><link rel="apple-touch-icon" href="/assets/disha-8-2-wordmark-cropped.png?v=brand20261118">
-<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<meta name="theme-color" content="#f7f8fc"><title>Complete your UPI payment | DISHA 8.2</title>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="color-scheme" content="dark">
+<meta name="theme-color" content="#070d21">
+<title>DISHA 8.2 — Checkout</title>
+<meta name="description" content="Complete a UPI payment with DISHA 8.2.">
 
-<style>
-:root{color-scheme:light;color:#182135;background:#f7f8fc;font-family:-apple-system,BlinkMacSystemFont,Inter,system-ui,sans-serif}
-*{box-sizing:border-box}body{margin:0;min-height:100svh;background:radial-gradient(ellipse at 50% 0%,#edf2ff 0,transparent 50%),#f7f8fc}
-header{max-width:1050px;margin:auto;padding:28px;display:flex;align-items:center;justify-content:space-between}
-.brand{font-size:17px;letter-spacing:-.8px;font-weight:800;color:#141e31;text-decoration:none}.brand span{color:#5171ba}
-.fine{font-size:12px;color:#79879c}.container{max-width:520px;margin:25px auto 80px;padding:0 16px}
-.card{padding:38px;background:#fff;border:1px solid #e5e9f2;border-radius:24px;box-shadow:0 18px 70px #11233a0b,0 1px 2px #12223c08}
-.overline{font-size:11px;letter-spacing:1.5px;text-transform:uppercase;font-weight:800;color:#68758c}
-h1{font-size:27px;letter-spacing:-1px;margin:12px 0 4px}
-.amount{font-size:45px;font-weight:750;letter-spacing:-2px;margin:20px 0 10px}
-.small{font-size:13px;color:#7c889a;margin:0}
-.panel{border-radius:17px;background:#f8faff;border:1px solid #e9edf6;margin:22px 0;padding:22px;display:flex;flex-direction:column;align-items:center;gap:14px}
-#qr{background:white;border-radius:12px;padding:14px;min-height:196px;display:grid;place-items:center}
-#qr img{display:block}.line{display:flex;justify-content:space-between;align-items:center;gap:15px;border-bottom:1px solid #eef1f6;padding:12px 0;font-size:13px}
-.line span{color:#68778d}.line strong{font-size:13px;text-align:right;overflow-wrap:anywhere}
-.btn{display:flex;width:100%;min-height:48px;align-items:center;justify-content:center;gap:8px;border-radius:12px;border:1px solid #dbe2ed;font-size:14px;font-weight:700;cursor:pointer;text-decoration:none;background:#fff;color:#213655;margin-top:11px}
-.btn.primary{background:#1e3b72;color:#fff;border-color:#1e3b72;box-shadow:0 5px 20px #1e3b7220}
-.btn:focus-visible{outline:3px solid #9bb8ed;outline-offset:3px}
-.btn:disabled{opacity:.5;cursor:not-allowed}.state{font-size:13px;background:#eef4ff;color:#2c5797;border-radius:10px;padding:12px 14px;margin:20px 0}
-.state.success{background:#eaf8f0;color:#116d49}.state.error{background:#fff1f2;color:#aa3443}
-footer{text-align:center;font-size:11px;color:#9ba7b7;padding:5px 20px 25px;line-height:1.8}
-@media(max-width:550px){header{padding:20px}.container{margin:0 auto 40px}.card{padding:24px 18px}h1{font-size:24px}.amount{font-size:39px}}
-</style>
-<script src="/vendor/qrcode.min.js"></script>
-</head><body>
-<header><a class="brand" href="/">DISHA <span>8.2</span></a><span class="fine">Protected payment request</span></header>
-<main class="container"><div class="card">
-<div class="overline">UPI payment</div><h1 id="business">Loading payment details…</h1>
-<p class="small" id="reference">Verifying your payment link</p>
-<div class="amount" id="amount">—</div>
-<div class="panel"><div id="qr" aria-label="UPI payment QR"></div><p class="small" style="text-align:center">Scan with your UPI app or open it below</p></div>
-<div class="line"><span>Receiving UPI ID</span><strong id="vpa">—</strong></div>
-<div class="line"><span>Payment reference</span><strong id="ref">—</strong></div>
-<div class="line"><span>Expires</span><strong id="expires">—</strong></div>
-<div id="status" class="state" role="status" aria-live="polite">Checking request…</div>
-<a id="openUpi" class="btn primary" href="#" style="pointer-events:none;opacity:.6">Open UPI app</a>
-<button type="button" class="btn" id="copy" disabled>Copy payment URI</button>
-<button type="button" class="btn" id="refresh">Refresh payment status</button>
-<p class="fine" style="line-height:1.7;margin-top:20px">Only the merchant's recorded payment status is shown here. Opening an app or returning to this page does not by itself confirm payment.</p>
-</div></main><footer>Powered by DISHA 8.2 · Do not share your UPI PIN or bank credentials</footer>
-<script>
-(function(){
-'use strict';
-const $=id=>document.getElementById(id),params=new URLSearchParams(location.search);
-const orderId=params.get('orderId'),token=params.get('token');
-let uri='',timer=null;
-const money=v=>new Intl.NumberFormat('en-IN',{style:'currency',currency:'INR'}).format(v);
-function status(msg,type=''){const el=$('status');el.textContent=msg;el.className='state '+type;}
-async function load(){
- if(!orderId||!token){status('This payment link is incomplete. Request a new link from the merchant.','error');return;}
- try{
- const r=await fetch('/api/merchant/public/order/'+encodeURIComponent(orderId)+'?token='+encodeURIComponent(token),
-  {cache:'no-store',credentials:'same-origin'});
- const data=await r.json();
- if(!r.ok||!data.success)throw Error(data.error||'Unable to retrieve the payment request');
- const o=data.order;
- $('business').textContent=o.business_name;
- $('reference').textContent=o.description||'Payment request';
- $('amount').textContent=money(o.amount);
- $('vpa').textContent=o.vpa_address;
- $('ref').textContent=o.id;
- $('expires').textContent=new Date(o.expires_at).toLocaleString('en-IN',{dateStyle:'medium',timeStyle:'short'});
- if(o.status==='COMPLETED'){
-  status('This payment is recorded as completed.','success');$('openUpi').style.pointerEvents='none';
-  $('openUpi').style.opacity='.5';$('openUpi').textContent='Payment recorded';$('copy').disabled=true;return;
- }
- if(o.status==='EXPIRED'||o.status==='FAILED'){
-  status('This payment request is '+o.status.toLowerCase()+'. Ask the merchant for a new link.','error');
-  $('openUpi').style.pointerEvents='none';$('openUpi').style.opacity='.5';$('copy').disabled=true;return;
- }
- uri=o.upi_uri;
- $('openUpi').href=uri;$('openUpi').textContent='Open UPI app';
- $('openUpi').style.pointerEvents='auto';$('openUpi').style.opacity='1';$('copy').disabled=false;
- status('Payment request active. Complete payment in your UPI app, then refresh for its recorded status.');
- if(!$('qr').dataset.value||$('qr').dataset.value!==uri){
-  $('qr').replaceChildren();$('qr').dataset.value=uri;
-  if(window.QRCode)new QRCode($('qr'),{text:uri,width:176,height:176,correctLevel:QRCode.CorrectLevel.M});
-  else $('qr').textContent='QR unavailable. Use the UPI app button.';
- }
- }catch(e){status(e.message||'Unable to load payment request','error');}
-}
-$('copy').onclick=async()=>{if(!uri)return;try{await navigator.clipboard.writeText(uri);status('UPI payment URI copied.')}catch{status('Your browser blocked clipboard access.','error')}};
-$('refresh').onclick=load;
-load();timer=setInterval(load,5000);
-document.addEventListener('visibilitychange',()=>{if(!document.hidden)load()});
-})();
-</script>
-</body></html>
+<link rel="preload" href="/assets/disha-8-2-wordmark-cropped.png" as="image">
+<link rel="preload" href="/assets/disha-vault-sculpture.svg" as="image">
+<link rel="stylesheet" href="/cosmic-checkout.css?v=viewport3-20261118">
+<script defer src="/vendor/qrcode.min.js"></script>
+<script defer src="/vendor/simplewebauthn.umd.js"></script>
+<script defer src="/one-touch-vault.js"></script>
+<script defer src="/cosmic-checkout-model.js"></script>
+<script defer src="/cosmic-checkout.js"></script>
+</head>
+<body data-checkout="merchant">
+<div class="universe" aria-hidden="true">
+ <div class="starfield starfield-a"></div><div class="starfield starfield-b"></div>
+ <div class="nebula nebula-one"></div><div class="nebula nebula-two"></div>
+ <div class="horizon"></div>
+</div>
+<main class="checkout-shell" aria-label="DISHA payment checkout">
+ <article class="checkout-panel" aria-label="UPI payment">
+  <header class="checkout-brand">
+   <img src="/assets/disha-8-2-wordmark-cropped.png" width="240" height="60" alt="DISHA 8.2" class="logo">
+  </header>
+  <section data-stage="initial" class="stage stage-initial" aria-label="Begin payment">
+   <p class="eyebrow">PAYMENT</p>
+   <div id="payAmount" class="amount" aria-label="Amount to pay">—</div>
+   <div class="vault-scene" aria-hidden="true">
+    <div class="vault-atmosphere"></div>
+    <img class="vault-art" src="/assets/disha-vault-sculpture.svg" width="320" height="320" alt="" decoding="async">
+    <span class="vault-spectral-orbit vault-spectral-orbit-a"></span>
+    <span class="vault-spectral-orbit vault-spectral-orbit-b"></span>
+   </div>
+   <button id="btnOneTouch" type="button" class="action-primary" disabled>
+    <span class="touch-icon" aria-hidden="true">◈</span><span>Touch to Pay</span><span class="action-arrow" aria-hidden="true">↗</span>
+   </button>
+   <p class="button-help">Continue securely with your device</p>
+  </section>
+
+  <section data-stage="methods" class="stage" aria-label="Choose payment app" hidden>
+   <p class="eyebrow">CONTINUE PAYMENT</p><h1>Pay with your UPI app.</h1>
+   <p class="stage-copy">Choose the app you prefer, or scan the QR code.</p>
+   <div class="app-grid" aria-label="UPI applications">
+    <button id="app-gpay" type="button" class="app-choice" data-app="gpay"><span class="app-icon google"><img src="/assets/upi-googlepay.svg" alt="" width="31" height="31"></span><span>Google Pay</span></button>
+    <button id="app-phonepe" type="button" class="app-choice" data-app="phonepe"><span class="app-icon phonepe"><img src="/assets/upi-phonepe.svg" alt="" width="31" height="31"></span><span>PhonePe</span></button>
+    <button id="app-paytm" type="button" class="app-choice" data-app="paytm"><span class="app-icon paytm"><img src="/assets/upi-paytm.svg" alt="" width="31" height="31"></span><span>Paytm</span></button>
+    <button id="app-cred" type="button" class="app-choice" data-app="cred"><span class="app-icon cred" aria-hidden="true">C</span><span>CRED / UPI</span></button>
+   </div>
+   <a id="oneTouchFallback" class="fallback-anchor" href="#" hidden>Open UPI app <span aria-hidden="true">↗</span></a>
+   <button id="showQr" type="button" class="action-secondary"><span class="mini-qr" aria-hidden="true">▦</span> Show dynamic QR <span class="action-arrow" aria-hidden="true">→</span></button>
+   <p class="inline-note">Your UPI app will show the payment details before you approve.</p>
+  </section>
+
+  <section data-stage="qr" class="stage stage-qr" aria-label="Scan UPI QR" hidden>
+   <p class="eyebrow">SCAN TO PAY</p><h1>Scan with a UPI app.</h1>
+   <p class="stage-copy">Use your UPI app on another device.</p>
+   <div class="qr-visual">
+    <span class="qr-scan-line" aria-hidden="true"></span>
+    <div class="qr-paper"><div id="paymentQr" role="img" aria-label="Order-specific UPI QR"></div></div>
+   </div>
+   <p class="qr-expiry" id="qrExpiry">Preparing your payment code…</p>
+   <button id="backToApps" type="button" class="action-secondary">Choose a UPI app <span class="action-arrow" aria-hidden="true">→</span></button>
+   <p class="inline-note">Complete the payment in your UPI app.</p>
+  </section>
+
+  <section data-stage="checking" class="stage stage-checking" aria-label="Checking payment" hidden>
+   <p class="eyebrow">PAYMENT STATUS</p>
+   <div class="receipt-sculpture" aria-hidden="true"><div class="paper-back"></div><div class="paper-front"><span></span><span></span><span></span><i></i></div><div class="receipt-halo"></div></div>
+   <h1>Checking your payment.</h1>
+   <p class="stage-copy" id="checkingHelp">We’ll update this page when your payment is confirmed.</p>
+   <div class="indeterminate" aria-label="Waiting for payment status"><span></span></div>
+   <button id="checkingApps" type="button" class="action-secondary">Choose another payment method <span class="action-arrow" aria-hidden="true">→</span></button>
+  </section>
+
+  <section data-stage="receipt" class="stage stage-receipt" aria-label="Payment receipt" hidden>
+   <p class="eyebrow">PAYMENT RECEIPT</p>
+   <div class="receipt-seal" aria-hidden="true">✓</div>
+   <h1>Payment confirmed.</h1>
+   <div id="receiptAmount" class="receipt-amount">—</div>
+   <p class="receipt-subline">Recorded payment</p>
+   <div class="receipt-details">
+    <div><span>Payment reference</span><strong id="receiptOrder">—</strong></div>
+    <div><span>UPI reference</span><strong id="receiptUtr">—</strong></div>
+    <div><span>Status</span><strong class="receipt-confirmed">Completed</strong></div>
+   </div>
+   <div class="receipt-actions">
+    <button id="saveReceipt" type="button" class="action-primary">Save / print receipt <span class="action-arrow" aria-hidden="true">↗</span></button>
+    <button id="shareReceipt" type="button" class="action-secondary">Share receipt <span class="action-arrow" aria-hidden="true">→</span></button>
+   </div>
+  </section>
+  <div id="checkoutStatus" role="status" aria-live="polite" class="checkout-status" hidden></div>
+ </article>
+ <footer class="checkout-footer"><span class="footer-pin" aria-hidden="true">✦</span> DISHA 8.2 <span aria-hidden="true">·</span> Made for direct payments</footer>
+</main>
+</body>
+</html>
