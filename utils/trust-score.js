@@ -2,7 +2,8 @@
 /**
  * trust-score.js — hardened zero-trust receipt evidence scoring.
  *
- * Returns a CONFIDENCE TIER, never "paid". Tiers: REJECT | LOW | MEDIUM | HIGH.
+ * Returns a receipt-claim confidence tier, never an account-credit determination.
+ * The API accepts customer-origin material only; all scores are capped below HIGH.
  *
  * All gates are fail-closed. No client-trusted fields are accepted. The scoring
  * breakdown is never returned to the caller — only tier + code + reason.
@@ -49,6 +50,7 @@ function scoreEvidence(session, ev, hist = {}, opts = {}) {
 
   // ───── HARD GATES (any failure = REJECT, no settlement) ─────
   if (now > session.expiresAt + grace) return gate('SESSION_EXPIRED', 'Checkout window closed.');
+  if (!ev || typeof ev !== 'object') return gate('NO_EVIDENCE', 'No receipt evidence supplied.');
   if (ev.statusText && FAIL_WORDS.test(ev.statusText)) return gate('STATUS_FAILED', 'Receipt shows failed or reversed payment.');
   if (ev.statusText && PENDING_WORDS.test(ev.statusText)) return gate('STATUS_PENDING', 'Receipt shows payment pending.');
   if (typeof ev.amount !== 'number' || Math.abs(ev.amount - session.challengeAmount) > 0.004) {
@@ -64,9 +66,8 @@ function scoreEvidence(session, ev, hist = {}, opts = {}) {
     return gate('PAYEE_MISMATCH', 'Payee VPA does not match order payee.');
   }
 
-  // Integrity gate — receipt must look like an authentic screenshot.
-  // EXIF/editor metadata is not captured by the text parser; the gate fires
-  // when the parsed receipt does not exhibit screenshot structure.
+  // Formatting/structure check only: text containing receipt-like words
+  // is never proof of a genuine bank-confirmed UPI payment.
   if (ev.looksLikeScreenshot === false) {
     return gate('INTEGRITY_FAILED', 'Receipt does not match authentic UPI screenshot structure.');
   }
@@ -87,7 +88,7 @@ function scoreEvidence(session, ev, hist = {}, opts = {}) {
     ? ev.layoutFieldsFound / ev.layoutFieldsExpected : 0, 'expected receipt fields present');
 
   // integrity: screenshot structure verified by gate above (full weight if reached)
-  add('integrity', 1, 'authentic screenshot structure');
+  add('integrity', 1, 'receipt-like structure, not authenticated bank evidence');
 
   // behavior: same device, single attempt, prompt
   let beh = 0;
@@ -102,17 +103,21 @@ function scoreEvidence(session, ev, hist = {}, opts = {}) {
   // reputation: prior confirmed payments
   add('reputation', Math.min(1, (hist.priorConfirmed || 0) / 3), 'prior confirmed payments');
 
-  const tier = score >= TIERS.HIGH ? 'HIGH' : score >= TIERS.MEDIUM ? 'MEDIUM' : 'LOW';
-  return { tier, score, gate: null, reasons };
+  // P0 safety: customer text, screenshots and app-return parameters can be forged.
+  // Even a perfect receipt-looking claim cannot attain HIGH or trigger settlement.
+  // The cap represents useful matching evidence, NOT probability that funds arrived.
+  const observedScore = Math.min(score, TIERS.HIGH - 1);
+  const tier = observedScore >= TIERS.MEDIUM ? 'MEDIUM' : 'LOW';
+  reasons.push('customer-supplied reference is not authenticated payment credit');
+  return { tier, score: observedScore, gate: 'UNVERIFIED_RECEIPT_SOURCE', verified: false, reasons };
 }
 
 /**
  * Suggested shop policy:
- *  HIGH   -> release, still show UTR for later matching
- *  MEDIUM / LOW / PENDING / REJECT -> do not release
+ *  Client-origin claims can never authorize financial release.
+ *  Financial confirmation is outside this receipt scoring function.
  */
 function suggestAction(result, amount) {
-  if (result.tier === 'HIGH') return 'RELEASE_AND_RECONCILE';
   return 'DO_NOT_RELEASE';
 }
 
