@@ -458,9 +458,9 @@ function createMerchantApi({db,getAuth,buildUpiUri,platformControl}) {
         if(!receiving)throw fail(409,'No healthy receiving UPI ID available');
       }
       const accountType=String(receiving.account_type||'').toUpperCase();
-      const payeeName=accountType==='MERCHANT'
-        ? val(req.merchant.business_name,100)
-        : val(receiving.holder_name||req.merchant.business_name,100);
+      // The payee visible to UPI must be the saved bank/account holder,
+      // not an unrelated branding name for genuine P2M accounts.
+      const payeeName=val(receiving.holder_name||req.merchant.business_name,100);
       // Validate exact P2P/P2M URI before persisting the order.
       const payee={vpa_address:receiving.vpa_address,account_type:accountType,mcc:receiving.mcc};
       checkoutUri=upi(payee,payeeName,amount,description,orderId);

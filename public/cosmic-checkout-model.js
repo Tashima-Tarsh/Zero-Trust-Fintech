@@ -3,7 +3,7 @@
  'use strict';
  const APPS=Object.freeze({
    gpay:{package:'com.google.android.apps.nbu.paisa.user',ios:'gpay://upi/pay?'},
-   phonepe:{package:'com.phonepe.app',ios:'phonepe://pay?'},
+   phonepe:{package:'com.phonepe.app',ios:'phonepe://upi/pay?'},
    paytm:{package:'net.one97.paytm',ios:'paytmmp://pay?'},
    cred:{package:null,ios:null},
    generic:{package:null,ios:null}

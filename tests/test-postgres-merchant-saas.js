@@ -185,7 +185,7 @@ const {buildUpiUri}=require('../utils/upi-intent');
   assert.equal(p2mParams.get('pa'),merchantVpa);
   assert.equal(p2mParams.get('mc'),'5411');
   assert.ok(p2mParams.get('tr'),'Merchant payment has stable unique transaction reference');
-  assert.equal(p2mParams.get('pn'),result.data.merchant.business_name==='Acme '+nonce?'Acme '+nonce:'Acme '+nonce);
+  assert.equal(p2mParams.get('pn'),'Counter Team','P2M uses the saved receiving-account holder, not unrelated business branding');
   const recorded=await pg.query('SELECT payee_name,payee_account_type,payee_mcc FROM saas_merchant_orders WHERE id=$1',
     [p2m.data.order.id]);
   assert.equal(recorded.rows[0].payee_account_type,'MERCHANT');

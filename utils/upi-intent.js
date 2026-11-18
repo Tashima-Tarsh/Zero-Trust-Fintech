@@ -53,8 +53,11 @@ function buildUpiUri(o) {
   if (kind !== 'P2P' && kind !== 'P2M') throw new Error("kind must be 'P2P' or 'P2M'");
 
   const parts = [];
-  const pa = encodeURIComponent(o.pa || '');
-  parts.push('pa=' + pa);
+  // Reject malformed or absent receiving account before opening a bank app:
+  // an invalid pa otherwise produces an app-side error before UPI PIN.
+  const payee=String(o.pa||'').trim();
+  if(!VPA_RE.test(payee))throw new Error('A valid receiving UPI ID is required');
+  parts.push('pa=' + encodeURIComponent(payee));
   const pn = cleanText(o.pn, 40) || 'Payee';
   parts.push('pn=' + encodeURIComponent(pn));
 
@@ -112,7 +115,7 @@ function appLinks(upiUri) {
     },
     ios: {
       gpay: 'gpay://upi/pay?' + q,
-      phonepe: 'phonepe://pay?' + q,
+      phonepe: 'phonepe://upi/pay?' + q,
       paytm: 'paytmmp://pay?' + q
     }
   };
