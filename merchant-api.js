@@ -17,7 +17,7 @@ const accountConfig = input => {
   const type=String(input.accountType||'PERSONAL').toUpperCase();
   if(!['PERSONAL','MERCHANT'].includes(type))throw fail(400,'Select a valid UPI account type');
   const mcc=type==='MERCHANT'?val(input.mcc,4):null;
-  if(type==='MERCHANT'&&!/^\d{4}$/.test(mcc))throw fail(400,'Bank-issued merchant MCC must be exactly four digits');
+  if(type==='MERCHANT'&&(!/^\d{4}$/.test(mcc)||mcc==='0000'))throw fail(400,'Provide a valid four-digit MCC from your bank or acquirer');
   return {type,mcc};
 };
 function upi(o,holder,amount,description,orderId){
