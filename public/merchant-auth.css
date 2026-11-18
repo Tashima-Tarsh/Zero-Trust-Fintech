@@ -274,3 +274,34 @@ button,input{font:inherit}
  .auth-story h2{font-size:clamp(18px,5vw,25px);margin:0}
  .auth-bottom{display:none}
 }
+
+/* Verified ship-ready merchant authentication presentation (native Clerk UI). */
+@media screen {
+ .auth-story{
+   background-color:#060b22;
+   background-image:
+     linear-gradient(90deg,rgba(4,9,29,.82) 0%,rgba(6,12,37,.51) 53%,rgba(6,10,29,.35) 100%),
+     url('/assets/disha-universe-background.svg');
+   background-size:cover,cover;
+   background-position:center,center;
+   background-repeat:no-repeat;
+ }
+ .auth-story::before{opacity:.23}
+ .auth-story::after{display:none}
+ .auth-story-middle{justify-content:center}
+ .auth-story-description{max-width:550px;color:#eef2ff}
+ .auth-logo-stage{filter:none!important}
+ .auth-logo{max-height:54px;object-position:left center;filter:drop-shadow(0 2px 6px #020617)}
+ .auth-network-art{display:none!important}
+ /* Clerk owns its card, headings, prompts, fields and sign-up navigation. */
+ #auth-slot .cl-header{display:block!important}
+ #auth-slot .cl-headerTitle,#auth-slot .cl-headerSubtitle{display:block}
+ #auth-slot .cl-card{overflow:visible}
+ .auth-slot-wrap{scrollbar-gutter:stable}
+}
+@media(max-width:600px){
+ .auth-story{background-position:center 54%,center 54%}
+ .auth-story-middle{justify-content:center}
+ .auth-action{overflow:hidden}
+ .auth-slot-wrap{max-height:100%;overflow:auto}
+}
