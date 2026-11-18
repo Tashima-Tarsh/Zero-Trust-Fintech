@@ -207,8 +207,11 @@ function createMerchantApi({db,getAuth,buildUpiUri,platformControl}) {
       'INSERT INTO saas_merchant_notifications(id,merchant_id,title,message,created_at) VALUES($1,$2,$3,$4,$5)',
       [id('note_'),merchantId,title,message,now()]);
   }
-  function link(orderId,token){
-    return '/merchant-checkout.html?orderId='+encodeURIComponent(orderId)+'&token='+encodeURIComponent(token);
+  function link(orderId,token,internalTest=false){
+    // Only owner-provisioned internal testing automatically enables diagnostics.
+    // External merchant/customer links retain privacy-by-default behavior.
+    return '/merchant-checkout.html?orderId='+encodeURIComponent(orderId)+'&token='+encodeURIComponent(token)+
+      (internalTest?'&debug=1':'');
   }
   router.get('/merchant/public/order/:orderId',wrap(async(req,res)=>{
     const token=String(req.query.token||'');
@@ -480,7 +483,7 @@ function createMerchantApi({db,getAuth,buildUpiUri,platformControl}) {
     res.status(201).json({success:true,order:{
       id:orderId,amount,description,vpa_address:receiving.vpa_address,
       status:'PENDING',expires_at:expiresAt,
-      upi_uri_dynamic:uri,checkout_url:link(orderId,sessionId)
+      upi_uri_dynamic:uri,checkout_url:link(orderId,sessionId,req.merchant.is_internal_test===true)
     }});
   }));
   router.get('/merchant/reports',wrap(async(req,res)=>{
