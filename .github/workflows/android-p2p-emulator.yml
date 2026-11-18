@@ -7,6 +7,11 @@ on:
       - '.github/workflows/android-p2p-emulator.yml'
       - 'tests/android/**'
       - 'public/merchant-checkout.html'
+      - 'public/checkout.html'
+      - 'public/cosmic-checkout.js'
+      - 'public/cosmic-checkout-model.js'
+      - 'utils/upi-intent.js'
+      - 'tests/test-upi-intent-handoff.js'
       - 'public/vendor/qrcode.min.js'
   push:
     branches: [main]
@@ -14,6 +19,11 @@ on:
       - '.github/workflows/android-p2p-emulator.yml'
       - 'tests/android/**'
       - 'public/merchant-checkout.html'
+      - 'public/checkout.html'
+      - 'public/cosmic-checkout.js'
+      - 'public/cosmic-checkout-model.js'
+      - 'utils/upi-intent.js'
+      - 'tests/test-upi-intent-handoff.js'
 
 permissions:
   contents: read
