@@ -39,6 +39,23 @@ const path=require('node:path');
   assert.match(html,/<button id="btnOneTouch"[\s\S]*?<span>Pay<\/span>/,'Checkout must show compact Pay CTA while retaining Vault handler');
   assert.doesNotMatch(html,/Touch to Pay/);
   assert.match(html,/cosmic-checkout\.js/);
+  // Regression: the real checkout HTML must load its exact JS/CSS URLs from
+  // this fixture, not just legacy root assets that the page no longer uses.
+  const required=[
+   '/api/runtime-assets/cosmic-checkout.css',
+   '/api/runtime-assets/checkout-moonlight.css',
+   '/api/runtime-assets/one-touch-vault.js',
+   '/api/runtime-assets/cosmic-checkout-model.js',
+   '/api/runtime-assets/cosmic-checkout.js'
+  ];
+  const linked=[...html.matchAll(/(?:src|href)="(\\/(?:api\\/runtime-assets\\/|vendor\\/)[^"?]+)(?:\\?[^"]*)?"/g)]
+   .map(match=>match[1]);
+  for(const asset of required)assert.ok(linked.includes(asset),'Checkout must load '+asset);
+  for(const asset of linked){
+   const response=await fetch(origin+asset);
+   assert.equal(response.status,200,'Android fixture must serve checkout asset '+asset);
+   assert.ok((await response.text()).length>0,'Checkout asset must not be empty: '+asset);
+  }
   const passkey=await fetch(origin+'/vendor/simplewebauthn.umd.js');
   assert.equal(passkey.status,200);
   const oneTouch=await fetch(origin+'/one-touch-vault.js');

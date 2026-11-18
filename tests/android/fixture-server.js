@@ -19,18 +19,25 @@ http.createServer((req,res)=>{
  if(url.pathname==='/merchant-checkout.html')return reply(res,200,fs.readFileSync(path.join(root,'merchant-checkout.html')),'text/html');
  const allowedAssets=new Map([
   ['/cosmic-checkout.css','text/css'],
+  ['/checkout-moonlight.css','text/css'],
   ['/cosmic-checkout.js','application/javascript'],
   ['/cosmic-checkout-model.js','application/javascript'],
+  ['/one-touch-vault.js','application/javascript'],
+  ['/assets/disha-vault-sculpture.svg','image/svg+xml'],
   ['/assets/disha-8-2-wordmark-cropped.png','image/png'],
   ['/assets/upi-googlepay.svg','image/svg+xml'],
   ['/assets/upi-phonepe.svg','image/svg+xml'],
   ['/assets/upi-paytm.svg','image/svg+xml']
  ]);
- if(allowedAssets.has(url.pathname))
-   return reply(res,200,fs.readFileSync(path.join(root,url.pathname.slice(1))),allowedAssets.get(url.pathname));
+ // Mirror Railway's production /api/runtime-assets/ URLs. The HTML uses
+ // these URLs, so serving only legacy root assets leaves Android WebView blank.
+ // Restrict the translation to the explicit allowlist: never expose arbitrary files.
+ const assetPath=url.pathname.startsWith('/api/runtime-assets/')
+   ? '/'+url.pathname.slice('/api/runtime-assets/'.length)
+   : url.pathname;
+ if(allowedAssets.has(assetPath))
+   return reply(res,200,fs.readFileSync(path.join(root,assetPath.slice(1))),allowedAssets.get(assetPath));
  if(url.pathname==='/vendor/qrcode.min.js')return reply(res,200,fs.readFileSync(path.join(root,'vendor','qrcode.min.js')),'application/javascript');
- if(url.pathname==='/one-touch-vault.js')return reply(res,200,
-  fs.readFileSync(path.join(root,'one-touch-vault.js')),'application/javascript');
  if(url.pathname==='/vendor/simplewebauthn.umd.js')return reply(res,200,
   "window.SimpleWebAuthnBrowser={startRegistration:async()=>({id:'CI_PASSED_REGISTRATION'}),"+
   "startAuthentication:async()=>({id:'CI_PASSED_AUTHENTICATION'})};",'application/javascript');
