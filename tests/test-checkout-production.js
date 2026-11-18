@@ -13,10 +13,22 @@ const generic=read('public/checkout.html');
 const merchant=read('public/merchant-checkout.html');
 const script=read('public/cosmic-checkout.js');
 const model=read('public/cosmic-checkout-model.js');
-assert.ok(server.indexOf("app.get(['/checkout', '/checkout/', '/pay', '/pay/']")>=0);
-assert.ok(server.indexOf("app.get(['/checkout', '/checkout/', '/pay', '/pay/']")<server.indexOf('app.use(express.static('));
+assert.ok(server.indexOf("app.get(['/checkout', '/checkout/', '/pay', '/pay/', '/checkout/index.html', '/pay/index.html']")>=0);
+assert.ok(server.indexOf("app.get(['/checkout', '/checkout/', '/pay', '/pay/', '/checkout/index.html', '/pay/index.html']")<server.indexOf('app.use(express.static('));
 assert.match(server,/res\.sendFile\(path\.join\(__dirname, 'public', 'checkout\.html'\)\)/);
-assert.match(edge,/\["\/checkout", "\/checkout\/", "\/pay", "\/pay\/"\]/);
+assert.match(edge,/\["\/checkout", "\/checkout\/", "\/pay", "\/pay\/", "\/checkout\/index\.html", "\/pay\/index\.html"\]/);
+for(const old of ['public/checkout/index.html','public/pay/index.html'])
+ assert.equal(fs.existsSync(path.join(root,old)),false,
+  'Deprecated manual UTR checkout must not exist: '+old);
+const sw=read('public/service-worker.js');
+const block=sw.match(/const ASSETS_TO_CACHE = \[([\s\S]*?)\];/);
+assert.ok(block,'Service worker precache must be readable');
+for(const [,asset] of block[1].matchAll(/'([^']+)'/g)){
+ const file=asset==='/'?'index.html':asset.replace(/^\//,'');
+ assert.ok(fs.existsSync(path.join(root,'public',file)),
+  'Missing precache asset prevents service worker installation: '+asset);
+}
+assert.doesNotMatch(sw,/^\s*'\/app\.js',/m,'Legacy payment controller must not be precached');
 assert.match(server,/new WebSocketServer\(\{ server, path: '\/ws' \}\)/);
 assert.match(server,/generateRegistrationOptions/);
 assert.match(server,/expectedRPID: RP_ID/);

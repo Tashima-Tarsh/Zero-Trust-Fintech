@@ -4,15 +4,15 @@
  * Extracts 12-digit Bank UTR and challenge amount, and submits for 7-layer verification.
  */
 
-const CACHE_NAME = 'disha-8.2-v1';
+const CACHE_NAME = 'disha-8.2-v2';
 const ASSETS_TO_CACHE = [
   '/',
   '/index.html',
   '/success.html',
   '/failed.html',
   '/styles.css',
-  '/app.js',
-  '/qr.js',
+  // Do not cache the legacy checkout controller or removed qr.js.
+  // Missing precache assets previously prevented service worker installation.
   '/manifest.json'
 ];
 

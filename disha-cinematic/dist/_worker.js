@@ -10,7 +10,7 @@ export default {
     }
 
     // Keep the canonical checkout consistent with the Railway Express route.
-    if (["/checkout", "/checkout/", "/pay", "/pay/"].includes(url.pathname)) {
+    if (["/checkout", "/checkout/", "/pay", "/pay/", "/checkout/index.html", "/pay/index.html"].includes(url.pathname)) {
       const checkoutUrl = new URL("/checkout.html" + url.search, request.url);
       return env.ASSETS.fetch(new Request(checkoutUrl, request));
     }
