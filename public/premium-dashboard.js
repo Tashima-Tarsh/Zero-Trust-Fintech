@@ -75,6 +75,7 @@ async function api(path,options={}){
 }
 function view(name,replaceHistory=false){
  if(!views[name])name='overview';
+ document.body.dataset.currentView=name;
  $$('.view').forEach(el=>el.classList.toggle('active',el.id==='view-'+name));
  $$('#appSide [data-view]').forEach(el=>{
   el.classList.toggle('active',el.dataset.view===name);
@@ -119,7 +120,12 @@ function setupBindings(){
   $('#sideToggle').setAttribute('aria-expanded',String($('#appSide').classList.contains('open')));
  });
  $('#sideBackdrop')?.addEventListener('click',closeMenu);
- document.addEventListener('keydown',e=>{if(e.key==='Escape')closeMenu()});
+ document.addEventListener('keydown',e=>{
+   if(e.key==='Escape')closeMenu();
+   if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==='k'){
+     e.preventDefault();$('#globalSearch')?.focus();$('#globalSearch')?.select();
+   }
+ });
  const routeFromUrl=()=>{const target=location.hash.slice(1);if(views[target])view(target,true)};
  window.addEventListener('hashchange',routeFromUrl);
  window.addEventListener('popstate',routeFromUrl);
