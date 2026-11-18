@@ -12,6 +12,7 @@ const crypto = require('crypto');
 const QRCode = require('qrcode');
 const { clerkMiddleware, getAuth } = require('@clerk/express');
 const db = require('./db');
+const { createMerchantApi } = require('./merchant-api');
 const {
   buildNPCIIntentUri,
   sanitizeTransactionNote,
@@ -228,6 +229,11 @@ async function idempotencyMiddleware(req, res, next) {
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(idempotencyMiddleware);
+const merchantApi = createMerchantApi({db, getAuth, buildUpiUri});
+// Merchant API is isolated: do NOT intercept public checkout APIs.
+app.use('/api', (req,res,next) =>
+  (/^\/(?:merchant(?:\/|$)|auth\/me(?:\/|$))/.test(req.path))
+    ? merchantApi.router(req,res,next) : next());
 // 1. Static Assets: Serve PhonePe marketing styles, console styles, scripts, videos, and icons
 // One canonical merchant dashboard; checkout and its APIs remain public.
 app.get('/merchant-console.html', (req, res) => res.redirect(302, '/dashboard'));
@@ -271,6 +277,9 @@ app.get('/auth-config.js', (req, res) => {
 });
 app.get('/login', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'merchant-login.html'));
+});
+app.get('/signup', (req,res) => {
+  res.sendFile(path.join(__dirname, 'public', 'merchant-signup.html'));
 });
 app.get(['/dashboard', '/payments', '/analytics'], (req, res) => {
   if (!CLERK_ENABLED) return res.redirect('/login');
@@ -2010,6 +2019,7 @@ app.get('/failed', (req, res) => res.sendFile(path.join(__dirname, 'public', 'fa
 // Initialize database and start server
 (async () => {
   await db.initDb();
+  if (db.pgPool && CLERK_ENABLED) await merchantApi.init();
   // Daily cron at 00:05 to reset daily VPA limits
   setInterval(async () => {
     const d = new Date();
