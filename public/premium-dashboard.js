@@ -282,9 +282,20 @@ async function loadVpas(){
    '<button type="button" class="btn-inline" data-vpa-action="'+(v.status==='ACTIVE'?'pause':'resume')+
    '" data-vpa-id="'+esc(v.id)+'">'+(v.status==='ACTIVE'?'Pause':'Resume')+'</button></td></tr>').join(''):
    '<tr><td colspan="6" class="empty">No UPI accounts yet. Add your own receiving UPI ID below, or import a CSV.</td></tr>';
-  $('#routingAccounts').innerHTML=vpas.length?vpas.map(v=>
-   '<span>'+esc(v.vpa_address)+' <strong>'+esc(v.status)+(v.is_default?' · Primary':'')+'</strong></span>').join(''):
-   '<div class="empty">No receiving accounts configured.</div>';
+  $('#routingAccounts').innerHTML=vpas.length?vpas.map(v=>{
+   const used=Math.max(0,Number(v.daily_tx_count)||0),limit=Math.max(1,Number(v.daily_tx_limit)||15);
+   const pct=Math.min(100,Math.round(used/limit*100));
+   const score=Math.max(0,Math.min(100,Number(v.health_score)||0));
+   return '<article class="routing-entry"><div class="routing-entry-head"><div><strong>'+esc(v.holder_name||v.vpa_address)+
+     '</strong><small>'+esc(v.vpa_address)+'</small></div><span class="state '+(v.status==='ACTIVE'?'active':'paused')+'">'+esc(v.status)+'</span></div>'+
+     '<div class="routing-facts"><span>Internal health score <b>'+num(score)+'/100</b></span>'+
+     '<span>Requests today <b>'+num(used)+' / '+num(limit)+'</b></span>'+
+     '<span>Policy volume today <b>'+money(v.daily_volume)+'</b></span></div>'+
+     '<div class="routing-meter" aria-label="'+pct+' percent daily request allowance used"><span style="width:'+pct+'%"></span></div>'+
+     '<small class="routing-caption">'+(v.is_default?'Primary receiving account':'Additional receiving account')+
+     ' · Internal policy indicators, not a bank-verified balance</small></article>';
+  }).join(''):
+   '<div class="empty-state"><strong>No receiving accounts connected</strong><p>Add your own UPI ID in Accounts before creating payment requests.</p><button type="button" class="btn tiny ghost" data-switch="vpas">Open UPI accounts</button></div>';
   populateSelect();miniPanels();
  }catch(e){toast(e.message)}
 }
