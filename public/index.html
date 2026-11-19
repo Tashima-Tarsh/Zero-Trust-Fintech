@@ -66,6 +66,14 @@ footer{border-top:1px solid #ffffff25;background:#08090d;padding:28px clamp(20px
 @media(max-width:740px){.site-header{padding-inline:12px;gap:7px}.nav-actions{gap:5px}.header-checkout-label{display:none}.header-checkout{padding:3px;gap:3px}.header-mode{min-width:45px;min-height:42px;padding:8px 8px;font-size:12px}}
 @media(max-width:390px){.brand img{width:129px}.site-header{padding-inline:8px}.nav-actions{gap:4px}.header-mode{min-width:42px;padding:8px 6px}.menu-toggle{padding:10px 9px}}
 
+
+/* User-selected orbital image: dedicated local asset avoids remote 404 and layout shift. */
+.hero{background-image:linear-gradient(90deg,#071021ee 0%,#081226b6 52%,#09112b70 100%),url('/assets/disha-earth-night.webp')!important;
+ background-position:center,center!important;background-size:cover,cover!important}
+.hero-planet-photography{display:none!important}
+.hero-inner{position:relative;z-index:4}
+@media(max-width:740px){.hero{background-position:center,59% center!important}}
+
 </style>
 
 <style id="mars-editorial-v2">
@@ -166,7 +174,7 @@ html,body{overflow-x:clip}
  <nav class="mobile-nav" id="mobile-nav" aria-label="Mobile navigation"><a href="#the-problem">Why DISHA</a><a href="#intelligence">Payment intelligence</a><a href="#the-system">The platform</a><a href="#ownership">Ownership</a><a href="/login">Merchant Login</a><a href="https://wa.me/919142197135?text=I%20would%20like%20to%20discuss%20DISHA%208.2" target="_blank" rel="noopener noreferrer">WhatsApp</a></nav>
 </header>
 <main>
-<section class="hero" aria-labelledby="hero-title"><div class="space-field" aria-hidden="true"></div><div class="hero-planet-photography" aria-hidden="true"><img class="mars-photo" src="https://assets.science.nasa.gov/dynamicimage/assets/science/psd/mars/downloadable_items/3/7/37983_mars-globe-valles-marineris-enhanced.jpg" alt="" fetchpriority="high" decoding="async"><img class="earth-photo" src="https://astro4edu.org/media/multimedia/The_Blue_Marble_remastered.jpg" alt="" decoding="async"><img class="moon-photo" src="https://assets.science.nasa.gov/dynamicimage/assets/science/psd/solar/2023/06/edu_distance_to_the_moon.png" alt="" decoding="async"></div><canvas id="cosmos" aria-hidden="true"></canvas>
+<section class="hero" aria-labelledby="hero-title"><div class="space-field" aria-hidden="true"></div><div class="hero-planet-photography" aria-hidden="true"></div><canvas id="cosmos" aria-hidden="true"></canvas>
  <div class="hero-inner"><p class="eyebrow">DISHA 8.2 / Merchant-Owned Payment Intelligence</p><h1 id="hero-title">The money moves on UPI.<br>The intelligence <em>belongs to you.</em></h1><p class="hero-description">Your customers already know how to pay. Give your business a better way to understand the order, evaluate the evidence, manage exceptions and keep its financial records.</p>
  <div class="hero-ctas"><a href="/choose-payment" class="pill primary">Try Checkout <span aria-hidden="true">↗</span></a><a href="/login" class="pill">Merchant Login</a><a href="https://wa.me/919142197135?text=I%20would%20like%20to%20discuss%20DISHA%208.2" target="_blank" rel="noopener noreferrer" class="pill whatsapp">Talk on WhatsApp</a></div>
  <div class="hero-tags" aria-label="Core capabilities"><span>Direct UPI checkout</span><span>Device Vault evidence</span><span>Fraud-resistant controls</span><span>Merchant-owned software</span></div>
