@@ -20,7 +20,7 @@ const CODES=new Set([
  'RETURN_FAST','RETURN_NORMAL','NO_BACKGROUND','NO_RETURN_PARAMS',
  'HAS_RETURN_PARAMS','NO_OBSERVATION','EVIDENCE_UNVERIFIED','EVIDENCE_CONFLICT'
 ]);
-const APPS=new Set(['none','gpay','phonepe','paytm','cred','generic']);
+const APPS=new Set(['none','gpay','phonepe','paytm','bhim','cred','generic']);
 const DEVICES=new Set(['android','ios','desktop','other']);
 function validEvent(body){
  if(!body||typeof body!=='object'||Array.isArray(body))return null;
