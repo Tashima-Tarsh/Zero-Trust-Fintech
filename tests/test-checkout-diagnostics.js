@@ -5,8 +5,23 @@ const {createCheckoutDiagnostics,validEvent}=require('../financial/checkout-diag
 const token='a'.repeat(48),orderId='ORD_TRACE_TEST_123';
 const valid={orderId,token,event:'VAULT_AUTH_PROMPT',code:'OK',app:'phonepe',device:'android'};
 assert.ok(validEvent(valid));
+
+for(const [event,code,app] of [
+ ['ORDER_READY','OK','none'],['APP_DISPATCH','APP_GENERIC','generic'],
+ ['APP_DISPATCH','APP_TARGETED','gpay'],['APP_DISPATCH','APP_TARGETED','paytm'],
+ ['APP_DISPATCH','APP_TARGETED','bhim'],['BROWSER_RETURN','RETURN_FAST','none'],
+ ['BROWSER_RETURN','RETURN_NORMAL','none'],['APP_ERROR','APP_NAVIGATION_ERROR','none']
+]){
+ assert.ok(validEvent({...valid,event,code,app}),
+  'Every emitted checkout event must be accepted by diagnostics: '+event+'/'+code+'/'+app);
+}
+
 const fs=require('node:fs'),path=require('node:path');
 const checkoutScript=fs.readFileSync(path.join(__dirname,'../public/cosmic-checkout.js'),'utf8');
+assert.match(checkoutScript,/trace\('ORDER_READY'\)/);
+assert.match(checkoutScript,/trace\('BROWSER_RETURN',early\?'RETURN_FAST':'RETURN_NORMAL'\)/);
+assert.match(checkoutScript,/trace\('APP_ERROR','APP_NAVIGATION_ERROR'\)/);
+
 for(const p of ['checkout.html','merchant-checkout.html']){
  const html=fs.readFileSync(path.join(__dirname,'../public',p),'utf8');
  assert.match(html,/id="checkoutDebugPanel"/,'Debug banner must be present on test checkout');
