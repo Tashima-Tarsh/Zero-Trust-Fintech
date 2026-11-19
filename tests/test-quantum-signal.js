@@ -41,7 +41,8 @@ assert.equal(result({txnId:'123456789012'},null,twin.expires_at+100).state,'LATE
 (async()=>{
  const memory=new Map(),events=[],calls=[];
  const order={orderId:'PAY_TEST_1234',token:'a'.repeat(32)};
- const fake={crypto:{getRandomValues(b){b.fill(5);return b}},location:{search:'?Status=SUCCESS&txnId=123456789012&am=1.00',hash:''},
+ let nextByte=5;
+ const fake={crypto:{getRandomValues(b){b.fill(nextByte++);return b}},location:{search:'?Status=SUCCESS&txnId=123456789012&am=1.00',hash:''},
   DISHAOneTouchVault:{authorize:async()=>({sessionId:'b'.repeat(32)}),
    beginHandoff(...a){calls.push(['handoff',...a])},markBackgrounded(){calls.push(['background'])},
    submitReturnEvidence:async()=>({state:'UTR_CANDIDATE_UNVERIFIED'})}};
