@@ -327,36 +327,6 @@ function generateChallengeAmount(baseAmount, activeAmounts = new Set()) {
   return Number(((baseCents + cents) / 100).toFixed(2));
 }
 
-/**
- * Sign a UPI intent string with merchant's private key (SHA256+RSA512).
- * Returns base64-encoded signature. Use ONLY if you have the private key.
- * The intent string passed MUST NOT include '&sign='.
- * 
- * @param {string} intentString  e.g., 'upi://pay?pa=...&pn=...&am=...&mode=05&orgid=000000'
- * @param {string} privateKeyPem  PEM-encoded RSA private key (PKCS#1 or PKCS#8)
- * @returns {string} base64 signature
- */
-function signUpiIntent(intentString, privateKeyPem) {
-  const sign = crypto.createSign('SHA256');
-  sign.update(intentString);
-  sign.end();
-  return sign.sign(privateKeyPem, 'base64');
-}
-
-/**
- * Verify a signed UPI intent (for testing/validation).
- * @param {string} intentString  without '&sign='
- * @param {string} signature  base64 signature
- * @param {string} publicKeyPem  PEM-encoded RSA public key
- * @returns {boolean}
- */
-function verifyUpiIntent(intentString, signature, publicKeyPem) {
-  const verify = crypto.createVerify('SHA256');
-  verify.update(intentString);
-  verify.end();
-  return verify.verify(publicKeyPem, signature, 'base64');
-}
-
 module.exports = {
   buildUpiUri,
   appLinks,
@@ -364,8 +334,6 @@ module.exports = {
   qrTapLaunchUri,
   buildFallbackChain,
   generateChallengeAmount,
-  signUpiIntent,
-  verifyUpiIntent,
   VPA_RE,
   MC_RE,
   TR_RE,
