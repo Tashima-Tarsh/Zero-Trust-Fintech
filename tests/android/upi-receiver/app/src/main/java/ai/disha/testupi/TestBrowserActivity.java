@@ -4,6 +4,7 @@ import android.app.Activity;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
+import android.os.SystemClock;
 import android.webkit.WebView;
 import android.webkit.WebViewClient;
 import android.webkit.WebResourceRequest;
@@ -18,6 +19,8 @@ import android.view.ViewGroup;
 
 public final class TestBrowserActivity extends Activity {
     private static final String TAG = "DISHA_UPI_TEST";
+    private static final int UPI_EVIDENCE_REQUEST = 8202;
+    private long lastIntentLaunchMs = 0L;
     private WebView webView;
     // Sample the DOM directly: ActivityManager -W is not a safe polling API in CI.
     private final Handler snapshotHandler = new Handler(Looper.getMainLooper());
@@ -38,8 +41,22 @@ public final class TestBrowserActivity extends Activity {
                 Uri uri = request.getUrl();
                 if ("upi".equalsIgnoreCase(uri.getScheme()) && "pay".equalsIgnoreCase(uri.getHost())) {
                     Log.i(TAG, "ANDROID_WEBVIEW_DISPATCH upi://pay");
-                    try { startActivity(new Intent(Intent.ACTION_VIEW, uri)); }
-                    catch (Exception error) { Log.e(TAG, "UPI_HANDLER_UNAVAILABLE", error); }
+                    // Android evidence is collected for launch/return only.
+                    // Never treat an app-reported RESULT_OK as bank settlement.
+                    try {
+                        Intent paymentIntent = new Intent(Intent.ACTION_VIEW, uri);
+                        lastIntentLaunchMs = SystemClock.elapsedRealtime();
+                        Log.i(TAG, "ANDROID_INTENT_REQUESTED protocol=upi handler=external");
+                        startActivityForResult(paymentIntent, UPI_EVIDENCE_REQUEST);
+                        Log.i(TAG, "ANDROID_INTENT_DISPATCHED request=" + UPI_EVIDENCE_REQUEST);
+                    } catch (android.content.ActivityNotFoundException missing) {
+                        Log.e(TAG, "ANDROID_INTENT_NO_HANDLER result=UNAVAILABLE");
+                    } catch (SecurityException blocked) {
+                        Log.e(TAG, "ANDROID_INTENT_SECURITY_BLOCK result=UNAVAILABLE");
+                    } catch (Exception unexpected) {
+                        Log.e(TAG, "ANDROID_INTENT_LAUNCH_EXCEPTION class=" +
+                            unexpected.getClass().getSimpleName());
+                    }
                     return true;
                 }
                 return false;
@@ -95,6 +112,22 @@ public final class TestBrowserActivity extends Activity {
         webView.loadUrl(url);
     }
 
+    @Override protected void onActivityResult(int requestCode, int resultCode, Intent response) {
+        super.onActivityResult(requestCode, resultCode, response);
+        if (requestCode != UPI_EVIDENCE_REQUEST) return;
+        long elapsed = lastIntentLaunchMs <= 0 ? -1
+            : SystemClock.elapsedRealtime() - lastIntentLaunchMs;
+        String label = resultCode == Activity.RESULT_OK ? "APP_REPORTED_OK"
+            : resultCode == Activity.RESULT_CANCELED ? "CANCELLED" : "OTHER";
+        // Status is an *untrusted* string supplied by the target Android app.
+        String raw = response == null ? null : response.getStringExtra("Status");
+        String declared = raw != null && raw.equalsIgnoreCase("SUCCESS") ? "SUCCESS"
+            : raw != null && raw.equalsIgnoreCase("FAILURE") ? "FAILURE" : "UNAVAILABLE";
+        Log.i(TAG, "ANDROID_ACTIVITY_RESULT classification=" + label
+            + " appReported=" + declared + " elapsedMs=" + elapsed + " bankVerified=false");
+        lastIntentLaunchMs = 0L;
+    }
+
     // Android 15/17 UIAutomator window hierarchy dumps are unstable in headless
     // runner VMs. Query the actual WebView DOM in this local CI-only app instead.
     @Override protected void onNewIntent(Intent intent) {
@@ -104,8 +137,8 @@ public final class TestBrowserActivity extends Activity {
         if (command == null || webView == null) return;
         if ("snapshot".equals(command)) snapshot();
         else if ("open".equals(command)) {
-            Log.i(TAG,"TAP_TOUCH_TO_PAY");
-            webView.evaluateJavascript("(function(){var b=document.getElementById('btnOneTouch');if(b)b.click()})()",null);
+            Log.i(TAG,"TAP_QR_TO_OPEN_UPI");
+            webView.evaluateJavascript("(function(){var b=document.getElementById('qrTapToPay');if(b)b.click()})()",null);
         } else if ("refresh".equals(command)) {
             Log.i(TAG,"RELOAD_CHECKOUT");
             webView.reload();
@@ -120,8 +153,8 @@ public final class TestBrowserActivity extends Activity {
               "return {x:Math.round((r.left+r.width/2)*devicePixelRatio)," +
               "y:Math.round((r.top+r.height/2)*devicePixelRatio)," +
               "visible:r.width>0&&r.height>0&&getComputedStyle(el).display!='none'};}" +
-            "var b=document.getElementById('btnOneTouch');" +
-            "var app=document.getElementById('app-cred');" +
+            "var b=null;" +
+            "var app=null;" +
             "var qrTap=document.getElementById('qrTapToPay');" +
             "var active=Array.from(document.querySelectorAll('[data-stage]')).find(function(e){return !e.hidden});" +
             "return JSON.stringify({amount:v('payAmount'),stage:active?active.dataset.stage:'none'," +
@@ -137,10 +170,12 @@ public final class TestBrowserActivity extends Activity {
     @Override protected void onPause() {
         snapshotHandler.removeCallbacks(periodicSnapshot);
         if (webView != null) webView.onPause();
+        Log.i(TAG,"ANDROID_HOST_PAUSED");
         super.onPause();
     }
     @Override protected void onResume() {
         super.onResume();
+        Log.i(TAG,"ANDROID_HOST_RESUMED bankVerified=false");
         if (webView != null) {
             webView.onResume();
             snapshotHandler.removeCallbacks(periodicSnapshot);

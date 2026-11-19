@@ -17,6 +17,12 @@ assert.match(activity,/snapshotHandler\.postDelayed\(this, 1200\)/,
   'WebView must emit periodic DOM snapshots itself');
 assert.match(activity,/WEBVIEW_RENDER_PROCESS_GONE/,
   'WebView renderer failures must be visible in CI');
+assert.match(activity,/startActivityForResult\(paymentIntent, UPI_EVIDENCE_REQUEST\)/,
+  'Android native host must observe the actual UPI activity return');
+assert.match(activity,/ANDROID_ACTIVITY_RESULT classification=/,
+  'Android activity result must be reported separately from financial confirmation');
+assert.match(activity,/bankVerified=false/,
+  'A successful Android return is not proof money arrived');
 assert.match(harness,/shlex\.quote\(CHECKOUT\)/,
   'ADB shell must quote ampersands so the checkout bearer token is not stripped');
 assert.match(activity,/CHECKOUT_FIXTURE_TOKEN_MISSING/,

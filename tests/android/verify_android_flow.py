@@ -144,6 +144,8 @@ def test():
 
     print("A03: UPI cancellation keeps original QR and order pending",flush=True)
     adb("shell","input","keyevent","KEYCODE_BACK")
+    await_log("ANDROID_ACTIVITY_RESULT classification=CANCELLED",timeout=25)
+    await_log("bankVerified=false")
     wait_state(lambda s:s["stage"]=="qr" and s["qr"] and s["receiptUtr"]!="123456789012",
         "A cancelled transfer cannot create a receipt")
     assert fixture_state()=="PENDING"
@@ -183,6 +185,7 @@ def test():
     await_log("tn=Service payment")
     screen("07-merchant-upi-handoff")
     adb("shell","input","keyevent","KEYCODE_BACK")
+    await_log("ANDROID_ACTIVITY_RESULT classification=CANCELLED")
     wait_state(lambda s:s["stage"]=="qr" and s["qr"] and not s["qrDisabled"],
         "Merchant cancellation remains pending with QR available")
     assert fixture_state()=="PENDING"
