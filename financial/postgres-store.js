@@ -107,6 +107,20 @@ function buildStore(pg, vpaRouter) {
       [vpa,Math.floor(nowMs()/3600000)]);
     return (!r||Number(r.count)<maxPerHour);
   }
+  // Atomic check-and-consume: concurrent checkout requests cannot exceed
+  // the configured limit because the conflict predicate is row-locked.
+  async function checkAndIncrementVpaVelocity(vpa,maxPerHour=15) {
+    if(!vpa)return false;
+    if(!Number.isSafeInteger(maxPerHour)||maxPerHour<1)
+      throw new TypeError('Invalid VPA hourly limit');
+    const result=await pg.query(
+      'INSERT INTO vpa_hourly_txns(vpa_address,hour_bucket,count) VALUES($1,$2,1) '+
+      'ON CONFLICT(vpa_address,hour_bucket) DO UPDATE '+
+      'SET count=vpa_hourly_txns.count+1 '+
+      'WHERE vpa_hourly_txns.count<$3 RETURNING count',
+      [vpa,Math.floor(nowMs()/3600000),maxPerHour]);
+    return result.rowCount===1;
+  }
   async function getVpaHourlyCount(vpa) {
     const r=await scalar(pg,'SELECT count FROM vpa_hourly_txns WHERE vpa_address=$1 AND hour_bucket=$2',
       [vpa,Math.floor(nowMs()/3600000)]);
@@ -236,7 +250,7 @@ function buildStore(pg, vpaRouter) {
     findSessionByOrderId,findSessionByTxnRef,findSessionByAmount,saveSession,
     updateSessionStatus,updateSessionState,getOrderState,isUtrBlacklisted,
     blacklistUtr,getUtrBoundOrder,bindUtrToOrder,checkVpaVelocity,
-    incrementVpaVelocity,getVpaHourlyCount,checkSessionCooldown,setSessionCooldown,
+    incrementVpaVelocity,checkAndIncrementVpaVelocity,getVpaHourlyCount,checkSessionCooldown,setSessionCooldown,
     savePasskey,findPasskeyByCredentialId,findPasskeysByUserId,updatePasskeyCounter,
     isImageHashSeen,blacklistImageHash,getVpaMerchantType,getAllActiveVPAs,
     selectVPA,selectVPARoute,getLedgerVerification,

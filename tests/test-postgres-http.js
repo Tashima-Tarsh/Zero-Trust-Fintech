@@ -37,7 +37,7 @@ const crypto=require('node:crypto');
   assert.equal(unauthorized.status,400,'Public checkout must reject cross-tenant VPA substitution');
   assert.equal((await unauthorized.json()).error,'UNAUTHORIZED_PAYEE_VPA');
   const publicSession=await fetch(base+'/api/session/new?amount=1');
-  assert.equal(publicSession.status,200);
+  if(publicSession.status!==200)throw Error('PUBLIC_SESSION_CREATE_HTTP_'+publicSession.status+': '+await publicSession.text()+'; server: '+logs.slice(-2600));
   const publicPayload=await publicSession.json();
   assert.equal(publicPayload.vpaAddress,'disha82@okaxis','Public checkout must never rotate to another tenant VPA');
   assert.equal(publicPayload.paymentType,'P2P','Owner public test must use personal UPI fields');
