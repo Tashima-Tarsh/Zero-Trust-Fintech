@@ -407,3 +407,17 @@ body.app-page .celestial-earth-photo{
 @media(prefers-reduced-motion:reduce){
  body.app-page .celestial-earth{animation:none!important;transform:none!important;will-change:auto!important}
 }
+
+/* Ponytail: standalone decorative layers cannot intercept or overlap active workspace content. */
+.celestial-earth{pointer-events:none!important;z-index:0!important}
+body.app-page .app-layout{z-index:1;isolation:isolate}
+body.app-page #appNotice{position:relative;z-index:3;max-width:100%;overflow-wrap:anywhere}
+@media(max-width:740px){body.app-page .app-title-actions [data-switch="create"]{display:none!important}}
+
+/* User-selected Earth-at-night workspace background. Locally served, no broken remote img. */
+body.app-page .celestial-stage{background-image:linear-gradient(110deg,#07132ad8,#07152777),url('/assets/disha-earth-night.webp')!important;
+ background-position:center,center!important;background-size:cover,cover!important;opacity:.46!important;filter:none!important}
+body.app-page .celestial-moon,body.app-page .celestial-clouds,body.app-page .celestial-earth{display:none!important}
+body.app-page .app-layout{position:relative;z-index:1}
+body.app-page .app-main{isolation:isolate}
+body.app-page #appNotice{backdrop-filter:none!important;-webkit-backdrop-filter:none!important}

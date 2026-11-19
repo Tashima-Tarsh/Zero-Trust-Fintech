@@ -305,3 +305,14 @@ button,input{font:inherit}
  .auth-action{overflow:hidden}
  .auth-slot-wrap{max-height:100%;overflow:auto}
 }
+
+/* User-selected Mars Perseverance artwork, locally hosted; Clerk remains unmodified. */
+@media screen{
+ .auth-story{background-image:linear-gradient(90deg,#13102780 0%,#130a2635 55%,#0d103877 100%),url('/assets/disha-login-mars.webp')!important;
+ background-position:center,center;background-size:cover,cover;background-repeat:no-repeat}
+ .auth-story:after{opacity:0!important}
+ .auth-story-middle{justify-content:flex-end!important}
+ .auth-story-middle .payment-journey{opacity:.65}
+ .auth-action{overflow-y:auto!important}
+}
+@media(max-width:600px){.auth-story{background-position:center 45%;background-size:cover}.auth-story-middle{justify-content:flex-end!important}}

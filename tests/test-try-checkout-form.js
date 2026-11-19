@@ -1,0 +1,17 @@
+'use strict';
+const assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path');
+const read=file=>fs.readFileSync(path.join(__dirname,'..',file),'utf8');
+const html=read('public/payment-modes.html'),js=read('public/try-checkout.js'),home=read('public/index.html');
+for(const id of ['tryCheckoutForm','tryAmount','tryVpa','tryError'])assert.ok(html.includes('id="'+id+'"'),'Missing '+id);
+for(const m of ['P2P','P2M'])assert.ok(html.includes('data-payment-mode="'+m+'"'));
+assert.ok(js.includes("fetch('/api/session/new?"),'P2P creates original session before QR');
+assert.ok(js.includes("checkout.searchParams.set('orderId'"),'Carry created order not a new one');
+assert.ok(js.includes("checkout.searchParams.set('qs','1')"),'Prepare Quantum Signal');
+assert.ok(js.includes('disha82:merchant-prefill'),'P2M passes prefill to authorized workspace');
+assert.ok(js.includes("location.assign('/login?mode=P2M')"),'P2M auth gate');
+assert.ok(js.includes("result.error==='UNAUTHORIZED_PAYEE_VPA'"),'Do not allow unrelated payees');
+assert.ok(read('server.js').includes('UNAUTHORIZED_PAYEE_VPA'),'Server enforces allowed receiver');
+assert.ok(read('public/premium-dashboard.js').includes('applyTryCheckoutPrefill()'));
+assert.ok(home.includes('href="/choose-payment?mode=P2P"'));
+assert.ok(home.includes('href="/choose-payment?mode=P2M"'));
+console.log('TRY_CHECKOUT_FORM_PASS');

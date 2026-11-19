@@ -200,32 +200,20 @@ async function init(){
   if(error.status===401){location.replace('/login');return}
   if(error.status===403){
    const pending=error.code==='MERCHANT_APPROVAL_PENDING'||error.code==='MERCHANT_APPROVAL_REQUIRED';
-   const signedInEmail=String(clerk?.user?.primaryEmailAddress?.emailAddress||'').trim().toLowerCase();
-   notice(signedInEmail==='nitish@thenitishkr.in'?
-    'Clerk shows the Super Admin email, but the server refused owner access. Check that your primary email is verified in Clerk.':
-    'Signed in as '+(signedInEmail||'unknown')+
-    '. This is not the authorized Super Admin account. Owner access requires the verified primary Clerk email nitish@thenitishkr.in.');
+   notice(pending?'Merchant access is awaiting approval. Switch account or request access.':
+     'This account is not authorized for this workspace. Switch account or request access.');
    const area=$('#appNotice');
    if(area){
     const switchButton=document.createElement('button');
-    switchButton.type='button';switchButton.textContent='Switch to Super Admin sign-in';
-    switchButton.style.cssText='margin:8px 10px 0 0;padding:9px 12px;border-radius:7px;border:1px solid #f6aa81;background:transparent;color:#f6aa81;cursor:pointer';
+    switchButton.type='button';switchButton.textContent='Switch account';switchButton.className='btn small ghost';
     switchButton.addEventListener('click',async()=>{
       if(clerk?.signOut)await clerk.signOut();
-      location.assign('/login?owner=1');
+      location.assign('/login');
     });
     area.appendChild(switchButton);
-    const ownerLink=document.createElement('a');ownerLink.href='/owner#requests';
-    ownerLink.textContent='Owner approval inbox';
-    ownerLink.style.cssText='display:inline-block;margin-top:8px;color:#f6aa81;text-decoration:underline';
-    area.appendChild(ownerLink);
-   }
-   if(area&&pending){
     const link=document.createElement('a');
-    link.href='/request-access';
-    link.textContent='Request merchant approval';
-    link.style.cssText='display:inline-block;margin-left:10px;color:#f6aa81;text-decoration:underline;font-weight:700';
-    area.appendChild(link);
+    link.href='/request-access';link.textContent=pending?'Request merchant approval':'Request access';
+    link.className='btn small ghost';area.appendChild(link);
    }
    return;
   }
@@ -395,7 +383,7 @@ async function loadVpas(){
      ' · Internal policy indicators, not a bank-verified balance</small></article>';
   }).join(''):
    '<div class="empty-state"><strong>No receiving accounts connected</strong><p>Add your own UPI ID in Accounts before creating payment requests.</p><button type="button" class="btn tiny ghost" data-switch="vpas">Open UPI accounts</button></div>';
-  populateSelect();miniPanels();
+  populateSelect();miniPanels();applyTryCheckoutPrefill();
  }catch(e){toast(e.message)}
 }
 function populateSelect(){
@@ -449,6 +437,24 @@ async function updateVpa(id,action){
   await loadVpas();toast('Receiving account updated');
  }catch(e){toast(e.message)}
 }
+// A P2M Try Checkout never creates a payment before authenticated merchant validation.
+function applyTryCheckoutPrefill(){
+ if(!p2mOnly())return;
+ let raw;
+ try{raw=JSON.parse(sessionStorage.getItem('disha82:merchant-prefill')||'null')}catch(_){return}
+ if(!raw||raw.mode!=='P2M'||Date.now()-Number(raw.savedAt)>600000){
+  try{sessionStorage.removeItem('disha82:merchant-prefill')}catch(_){}
+  return;
+ }
+ const amount=String(raw.amount||''),vpa=String(raw.vpa||'').toLowerCase();
+ if(!/^\d+(?:\.\d{1,2})?$/.test(amount)||Number(amount)<=0||Number(amount)>100000)return;
+ const receiving=vpas.find(v=>v.status==='ACTIVE'&&String(v.account_type).toUpperCase()==='MERCHANT'&&String(v.vpa_address).toLowerCase()===vpa);
+ if($('#newAmount'))$('#newAmount').value=amount;
+ if(receiving&&$('#newVpa'))$('#newVpa').value=receiving.vpa_address;
+ if(!receiving)toast('Choose an active bank-registered merchant UPI account before creating a P2M request.');
+ try{sessionStorage.removeItem('disha82:merchant-prefill')}catch(_){}
+}
+
 async function createPayment(e){
  e.preventDefault();const button=e.submitter;busy(button,true);
  const amount=plain($('#newAmount').value);

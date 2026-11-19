@@ -119,8 +119,7 @@ $('#owner-signout').addEventListener('click',async()=>{if(clerk){await clerk.sig
 (async()=>{try{await authInit();owner=await api('/owner/me');if(owner.role!=='PLATFORM_OWNER')throw Error('Not authorized');void refreshOwnerInbox();select(titles[location.hash.slice(1)]?location.hash.slice(1):'overview')}catch(e){
  const signedInEmail=String(clerk?.user?.primaryEmailAddress?.emailAddress||'').toLowerCase();
  notice(e.status===403?
-  'Super Admin access denied. Current Clerk primary email: '+(signedInEmail||'unknown')+
-  '. Authorized verified primary email: nitish@thenitishkr.in. Switch Clerk account to continue.':e.message);
+  'Owner workspace access is not available for this account. Switch to an authorized account.':e.message);
  if(e.status===403){
   const control=$('#owner-switch-account');if(control){
    control.hidden=false;
