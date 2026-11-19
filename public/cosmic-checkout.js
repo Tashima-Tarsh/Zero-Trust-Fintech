@@ -241,6 +241,10 @@
   if(left===0){
    get('qrTapToPay').href='#';
    get('qrTapToPay').setAttribute('aria-disabled','true');
+   get('upiAppOptions').hidden=true;
+   for(const link of document.querySelectorAll('[data-upi-app]')){
+    link.href='#';link.setAttribute('aria-disabled','true');
+   }
    get('paymentQr').replaceChildren();
    qrUri=null;
   }
@@ -258,11 +262,18 @@
   const anchor=get('qrTapToPay'),container=get('paymentQr');
   if(expired()||['EXPIRED','FAILED','CANCELLED'].includes(session.initialStatus)){
    anchor.href='#';anchor.setAttribute('aria-disabled','true');
+   get('upiAppOptions').hidden=true;
    container.replaceChildren();qrUri=null;handleQrExpiry();return;
   }
   anchor.href=model.supportsNativeUPI(userAgent)
    ?model.qrTapLaunchUri(session.upiUri,userAgent,secureCheckoutUrl(true)):'#';
   anchor.setAttribute('aria-disabled','false');
+  const targeted=model.supportsTargetedAppLaunch(userAgent);
+  get('upiAppOptions').hidden=!targeted;
+  for(const link of document.querySelectorAll('[data-upi-app]')){
+   link.href=targeted?model.appTapLaunchUri(session.upiUri,userAgent,secureCheckoutUrl(true),link.dataset.upiApp):'#';
+   link.setAttribute('aria-disabled',targeted?'false':'true');
+  }
   if(qrUri!==session.upiUri){
    container.replaceChildren();
    if(typeof window.QRCode!=='function'){
@@ -301,6 +312,19 @@
    qrTapStartedAt=Date.now();qrAppBackgrounded=false;
    trace('APP_DISPATCH','APP_GENERIC','generic');
   });
+  for(const link of document.querySelectorAll('[data-upi-app]')){
+   link.addEventListener('click',event=>{
+    if(!session||receiptShown||expired()||
+       ['EXPIRED','FAILED','CANCELLED'].includes(session.initialStatus)||
+       !model.supportsTargetedAppLaunch(userAgent)){
+     event.preventDefault();
+     message('This UPI app choice is unavailable. Scan the QR using your preferred app.','info');
+     return;
+    }
+    qrTapStartedAt=Date.now();qrAppBackgrounded=false;
+    trace('APP_DISPATCH','APP_TARGETED',link.dataset.upiApp);
+   });
+  }
   get('shareCheckout').addEventListener('click',async()=>{
    if(!session?.token||!session?.orderId)return;
    const link=secureCheckoutUrl();
