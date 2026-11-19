@@ -45,6 +45,7 @@ const UNIT_TESTS = [
   'test-one-touch-vault.js', // one biometric to vault register/authenticate, then UPI intent
   'test-vault-browser-evidence.js',
   'test-quantum-signal.js', // automatic post-UPI browser evidence packet and idempotent retries
+  'test-high-concurrency-limiter.js', // no O(total IPs) hot-path cleanup before 100K load tests
   'test-utr-hypothesis.js', // UTR anti-fraud and no-false-credit regression
   'test-pony-tail-window.js', // Pony-tail 15s/180s temporal invariants and no UTR poisoning
   'test-android-fixture.js', // no-money P2P URL and UTR intent fixture
