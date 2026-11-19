@@ -53,7 +53,7 @@ async function flush(){for(let i=0;i<35;i++)await Promise.resolve()}
   'Early app return must retain QR instead of claiming payment');
  assert.match(mobile.nodes.checkoutStatus.textContent,/UPI app returned quickly/,
   'A pre-PIN-like early return should be visible and accurately classified');
- assert.notEqual(mobile.nodes.receiptUtr.textContent,'123456789012',
+ assert.notEqual(mobile.nodes.receiptUtr?.textContent,'123456789012',
   'App return is not a credit');
  await mobile.nodes.shareCheckout.events.click();
  const shared=new URL(mobile.state.shared);
