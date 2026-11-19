@@ -207,21 +207,21 @@ function createMerchantApi({db,getAuth,buildUpiUri,platformControl}) {
       'INSERT INTO saas_merchant_notifications(id,merchant_id,title,message,created_at) VALUES($1,$2,$3,$4,$5)',
       [id('note_'),merchantId,title,message,now()]);
   }
-  function link(orderId,token,internalTest=false){
+  function link(paymentRef,token,internalTest=false){
     // Owner test links bypass potentially stale Cloudflare static checkout HTML.
     // External merchant checkout links remain unchanged and private by default.
     const page=internalTest?'/api/runtime/merchant-checkout':'/merchant-checkout.html';
-    return page+'?orderId='+encodeURIComponent(orderId)+'&token='+encodeURIComponent(token)+
+    return page+'?paymentRef='+encodeURIComponent(paymentRef)+'&token='+encodeURIComponent(token)+
       (internalTest?'&debug=1':'');
   }
-  router.get('/merchant/public/order/:orderId',wrap(async(req,res)=>{
+  router.get(['/merchant/public/payment/:paymentRef','/merchant/public/order/:orderId'],wrap(async(req,res)=>{
     const token=String(req.query.token||'');
     if(!/^[0-9a-f]{24,64}$/i.test(token))throw fail(401,'Payment link token required');
     const r=await db.pgPool.query(
       "SELECT o.*,m.business_name,s.status,s.utr,s.txn_ref FROM saas_merchant_orders o "+
       "JOIN saas_merchants m ON m.id=o.merchant_id "+
       "JOIN sessions s ON s.session_id=o.session_id WHERE o.id=$1 AND o.session_id=$2",
-      [req.params.orderId,token]);
+      [req.params.paymentRef||req.params.orderId,token]);
     if(!r.rowCount)throw fail(404,'Payment request not found');
     const o=r.rows[0],amount=Number(o.amount_paise)/100;
     // Prefer the immutable payee snapshot stored with this payment session.
@@ -238,8 +238,11 @@ function createMerchantApi({db,getAuth,buildUpiUri,platformControl}) {
       if(!prior.rowCount)throw fail(409,'PAYEE_CONFIG_UNAVAILABLE');
       payee={...payee,...prior.rows[0]};
     }
+    // Retain previously issued merchant payment links without changing their UPI tr.
+    const paymentReference=/^PAY[A-F0-9]{24}$/i.test(String(o.txn_ref||''))
+      ?o.txn_ref:o.id.replace(/[^A-Za-z0-9]/g,'').slice(0,35);
     const uri=upi(payee,payee.holder_name||o.business_name,
-      amount,o.description||'Payment',o.txn_ref||o.id.replace(/[^A-Za-z0-9]/g,'').slice(0,35));
+      amount,o.description||'Payment',paymentReference);
     res.set('Cache-Control','no-store').json({success:true,order:{
       id:o.id,amount,business_name:o.business_name,vpa_address:o.vpa_address,
       payee_name:payee.holder_name||o.business_name,

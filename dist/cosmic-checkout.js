@@ -115,7 +115,7 @@
    paymentType:raw.paymentType,payeeVpa:raw.vpaAddress};
  }
  function saveAuthorizedSession(){
-  if(mode!=='generic'||!session||query.has('orderId'))return;
+  if(mode!=='generic'||!session||query.has('paymentRef')||query.has('orderId'))return;
   try{
    sessionStorage.setItem(resumeKey,JSON.stringify({
     ...session,requestedAmount:query.get('amount')||'1',savedAt:Date.now()
@@ -146,11 +146,12 @@
  async function getSession(){
   let url;
   if(mode==='merchant'){
-   const id=query.get('orderId'),token=query.get('token');
+   const id=query.get('paymentRef')||query.get('orderId'),token=query.get('token');
    if(!id||!token)throw Error('This payment link is incomplete. Request a new link.');
-   url='/api/merchant/public/order/'+encodeURIComponent(id)+'?token='+encodeURIComponent(token);
-  }else if(query.has('orderId')||query.has('token')){
-   const id=query.get('orderId'),token=query.get('token');
+   url='/api/merchant/public/'+(query.has('paymentRef')?'payment/':'order/')+
+    encodeURIComponent(id)+'?token='+encodeURIComponent(token);
+  }else if(query.has('paymentRef')||query.has('orderId')||query.has('token')){
+   const id=query.get('paymentRef')||query.get('orderId'),token=query.get('token');
    if(!/^[a-z0-9_-]{6,150}$/i.test(id||'')||!/^[a-f0-9]{24,64}$/i.test(token||''))
     throw Error('This payment link is incomplete. Request a new link.');
    url='/api/session/'+encodeURIComponent(id)+'?token='+encodeURIComponent(token);
@@ -428,7 +429,7 @@
    // Sharing the browser checkout intentionally grants access to that order.
    // Its token is never placed in the bank-scannable UPI payment QR.
    const link=new URL(mode==='merchant'?'/merchant-checkout.html':'/checkout',location.href);
-   link.searchParams.set('orderId',session.orderId);
+   link.searchParams.set('paymentRef',session.orderId);
    link.searchParams.set('token',session.token);
    try{
     if(navigator.share)await navigator.share({title:'DISHA 8.2 payment details',url:link.href});

@@ -450,7 +450,7 @@ async function createPayment(e){
  if(!/^\d+(?:\.\d{1,2})?$/.test(amount)){toast('Enter a valid amount up to two decimal places');busy(button,false);return}
  try{
   const response=await api('/api/merchant/payments',{method:'POST',body:JSON.stringify({
-   amount,description:$('#newDesc').value.trim(),orderId:$('#newOrderId').value.trim(),
+   amount,description:$('#newDesc').value.trim(),paymentReference:$('#newPaymentRef').value.trim(),
    vpaAddress:$('#newVpa').value||null
   })});
   created=response.order;showCreatedOrder(created);toast('Live payment request generated');

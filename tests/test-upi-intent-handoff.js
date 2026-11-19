@@ -46,7 +46,7 @@ async function flush(){for(let i=0;i<35;i++)await Promise.resolve()}
  assert.ok(!uri.includes(token),'Browser bearer token is not embedded in payment QR');
  await mobile.nodes.shareCheckout.events.click();
  const shared=new URL(mobile.state.shared);
- assert.equal(shared.searchParams.get('orderId'),order);
+ assert.equal(shared.searchParams.get('paymentRef'),order);
  assert.equal(shared.searchParams.get('token'),token);
  assert.equal(shared.pathname,'/merchant-checkout.html');
  const desktop=start('Mozilla/5.0 (Windows NT 10.0)');

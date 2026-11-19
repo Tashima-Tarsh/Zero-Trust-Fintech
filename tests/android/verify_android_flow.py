@@ -18,7 +18,7 @@ OUT=Path("test-results/android")
 OUT.mkdir(parents=True,exist_ok=True)
 BASE="http://127.0.0.1:8765"
 CHECKOUT=("http://10.0.2.2:8765/merchant-checkout.html?"
-          "orderId=ORD_ANDROID_CI_1001&token="+("b"*48))
+          "paymentRef=ORD_ANDROID_CI_1001&token="+("b"*48))
 
 def run(args,timeout=35):
     try:

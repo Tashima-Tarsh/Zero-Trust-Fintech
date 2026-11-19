@@ -12,7 +12,7 @@ function open(sharedToken){
  const state={qr:null,links:[],ledger:'PENDING',shared:null};
  const document={body:{dataset:{checkout:'generic'}},visibilityState:'visible',getElementById:node,
   querySelectorAll:q=>q==='[data-stage]'?stages:[],addEventListener:(k,fn)=>events[k]=fn};
- const location={href:'https://disha.example/checkout?orderId='+order+'&token='+sharedToken,
+ const location={href:'https://disha.example/checkout?paymentRef='+order+'&token='+sharedToken,
   search:'?orderId='+order+'&token='+sharedToken};
  const navigator={userAgent:'Mozilla/5.0 (Linux; Android 15)',clipboard:{
   writeText:async text=>{state.shared=text}}};
@@ -46,7 +46,7 @@ async function flush(){for(let i=0;i<35;i++)await Promise.resolve()}
  assert.ok(phone.state.links.includes('/api/session/'+order+'?token='+token));
  assert.ok(!phone.state.links.some(link=>link.includes('/api/session/new')));
  await phone.nodes.shareCheckout.events.click();
- assert.equal(new URL(phone.state.shared).searchParams.get('orderId'),order);
+ assert.equal(new URL(phone.state.shared).searchParams.get('paymentRef'),order);
  phone.state.ledger='SUCCESS';phone.events.focus();await flush();
  assert.equal(phone.stages.find(x=>!x.hidden).dataset.stage,'receipt');
  const blocked=open('c'.repeat(48));await flush();
