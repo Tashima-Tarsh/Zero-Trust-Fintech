@@ -39,6 +39,30 @@ assert.equal(model.qrTapLaunchUri(original,'Mozilla/5.0 (Windows NT 10.0)',fallb
 assert.equal(model.qrTapLaunchUri(original,'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X)',fallback),original);
 assert.ok(!original.includes('token'),'Scannable QR carries no browser token');
 
+// Backend and browser must fail closed before launching a zero/rounded amount,
+// malformed payee, duplicated key or a merchant URI missing either mc or tr.
+for(const amount of [0.001,1.005,0.0000001,100000.01])
+ assert.throws(()=>buildUpiUri({kind:'P2P',pa:'person@oksbi',pn:'Person',am:amount}),
+  /paisa|paise|amount|max/i,'Refuse non-paise or above-limit amounts');
+for(const uri of [
+ 'upi://pay?pa=person@oksbi&pn=Person&am=0.001&cu=INR',
+ 'upi://pay?pa=person@oksbi&pn=Person&am=0.00&cu=INR',
+ 'upi://pay?pa=invalid&pn=Person&am=1.00&cu=INR',
+ 'upi://pay?pa=person@oksbi&pa=attacker@okaxis&pn=Person&am=1.00&cu=INR',
+ 'upi://pay?pa=person@oksbi&pn=Person&am=1.00&cu=USD',
+ 'upi://pay?pa=merchant@ypbiz&pn=Shop&am=1.00&cu=INR&mc=5411',
+ 'upi://pay?pa=merchant@ypbiz&pn=Shop&am=1.00&cu=INR&tr=ORD123',
+ 'upi://pay?pa=merchant@ypbiz&pn=Shop&am=1.00&cu=INR&mc=0000&tr=ORD123'
+]){
+ assert.throws(()=>model.qrPayload(uri),/URI|UPI|amount|currency/i);
+ assert.throws(()=>model.qrTapLaunchUri(uri,chromeUa,fallback),
+  /URI|UPI|amount|currency/i,'Reject before Android Chrome intent dispatch');
+}
+assert.equal(model.qrPayload(original),original,'Valid personal URI bytes unchanged');
+const merchantOriginal='upi://pay?pa=merchant@ypbiz&pn=Shop&am=1.00&cu=INR&mc=5411&tr=ORD123';
+assert.equal(model.qrPayload(merchantOriginal),merchantOriginal,'Valid merchant URI bytes unchanged');
+
+
 assert.equal(model.supportsTargetedAppLaunch(chromeUa),true);
 assert.equal(model.supportsTargetedAppLaunch(webViewUa),false,'Embedded WebView needs raw upi://pay');
 assert.equal(model.supportsTargetedAppLaunch('Mozilla/5.0 (Linux; Android 15) SamsungBrowser/26 Chrome/129'),false);
