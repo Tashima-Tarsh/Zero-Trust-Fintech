@@ -28,12 +28,12 @@ public final class FakeUpiActivity extends Activity {
             if ("PRE_PIN_FAILURE".equals(outcome)) {
                 result.putExtra("Status", "FAILURE");
                 Log.i(TAG, "QA_RECEIVER_PRE_PIN_FAILURE_NO_MONEY");
-                setResult(Activity.RESULT_CANCELED, result);
+                FakeUpiActivity.this.setResult(Activity.RESULT_CANCELED, result);
                 finish();
             } else if ("APP_REPORTED_SUCCESS".equals(outcome)) {
                 result.putExtra("Status", "SUCCESS");
                 Log.i(TAG, "QA_RECEIVER_APP_CLAIM_ONLY_NO_MONEY");
-                setResult(Activity.RESULT_OK, result);
+                FakeUpiActivity.this.setResult(Activity.RESULT_OK, result);
                 finish();
             }
         }
