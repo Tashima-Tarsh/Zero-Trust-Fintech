@@ -85,6 +85,8 @@
  }
  function locked(text){
   get('btnOneTouch').disabled=true;
+  const qr=get('qrTapToPay');
+  if(qr){qr.setAttribute('aria-disabled','true');qr.href='#'}
   if(text)message(text,'error');
  }
  function format(v){return model.formatINR(v)}
@@ -100,13 +102,20 @@
      amount:Number(o.amount),expiresAt:Number(o.expires_at),initialStatus:o.status,
      paymentType:o.payment_type,payeeVpa:o.vpa_address};
   }
+  if(raw.session){
+   const o=raw.session;
+   if(!o.orderId||!raw.upiLink||!Number(o.challengeAmount))throw Error('Payment link is incomplete');
+   return {orderId:o.orderId,token:query.get('token'),upiUri:model.qrPayload(raw.upiLink),
+    amount:Number(o.challengeAmount),expiresAt:Number(o.expiresAt),initialStatus:o.status,
+    paymentType:o.merchantType,payeeVpa:o.vpaAddress};
+  }
   return {orderId:raw.orderId,token:raw.sessionId,
    upiUri:model.qrPayload(raw.upiLink),amount:Number(raw.challengeAmount),
    expiresAt:Number(raw.expiresAt),initialStatus:'PENDING',
    paymentType:raw.paymentType,payeeVpa:raw.vpaAddress};
  }
  function saveAuthorizedSession(){
-  if(mode!=='generic'||!session)return;
+  if(mode!=='generic'||!session||query.has('orderId'))return;
   try{
    sessionStorage.setItem(resumeKey,JSON.stringify({
     ...session,requestedAmount:query.get('amount')||'1',savedAt:Date.now()
@@ -140,6 +149,11 @@
    const id=query.get('orderId'),token=query.get('token');
    if(!id||!token)throw Error('This payment link is incomplete. Request a new link.');
    url='/api/merchant/public/order/'+encodeURIComponent(id)+'?token='+encodeURIComponent(token);
+  }else if(query.has('orderId')||query.has('token')){
+   const id=query.get('orderId'),token=query.get('token');
+   if(!/^[a-z0-9_-]{6,150}$/i.test(id||'')||!/^[a-f0-9]{24,64}$/i.test(token||''))
+    throw Error('This payment link is incomplete. Request a new link.');
+   url='/api/session/'+encodeURIComponent(id)+'?token='+encodeURIComponent(token);
   }else{
    const raw=query.get('amount')||'1';
    const amount=Number(raw);
@@ -209,7 +223,8 @@
   const node=get('checkoutTimer');
   if(!node||!session)return;
   if(receiptShown){node.textContent='Payment confirmed';return}
-  const remaining=Math.max(0,Math.ceil((session.expiresAt-Date.now())/1000));
+  const remaining=['EXPIRED','FAILED','CANCELLED'].includes(session.initialStatus)
+   ?0:Math.max(0,Math.ceil((session.expiresAt-Date.now())/1000));
   const mm=String(Math.floor(remaining/60)).padStart(2,'0');
   const ss=String(remaining%60).padStart(2,'0');
   node.textContent=remaining?'Session expires in '+mm+':'+ss:'Session expired · Request a new payment link';
@@ -228,14 +243,27 @@
  }
  function handleQrExpiry(){
   if(!session||lastStage!=='qr')return;
-  const left=Math.max(0,Math.ceil((session.expiresAt-Date.now())/1000));
+  const left=['EXPIRED','FAILED','CANCELLED'].includes(session.initialStatus)
+   ?0:Math.max(0,Math.ceil((session.expiresAt-Date.now())/1000));
   get('qrExpiry').textContent=left>0?'QR valid for '+Math.floor(left/60)+':'+String(left%60).padStart(2,'0')+
     ' · Linked to this payment request':'Payment link expired — request a new link';
   get('paymentQr').classList.toggle('is-expired',left===0);
+  if(left===0){
+   get('qrTapToPay').href='#';
+   get('qrTapToPay').setAttribute('aria-disabled','true');
+   get('paymentQr').replaceChildren();
+   qrUri=null;
+  }
  }
  function renderQr(){
-  if(!authorized||!session)return;
-  const container=get('paymentQr');
+  if(!session)return;
+  const anchor=get('qrTapToPay'),container=get('paymentQr');
+  if(expired()||['EXPIRED','FAILED','CANCELLED'].includes(session.initialStatus)){
+   anchor.href='#';anchor.setAttribute('aria-disabled','true');
+   container.replaceChildren();qrUri=null;handleQrExpiry();return;
+  }
+  anchor.href=model.supportsNativeUPI(userAgent)?session.upiUri:'#';
+  anchor.setAttribute('aria-disabled','false');
   if(qrUri!==session.upiUri){
    container.replaceChildren();
    if(typeof window.QRCode!=='function'){
@@ -368,8 +396,8 @@
    const retry=model.needsPaymentMethodRetry(observed.evidence);
    trace('BROWSER_RETURN',retry?'RETURN_FAST':'RETURN_NORMAL',observed.evidence?.selectedApp||'generic');
    if(retry&&lastStage!=='receipt'){
-    showStage('methods');
-    message('The UPI app returned without payment confirmation. If you paid, check your UPI history before trying again. Otherwise choose another app or scan QR.','info');
+    showStage('qr');
+    message('The UPI app returned. Check its history before trying again.','info');
    }else if(lastStage!=='receipt'&&lastStage!=='checking'){
     showStage('checking');
    }
@@ -381,6 +409,37 @@
   void pollLedger();
  }
  function setEventHandlers(){
+  // Direct QR-link tap preserves the browser's user gesture; no passkey
+  // ceremony or package-specific intent interrupts native app dispatch.
+  get('qrTapToPay').addEventListener('click',event=>{
+   if(!session||receiptShown||expired()||
+      ['EXPIRED','FAILED','CANCELLED'].includes(session.initialStatus)){
+    event.preventDefault();
+    message('This payment request is unavailable. Open a fresh checkout.','error');
+    return;
+   }
+   if(!model.supportsNativeUPI(userAgent)){
+    event.preventDefault();
+    message('Scan this QR with a UPI app on another phone.','info');
+    return;
+   }
+   trace('APP_DISPATCH','APP_GENERIC','generic');
+  });
+  get('shareCheckout').addEventListener('click',async()=>{
+   if(!session?.token||!session?.orderId)return;
+   // Sharing the browser checkout intentionally grants access to that order.
+   // Its token is never placed in the bank-scannable UPI payment QR.
+   const link=new URL(mode==='merchant'?'/merchant-checkout.html':'/checkout',location.href);
+   link.searchParams.set('orderId',session.orderId);
+   link.searchParams.set('token',session.token);
+   try{
+    if(navigator.share)await navigator.share({title:'DISHA 8.2 payment details',url:link.href});
+    else if(navigator.clipboard?.writeText){
+     await navigator.clipboard.writeText(link.href);
+     message('Checkout link copied. Share only with the person paying.','info');
+    }else message('Sharing is unavailable in this browser.','error');
+   }catch(_){message('Could not share this payment link.','error')}
+  });
   const diag=get('checkoutDebugPanel');
   if(diag&&debug){
    diag.hidden=false;
@@ -397,7 +456,6 @@
   get('showQr').addEventListener('click',()=>{
    if(authorized && !expired()){trace('QR_OPEN');showStage('qr')}
   });
-  get('backToApps').addEventListener('click',()=>showStage('methods'));
   get('checkingApps').addEventListener('click',()=>showStage('methods'));
   get('saveReceipt').addEventListener('click',()=>{if(receiptShown)window.print()});
   get('shareReceipt').addEventListener('click',async()=>{
@@ -421,7 +479,7 @@
  }
  async function start(){
   setEventHandlers();
-  showStage('initial');
+  showStage('qr');
   try{
    session=await getSession();
    if(debug){
@@ -433,8 +491,16 @@
     }catch(_){}
    }
    trace('ORDER_READY');
+   saveAuthorizedSession();
    setMoney(session.amount);
    setPaymentKind();
+   get('checkoutOrderLabel').textContent='Order · '+session.orderId;
+   const params=new URLSearchParams(session.upiUri.split('?')[1]||'');
+   get('checkoutNote').textContent=params.get('tn')||'';
+   get('qrTapToPayHint').textContent=model.supportsNativeUPI(userAgent)
+     ?'Tap the QR to open an installed UPI app, or scan from another phone.'
+     :'Scan with a UPI app on your phone. This page tracks the same order.';
+   showStage('qr');
    tickSessionTimer();
    // Resolve a verified recorded credit even after the original checkout TTL.
    await pollLedger();
@@ -446,7 +512,8 @@
     return;
    }
    if(expired()){locked('This payment request has expired.');return}
-   get('btnOneTouch').disabled=false;
+   // QR-first does not require a passkey before launching the UPI app.
+   // Existing pre-upgrade Vault handoffs may still complete their observations.
    // A returning browser can recover its own existing Vault handoff.
    const returnEvidence=typeof vault.requestEvidence==='function'?vault.requestEvidence(orderId()):null;
    if(vault.getPendingOrderId()===orderId()&&returnEvidence){
@@ -454,10 +521,10 @@
     vaultSessionId=returnEvidence.vaultSessionId;
     const retry=query.get('upi_intent_fallback')==='1'||
       model.needsPaymentMethodRetry(returnEvidence.evidence);
-    showStage(retry?'methods':'checking');
+    showStage(retry?'qr':'checking');
     if(query.get('upi_intent_fallback')==='1')
       message('The selected UPI app could not open. Choose another app or scan QR.','info');
-    void submitReturnEvidence(retry);
+    void submitReturnEvidence(true);
    }
    ledgerTicker=setInterval(()=>{void pollLedger()},3500);
    expiryTicker=setInterval(tickSessionTimer,1000);

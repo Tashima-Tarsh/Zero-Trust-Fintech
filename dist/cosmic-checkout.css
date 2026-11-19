@@ -330,3 +330,15 @@ body{background:#040817}
 .checkout-debug-panel strong{font-size:11px;letter-spacing:.1em;color:#7ce6cc}
 .checkout-debug-panel button{align-self:flex-start;border:1px solid rgba(255,255,255,.35);background:transparent;color:inherit;border-radius:6px;padding:6px 10px;cursor:pointer}
 .checkout-debug-panel small{opacity:.8}
+
+/* QR-first: readable bank QR, tappable on mobile and scannable externally. */
+body[data-qr-primary="true"] .stage-qr .amount{margin:12px 0 7px;font-size:clamp(36px,9vw,52px)}
+body[data-qr-primary="true"] .stage-qr .checkout-payment-kind{overflow-wrap:anywhere}
+body[data-qr-primary="true"] .stage-qr .stage-copy{margin:12px auto 6px}
+.qr-tap-link{display:block;width:min(100%,307px);margin:0 auto;border-radius:25px;text-decoration:none}
+.qr-tap-link .qr-visual{margin:15px auto 12px}
+.qr-tap-link:focus-visible{outline:3px solid #b8ddff;outline-offset:6px}
+.qr-tap-link[aria-disabled="true"]{cursor:default}
+body[data-qr-primary="true"] .qr-scan-line{display:none}
+.checkout-share-link{display:inline-block;margin-top:12px;padding:11px 5px;border:0;background:none;color:#d4dfff;text-decoration:underline;text-underline-offset:4px;font-size:12px;cursor:pointer}
+.checkout-share-link:hover{color:#fff}

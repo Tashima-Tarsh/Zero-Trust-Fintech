@@ -109,89 +109,51 @@ def tap_native(target):
     adb("shell","input","tap",str(x),str(y))
 
 def test():
-    print("A01: DISHA payment opens with only amount and Touch to Pay",flush=True)
-    # adb shell invokes a remote POSIX shell. Without shell quoting, '&token'
-    # becomes a background operator and the Activity receives only orderId.
+    print("A01: checkout displays amount, receiving VPA and scannable QR",flush=True)
+    # Remote POSIX shell needs quotes around &token in the checkout URL.
     adb("shell","am start -n ai.disha.testupi/.TestBrowserActivity --es url "+
         shlex.quote(CHECKOUT),timeout=15)
-    page=wait_state(lambda s:s["stage"]=="initial" and "499.01" in s["amount"]
-        and not s["disabled"] and not s["qr"],
-        "Touch-first stage shows server amount, without premature QR")
+    page=wait_state(lambda s:s["stage"]=="qr" and "499.01" in s["amount"]
+        and s["qr"] and s["qrTarget"] is not None
+        and s["qrTarget"]["visible"] and not s["qrDisabled"],
+        "Order-bound QR is ready without app selection or a passkey")
     assert fixture_state()=="PENDING"
-    screen("01-android-checkout")
+    screen("01-qr-checkout")
 
-    print("A02: one physical tap authorizes Vault, then shows UPI methods",flush=True)
-    tap_native(page["touchTarget"])
-    def methods_ready(s):
-        return s["stage"]=="methods" and s["appTarget"]["visible"]
-    try:
-        methods=wait_state(methods_ready,
-            "WebAuthn single prompt, native UPI choices",timeout=12)
-    except AssertionError:
-        # API35 emulator sometimes drops the first ADB touch before WebView
-        # has registered an input target. Retry only when no credential
-        # ceremony completed; never permit a second Vault confirmation.
-        current=fixture_info()
-        if current["vaultPrompts"]!=0:
-            raise
-        latest=states()
-        candidate=latest[-1] if latest else page
-        if candidate["stage"]!="initial" or candidate["disabled"]:
-            raise
-        print("ANDROID_INPUT_RETRY: first physical tap not registered",flush=True)
-        tap_native(candidate["touchTarget"])
-        methods=wait_state(methods_ready,
-            "single Vault prompt after a retried physical touch",timeout=35)
-    auth=fixture_info()
-    assert auth["vaultRegistered"],"Test Vault must register this device"
-    assert auth["vaultPrompts"]==1,"One Touch must not ask for a second credential prompt"
-    assert not methods["qr"],"QR must remain hidden until user chooses QR"
-
-    print("A03: native Android UPI handoff and cancellation",flush=True)
-    # CRED/UPI fallback uses the standard upi:// URI, allowing the installed
-    # fixture receiver to exercise real Android intent dispatch.
-    tap_native(methods["appTarget"])
+    print("A02: physical QR tap launches generic Android UPI intent",flush=True)
+    tap_native(page["qrTarget"])
     await_log("ANDROID_WEBVIEW_DISPATCH upi://pay",timeout=35)
     await_log("RECEIVED pa=qa-receiver@oksbi")
     await_log("am=499.01")
     await_log("cu=INR")
     await_log("mc=null")
-    screen("02-android-upi-intent")
-    adb("shell","input","keyevent","KEYCODE_BACK")
-    wait_state(lambda s:s["stage"] in ("methods","checking"),
-        "cancelled UPI return permits retry or checking, never a receipt")
-    assert fixture_state()=="PENDING"
-    until=time.monotonic()+30
-    evidence=None
-    while time.monotonic()<until:
-        with urllib.request.urlopen(BASE+"/__test/vault",timeout=8) as response:
-            evidence=json.load(response)
-        if evidence["count"]>=1:break
-        time.sleep(1)
-    assert evidence is not None and evidence["count"]==1,(
-        "Return did not deliver one Vault event: "+repr(evidence))
-    item=evidence["events"][0]
-    assert item["orderId"]=="ORD_ANDROID_CI_1001"
-    assert item["state"]=="RETURN_OBSERVED_NO_UTR"
-    assert item["utrCandidate"] is None
-    assert fixture_state()=="PENDING","Browser return cannot establish completed payment"
-    screen("03-cancelled-no-credit")
+    screen("02-native-qr-tap-intent")
 
-    print("A04: receipt appears only after server-ledger completion",flush=True)
+    print("A03: UPI cancellation keeps original QR and order pending",flush=True)
+    adb("shell","input","keyevent","KEYCODE_BACK")
+    wait_state(lambda s:s["stage"]=="qr" and s["qr"] and s["receiptUtr"]!="123456789012",
+        "A cancelled transfer cannot create a receipt")
+    assert fixture_state()=="PENDING"
+    state=fixture_info()
+    assert state["vaultPrompts"]==0,"QR tap must not cause an extra passkey prompt"
+    assert state["evidenceCount"]==0,"Browser return alone is not settlement"
+    screen("03-return-pending")
+
+    print("A04: other-phone ledger credit appears on original browser",flush=True)
     set_state("COMPLETED")
     receipt=wait_state(lambda s:s["stage"]=="receipt" and s["receiptUtr"]=="123456789012",
-        "backend-confirmed completion only")
+        "Existing checkout sees completed server-ledger status")
     assert receipt["stage"]=="receipt"
-    screen("04-completed-backend-only")
+    screen("04-cross-device-receipt")
 
-    print("A05: expired link cannot start new UPI handoff",flush=True)
+    print("A05: expired order never exposes scannable QR or app handoff",flush=True)
     set_state("EXPIRED")
     command("refresh")
-    wait_state(lambda s:s["stage"]=="initial" and s["disabled"]
-        and "expired" in s["status"].lower(),
-        "expired checkout disables Touch to Pay")
-    screen("05-expired-no-payment")
-    print("ANDROID_COSMIC_P2P_E2E_PASS: Touch gate, app picker, real Android intent, cancellation evidence, ledger receipt and expiry",flush=True)
+    wait_state(lambda s:s["stage"]=="qr" and s["qrDisabled"]
+        and not s["qr"] and "expired" in s["status"].lower(),
+        "Expired checkout disables QR and native UPI tap")
+    screen("05-expired-qr-blocked")
+    print("ANDROID_COSMIC_P2P_E2E_PASS: same-phone QR tap, Android UPI handoff, cancellation, second-phone ledger receipt, expiry",flush=True)
 
 if __name__=="__main__":
     try:test()
