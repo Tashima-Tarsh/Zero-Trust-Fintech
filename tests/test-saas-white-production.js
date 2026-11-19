@@ -36,7 +36,7 @@ assert.ok(css.includes('body.app-page .btn.primary'),'Primary button style missi
 assert.ok(css.includes('@media(max-width:620px)'),'Small-screen SaaS design missing');
 assert.ok(login.includes('mountSignIn') && login.includes("signUpUrl:'/request-access'"),'Clerk sign-in must point new merchants to Request Access');
 assert.ok(signup.includes('/request-access'),'Legacy public signup must redirect to approval flow');
-assert.ok(checkout.includes('/cosmic-checkout.js') && read('cosmic-checkout.js').includes('/api/merchant/public/order/'),'Real merchant checkout endpoint missing');
+assert.ok(checkout.includes('/cosmic-checkout.js') && read('cosmic-checkout.js').includes("'/api/merchant/public/'"),'Real merchant checkout endpoint missing');
 assert.ok(read('cosmic-checkout.js').includes('upi_uri'),'Payee-specific UPI data binding missing');
 assert.ok(!/previewOrders|previewVpas|VISUAL PREVIEW|SAMPLE-240|isPreview/.test(js),
  'Never ship fake financial data or preview-mode branches');
