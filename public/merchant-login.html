@@ -71,6 +71,8 @@
 const status=document.getElementById('auth-status');
 const ownerLogin=/(?:^|[?&])owner=1(?:&|$)/.test(location.search||'');
 const destination=ownerLogin?'/owner#requests':'/dashboard';
+const paymentDestination=(!ownerLogin&&/(?:^|[?&])mode=P2M(?:&|$)/i.test(location.search||''))
+ ?'/dashboard?mode=P2M#create':destination;
 try{
 const key=window.DISHA_CLERK_PUBLISHABLE_KEY;
 if(!key || window.DISHA_CLERK_CONFIG_READY===false)throw Error('Secure merchant sign-in is unavailable. Please contact platform support.');
@@ -87,10 +89,10 @@ s.onload=resolve;s.onerror=()=>reject(Error('Authentication service unavailable'
 await script('https://'+domain+'/npm/@clerk/ui@1/dist/ui.browser.js');
 await script('https://'+domain+'/npm/@clerk/clerk-js@6/dist/clerk.browser.js',true);
 await window.Clerk.load({ui:{ClerkUI:window.__internal_ClerkUICtor}});
-if(window.Clerk.isSignedIn){location.replace(destination);return}
+if(window.Clerk.isSignedIn){location.replace(paymentDestination);return}
 status.remove();
 window.Clerk.mountSignIn(document.getElementById('auth-slot'),{
-routing:'hash',forceRedirectUrl:destination,fallbackRedirectUrl:destination,signUpUrl:'/request-access'
+routing:'hash',forceRedirectUrl:paymentDestination,fallbackRedirectUrl:paymentDestination,signUpUrl:'/request-access'
 });
 }catch(err){console.error('[Merchant authentication] Startup failed:',err);status.textContent=err.message||'Unable to start authentication';status.style.color='#ba3749';}
 })();

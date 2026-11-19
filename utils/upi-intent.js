@@ -31,7 +31,12 @@ function formatAmount(am, maxAmount) {
   const n = Number(am);
   if (!Number.isFinite(n) || n <= 0) throw new Error('am must be a positive number');
   if (n > maxAmount) throw new Error('am exceeds configured max ' + maxAmount);
-  return n.toFixed(2);
+  // UPI amounts are in rupees and paise. Never round a non-zero amount down
+  // to zero or silently change a value with more than two decimal places.
+  const paise = n * 100;
+  if (paise < 1 || Math.abs(paise - Math.round(paise)) > 1e-7)
+    throw new Error('am must be at least one paisa and use at most two decimal places');
+  return (Math.round(paise) / 100).toFixed(2);
 }
 
 /**

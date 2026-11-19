@@ -65,12 +65,13 @@ const {buildUpiUri}=require('../utils/upi-intent');
   r=await call('/api/merchant/vpas',bob,'POST',{vpaAddress:'acme'+nonce+'@oksbi'});
   assert.equal(r.status,409,'UPI ID ownership must be unique across tenants');
   r=await call('/api/merchant/payments',alice,'POST',{
-   amount:'500.01',description:'Real request',orderId:'invoice-1'});
+   amount:'500.01',description:'Real request',orderId:'invoice-1',paymentMode:'P2P'});
   assert.equal(r.status,201);
   const order=r.data.order;
   assert.equal(order.amount,500.01);
   assert.equal(order.status,'PENDING');
   assert.ok(order.checkout_url.includes('/merchant-checkout.html?'));
+  assert.equal(order.payment_type,'P2P','Personal receiving account remains P2P');
   assert.ok(order.upi_uri_dynamic.startsWith('upi://pay?'));
   assert.ok(order.upi_uri_dynamic.includes('pa=acme'));
   // 24/7 single-account merchant must not get blocked by routing-hours or
@@ -176,6 +177,7 @@ const {buildUpiUri}=require('../utils/upi-intent');
   assert.equal(earlier.data.order.upi_uri,initialUri,'Existing P2P payment must not mutate after VPA modification');
   await pg.query("UPDATE saas_merchant_vpas SET account_type='PERSONAL',mcc=NULL,holder_name='Acme Treasury' WHERE vpa_address=$1",
     ['acme'+nonce+'@oksbi']);
+ feat/frontend-3d-vault-premium-ui
 
   // Regression: changing the existing primary receiving account from P2P to
   // bank-issued P2M via the merchant setup form must update the stored type/MCC.
@@ -214,11 +216,22 @@ const {buildUpiUri}=require('../utils/upi-intent');
     '?token='+encodeURIComponent(token));
   assert.equal(originalAfterRestore.data.order.upi_uri,initialUri);
 
+=======
+  // Selected merchant lane must reject a personal VPA or implicit account rotation.
+  let mismatched=await call('/api/merchant/payments',alice,'POST',{
+   amount:'1.00',paymentMode:'P2M',vpaAddress:'finance'+nonce+'@oksbi'});
+  assert.equal(mismatched.status,409,'P2M personal VPA must fail closed');
+  mismatched=await call('/api/merchant/payments',alice,'POST',{
+   amount:'1.00',paymentMode:'P2M'});
+  assert.equal(mismatched.status,409,'P2M requires explicit merchant VPA');
+ main
   const merchantVpa='counter'+nonce+'@ybl';
   let p2m=await call('/api/merchant/payments',alice,'POST',{
-    amount:'1.00',vpaAddress:merchantVpa,description:'Company receipt'});
+    amount:'1.00',paymentMode:'P2M',vpaAddress:merchantVpa,description:'Company receipt'});
   assert.equal(p2m.status,201,'Validated P2M receiving VPA creates a merchant payment');
   const p2mLink=new URL(p2m.data.order.checkout_url,base);
+  assert.equal(p2mLink.pathname,'/p2m/checkout','P2M receives distinct merchant checkout');
+  assert.equal(p2m.data.order.payment_type,'P2M');
   const p2mParams=new URL(p2m.data.order.upi_uri_dynamic).searchParams;
   assert.equal(p2mParams.get('pa'),merchantVpa);
   assert.equal(p2mParams.get('mc'),'5411');

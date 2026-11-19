@@ -12,7 +12,9 @@ assert.match(merchant,/src="\/api\/runtime-assets\/premium-dashboard\.js/);
 for(const page of ['public/checkout.html','public/merchant-checkout.html']){
  const html=read(page);
  assert.match(html,/\/api\/runtime-assets\/cosmic-checkout\.js/);
- assert.doesNotMatch(html,/\/api\/runtime-assets\/one-touch-vault\.js/,'No legacy passkey in direct checkout');
+ assert.match(html,/\/api\/runtime-assets\/one-touch-vault\.js/,
+  'Quantum Signal opt-in must load the original Vault module');
+ assert.match(html,/\/api\/runtime-assets\/quantum-signal-client\.js/);
 }
 assert.match(login,/Super Admin sign-in/);
 assert.match(login,/const destination=ownerLogin\?'\/owner#requests':'\/dashboard'/);

@@ -19,7 +19,9 @@ for(const page of ['public/checkout.html','public/merchant-checkout.html']){
   assert.ok(html.includes('id="'+id+'"'),'JS handler lacks DOM target '+id);
  assert.match(html,/data-stage="qr"/);
  assert.match(html,/data-stage="receipt"[^>]*hidden/);
- assert.doesNotMatch(html,/data-stage="methods"|data-stage="initial"|one-touch-vault\.js|simplewebauthn/);
+ assert.doesNotMatch(html,/data-stage="methods"|data-stage="initial"/);
+ assert.match(html,/id="vaultProceed"/);
+ assert.match(html,/quantum-signal-client\.js/);
  assert.match(html,/\/api\/runtime-assets\/cosmic-checkout\.js\?v=[A-Za-z0-9._-]+/);
 }
 for(const [name,s] of [['checkout',js],['model',model]])new vm.Script(s,{filename:name});

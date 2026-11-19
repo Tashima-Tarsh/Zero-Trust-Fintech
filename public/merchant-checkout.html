@@ -15,6 +15,9 @@
 <link rel="stylesheet" href="/api/runtime-assets/checkout-moonlight.css?v=moonlight1">
 <link rel="stylesheet" href="/api/runtime-assets/disha-vault-3d.css?v=vault1">
 <script defer src="/vendor/qrcode.min.js"></script>
+<script defer src="/vendor/simplewebauthn.umd.js"></script>
+<script defer src="/api/runtime-assets/one-touch-vault.js?v=quantum20261119"></script>
+<script defer src="/api/runtime-assets/quantum-signal-client.js?v=quantum20261119"></script>
 <script defer src="/api/runtime-assets/cosmic-checkout-model.js?v=intent-retry-20261119"></script>
 <script defer src="/api/runtime-assets/cosmic-checkout.js?v=upi-direct-20261119"></script>
 <script defer src="/api/runtime-assets/disha-vault-3d.js?v=vault1"></script>
@@ -37,6 +40,8 @@
     <h1>Scan or tap to pay.</h1>
     <div id="payAmount" class="amount" aria-label="Exact payment amount">—</div>
     <p id="paymentKind" class="checkout-payment-kind" aria-live="polite">Checking receiving account…</p>
+    <a id="vaultProceed" role="button" href="#" aria-disabled="true" class="action-primary" hidden>Proceed to UPI</a>
+    <p id="vaultStatus" class="inline-note" aria-live="polite"></p>
     <p class="stage-copy">Tap the QR on this phone, or scan it with a UPI app on another phone.</p>
     <a id="qrTapToPay" class="qr-tap-link" href="#" aria-disabled="true" aria-label="Tap QR to open a UPI app on this phone">
      <div class="qr-visual">
@@ -45,6 +50,12 @@
     </a>
     <p class="qr-expiry" id="qrExpiry">Preparing your payment code…</p>
     <p id="qrTapToPayHint" class="inline-note">Your payment details stay linked to this payment.</p>
+    <nav id="upiAppOptions" class="upi-app-options" aria-label="Choose your UPI app" hidden>
+      <a data-upi-app="gpay" href="#" aria-disabled="true">Google Pay</a>
+      <a data-upi-app="phonepe" href="#" aria-disabled="true">PhonePe</a>
+      <a data-upi-app="paytm" href="#" aria-disabled="true">Paytm</a>
+      <a data-upi-app="bhim" href="#" aria-disabled="true">BHIM</a>
+    </nav>
     <p id="checkoutPaymentIdentity" class="inline-note" aria-live="polite"></p>
     <p id="paymentTrackingStatus" class="inline-note" role="status" aria-live="polite">Payment status · Checking…</p>
     <p id="checkoutNote" class="inline-note"></p>

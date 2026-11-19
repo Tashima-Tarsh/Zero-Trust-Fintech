@@ -17,7 +17,13 @@
     "/debug.html",
     "/request-access",
     "/owner",
-    "/owner-console.html"
+    "/owner-console.html",
+    "/choose-payment",
+    "/choose-payment/*",
+    "/p2p",
+    "/p2p/*",
+    "/p2m",
+    "/p2m/*"
   ],
   "exclude": [
     "/assets/*",

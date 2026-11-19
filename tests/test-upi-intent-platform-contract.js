@@ -14,6 +14,9 @@ for(const page of ['public/checkout.html','public/merchant-checkout.html']){
  assert.match(html,/<a id="qrTapToPay"[^>]*class="qr-tap-link"/);
  assert.match(html,/id="paymentQr"/);
  assert.match(html,/id="shareCheckout"/);
+ for(const app of ['gpay','phonepe','paytm','bhim'])
+  assert.match(html,new RegExp('data-upi-app="'+app+'"'),'Missing explicit UPI app choice');
+
  assert.doesNotMatch(html,/checkout\.razorpay\.com|razorpay\.js|collect-based|UPI Collect/i,
   'Checkout must stay native UPI Intent+QR, without gateway/collect integration');
 }
@@ -35,6 +38,52 @@ assert.equal(model.qrTapLaunchUri(original,webViewUa,fallback),original,'WebView
 assert.equal(model.qrTapLaunchUri(original,'Mozilla/5.0 (Windows NT 10.0)',fallback),original);
 assert.equal(model.qrTapLaunchUri(original,'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X)',fallback),original);
 assert.ok(!original.includes('token'),'Scannable QR carries no browser token');
+
+// Backend and browser must fail closed before launching a zero/rounded amount,
+// malformed payee, duplicated key or a merchant URI missing either mc or tr.
+for(const amount of [0.001,1.005,0.0000001,100000.01])
+ assert.throws(()=>buildUpiUri({kind:'P2P',pa:'person@oksbi',pn:'Person',am:amount}),
+  /paisa|paise|amount|max/i,'Refuse non-paise or above-limit amounts');
+for(const uri of [
+ 'upi://pay?pa=person@oksbi&pn=Person&am=0.001&cu=INR',
+ 'upi://pay?pa=person@oksbi&pn=Person&am=0.00&cu=INR',
+ 'upi://pay?pa=invalid&pn=Person&am=1.00&cu=INR',
+ 'upi://pay?pa=person@oksbi&pa=attacker@okaxis&pn=Person&am=1.00&cu=INR',
+ 'upi://pay?pa=person@oksbi&pn=Person&am=1.00&cu=USD',
+ 'upi://pay?pa=merchant@ypbiz&pn=Shop&am=1.00&cu=INR&mc=5411',
+ 'upi://pay?pa=merchant@ypbiz&pn=Shop&am=1.00&cu=INR&tr=ORD123',
+ 'upi://pay?pa=merchant@ypbiz&pn=Shop&am=1.00&cu=INR&mc=0000&tr=ORD123'
+]){
+ assert.throws(()=>model.qrPayload(uri),/URI|UPI|amount|currency/i);
+ assert.throws(()=>model.qrTapLaunchUri(uri,chromeUa,fallback),
+  /URI|UPI|amount|currency/i,'Reject before Android Chrome intent dispatch');
+}
+assert.equal(model.qrPayload(original),original,'Valid personal URI bytes unchanged');
+const merchantOriginal='upi://pay?pa=merchant@ypbiz&pn=Shop&am=1.00&cu=INR&mc=5411&tr=ORD123';
+assert.equal(model.qrPayload(merchantOriginal),merchantOriginal,'Valid merchant URI bytes unchanged');
+
+
+assert.equal(model.supportsTargetedAppLaunch(chromeUa),true);
+assert.equal(model.supportsTargetedAppLaunch(webViewUa),false,'Embedded WebView needs raw upi://pay');
+assert.equal(model.supportsTargetedAppLaunch('Mozilla/5.0 (Linux; Android 15) SamsungBrowser/26 Chrome/129'),false);
+const appPackages={gpay:'com.google.android.apps.nbu.paisa.user',phonepe:'com.phonepe.app',
+ paytm:'net.one97.paytm',bhim:'in.org.npci.upiapp'};
+for(const [app,pkg] of Object.entries(appPackages)){
+ for(const type of [original,'upi://pay?pa=clinic@ypbiz&pn=Clinic&am=1.00&cu=INR&tr=PAY123456&mc=5411']){
+  const targeted=model.appTapLaunchUri(type,chromeUa,fallback,app);
+  assert.match(targeted,new RegExp('package='+pkg.replace(/\\./g,'\\\\.')+';'));
+  assert.equal(targeted.split('#Intent')[0],chromeIntent.split('#Intent')[0].replace(
+   original.slice(original.indexOf('?')+1),type.slice(type.indexOf('?')+1)),
+   'App selection cannot alter the P2P or P2M payment fields');
+  const fb=targeted.split('S.browser_fallback_url=')[1]?.split(';')[0];
+  assert.equal(new URL(decodeURIComponent(fb)).searchParams.get('paymentRef'),'PAY_123456',
+   'App missing fallback must recover the original order');
+ }
+ assert.equal(model.appTapLaunchUri(original,webViewUa,fallback,app),original);
+ assert.equal(model.appTapLaunchUri(original,'Mozilla/5.0 (Windows NT 10.0)',fallback,app),original);
+}
+assert.throws(()=>model.appTapLaunchUri(original,chromeUa,fallback,'arbitrary_package'),/Unsupported UPI app/);
+
 const click=client.slice(client.indexOf("get('qrTapToPay').addEventListener('click'"),client.indexOf("get('shareCheckout').addEventListener"));
 assert.match(click,/trace\('APP_DISPATCH'/);
 assert.match(click,/qrTapStartedAt=now;/,'Native handoff must retain the same synchronous gesture');

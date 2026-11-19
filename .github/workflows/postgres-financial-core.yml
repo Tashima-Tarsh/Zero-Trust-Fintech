@@ -3,18 +3,21 @@ name: PostgreSQL financial invariants
 on:
   pull_request:
     paths:
+      - 'db.js'
       - 'financial/**'
       - 'merchant-api.js'
       - 'server.js'
       - 'utils/trust-score.js'
       - 'tests/test-postgres-utr-evidence-http.js'
       - 'tests/test-postgres-vault-evidence-http.js'
+      - 'tests/test-postgres-quantum-signal-http.js'
       - 'tests/test-vault-browser-evidence.js'
       - 'tests/test-postgres-merchant-saas.js'
       - 'migrations/001_financial_core.sql'
       - 'tests/test-postgres-financial-core.js'
       - 'tests/test-postgres-checkout-store.js'
       - 'tests/test-postgres-legacy-sessions.js'
+      - 'tests/test-postgres-checkout-bootstrap.js'
       - 'tests/test-postgres-migration.js'
       - 'tests/test-postgres-switch.js'
       - 'tests/test-postgres-http.js'
@@ -76,6 +79,8 @@ jobs:
         run: node tests/test-postgres-checkout-store.js
       - name: Verify legacy PostgreSQL sessions table upgrade
         run: node tests/test-postgres-legacy-sessions.js
+      - name: Reproduce and repair missing Railway checkout fields before serving sessions
+        run: node tests/test-postgres-checkout-bootstrap.js
       - name: Rehearse SQLite-to-PostgreSQL migration
         run: node tests/test-postgres-migration.js
       - name: Verify PostgreSQL-only cutover switch
@@ -92,3 +97,5 @@ jobs:
         run: node tests/test-postgres-reconciliation-http.js
       - name: Prove Vault evidence handoff cannot fabricate payment success
         run: node tests/test-postgres-vault-evidence-http.js
+      - name: Prove Quantum Signal twin isolation against real PostgreSQL
+        run: node tests/test-postgres-quantum-signal-http.js

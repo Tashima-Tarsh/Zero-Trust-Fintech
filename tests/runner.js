@@ -20,6 +20,7 @@ const TESTS_DIR = path.join(__dirname);
 const UNIT_TESTS = [
   'test-disha.js',        // challenge math, session, NPCI link, double-entry ledger
   'test-payment-classification-ui.js',
+  'test-payment-mode-separation.js',
   'test-owner-runtime-delivery.js', // role diagnostics, owner inbox, Railway/Cloudflare UI coherence // transparent P2P/P2M checkout and release criteria
   'test-live-upi-contract.js',
   'test-sqlite-upi-snapshot.js',
@@ -42,7 +43,9 @@ const UNIT_TESTS = [
   'test-utr-confidence-source.js', // forged UTR success receipts cannot release
   'test-clerk-merchant-auth.js', // Clerk FAPI CSP, signup and login bootstrapping
   'test-one-touch-vault.js', // one biometric to vault register/authenticate, then UPI intent
-  'test-vault-browser-evidence.js', // automatic post-UPI browser evidence packet and idempotent retries
+  'test-vault-browser-evidence.js',
+  'test-quantum-signal.js', // automatic post-UPI browser evidence packet and idempotent retries
+  'test-high-concurrency-limiter.js', // no O(total IPs) hot-path cleanup before 100K load tests
   'test-utr-hypothesis.js', // UTR anti-fraud and no-false-credit regression
   'test-pony-tail-window.js', // Pony-tail 15s/180s temporal invariants and no UTR poisoning
   'test-android-fixture.js',

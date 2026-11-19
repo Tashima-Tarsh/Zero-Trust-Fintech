@@ -8,7 +8,8 @@ export default {
     // Railway still handles payment session, ledger, merchant and auth APIs.
     const checkoutFiles = new Set([
       "cosmic-checkout.js", "cosmic-checkout-model.js",
-      "cosmic-checkout.css", "checkout-moonlight.css"
+      "cosmic-checkout.css", "checkout-moonlight.css",
+      "one-touch-vault.js", "quantum-signal-client.js"
     ]);
     let localCheckout = null;
     if (url.pathname === "/api/runtime/checkout" || url.pathname === "/api/runtime/merchant-checkout") {
@@ -24,6 +25,26 @@ export default {
       headers.set("cache-control", "no-store");
       headers.set("x-disha-edge", "cloudflare-pages-checkout");
       return new Response(response.body, {status:response.status,headers});
+    }
+
+    // The selected payment account type determines which static checkout loads.
+    // P2M never falls through to /checkout or /api/session/new.
+    const paymentPages={
+      "/choose-payment":"/payment-modes.html",
+      "/choose-payment/":"/payment-modes.html",
+      "/p2p":"/checkout.html",
+      "/p2p/":"/checkout.html",
+      "/p2m":"/p2m.html",
+      "/p2m/":"/p2m.html",
+      "/p2m/checkout":"/merchant-checkout.html",
+      "/p2m/checkout/":"/merchant-checkout.html"
+    };
+    if(paymentPages[url.pathname]){
+      const assetUrl=new URL(paymentPages[url.pathname]+url.search,request.url);
+      const response=await env.ASSETS.fetch(new Request(assetUrl,request));
+      const headers=new Headers(response.headers);
+      headers.set("cache-control","no-store");
+      return new Response(response.body,{status:response.status,headers});
     }
 
     // Disallow the legacy public diagnostics console on the Pages edge.

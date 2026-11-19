@@ -16,6 +16,7 @@ const { createMerchantApi } = require('./merchant-api');
 const { createPlatformControl } = require('./platform-control');
 const {createReconciliationRouter,initializeReconciliationSchema,reconcileCredit} = require('./financial/reconciliation-webhook');
 const {createVaultEvidenceRouter,initializeVaultEvidenceSchema,rememberVaultAuthorization} = require('./financial/vault-evidence');
+const {initializeQuantumSignal,createQuantumSignalRouter}=require('./financial/quantum-signal');
 const {createCheckoutDiagnostics}=require('./financial/checkout-diagnostics');
 const {initializeClaimObserver,observeClaim} = require('./financial/untrusted-utr-claims');
 const {
@@ -114,6 +115,16 @@ app.use((req, res, next) => {
 // Falls back to per-process Map when Redis is unavailable.
 function createRateLimiter(windowMs, maxRequests, message) {
   const fallbackHits = new Map();
+  // Sweep expired IP buckets on a detached interval, never during each request.
+  const sweep = setInterval(() => {
+    const cutoff = Date.now() - windowMs;
+    for (const [key, times] of fallbackHits.entries()) {
+      const active = times.filter(t => t > cutoff);
+      if (active.length) fallbackHits.set(key, active);
+      else fallbackHits.delete(key);
+    }
+  }, Math.max(10000, windowMs));
+  sweep.unref?.();
   return async (req, res, next) => {
     const ip = getClientIP(req);
     const key = `rl:${ip}`;
@@ -155,13 +166,6 @@ function createRateLimiter(windowMs, maxRequests, message) {
       }
       timestamps.push(now);
       fallbackHits.set(ip, timestamps);
-      // Cleanup expired entries across all IPs to prevent unbounded Map growth
-      const cutoff = now - windowMs;
-      for (const [k, arr] of fallbackHits.entries()) {
-        const filtered = arr.filter(t => t > cutoff);
-        if (filtered.length === 0) fallbackHits.delete(k);
-        else fallbackHits.set(k, filtered);
-      }
       next();
     }
     fallbackLimiter();
@@ -256,7 +260,7 @@ const RUNTIME_ASSETS=new Set([
  'premium.css','saas-white.css','merchant-mars.css','merchant-celestial.css',
  'merchant-reference.css','merchant-vpa-import.js','cosmic-checkout.js',
  'cosmic-checkout-model.js','cosmic-checkout.css','checkout-moonlight.css',
- 'one-touch-vault.js'
+ 'one-touch-vault.js','quantum-signal-client.js'
 ]);
 app.get('/api/runtime-assets/:asset',(req,res)=>{
  const asset=req.params.asset;
@@ -289,6 +293,23 @@ app.get(['/checkout', '/checkout/', '/pay', '/pay/'], (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'checkout.html'));
 });
 // Serve the browser bundle matching the installed @simplewebauthn package.
+// Deliberate payment-mode routes. Never route /p2m to /api/session/new.
+app.get(['/choose-payment','/choose-payment/'],(req,res)=>{
+  res.setHeader('Cache-Control','no-store');
+  res.sendFile(path.join(__dirname,'public','payment-modes.html'));
+});
+app.get(['/p2p','/p2p/'],(req,res)=>{
+  res.setHeader('Cache-Control','no-store');
+  res.sendFile(path.join(__dirname,'public','checkout.html'));
+});
+app.get(['/p2m','/p2m/'],(req,res)=>{
+  res.setHeader('Cache-Control','no-store');
+  res.sendFile(path.join(__dirname,'public','p2m.html'));
+});
+app.get(['/p2m/checkout','/p2m/checkout/'],(req,res)=>{
+  res.setHeader('Cache-Control','no-store');
+  res.sendFile(path.join(__dirname,'public','merchant-checkout.html'));
+});
 app.get('/vendor/simplewebauthn.umd.js', (req, res) => {
   res.sendFile(path.join(__dirname, 'node_modules', '@simplewebauthn', 'browser', 'dist', 'bundle', 'index.umd.min.js'));
 });
@@ -403,6 +424,16 @@ const orderWsClients = new Map(); // Map<orderId, Set<WebSocket>>
 const wsConnectionHits = new Map();
 const WS_CONNECTION_WINDOW_MS = 60000;
 const WS_MAX_CONNECTIONS = 15;
+// Amortize global cleanup; connection admission is O(1) per IP, not O(all IPs).
+const wsHitsSweep = setInterval(() => {
+  const cutoff = Date.now() - WS_CONNECTION_WINDOW_MS;
+  for (const [ip, hits] of wsConnectionHits.entries()) {
+    const active = hits.filter(t => t > cutoff);
+    if (active.length) wsConnectionHits.set(ip, active);
+    else wsConnectionHits.delete(ip);
+  }
+}, WS_CONNECTION_WINDOW_MS);
+wsHitsSweep.unref?.();
 function wsClientIp(req) {
   if (app.get('trust proxy') && req.headers['x-forwarded-for']) {
     return req.headers['x-forwarded-for'].split(',')[0].trim();
@@ -416,13 +447,6 @@ function wsRateLimit(ip) {
   if (hits.length >= WS_MAX_CONNECTIONS) return false;
   hits.push(now);
   wsConnectionHits.set(ip, hits);
-  // Tidy stale buckets
-  const keys = Array.from(wsConnectionHits.keys());
-  for (const k of keys) {
-    const arr = (wsConnectionHits.get(k) || []).filter((t) => t > cutoff);
-    if (arr.length === 0) wsConnectionHits.delete(k);
-    else wsConnectionHits.set(k, arr);
-  }
   return true;
 }
 wss.on('connection', async (ws, req) => {
@@ -508,7 +532,6 @@ function broadcastOrderSuccess(orderId, payload) {
       vpaAddress: maskVpa(payload.vpaAddress),
       senderVpa: maskVpa(payload.senderVpa),
       maskedUtr: maskUtr(payload.utr),
-      maskedUtr: maskUtr(payload.utr),
       txId: payload.txId,
       timestamp: payload.timestamp,
       message: 'Settlement confirmed'
@@ -524,6 +547,8 @@ function broadcastOrderSuccess(orderId, payload) {
 // ════════════════════════════════════════════════════════════════════
 // Vault evidence: verified passkey authorization + observed browser return, never settlement.
 app.use('/api/vault',createVaultEvidenceRouter({getPool:()=>db.pgPool}));
+// Per-order digital twin. Browser observations are never converted to financial credits.
+app.use('/api/quantum-signal',createQuantumSignalRouter({getPool:()=>db.pgPool}));
 // Authenticated internal account-credit boundary; disabled without explicit connector config.
 // It never accepts customer-origin callbacks as bank-confirmed funds.
 app.use('/api/reconciliation',createReconciliationRouter({
@@ -633,6 +658,14 @@ async function generateSession(baseAmount = 100, description = '', customVpa = n
     vpaMcc = mt.mcc;
     payeeName = mt.holderName || null;
   }
+  // This public endpoint is P2P ONLY. A receiving account classified as
+  // merchant (including the separately provisioned company VPA) must never
+  // be silently rendered as a P2P intent.
+  const classified=String(merchantType||'').toUpperCase();
+  const companyVpa=String(process.env.DISHA_COMPANY_P2M_VPA||'').trim().toLowerCase();
+  if(!['PERSONAL','P2P'].includes(classified)||
+     (companyVpa&&String(vpaAddress||'').toLowerCase()===companyVpa))
+    throw new Error('P2P_RECEIVER_ACCOUNT_TYPE_MISMATCH');
   // Challenge amount is the exact baseAmount — no extra paise offsets.
   // ECC vault signature + UTR-order binding is the mathematical proof;
   // amount uniqueness is enforced by UTR-order binding, not challenge_amount.
@@ -759,6 +792,9 @@ app.get('/api/session/new', checkoutLimiter, async (req, res) => {
       qrDataUrl
     });
   } catch (err) {
+    if(err?.message==='P2P_RECEIVER_ACCOUNT_TYPE_MISMATCH')
+      return res.status(409).json({success:false,error:'P2P_RECEIVER_ACCOUNT_TYPE_MISMATCH',
+        message:'This P2P checkout requires a personal receiving account. Merchant payments must use P2M.'});
     console.error('Error generating session:', err);
     res.status(500).json({ success: false, error: 'INTERNAL_SERVER_ERROR', message: err.message });
   }
@@ -1945,6 +1981,7 @@ app.get('/failed', (req, res) => res.sendFile(path.join(__dirname, 'public', 'fa
   if (db.pgPool && CLERK_ENABLED){ await merchantApi.init(); await platformControl.init(); }
   if(db.pgPool) {
     await initializeVaultEvidenceSchema(db.pgPool);
+    await initializeQuantumSignal(db.pgPool);
     await initializeClaimObserver(db.pgPool);
   }
   if(process.env.RECONCILIATION_WEBHOOK_SECRET && process.env.RECONCILIATION_SOURCE_ID){

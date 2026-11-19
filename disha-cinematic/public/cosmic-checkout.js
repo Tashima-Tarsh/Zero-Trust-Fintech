@@ -5,6 +5,11 @@
  const get=id=>document.getElementById(id);
  const mode=document.body.dataset.checkout==='merchant'?'merchant':'generic';
  const query=new URLSearchParams(location.search);
+ const quantumEnabled=query.get('qs')==='1';
+ const quantumClient=window.DISHAQuantumSignalClient||null;
+ let quantumReady=false;
+ const requiredMode=mode==='generic'?'P2P':
+  (/^\/p2m\/checkout\/?$/.test(location.pathname||'')?'P2M':null);
  const resumeKey='disha82:upi-payment-resume:v2';
  const stages=[...document.querySelectorAll('[data-stage]')];
  let session=null,polling=false,receiptShown=false;
@@ -53,7 +58,7 @@
  // response, device identifier or transaction data are collected.
  function trace(event,code='OK',app='none'){
   if(!debug||!session?.token||!session?.orderId)return;
-  const selected=['gpay','phonepe','paytm','cred','generic'].includes(app)?app:'none';
+  const selected=['gpay','phonepe','paytm','bhim','cred','generic'].includes(app)?app:'none';
   try{
    debugHistory.push({time:new Date().toISOString(),event,code,app:selected});
    if(debugHistory.length>45)debugHistory.shift();
@@ -245,28 +250,54 @@
   if(left===0){
    get('qrTapToPay').href='#';
    get('qrTapToPay').setAttribute('aria-disabled','true');
+   get('upiAppOptions').hidden=true;
+   for(const link of document.querySelectorAll('[data-upi-app]')){
+    link.href='#';link.setAttribute('aria-disabled','true');
+   }
    get('paymentQr').replaceChildren();
    qrUri=null;
   }
  }
  // Chrome fallback returns to this exact payment, not a new amount-based session.
  function secureCheckoutUrl(forFallback=false){
-  const u=new URL(mode==='merchant'?'/merchant-checkout.html':'/checkout',location.href);
+  const merchantPath=requiredMode==='P2M'?'/p2m/checkout':'/merchant-checkout.html';
+  const u=new URL(mode==='merchant'?merchantPath:'/checkout',location.href);
   u.searchParams.set('paymentRef',session.orderId);
   u.searchParams.set('token',session.token);
+  if(quantumEnabled)u.searchParams.set('qs','1');
   if(forFallback)u.searchParams.set('upi_intent_fallback','1');
   return u.href;
  }
  function renderQr(){
   if(!session)return;
   const anchor=get('qrTapToPay'),container=get('paymentQr');
+  if(quantumEnabled&&!quantumReady){
+   anchor.href='#';anchor.setAttribute('aria-disabled','true');
+   const proceed=get('vaultProceed');proceed.href='#';proceed.setAttribute('aria-disabled','true');
+   get('upiAppOptions').hidden=true;
+   container.replaceChildren();qrUri=null;
+   get('qrExpiry').textContent='Preparing the protected payment session.';
+   return;
+  }
   if(expired()||['EXPIRED','FAILED','CANCELLED'].includes(session.initialStatus)){
    anchor.href='#';anchor.setAttribute('aria-disabled','true');
+   get('upiAppOptions').hidden=true;
    container.replaceChildren();qrUri=null;handleQrExpiry();return;
   }
   anchor.href=model.supportsNativeUPI(userAgent)
    ?model.qrTapLaunchUri(session.upiUri,userAgent,secureCheckoutUrl(true)):'#';
   anchor.setAttribute('aria-disabled','false');
+  if(quantumEnabled){
+   const proceed=get('vaultProceed');
+   proceed.href=anchor.href;
+   proceed.setAttribute('aria-disabled',model.supportsNativeUPI(userAgent)?'false':'true');
+  }
+  const targeted=model.supportsTargetedAppLaunch(userAgent);
+  get('upiAppOptions').hidden=!targeted;
+  for(const link of document.querySelectorAll('[data-upi-app]')){
+   link.href=targeted?model.appTapLaunchUri(session.upiUri,userAgent,secureCheckoutUrl(true),link.dataset.upiApp):'#';
+   link.setAttribute('aria-disabled',targeted?'false':'true');
+  }
   if(qrUri!==session.upiUri){
    container.replaceChildren();
    if(typeof window.QRCode!=='function'){
@@ -284,6 +315,16 @@
  function onReturn(){
   if(!session||receiptShown||document.visibilityState==='hidden')return;
   tickSessionTimer();
+  if(quantumEnabled&&quantumReady&&quantumClient){
+   void quantumClient.returned(session).then(result=>{
+    if(!result)return;
+    const state=result.eventState||'';
+    if(state==='CONFLICTING_EVIDENCE')message('Returned payment details conflict with your order.','error');
+    else if(state==='UTR_CANDIDATE_UNVERIFIED')
+     message('UPI reference observed in app return. Evidence stored; verification pending.','info');
+    else message('Android/browser return recorded. Awaiting transaction evidence.','info');
+   }).catch(()=>message('Evidence connection unavailable. Your checkout remains pending.','info'));
+  }
   if(qrTapStartedAt&&qrAppBackgrounded){
    const early=Date.now()-qrTapStartedAt<12000;
    trace('BROWSER_RETURN',early?'RETURN_FAST':'RETURN_NORMAL');
@@ -294,6 +335,24 @@
   void pollLedger();
  }
  function setEventHandlers(){
+
+  // Native browser anchor navigation preserves Android's direct user gesture.
+  // Signal twin and ACK are established before this click.
+  get('vaultProceed').addEventListener('click',event=>{
+   if(!quantumEnabled||!quantumReady||!session||receiptShown||expired()||
+      !model.supportsNativeUPI(userAgent)||
+      ['EXPIRED','FAILED','CANCELLED'].includes(session.initialStatus)){
+    event.preventDefault();
+    message(expired()?'Payment window expired. Request a fresh link.':
+     'Preparing payment. Retry Proceed when the secure channel is ready.','info');
+    return;
+   }
+   try{quantumClient.handoff(session,'generic')}
+   catch(_){event.preventDefault();message('Trust channel unavailable. Retry Proceed.','error');return}
+   qrTapStartedAt=Date.now();qrAppBackgrounded=false;
+   trace('APP_DISPATCH','APP_GENERIC','generic');
+   // Allow the browser to navigate via this user-tapped link.
+  });
   get('qrTapToPay').addEventListener('click',event=>{
    if(!session||receiptShown||expired()||
       ['EXPIRED','FAILED','CANCELLED'].includes(session.initialStatus)||!model.supportsNativeUPI(userAgent)){
@@ -302,6 +361,7 @@
      'Scan this QR with any UPI app (GPay, PhonePe, Paytm, BHIM, etc.).','info');
     return;
    }
+feat/frontend-3d-vault-premium-ui
    const now=Date.now();
    if(lastNativeLaunchAt&&now-lastNativeLaunchAt<nativeLaunchCooldownMs){
     event.preventDefault();
@@ -311,8 +371,32 @@
    }
    lastNativeLaunchAt=now;
    qrTapStartedAt=now;qrAppBackgrounded=false;
+
+   qrTapStartedAt=Date.now();qrAppBackgrounded=false;
+   if(quantumEnabled&&quantumClient){
+    try{quantumClient.handoff(session,'generic')}
+    catch(_){event.preventDefault();message('Authorize Vault before paying.','error');return}
+   }
+main
    trace('APP_DISPATCH','APP_GENERIC','generic');
   });
+  for(const link of document.querySelectorAll('[data-upi-app]')){
+   link.addEventListener('click',event=>{
+    if(!session||receiptShown||expired()||
+       ['EXPIRED','FAILED','CANCELLED'].includes(session.initialStatus)||
+       !model.supportsTargetedAppLaunch(userAgent)){
+     event.preventDefault();
+     message('This UPI app choice is unavailable. Scan the QR using your preferred app.','info');
+     return;
+    }
+    qrTapStartedAt=Date.now();qrAppBackgrounded=false;
+    if(quantumEnabled&&quantumClient){
+     try{quantumClient.handoff(session,link.dataset.upiApp)}
+     catch(_){event.preventDefault();message('Authorize Vault before paying.','error');return}
+    }
+    trace('APP_DISPATCH','APP_TARGETED',link.dataset.upiApp);
+   });
+  }
   get('shareCheckout').addEventListener('click',async()=>{
    if(!session?.token||!session?.orderId)return;
    const link=secureCheckoutUrl();
@@ -339,10 +423,15 @@
   });
   document.addEventListener('visibilitychange',()=>{
    if(document.visibilityState==='hidden'){
+feat/frontend-3d-vault-premium-ui
     if(qrTapStartedAt&&!qrAppBackgrounded){
      qrAppBackgrounded=true;
      trace('BROWSER_HIDDEN');
     }
+
+    if(qrTapStartedAt)qrAppBackgrounded=true;
+    if(quantumEnabled&&quantumReady&&quantumClient)quantumClient.background(session);
+ main
    }else onReturn();
   });
   window.addEventListener('pageshow',onReturn);
@@ -352,7 +441,25 @@
   setEventHandlers();showStage('qr');
   try{
    session=await getSession();
+feat/frontend-3d-vault-premium-ui
    trace('QR_OPEN');
+=======
+   const declared=String(session.paymentType||'').toUpperCase();
+   const normalized=declared==='PERSONAL'?'P2P':declared==='MERCHANT'?'P2M':declared;
+   if(requiredMode&&normalized!==requiredMode)throw Error('PAYMENT_MODE_MISMATCH');
+   if(quantumEnabled){
+    if(!quantumClient)throw Error('Quantum Signal client unavailable');
+    const proceed=get('vaultProceed');
+    proceed.hidden=!model.supportsNativeUPI(userAgent);
+    proceed.href='#';proceed.setAttribute('aria-disabled','true');
+    get('vaultStatus').textContent='Preparing DISHA two-way trust signal…';
+    quantumReady=Boolean(quantumClient.restore(session));
+    if(!quantumReady)await quantumClient.prepare(session);
+    quantumReady=true;
+    get('vaultStatus').textContent='Protected signal channel ready · one Proceed tap opens UPI.';
+   }
+   trace('ORDER_READY');
+ main
    saveSessionState();
    setMoney(session.amount);
    setPaymentKind();
@@ -364,19 +471,29 @@
     ?'Tap the QR to open your UPI app (GPay/PhonePe/Paytm/BHIM), or scan from another phone.'
     :'Scan this QR using your UPI app on another phone.';
    showStage('qr');tickSessionTimer();
+feat/frontend-3d-vault-premium-ui
    // Initialize 3D vault after session is ready
    if(window.DISHAVault3D&&!window.DISHAVault3D.isReduced()){
     setTimeout(()=>window.DISHAVault3D.init(),300);
    }
    if(query.get('upi_intent_fallback')==='1')
     message('UPI app did not open. Scan this QR from another phone.','info');
+=======
+   if(query.get('upi_intent_fallback')==='1'){
+    // Chrome's fallback indicates a failed external-app handoff, not a payment decision.
+    trace('APP_ERROR','APP_NAVIGATION_ERROR');
+    message('UPI app could not be opened. Choose another app or scan this QR from another phone.','info');
+   }
+ main
    await pollLedger();
    if(receiptShown)return;
    if(['EXPIRED','FAILED','CANCELLED'].includes(session.initialStatus)||expired())
     locked(session.initialStatus==='EXPIRED'||expired()?'This payment link expired. A recorded credit may still appear here.':'This payment did not complete.');
    ledgerTicker=setInterval(()=>{void pollLedger()},3500);
    expiryTicker=setInterval(tickSessionTimer,1000);
-  }catch(err){locked(model.userFacingError(err,'load'))}
+  }catch(err){locked(err?.message==='PAYMENT_MODE_MISMATCH'
+    ?'Payment type and receiving account do not match. Request the correct P2P or P2M payment link.'
+    :model.userFacingError(err,'load'))}
  }
  start();
 })();
