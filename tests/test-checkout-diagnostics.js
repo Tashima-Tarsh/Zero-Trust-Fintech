@@ -7,7 +7,7 @@ const valid={orderId,token,event:'VAULT_AUTH_PROMPT',code:'OK',app:'phonepe',dev
 assert.ok(validEvent(valid));
 
 for(const [event,code,app] of [
- ['ORDER_READY','OK','none'],['APP_DISPATCH','APP_GENERIC','generic'],
+ ['ORDER_READY','OK','none'],['APP_DUPLICATE_BLOCKED','OK','none'],['APP_DISPATCH','APP_GENERIC','generic'],
  ['APP_DISPATCH','APP_TARGETED','gpay'],['APP_DISPATCH','APP_TARGETED','paytm'],
  ['APP_DISPATCH','APP_TARGETED','bhim'],['BROWSER_RETURN','RETURN_FAST','none'],
  ['BROWSER_RETURN','RETURN_NORMAL','none'],['APP_ERROR','APP_NAVIGATION_ERROR','none']

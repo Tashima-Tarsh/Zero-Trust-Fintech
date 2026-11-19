@@ -366,7 +366,7 @@
    const now=Date.now();
    if(lastNativeLaunchAt&&now-lastNativeLaunchAt<nativeLaunchCooldownMs){
     event.preventDefault();
-
+    trace('APP_DUPLICATE_BLOCKED');
     message('UPI app was already opened. Return here before trying again.','info');
     return;
    }
