@@ -10,12 +10,12 @@ const client=read('public/cosmic-checkout.js');
 const java=read('tests/android/upi-receiver/app/src/main/java/ai/disha/testupi/TestBrowserActivity.java');
 const pkg=JSON.parse(read('package.json'));
 for(const page of ['public/checkout.html','public/merchant-checkout.html']){
- const html=read(page);
- assert.match(html,/<a id="qrTapToPay"[^>]*class="qr-tap-link"/);
- assert.match(html,/id="paymentQr"/);
- assert.match(html,/id="shareCheckout"/);
- for(const app of ['gpay','phonepe','paytm','bhim'])
-  assert.match(html,new RegExp('data-upi-app="'+app+'"'),'Missing explicit UPI app choice');
+  const html=read(page);
+  assert.match(html,/<a id="qrTapToPay"[^>]*class="qr-tap-link/);
+  assert.match(html,/id="paymentQr"/);
+  assert.match(html,/id="shareCheckout"/);
+  for(const app of ['gpay','phonepe','paytm','bhim'])
+   assert.match(html,new RegExp('data-upi-app="'+app+'"'),'Missing explicit UPI app choice');
 
  assert.doesNotMatch(html,/checkout\.razorpay\.com|razorpay\.js|collect-based|UPI Collect/i,
   'Checkout must stay native UPI Intent+QR, without gateway/collect integration');

@@ -3,9 +3,9 @@
 <head>
 <link rel="icon" type="image/png" href="/assets/disha-8-2-wordmark-cropped.png?v=brand20261118"><link rel="apple-touch-icon" href="/assets/disha-8-2-wordmark-cropped.png?v=brand20261118">
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no">
 <meta name="color-scheme" content="dark">
-<meta name="theme-color" content="#070d21">
+<meta name="theme-color" content="#0a0604">
 <title>DISHA 8.2 — Checkout</title>
 <meta name="description" content="Complete a UPI payment with DISHA 8.2.">
 <meta name="referrer" content="no-referrer">
@@ -24,70 +24,87 @@
 <script src="/api/runtime-assets/frontend-monitor.js?v=owner-monitor-1" defer></script>
 </head>
 <body data-qr-primary="true" data-checkout="merchant">
-<div class="universe" aria-hidden="true">
- <div class="starfield starfield-a"></div><div class="starfield starfield-b"></div>
- <div class="nebula nebula-one"></div><div class="nebula nebula-two"></div>
- <div class="horizon"></div><div class="nasa-moon"></div><div class="moon-haze"></div>
-</div>
-<main class="checkout-shell" aria-label="DISHA payment checkout">
- <article class="checkout-panel" aria-label="UPI payment">
-  <div id="dishaVault3d" aria-hidden="true"></div>
-  <header class="checkout-brand">
-   <img src="/assets/disha-8-2-wordmark-cropped.png" width="240" height="60" alt="DISHA 8.2" class="logo">
-  </header>
-  <p id="checkoutTimer" class="checkout-timer" role="timer" aria-live="off">Preparing secure session…</p>
-  <section data-stage="qr" class="stage stage-qr" aria-label="UPI QR checkout">
-    <p class="eyebrow">ONE QR · TWO WAYS TO PAY</p>
-    <h1>Scan or tap to pay.</h1>
-    <div id="payAmount" class="amount" aria-label="Exact payment amount">—</div>
-    <p id="paymentKind" class="checkout-payment-kind" aria-live="polite">Checking receiving account…</p>
-    <a id="vaultProceed" role="button" href="#" aria-disabled="true" class="action-primary" hidden>Proceed to UPI</a>
-    <p id="vaultStatus" class="inline-note" aria-live="polite"></p>
-    <p class="stage-copy">Tap the QR on this phone, or scan it with a UPI app on another phone.</p>
-    <a id="qrTapToPay" class="qr-tap-link" href="#" aria-disabled="true" aria-label="Tap QR to open a UPI app on this phone">
-     <div class="qr-visual">
-      <div class="qr-paper"><div id="paymentQr" role="img" aria-label="Payment-specific UPI payment QR"></div></div>
-     </div>
-    </a>
-    <p class="qr-expiry" id="qrExpiry">Preparing your payment code…</p>
-    <p id="qrTapToPayHint" class="inline-note">Your payment details stay linked to this payment.</p>
-    <nav id="upiAppOptions" class="upi-app-options" aria-label="Choose your UPI app" hidden>
-      <a data-upi-app="gpay" href="#" aria-disabled="true">Google Pay</a>
-      <a data-upi-app="phonepe" href="#" aria-disabled="true">PhonePe</a>
-      <a data-upi-app="paytm" href="#" aria-disabled="true">Paytm</a>
-      <a data-upi-app="bhim" href="#" aria-disabled="true">BHIM</a>
-    </nav>
-    <p id="checkoutPaymentIdentity" class="inline-note" aria-live="polite"></p>
-    <p id="paymentTrackingStatus" class="inline-note" role="status" aria-live="polite">Payment status · Checking…</p>
-    <p id="checkoutNote" class="inline-note"></p>
-    <button id="shareCheckout" type="button" class="checkout-share-link">Share checkout link with another phone</button>
-   </section>
 
-  <section data-stage="receipt" class="stage stage-receipt" aria-label="Payment receipt" hidden>
-   <p class="eyebrow">PAYMENT RECEIPT</p>
-   <div class="receipt-seal" aria-hidden="true">✓</div>
-   <h1>Payment confirmed.</h1>
-   <div id="receiptAmount" class="receipt-amount">—</div>
-   <p class="receipt-subline">Recorded payment</p>
-   <div class="receipt-details">
-    <div><span>UPI transaction reference (TR)</span><strong id="receiptPaymentRef">—</strong></div>
-    <div><span>UPI reference</span><strong id="receiptUtr">—</strong></div>
-    <div><span>Status</span><strong class="receipt-confirmed">Completed</strong></div>
-   </div>
-   <div class="receipt-actions">
-    <button id="saveReceipt" type="button" class="action-primary">Save / print receipt <span class="action-arrow" aria-hidden="true">↗</span></button>
-    <button id="shareReceipt" type="button" class="action-secondary">Share receipt <span class="action-arrow" aria-hidden="true">→</span></button>
-   </div>
-  </section>
-  <aside id="checkoutDebugPanel" class="checkout-debug-panel" hidden aria-live="polite">
-   <strong>DIAGNOSTICS ON · CHECKOUT TEST</strong>
-   <span id="checkoutDebugStage">Awaiting diagnostic steps</span>
-   <button id="checkoutDebugCopy" type="button">Copy step history</button>
-   <small>Only stage/error codes are stored. No UPI PIN or passkey content.</small>
-  </aside>
-  <div id="checkoutStatus" role="status" aria-live="polite" class="checkout-status" hidden></div>
- </article>
- <footer class="checkout-footer"><span class="footer-pin" aria-hidden="true">✦</span> DISHA 8.2 <span aria-hidden="true">·</span> Made for direct payments</footer>
+<!-- Mars 3D Background -->
+<canvas id="mars-bg-canvas" class="mars-bg" aria-hidden="true"></canvas>
+
+<main class="checkout-shell" aria-label="DISHA payment checkout">
+  <article class="checkout-panel" aria-label="UPI payment">
+    <div id="dishaVault3d" aria-hidden="true"></div>
+    
+    <header class="checkout-brand">
+      <img src="/assets/disha-8-2-wordmark-cropped.png" width="240" height="60" alt="DISHA 8.2" class="logo">
+    </header>
+    
+    <p id="checkoutTimer" class="checkout-timer" role="timer" aria-live="off">Preparing secure session…</p>
+    
+    <section data-stage="qr" class="stage stage-qr" aria-label="UPI QR checkout">
+      <p class="eyebrow">ONE QR · TWO WAYS TO PAY</p>
+      <h1>Scan or tap to pay.</h1>
+      <div id="payAmount" class="amount" aria-label="Exact payment amount">—</div>
+      <p id="paymentKind" class="checkout-payment-kind" aria-live="polite">Checking receiving account…</p>
+      
+      <!-- Glass Proceed button -->
+      <a id="vaultProceed" role="button" href="#" aria-disabled="true" class="action-primary glass-btn" hidden>Proceed to UPI</a>
+      <p id="vaultStatus" class="inline-note" aria-live="polite"></p>
+      
+      <p class="stage-copy">Tap the QR on this phone, or scan it with a UPI app on another phone.</p>
+      
+      <!-- Glass QR card -->
+      <a id="qrTapToPay" class="qr-tap-link glass-card" href="#" aria-disabled="true" aria-label="Tap QR to open a UPI app on this phone">
+        <div class="qr-visual">
+          <div class="qr-paper"><div id="paymentQr" role="img" aria-label="Payment-specific UPI payment QR"></div></div>
+        </div>
+      </a>
+      
+      <p class="qr-expiry" id="qrExpiry">Preparing your payment code…</p>
+      <p id="qrTapToPayHint" class="inline-note">Your payment details stay linked to this payment.</p>
+      
+      <!-- Glass app choice buttons -->
+      <nav id="upiAppOptions" class="upi-app-options" aria-label="Choose your UPI app" hidden>
+        <a data-upi-app="gpay" href="#" aria-disabled="true" class="glass-app-btn">Google Pay</a>
+        <a data-upi-app="phonepe" href="#" aria-disabled="true" class="glass-app-btn">PhonePe</a>
+        <a data-upi-app="paytm" href="#" aria-disabled="true" class="glass-app-btn">Paytm</a>
+        <a data-upi-app="bhim" href="#" aria-disabled="true" class="glass-app-btn">BHIM</a>
+      </nav>
+      
+      <p id="checkoutPaymentIdentity" class="inline-note" aria-live="polite"></p>
+      <p id="paymentTrackingStatus" class="inline-note" role="status" aria-live="polite">Payment status · Checking…</p>
+      <p id="checkoutNote" class="inline-note"></p>
+      <button id="shareCheckout" type="button" class="checkout-share-link glass-btn">Share checkout link with another phone</button>
+    </section>
+
+    <section data-stage="receipt" class="stage stage-receipt" aria-label="Payment receipt" hidden>
+      <p class="eyebrow">PAYMENT RECEIPT</p>
+      <div class="receipt-seal glass-seal" aria-hidden="true">✓</div>
+      <h1>Payment confirmed.</h1>
+      <div id="receiptAmount" class="receipt-amount">—</div>
+      <p class="receipt-subline">Recorded payment</p>
+      <div class="receipt-details">
+        <div><span>UPI transaction reference (TR)</span><strong id="receiptPaymentRef">—</strong></div>
+        <div><span>UPI reference</span><strong id="receiptUtr">—</strong></div>
+        <div><span>Status</span><strong class="receipt-confirmed">Completed</strong></div>
+      </div>
+      <div class="receipt-actions">
+        <button id="saveReceipt" type="button" class="action-primary glass-btn">Save / print receipt <span class="action-arrow" aria-hidden="true">↗</span></button>
+        <button id="shareReceipt" type="button" class="action-secondary glass-btn">Share receipt <span class="action-arrow" aria-hidden="true">→</span></button>
+      </div>
+    </section>
+    
+    <aside id="checkoutDebugPanel" class="checkout-debug-panel glass-panel" hidden aria-live="polite">
+      <strong>DIAGNOSTICS ON · CHECKOUT TEST</strong>
+      <span id="checkoutDebugStage">Awaiting diagnostic steps</span>
+      <button id="checkoutDebugCopy" type="button" class="glass-btn-sm">Copy step history</button>
+      <small>Only stage/error codes are stored. No UPI PIN or passkey content.</small>
+    </aside>
+    
+    <div id="checkoutStatus" role="status" aria-live="polite" class="checkout-status glass-toast" hidden></div>
+  </article>
+  
+  <footer class="checkout-footer"><span class="footer-pin" aria-hidden="true">✦</span> DISHA 8.2 <span aria-hidden="true">·</span> Made for direct payments</footer>
 </main>
+
+<!-- Mars scene module -->
+<script type="module" src="/assets/mars-scene.js"></script>
 </body>
 </html>
