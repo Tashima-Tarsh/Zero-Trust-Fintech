@@ -16,6 +16,7 @@ const { createMerchantApi } = require('./merchant-api');
 const { createPlatformControl } = require('./platform-control');
 const {createReconciliationRouter,initializeReconciliationSchema,reconcileCredit} = require('./financial/reconciliation-webhook');
 const {createVaultEvidenceRouter,initializeVaultEvidenceSchema,rememberVaultAuthorization} = require('./financial/vault-evidence');
+const {createPayerDebitRouter,initPayerDebitEvidence}=require('./financial/payer-debit-evidence');
 const {createCheckoutDiagnostics}=require('./financial/checkout-diagnostics');
 const {initializeClaimObserver,observeClaim} = require('./financial/untrusted-utr-claims');
 const {
@@ -541,6 +542,8 @@ function broadcastOrderSuccess(orderId, payload) {
 // ════════════════════════════════════════════════════════════════════
 // Vault evidence: verified passkey authorization + observed browser return, never settlement.
 app.use('/api/vault',createVaultEvidenceRouter({getPool:()=>db.pgPool}));
+// User-authorized Android notification evidence; never a bank or gateway callback.
+app.use('/api/payer-debit',createPayerDebitRouter({getPool:()=>db.pgPool}));
 // Authenticated internal account-credit boundary; disabled without explicit connector config.
 // It never accepts customer-origin callbacks as bank-confirmed funds.
 app.use('/api/reconciliation',createReconciliationRouter({
@@ -1973,6 +1976,7 @@ app.get('/failed', (req, res) => res.sendFile(path.join(__dirname, 'public', 'fa
   if (db.pgPool && CLERK_ENABLED){ await merchantApi.init(); await platformControl.init(); }
   if(db.pgPool) {
     await initializeVaultEvidenceSchema(db.pgPool);
+    await initPayerDebitEvidence(db.pgPool);
     await initializeClaimObserver(db.pgPool);
   }
   if(process.env.RECONCILIATION_WEBHOOK_SECRET && process.env.RECONCILIATION_SOURCE_ID){
