@@ -19,8 +19,11 @@ for(const page of ['checkout.html','merchant-checkout.html']){
  assert.match(html,/src="\/assets\/disha-8-2-wordmark-cropped\.png"/);
  assert.doesNotMatch(html,/data-stage="initial"|data-stage="methods"|data-stage="checking"/,
   'No hidden alternate payment wizard allowed');
- assert.doesNotMatch(html,/one-touch-vault\.js|simplewebauthn|id="btnOneTouch"|id="app-gpay"|id="oneTouchFallback"/,
-  'QR-first checkout must not load an unused passkey or app picker');
+ assert.match(html,/id="vaultProceed"/,'Quantum Signal opt-in Proceed must be present');
+ assert.match(html,/quantum-signal-client\.js/,'Bound browser signal transport must load');
+ assert.match(html,/one-touch-vault\.js/,'Vault authorization must be available for opt-in');
+ assert.doesNotMatch(html,/id="btnOneTouch"|id="app-gpay"|id="oneTouchFallback"/,
+  'Legacy payment wizard must not return');
  assert.doesNotMatch(html,/Collect-Based|Razorpay Checkout|Manual UTR|NPCI Clearing|T\+0 Settlement/i);
  assert.match(html,/cosmic-checkout\.css\?v=[A-Za-z0-9._-]+/,'Production CSS cache version');
 }
@@ -37,8 +40,9 @@ assert.match(script,/new window\.QRCode\(container,\{text:session\.upiUri/);
 assert.match(script,/model\.qrTapLaunchUri\(session\.upiUri,userAgent,secureCheckoutUrl\(true\)\)/);
 assert.match(script,/\/api\/ledger\//);
 assert.match(script,/model\.isSettled\(/);
-assert.doesNotMatch(script,/vault\.authorize|vault\.beginHandoff|\/api\/vault\/evidence|userName=Device user/,
- 'Native Intent launch cannot be gated by passkey/evidence');
+assert.match(script,/quantumEnabled=query\.get\('qs'\)==='1'/);
+assert.match(script,/quantumClient\.authorizeAndStart\(session\)/);
+assert.doesNotMatch(script,/userName=Device user/);
 assert.doesNotMatch(script,/finalizePayment\(|\/api\/settlement\/confirm/,
  'Browser may not invent settlement');
 console.log('COSMIC_CHECKOUT_PASS: QR-first, native gesture, two-device ledger receipt, no stale payment wizard');

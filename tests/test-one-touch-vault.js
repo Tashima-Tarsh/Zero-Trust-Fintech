@@ -14,10 +14,11 @@ const server=fs.readFileSync(path.join(dir,'server.js'),'utf8');
 const edge=fs.readFileSync(path.join(dir,'public','_worker.js'),'utf8');
 const routes=fs.readFileSync(path.join(dir,'public','_routes.json'),'utf8');
 
-// Standalone legacy Vault APIs remain testable for existing integrations, but
-// they must not be loaded by the new QR-first checkout.
+// Vault remains optional in default QR-first checkout; the explicit QS test mode
+// attaches it to a real, original payment session without a bank API.
 for(const html of [page,merchant]){
- assert.doesNotMatch(html,/one-touch-vault\.js|simplewebauthn|btnOneTouch|oneTouchFallback/);
+ assert.match(html,/one-touch-vault\.js|simplewebauthn/);
+ assert.doesNotMatch(html,/btnOneTouch|oneTouchFallback/);
  assert.match(html,/id="qrTapToPay"/);
 }
 assert.doesNotMatch(cosmic,/vault\.authorize|vault\.beginHandoff|requestEvidence/);
