@@ -18,6 +18,8 @@ for(const required of ['checkout.html','merchant-checkout.html','cosmic-checkout
  assert.ok(files.includes(required),'Missing canonical UPI Intent file: '+required);
 for(const output of ['dist','disha-cinematic/public','disha-cinematic/dist']){
  const dir=path.join(root,output);
+ const orphans=listFiles(dir).filter(file=>!files.includes(file));
+ assert.deepEqual(orphans,[],output+' has stale assets absent from public/: audit before deleting');
  for(const file of files){
   const target=path.join(dir,file),origin=path.join(source,file);
   assert.ok(fs.existsSync(target),output+'/'+file+' is missing: run npm run build');

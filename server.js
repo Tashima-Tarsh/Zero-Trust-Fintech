@@ -83,7 +83,7 @@ app.use((req, res, next) => {
   if (origin && ALLOWED_ORIGINS.includes(origin)) {
     res.setHeader('Access-Control-Allow-Origin', origin);
     res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, PATCH, DELETE, OPTIONS');
-    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-API-Key, X-Admin-Key');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-CSRF-Token, X-XSRF-Token, X-API-Key, X-Admin-Key');
   }
   if (req.method === 'OPTIONS') {
     return res.sendStatus(204);
@@ -98,9 +98,8 @@ app.use((req, res, next) => {
   }
   const origin = req.headers.origin;
   const referer = req.headers.referer;
-  const allowedOrigin = ALLOWED_ORIGINS.length > 0 ? ALLOWED_ORIGINS[0] : null;
-  // Reject cross-origin state-changing requests without a valid Origin
-  if (origin && allowedOrigin && origin !== allowedOrigin) {
+  // Accept any explicitly configured origin, not only the first entry.
+  if (origin && ALLOWED_ORIGINS.length > 0 && !ALLOWED_ORIGINS.includes(origin)) {
     return res.status(403).json({ success: false, error: 'CSRF: invalid origin' });
   }
   // Require X-CSRF-Token matching the session token for authenticated state changes
@@ -458,8 +457,7 @@ wss.on('connection', async (ws, req) => {
   }
   // Validate WebSocket Origin to prevent cross-site WebSocket hijacking
   const wsOrigin = req.headers.origin;
-  const allowedOrigin = ALLOWED_ORIGINS.length > 0 ? ALLOWED_ORIGINS[0] : null;
-  if (wsOrigin && allowedOrigin && wsOrigin !== allowedOrigin) {
+  if (wsOrigin && ALLOWED_ORIGINS.length > 0 && !ALLOWED_ORIGINS.includes(wsOrigin)) {
     ws.close(4403, 'Invalid origin');
     return;
   }
