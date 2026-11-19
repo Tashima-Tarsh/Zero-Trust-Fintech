@@ -61,6 +61,18 @@ const {spawn}=require('node:child_process'),{Pool}=require('pg');
   assert.equal(r.body.paymentType,'P2P');
   const nonceA=r.body.nonce;
   assert.equal((await call('start',start(a),a.token)).body.nonce,nonceA,'Idempotent start');
+  assert.equal((await call('event',event(a,nonceA,{},'HANDOFF'),a.token)).http,403,
+   'Events must be forbidden before server challenge acknowledgement');
+  const cha=await call('challenge',{orderId:a.id,token:a.token,nonce:nonceA},a.token);
+  assert.equal(cha.http,201,JSON.stringify(cha));
+  assert.equal(cha.body.protocol,'DISHA-SIGNAL-V1');
+  const ackA={orderId:a.id,token:a.token,nonce:nonceA,
+   challengeId:cha.body.challengeId,challenge:cha.body.challenge};
+  assert.equal((await call('ack',{...ackA,challenge:'0'.repeat(48)},a.token)).http,403,
+   'Incorrect challenge ACK must fail');
+  assert.equal((await call('ack',ackA,b.token)).http,403,'Cross-session ACK must fail');
+  assert.equal((await call('ack',ackA,a.token)).body.acknowledged,true);
+  assert.equal((await call('ack',ackA,a.token)).body.acknowledged,true,'Idempotent ACK');
   assert.equal((await call('event',event(a,nonceA,{},'HANDOFF'),a.token)).http,202);
   const result=event(a,nonceA,{Status:'SUCCESS',txnId:'123456789012',am:'1.00',pa:a.pa});
   r=await call('event',result,a.token);
@@ -76,10 +88,15 @@ const {spawn}=require('node:child_process'),{Pool}=require('pg');
   const status=await fetch(base+'/api/quantum-signal/status/'+a.id+'?token='+a.token);
   assert.equal(status.status,200);
   assert.equal((await status.json()).initialized,true);
-  r=await call('start',start(b),b.token);
+  r=await call('start',{orderId:b.id,token:b.token},b.token);
   assert.equal(r.http,201);
   assert.equal(r.body.paymentType,'P2M','P2M cannot downgrade to P2P');
+  assert.equal(r.body.authorizationMode,'SESSION','No second Vault gesture in P2M preflight');
   const nonceB=r.body.nonce;
+  const chb=await call('challenge',{orderId:b.id,token:b.token,nonce:nonceB},b.token);
+  assert.equal(chb.http,201);
+  assert.equal((await call('ack',{orderId:b.id,token:b.token,nonce:nonceB,
+   challengeId:chb.body.challengeId,challenge:chb.body.challenge},b.token)).body.acknowledged,true);
   r=await call('event',event(b,nonceB,{txnId:'123456789012',am:'1.00',pa:b.pa}),b.token);
   assert.equal(r.body.decision,'NO');
   assert.equal(r.body.eventState,'CONFLICTING_EVIDENCE','UTR reuse on another order');

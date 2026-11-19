@@ -41,7 +41,8 @@ assert.match(script,/model\.qrTapLaunchUri\(session\.upiUri,userAgent,secureChec
 assert.match(script,/\/api\/ledger\//);
 assert.match(script,/model\.isSettled\(/);
 assert.match(script,/quantumEnabled=query\.get\('qs'\)==='1'/);
-assert.match(script,/quantumClient\.authorizeAndStart\(session\)/);
+assert.match(script,/quantumClient\.prepare\(session\)/);
+assert.match(script,/get\('vaultProceed'\)\.addEventListener\('click',event=>/);
 assert.doesNotMatch(script,/userName=Device user/);
 assert.doesNotMatch(script,/finalizePayment\(|\/api\/settlement\/confirm/,
  'Browser may not invent settlement');

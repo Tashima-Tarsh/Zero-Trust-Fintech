@@ -12,7 +12,8 @@ new vm.Script(checkout);
 assert.match(server,/app\.use\('\/api\/quantum-signal',createQuantumSignalRouter/);
 assert.match(server,/await initializeQuantumSignal\(db\.pgPool\)/);
 assert.match(checkout,/quantumEnabled=query\.get\('qs'\)==='1'/);
-assert.match(checkout,/quantumClient\.authorizeAndStart\(session\)/);
+assert.match(checkout,/quantumClient\.prepare\(session\)/);
+assert.match(checkout,/get\('vaultProceed'\)\.addEventListener\('click',event=>/);
 assert.match(checkout,/quantumClient\.handoff\(session,/);
 assert.match(checkout,/quantumClient\.returned\(session\)/);
 const personal=snapshot({challenge_amount:'1.00',vpa_address:'personal@oksbi',
@@ -50,6 +51,11 @@ assert.equal(result({txnId:'123456789012'},null,twin.expires_at+100).state,'LATE
  const fetch=async(url,options)=>{
   if(String(url).endsWith('/start'))return {ok:true,json:async()=>({success:true,nonce:'c'.repeat(40),
    expiresAt:Date.now()+30000,paymentType:'P2P'})};
+  if(String(url).endsWith('/challenge'))return {ok:true,json:async()=>({
+   success:true,protocol:'DISHA-SIGNAL-V1',challengeId:'hc_'+('f'.repeat(32)),
+   challenge:'d'.repeat(48),expiresAt:Date.now()+30000})};
+  if(String(url).endsWith('/ack'))return {ok:true,json:async()=>({
+   success:true,protocol:'DISHA-SIGNAL-V1',acknowledged:true})};
   if(String(url).endsWith('/event')){
    const ev=JSON.parse(options.body);events.push(ev);
    return {ok:true,json:async()=>({success:true,eventState:'UTR_CANDIDATE_UNVERIFIED',decision:'UNKNOWN'})};
@@ -71,5 +77,9 @@ assert.equal(result({txnId:'123456789012'},null,twin.expires_at+100).state,'LATE
  assert.equal(observed.returnParams.txnId,'123456789012');
  assert.equal(events.every(e=>e.token===order.token),true);
  assert.equal(await qs.returned(order),null,'Duplicate focus cannot fabricate another return');
+ const sessionOnly={orderId:'PAY_TEST_P2M',token:'e'.repeat(32)};
+ await qs.prepare(sessionOnly);
+ assert.equal(qs.restore(sessionOnly),true,'Session preflight needs no Vault prompt');
+ qs.handoff(sessionOnly,'gpay');
  console.log('QUANTUM_SIGNAL_PASS: immutable order, two modes, Vault, nonce, no fake credit, return and replay gating');
 })().catch(e=>{console.error(e);process.exitCode=1});
