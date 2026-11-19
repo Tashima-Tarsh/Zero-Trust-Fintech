@@ -114,14 +114,19 @@ def test():
     adb("shell","am start -n ai.disha.testupi/.TestBrowserActivity --es url "+
         shlex.quote(CHECKOUT),timeout=15)
     page=wait_state(lambda s:s["stage"]=="qr" and "499.01" in s["amount"]
-        and s["qr"] and s["qrTarget"] is not None
+        and s["qr"] and s["readyState"]=="complete"
+        and s["qrTarget"] is not None
         and s["qrTarget"]["visible"] and not s["qrDisabled"],
         "Order-bound QR is ready without app selection or a passkey")
     assert fixture_state()=="PENDING"
     screen("01-qr-checkout")
 
     print("A02: physical QR tap launches generic Android UPI intent",flush=True)
-    tap_native(page["qrTarget"])
+    # Re-evaluate the live QR target after the screenshot. On API 37, a
+    # stale touch coordinate sampled during page load can miss the anchor.
+    current=states()[-1]
+    assert current["stage"]=="qr" and current["qr"] and not current["qrDisabled"]
+    tap_native(current["qrTarget"])
     await_log("ANDROID_WEBVIEW_DISPATCH upi://pay",timeout=35)
     await_log("RECEIVED pa=qa-receiver@oksbi")
     await_log("am=499.01")

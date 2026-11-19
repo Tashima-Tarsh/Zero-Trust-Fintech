@@ -54,10 +54,14 @@ jobs:
             ram: 2048M
             gpu: software
           - api-level: '37.0'
+            # Android 17 requires >=4 GB, but a smaller display/profile and
+            # supported software renderer avoid startup GLES/Vulkan UI stalls.
+            # The prior pixel_6 + deprecated swiftshader_indirect AVD
+            # froze input delivery at QR tap (Android ANR before UPI dispatch).
             target: google_apis_ps16k
-            profile: pixel_6
+            profile: pixel_2
             ram: 4096M
-            gpu: swiftshader_indirect
+            gpu: software
     steps:
       - name: Checkout application and test harness
         uses: actions/checkout@v4
