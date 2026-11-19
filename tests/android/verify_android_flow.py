@@ -114,6 +114,22 @@ def tap_native(target):
         raise AssertionError("Invalid Android touch target "+repr(target))
     adb("shell","input","tap",str(x),str(y))
 
+def tap_and_await_native_dispatch():
+    # API 37 software rendering can drop an adb-injected DOWN event while busy.
+    # Both attempts are genuine Android touchscreen events, never JS clicks.
+    for attempt in range(2):
+        current=states()[-1]
+        assert current["stage"]=="qr" and current["qr"] and not current["qrDisabled"]
+        start=len(log())
+        tap_native(current["qrTarget"])
+        until=time.monotonic()+12
+        while time.monotonic()<until:
+            if "ANDROID_WEBVIEW_DISPATCH upi://pay" in log()[start:]:
+                return
+            time.sleep(.8)
+        print("ANDROID_EMULATOR_TOUCH_NOT_DELIVERED attempt="+str(attempt+1),flush=True)
+    raise AssertionError("Android touchscreen tap did not reach WebView after 2 physical touches\\n"+log()[-3500:])
+
 def test():
     print("A01: checkout displays amount, receiving VPA and scannable QR",flush=True)
     # Remote POSIX shell needs quotes around &token in the checkout URL.
@@ -130,12 +146,8 @@ def test():
     screen("01-qr-checkout")
 
     print("A02: physical QR tap launches generic Android UPI intent",flush=True)
-    # Re-evaluate the live QR target after the screenshot. On API 37, a
-    # stale touch coordinate sampled during page load can miss the anchor.
-    current=states()[-1]
-    assert current["stage"]=="qr" and current["qr"] and not current["qrDisabled"]
-    tap_native(current["qrTarget"])
-    await_log("ANDROID_WEBVIEW_DISPATCH upi://pay",timeout=35)
+    # Require a real Android touch reaching the WebView, including under load.
+    tap_and_await_native_dispatch()
     await_log("RECEIVED pa=qa-receiver@oksbi")
     await_log("am=499.01")
     await_log("cu=INR")
@@ -177,7 +189,7 @@ def test():
         and s["readyState"]=="complete",
         "P2M QR rendered with bank-classified merchant receiver")
     screen("06-merchant-qr")
-    tap_native(states()[-1]["qrTarget"])
+    tap_and_await_native_dispatch()
     await_log("RECEIVED pa=qa-company@ypbiz")
     await_log("mc=5411 tr=PAYAABBCCDDEEFF001122334455")
     await_log("tn=Service payment")
