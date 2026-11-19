@@ -14,6 +14,9 @@
 <link rel="stylesheet" href="/api/runtime-assets/cosmic-checkout.css?v=qr-first-20261119">
 <link rel="stylesheet" href="/api/runtime-assets/checkout-moonlight.css?v=moonlight1">
 <script defer src="/vendor/qrcode.min.js"></script>
+<script defer src="/vendor/simplewebauthn.umd.js"></script>
+<script defer src="/api/runtime-assets/one-touch-vault.js?v=quantum20261119"></script>
+<script defer src="/api/runtime-assets/quantum-signal-client.js?v=quantum20261119"></script>
 <script defer src="/api/runtime-assets/cosmic-checkout-model.js?v=intent-retry-20261119"></script>
 <script defer src="/api/runtime-assets/cosmic-checkout.js?v=upi-direct-20261119"></script>
 </head>
@@ -34,6 +37,8 @@
     <h1>Scan or tap to pay.</h1>
     <div id="payAmount" class="amount" aria-label="Exact payment amount">—</div>
     <p id="paymentKind" class="checkout-payment-kind" aria-live="polite">Checking receiving account…</p>
+    <a id="vaultProceed" role="button" href="#" aria-disabled="true" class="action-primary" hidden>Proceed to UPI</a>
+    <p id="vaultStatus" class="inline-note" aria-live="polite"></p>
     <p class="stage-copy">Tap the QR on this phone, or scan it with a UPI app on another phone.</p>
     <a id="qrTapToPay" class="qr-tap-link" href="#" aria-disabled="true" aria-label="Tap QR to open a UPI app on this phone">
      <div class="qr-visual">

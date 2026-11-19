@@ -5,6 +5,9 @@
  const get=id=>document.getElementById(id);
  const mode=document.body.dataset.checkout==='merchant'?'merchant':'generic';
  const query=new URLSearchParams(location.search);
+ const quantumEnabled=query.get('qs')==='1';
+ const quantumClient=window.DISHAQuantumSignalClient||null;
+ let quantumReady=false;
  const requiredMode=mode==='generic'?'P2P':
   (/^\/p2m\/checkout\/?$/.test(location.pathname||'')?'P2M':null);
  const resumeKey='disha82:upi-payment-resume:v2';
@@ -257,12 +260,21 @@
   const u=new URL(mode==='merchant'?merchantPath:'/checkout',location.href);
   u.searchParams.set('paymentRef',session.orderId);
   u.searchParams.set('token',session.token);
+  if(quantumEnabled)u.searchParams.set('qs','1');
   if(forFallback)u.searchParams.set('upi_intent_fallback','1');
   return u.href;
  }
  function renderQr(){
   if(!session)return;
   const anchor=get('qrTapToPay'),container=get('paymentQr');
+  if(quantumEnabled&&!quantumReady){
+   anchor.href='#';anchor.setAttribute('aria-disabled','true');
+   const proceed=get('vaultProceed');proceed.href='#';proceed.setAttribute('aria-disabled','true');
+   get('upiAppOptions').hidden=true;
+   container.replaceChildren();qrUri=null;
+   get('qrExpiry').textContent='Preparing the protected payment session.';
+   return;
+  }
   if(expired()||['EXPIRED','FAILED','CANCELLED'].includes(session.initialStatus)){
    anchor.href='#';anchor.setAttribute('aria-disabled','true');
    get('upiAppOptions').hidden=true;
@@ -271,6 +283,11 @@
   anchor.href=model.supportsNativeUPI(userAgent)
    ?model.qrTapLaunchUri(session.upiUri,userAgent,secureCheckoutUrl(true)):'#';
   anchor.setAttribute('aria-disabled','false');
+  if(quantumEnabled){
+   const proceed=get('vaultProceed');
+   proceed.href=anchor.href;
+   proceed.setAttribute('aria-disabled',model.supportsNativeUPI(userAgent)?'false':'true');
+  }
   const targeted=model.supportsTargetedAppLaunch(userAgent);
   get('upiAppOptions').hidden=!targeted;
   for(const link of document.querySelectorAll('[data-upi-app]')){
@@ -294,6 +311,16 @@
  function onReturn(){
   if(!session||receiptShown||document.visibilityState==='hidden')return;
   tickSessionTimer();
+  if(quantumEnabled&&quantumReady&&quantumClient){
+   void quantumClient.returned(session).then(result=>{
+    if(!result)return;
+    const state=result.eventState||'';
+    if(state==='CONFLICTING_EVIDENCE')message('Returned payment details conflict with your order.','error');
+    else if(state==='UTR_CANDIDATE_UNVERIFIED')
+     message('UPI reference observed in app return. Evidence stored; verification pending.','info');
+    else message('Android/browser return recorded. Awaiting transaction evidence.','info');
+   }).catch(()=>message('Evidence connection unavailable. Your checkout remains pending.','info'));
+  }
   if(qrTapStartedAt&&qrAppBackgrounded){
    const early=Date.now()-qrTapStartedAt<12000;
    trace('BROWSER_RETURN',early?'RETURN_FAST':'RETURN_NORMAL');
@@ -304,6 +331,24 @@
   void pollLedger();
  }
  function setEventHandlers(){
+
+  // Native browser anchor navigation preserves Android's direct user gesture.
+  // Signal twin and ACK are established before this click.
+  get('vaultProceed').addEventListener('click',event=>{
+   if(!quantumEnabled||!quantumReady||!session||receiptShown||expired()||
+      !model.supportsNativeUPI(userAgent)||
+      ['EXPIRED','FAILED','CANCELLED'].includes(session.initialStatus)){
+    event.preventDefault();
+    message(expired()?'Payment window expired. Request a fresh link.':
+     'Preparing payment. Retry Proceed when the secure channel is ready.','info');
+    return;
+   }
+   try{quantumClient.handoff(session,'generic')}
+   catch(_){event.preventDefault();message('Trust channel unavailable. Retry Proceed.','error');return}
+   qrTapStartedAt=Date.now();qrAppBackgrounded=false;
+   trace('APP_DISPATCH','APP_GENERIC','generic');
+   // Allow the browser to navigate via this user-tapped link.
+  });
   get('qrTapToPay').addEventListener('click',event=>{
    if(!session||receiptShown||expired()||
       ['EXPIRED','FAILED','CANCELLED'].includes(session.initialStatus)||!model.supportsNativeUPI(userAgent)){
@@ -313,6 +358,10 @@
     return;
    }
    qrTapStartedAt=Date.now();qrAppBackgrounded=false;
+   if(quantumEnabled&&quantumClient){
+    try{quantumClient.handoff(session,'generic')}
+    catch(_){event.preventDefault();message('Authorize Vault before paying.','error');return}
+   }
    trace('APP_DISPATCH','APP_GENERIC','generic');
   });
   for(const link of document.querySelectorAll('[data-upi-app]')){
@@ -325,6 +374,10 @@
      return;
     }
     qrTapStartedAt=Date.now();qrAppBackgrounded=false;
+    if(quantumEnabled&&quantumClient){
+     try{quantumClient.handoff(session,link.dataset.upiApp)}
+     catch(_){event.preventDefault();message('Authorize Vault before paying.','error');return}
+    }
     trace('APP_DISPATCH','APP_TARGETED',link.dataset.upiApp);
    });
   }
@@ -355,6 +408,7 @@
   document.addEventListener('visibilitychange',()=>{
    if(document.visibilityState==='hidden'){
     if(qrTapStartedAt)qrAppBackgrounded=true;
+    if(quantumEnabled&&quantumReady&&quantumClient)quantumClient.background(session);
    }else onReturn();
   });
   window.addEventListener('pageshow',onReturn);
@@ -367,6 +421,17 @@
    const declared=String(session.paymentType||'').toUpperCase();
    const normalized=declared==='PERSONAL'?'P2P':declared==='MERCHANT'?'P2M':declared;
    if(requiredMode&&normalized!==requiredMode)throw Error('PAYMENT_MODE_MISMATCH');
+   if(quantumEnabled){
+    if(!quantumClient)throw Error('Quantum Signal client unavailable');
+    const proceed=get('vaultProceed');
+    proceed.hidden=!model.supportsNativeUPI(userAgent);
+    proceed.href='#';proceed.setAttribute('aria-disabled','true');
+    get('vaultStatus').textContent='Preparing DISHA two-way trust signal…';
+    quantumReady=Boolean(quantumClient.restore(session));
+    if(!quantumReady)await quantumClient.prepare(session);
+    quantumReady=true;
+    get('vaultStatus').textContent='Protected signal channel ready · one Proceed tap opens UPI.';
+   }
    trace('ORDER_READY');
    saveSessionState();
    setMoney(session.amount);

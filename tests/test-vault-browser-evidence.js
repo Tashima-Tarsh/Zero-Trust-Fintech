@@ -9,10 +9,10 @@ const script=fs.readFileSync(path.join(__dirname,'../public/one-touch-vault.js')
 const merchant=fs.readFileSync(path.join(__dirname,'../public/merchant-checkout.html'),'utf8');
 const checkout=fs.readFileSync(path.join(__dirname,'../public/checkout.html'),'utf8');
 const cosmic=fs.readFileSync(path.join(__dirname,'../public/cosmic-checkout.js'),'utf8');
-// The historical Vault evidence module is still tested for compatibility;
- // the new public Intent+QR checkout must never invoke it.
+// The Vault is loaded for opt-in quantum sessions and remains order-bound;
+// standard QR-first checkout has no automatic permission prompt.
 for(const html of [merchant,checkout]){
- assert.doesNotMatch(html,/one-touch-vault\.js|simplewebauthn/);
+ assert.match(html,/one-touch-vault\.js|simplewebauthn/);
  assert.match(html,/id="qrTapToPay"/);
 }
 assert.doesNotMatch(cosmic,/vault\.|\/api\/vault\/evidence/);
