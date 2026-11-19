@@ -19,7 +19,7 @@ assert.ok(merchant.includes("url('/assets/disha-earth-night.webp')"));
 assert.ok(home.includes("url('/assets/disha-earth-night.webp')"));
 assert.ok(!dashboard.includes('eoimages.gsfc.nasa.gov'),'Do not reintroduce broken external image');
 assert.ok(!dashboard.includes('nitish@thenitishkr.in'),'Never disclose hardcoded owner email in merchant shell');
-assert.equal((dashboard.match(/Create payment/gi)||[]).length,1,'Only one visible main Create payment action');
+assert.equal((dashboard.match(/<button[^>]*class="btn primary small"[^>]*data-switch="create"/g)||[]).length,1,'Exactly one primary desktop Create payment button');
 const app=read('public/premium-dashboard.js');
 assert.ok(!app.includes('Owner access requires the verified primary Clerk email'),'No user-facing owner email leak');
 const p2p=read('public/try-checkout.js');
