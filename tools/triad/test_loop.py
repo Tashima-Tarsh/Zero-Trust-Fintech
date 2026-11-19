@@ -30,6 +30,8 @@ class TriadTests(unittest.TestCase):
                 data = "ANDROID_ACTIVITY_RESULT"
             elif key == "receiver":
                 data = "NO MONEY MOVES"
+            elif key == "bridge":
+                data = "startActivityForResult();"
             else:
                 data = "test payment"
             p.write_text(data)
