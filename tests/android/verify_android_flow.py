@@ -169,9 +169,9 @@ def test():
     print("A06: merchant-classified QR must retain real MCC and independent payment reference",flush=True)
     set_state("PENDING")
     set_kind("P2M")
-    adb("shell","am","force-stop","ai.disha.testupi",timeout=15)
-    adb("shell","am start -n ai.disha.testupi/.TestBrowserActivity --es url "+
-        shlex.quote(CHECKOUT),timeout=15)
+    # Reuse the foreground WebView: on API 37, force-stop/relaunch during the
+    # second journey caused test-host and Play Services ANRs before a tap landed.
+    command("refresh")
     merchant=wait_state(lambda s:s["stage"]=="qr" and "499.01" in s["amount"]
         and s["qr"] and not s["qrDisabled"] and "P2M" in s["paymentKind"]
         and s["readyState"]=="complete",
