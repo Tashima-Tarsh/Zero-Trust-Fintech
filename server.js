@@ -593,6 +593,7 @@ async function generateSession(baseAmount = 100, description = '', customVpa = n
   let vpaAddress = (customVpa && String(customVpa).trim()) ? String(customVpa).trim() : null;
   let merchantType = 'P2P';
   let vpaMcc = null;
+  let payeeName = null;
 
   // Velocity control: if custom VPA is at hourly limit, reject
   if (vpaAddress && !await db.checkVpaVelocity(vpaAddress)) {
@@ -616,6 +617,7 @@ async function generateSession(baseAmount = 100, description = '', customVpa = n
         vpaAddress = underLimit.vpa_address;
         merchantType = underLimit.account_type || 'PERSONAL';
         vpaMcc = underLimit.mcc || null;
+        payeeName = underLimit.holder_name || null;
       } else {
         throw new Error('ALL_VPAS_AT_VELOCITY_LIMIT');
       }
@@ -623,11 +625,13 @@ async function generateSession(baseAmount = 100, description = '', customVpa = n
       vpaAddress = routeObj.vpaAddress || process.env.MERCHANT_UPI_ID || 'merchant@upi';
       merchantType = routeObj.merchantType || 'P2P';
       vpaMcc = routeObj.mcc || null;
+      payeeName = routeObj.holderName || null;
     }
   } else {
     const mt = await db.getVpaMerchantType(vpaAddress);
     merchantType = mt.accountType;
     vpaMcc = mt.mcc;
+    payeeName = mt.holderName || null;
   }
   // Challenge amount is the exact baseAmount — no extra paise offsets.
   // ECC vault signature + UTR-order binding is the mathematical proof;
@@ -642,6 +646,7 @@ async function generateSession(baseAmount = 100, description = '', customVpa = n
     vpaAddress,
     merchantType,
     mcc: vpaMcc,
+    payeeName,
     createdAt: now,
     expiresAt,
     qrRefreshAt,
@@ -650,7 +655,7 @@ async function generateSession(baseAmount = 100, description = '', customVpa = n
     utr: null
   };
   // Reject invalid UPI intents before consuming a session or velocity slot.
-  generateUPILink(session);
+  session.upiUri=generateUPILink(session);
   await db.saveSession(session);
   // Velocity control: increment hourly count for the selected VPA
   await db.incrementVpaVelocity(vpaAddress);
@@ -660,6 +665,9 @@ async function generateSession(baseAmount = 100, description = '', customVpa = n
 // TASK 4: NPCI-COMPLIANT UPI DEEP LINK GENERATOR (v3.2 Spec & upi-intent)
 // ═══════════════════════════════════════════════════════════════════
 function generateUPILink(session) {
+  // QR, native tap, and shared checkout must use the identical issued bytes.
+  // A reloaded database session does not retain merchant classification.
+  if(session.upiUri)return session.upiUri;
   // Never silently downgrade a merchant (P2M) account into a personal UPI
   // transfer, or manufacture bank/acquirer merchant classification.
   const account=String(session.merchantType||'PERSONAL').toUpperCase();
@@ -668,7 +676,7 @@ function generateUPILink(session) {
   // Use the actual payment purpose, not artificial notes intended to bypass
   // banking risk screening or obscure a merchant payment.
   const note=String(session.description||'UPI intent').trim().slice(0,50);
-  const common={pa,pn:MERCHANT_NAME,am:session.challengeAmount,tn:note};
+  const common={pa,pn:session.payeeName||MERCHANT_NAME,am:session.challengeAmount,tn:note};
   if(isMerchant){
     const mcc=String(session.mcc||'');
     if(!/^\d{4}$/.test(mcc)||mcc==='0000')
@@ -742,7 +750,7 @@ app.get('/api/session/new', checkoutLimiter, async (req, res) => {
       challengeAmount: session.challengeAmount,
       txnRef: session.txnRef,
       vpaAddress: session.vpaAddress,
-      merchantName: MERCHANT_NAME,
+      merchantName: session.payeeName||MERCHANT_NAME,
       paymentType:String(session.merchantType).toUpperCase()==='MERCHANT'?'P2M':'P2P',
       expiresAt: session.expiresAt,
       qrRefreshAt: session.qrRefreshAt,

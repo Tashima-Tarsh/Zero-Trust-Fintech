@@ -207,6 +207,7 @@ function setupSqliteTables() {
       base_amount REAL NOT NULL,
       txn_ref TEXT UNIQUE NOT NULL,
       vpa_address TEXT NOT NULL,
+    upi_uri TEXT,
     status TEXT NOT NULL DEFAULT 'PENDING',
     state TEXT NOT NULL DEFAULT 'WAITING',
     customer_id TEXT,
@@ -346,6 +347,10 @@ function setupSqliteTables() {
 
   // Run dynamic schema migration for existing databases
   migrateVpaPoolColumns(sqliteDb);
+  // Additive compatibility for existing SQLite sessions. Never rewrite old QR
+  // data or any financial row while upgrading the table.
+  const sessionColumns=new Set(sqliteDb.prepare('PRAGMA table_info(sessions)').all().map(c=>c.name));
+  if(!sessionColumns.has('upi_uri'))sqliteDb.exec('ALTER TABLE sessions ADD COLUMN upi_uri TEXT');
 
   // Seed default Chart of Accounts
   const seedAccounts = [
@@ -360,25 +365,32 @@ function setupSqliteTables() {
   }
 
   // Seed VPA Pool with human time-slots and conservative limits
-  const seedVpas = [
-    { id: 'vpa_nitish_01', vpa: process.env.MERCHANT_UPI_ID || 'merchant@upi', holder: 'Primary Merchant', bank: 'State Bank of India', score: 99, slot: 'ANY' },
-    { id: 'vpa_axis_01', vpa: 'disha82@okaxis', holder: 'Ramesh Kirana Core', bank: 'Axis Bank', score: 98, slot: 'MORNING' },
-    { id: 'vpa_icici_02', vpa: 'disha82@icici', holder: 'Ramesh Secondary', bank: 'ICICI Bank', score: 96, slot: 'AFTERNOON' },
-    { id: 'vpa_yes_03', vpa: 'disha82@ybl', holder: 'Ramesh Retail Store', bank: 'YES Bank', score: 94, slot: 'EVENING' },
-    { id: 'vpa_test_04', vpa: 'nkumar906099-7@oksbi', holder: 'Test Customer VPA', bank: 'State Bank of India', score: 100, slot: 'ANY' }
+  // Do not silently turn demo/test VPAs into real receiving accounts.
+  // Pause only the exact known built-in example rows, preserving their history.
+  const receivingVpa=String(process.env.MERCHANT_UPI_ID||'').trim().toLowerCase();
+  const examples=[
+    ['vpa_nitish_01','merchant@upi'],
+    ['vpa_axis_01','disha82@okaxis'],
+    ['vpa_icici_02','disha82@icici'],
+    ['vpa_yes_03','disha82@ybl'],
+    ['vpa_test_04','nkumar906099-7@oksbi']
   ];
-    const vpaStmt = sqliteDb.prepare(`
-      INSERT OR IGNORE INTO vpa_pool (
-        id, vpa_address, holder_name, bank_name, status, health_score,
-        preferred_time_slot, daily_tx_limit, daily_volume_limit, merchant_id, mcc, created_at
-      ) VALUES (?, ?, ?, ?, 'ACTIVE', ?, ?, 15, 25000.0, 'mer_default', '0000', ?)
-    `);
-  for (const v of seedVpas) {
-    vpaStmt.run(v.id, v.vpa, v.holder, v.bank, v.score, v.slot, now);
+  const pauseExample=sqliteDb.prepare(
+    "UPDATE vpa_pool SET status='PAUSED' WHERE id=? AND lower(vpa_address)=? AND status='ACTIVE'"
+  );
+  for(const [id,address] of examples){
+    if(address!==receivingVpa)pauseExample.run(id,address);
   }
-
-  // Backfill mcc for any existing seed VPAs inserted without it
-  sqliteDb.prepare(`UPDATE vpa_pool SET mcc = '0000' WHERE mcc IS NULL OR mcc = ''`).run();
+  // Seed exactly one *configured* receiving VPA, never a guessed address.
+  // Other accounts must enter through explicit, verified VPA provisioning.
+  if(receivingVpa){
+    const key='vpa_config_'+crypto.createHash('sha256').update(receivingVpa).digest('hex').slice(0,16);
+    sqliteDb.prepare(
+      "INSERT OR IGNORE INTO vpa_pool (id,vpa_address,holder_name,bank_name,status,health_score,"+
+      "preferred_time_slot,daily_tx_limit,daily_volume_limit,merchant_id,created_at) "+
+      "VALUES (?,?,?,'Configured Bank','ACTIVE',99,'ANY',15,25000,'mer_default',?)"
+    ).run(key,receivingVpa,String(process.env.MERCHANT_NAME||'').trim()||null,now);
+  }
 
   // Seed Default Gaming Company (GameZone Pro) & Server IPs
   // Removed hardcoded credentials: create tenants via POST /api/admin/companies
@@ -432,7 +444,8 @@ function selectVPARoute(merchantId = 'mer_default', amount = 100, customerRegion
         healthScore: route.healthScore,
         cooldownMinutes: route.cooldownMinutes,
         merchantType: mt.accountType,
-        mcc: mt.mcc
+        mcc: mt.mcc,
+        holderName: route.holderName || mt.holderName || null
       };
     }
   }
@@ -443,7 +456,8 @@ function selectVPARoute(merchantId = 'mer_default', amount = 100, customerRegion
     healthScore: 95,
     cooldownMinutes: 10,
     merchantType: mt.accountType,
-    mcc: mt.mcc
+    mcc: mt.mcc,
+    holderName: mt.holderName || null
   };
 }
 
@@ -456,10 +470,10 @@ function getVpaMerchantType(vpaAddress) {
   if (!vpaAddress || !sqliteDb) return { accountType: 'PERSONAL', mcc: null };
   try {
     const row = sqliteDb.prepare(`
-      SELECT account_type, mcc FROM vpa_pool WHERE vpa_address = ? LIMIT 1
+      SELECT account_type, mcc, holder_name FROM vpa_pool WHERE vpa_address = ? LIMIT 1
     `).get(vpaAddress);
     if (row) {
-      return { accountType: row.account_type || 'PERSONAL', mcc: row.mcc || null };
+      return { accountType: row.account_type || 'PERSONAL', mcc: row.mcc || null, holderName: row.holder_name || null };
     }
   } catch (err) {
     console.warn('[VPA MerchantType Notice]', err.message);
@@ -482,14 +496,15 @@ function getAllActiveVPAs() {
 function saveSession(session) {
   if (sqliteDb) {
     sqliteDb.prepare(`
-      INSERT INTO sessions (session_id, order_id, challenge_amount, base_amount, txn_ref, vpa_address, status, state, customer_id, created_at, expires_at, qr_refresh_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO sessions (session_id, order_id, challenge_amount, base_amount, txn_ref, vpa_address, upi_uri, status, state, customer_id, created_at, expires_at, qr_refresh_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       ON CONFLICT(order_id) DO UPDATE SET
         session_id = excluded.session_id,
         challenge_amount = excluded.challenge_amount,
         base_amount = excluded.base_amount,
         txn_ref = excluded.txn_ref,
         vpa_address = excluded.vpa_address,
+        upi_uri = COALESCE(sessions.upi_uri, excluded.upi_uri),
         status = excluded.status,
         state = excluded.state,
         customer_id = excluded.customer_id,
@@ -503,6 +518,7 @@ function saveSession(session) {
       session.baseAmount,
       session.txnRef,
       session.vpaAddress || process.env.MERCHANT_UPI_ID || 'merchant@upi',
+      session.upiUri || null,
       session.status,
       session.state || 'WAITING',
       session.customerId || null,
@@ -524,6 +540,7 @@ function findSessionByOrderId(orderId) {
       baseAmount: row.base_amount,
       txnRef: row.txn_ref,
       vpaAddress: row.vpa_address,
+      upiUri: row.upi_uri || null,
       status: row.status,
       state: row.state,
       customerId: row.customer_id,
@@ -547,6 +564,7 @@ function findSessionByTxnRef(txnRef) {
       baseAmount: row.base_amount,
       txnRef: row.txn_ref,
       vpaAddress: row.vpa_address,
+      upiUri: row.upi_uri || null,
       status: row.status,
       utr: row.utr,
       createdAt: row.created_at,
@@ -579,6 +597,7 @@ function findSessionByAmount(amount) {
       baseAmount: row.base_amount,
       txnRef: row.txn_ref,
       vpaAddress: row.vpa_address,
+      upiUri: row.upi_uri || null,
       status: row.status,
       utr: row.utr,
       createdAt: row.created_at,
