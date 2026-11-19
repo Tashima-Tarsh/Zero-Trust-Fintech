@@ -45,7 +45,8 @@ const UNIT_TESTS = [
   'test-vault-browser-evidence.js', // automatic post-UPI browser evidence packet and idempotent retries
   'test-utr-hypothesis.js', // UTR anti-fraud and no-false-credit regression
   'test-pony-tail-window.js', // Pony-tail 15s/180s temporal invariants and no UTR poisoning
-  'test-android-fixture.js', // no-money P2P URL and UTR intent fixture
+  'test-android-fixture.js',
+  'test-triad-agent-loop.js', // no-money P2P URL and UTR intent fixture
   'test-owner-production-provisioning.js', // verified owner, P2P/P2M isolation and no database wipe
   'test-platform-control-startup.js', // database connection assigned after owner service constructor
   'test-merchant-reference-ui.js', // matches approved premium lunar dashboard and frontend assets
