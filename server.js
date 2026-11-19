@@ -14,7 +14,7 @@ const { clerkMiddleware, getAuth } = require('@clerk/express');
 const db = require('./db');
 const { createMerchantApi } = require('./merchant-api');
 const { createPlatformControl } = require('./platform-control');
-const {createReconciliationRouter,initializeReconciliationSchema,reconcileCredit} = require('./financial/reconciliation-webhook');
+const {createReconciliationRouter,initializeReconciliationSchema,reconcileCredit,reconcileCreditInternal,reconcileCreditWithUtrClaim} = require('./financial/reconciliation-webhook');
 const {createVaultEvidenceRouter,initializeVaultEvidenceSchema,rememberVaultAuthorization} = require('./financial/vault-evidence');
 const {initializeQuantumSignal,createQuantumSignalRouter}=require('./financial/quantum-signal');
 const {createCheckoutDiagnostics}=require('./financial/checkout-diagnostics');
@@ -192,11 +192,14 @@ async function idempotencyMiddleware(req, res, next) {
   // Scope the idempotency key by authenticated tenant + endpoint path so that
   // reusing a key across merchants or routes cannot return another request's
   // cached response (including sensitive payment-link data).
-  let tenantId = 'mer_default';
+  let tenantId;
   try {
     const auth = getAuth(req);
-    if (auth && auth.userId) tenantId = auth.userId;
-  } catch (_) {}
+    if (!auth || !auth.userId) throw new Error('NO_AUTH');
+    tenantId = auth.userId;
+  } catch {
+    return res.status(401).json({ success: false, error: 'IDEMPOTENCY_AUTH_REQUIRED' });
+  }
   const cacheKey = `idem:${tenantId}:${req.path}:${key}`;
   // Redis path
   if (redis) {
@@ -230,8 +233,11 @@ async function idempotencyMiddleware(req, res, next) {
   }
   const originalSend = res.send;
   res.send = function (body) {
+    // Cap body size at 10KB to prevent memory bloat
+    const bodyStr = typeof body === 'string' ? body : JSON.stringify(body);
+    const cappedBody = bodyStr.length > 10240 ? bodyStr.substring(0, 10240) + '...[TRUNCATED]' : bodyStr;
     idempotencyCache.set(cacheKey, {
-      response: { status: res.statusCode, headers: res.getHeaders(), body: body },
+      response: { status: res.statusCode, headers: res.getHeaders(), body: cappedBody },
       expiresAt: Date.now() + IDEMPOTENCY_TTL_MS
     });
     return originalSend.call(this, body);
@@ -618,11 +624,6 @@ async function generateSession(baseAmount = 100, description = '', customVpa = n
   let vpaMcc = null;
   let payeeName = null;
 
-  // Velocity control: if custom VPA is at hourly limit, reject
-  if (vpaAddress && !await db.checkVpaVelocity(vpaAddress)) {
-    throw new Error('VPA_VELOCITY_LIMIT');
-  }
-
   if (!vpaAddress) {
     let route = null;
     try {
@@ -632,9 +633,9 @@ async function generateSession(baseAmount = 100, description = '', customVpa = n
     }
     const routeObj = route || {};
     // Check velocity on routed VPA; if at limit, find another active VPA under limit
-    if (routeObj.vpaAddress && !await db.checkVpaVelocity(routeObj.vpaAddress)) {
+    if (routeObj.vpaAddress && !await db.checkAndIncrementVpaVelocity(routeObj.vpaAddress)) {
       const activeVPAs = db.getAllActiveVPAs ? await db.getAllActiveVPAs() : [];
-      const candidates = await Promise.all(activeVPAs.map(async v => ({...v, eligible: await db.checkVpaVelocity(v.vpa_address)})));
+      const candidates = await Promise.all(activeVPAs.map(async v => ({...v, eligible: await db.checkAndIncrementVpaVelocity(v.vpa_address)})));
       const underLimit = candidates.find(v => v.eligible);
       if (underLimit) {
         vpaAddress = underLimit.vpa_address;
@@ -651,6 +652,10 @@ async function generateSession(baseAmount = 100, description = '', customVpa = n
       payeeName = routeObj.holderName || null;
     }
   } else {
+    // Velocity control: if custom VPA is at hourly limit, reject
+    if (!await db.checkAndIncrementVpaVelocity(vpaAddress)) {
+      throw new Error('VPA_VELOCITY_LIMIT');
+    }
     const mt = await db.getVpaMerchantType(vpaAddress);
     merchantType = mt.accountType;
     vpaMcc = mt.mcc;
@@ -688,8 +693,7 @@ async function generateSession(baseAmount = 100, description = '', customVpa = n
   // Reject invalid UPI intents before consuming a session or velocity slot.
   session.upiUri=generateUPILink(session);
   await db.saveSession(session);
-  // Velocity control: increment hourly count for the selected VPA
-  await db.incrementVpaVelocity(vpaAddress);
+  // Velocity already incremented atomically by checkAndIncrementVpaVelocity
   return session;
 }
 // ═══════════════════════════════════════════════════════════════════
@@ -1457,7 +1461,8 @@ app.post('/api/webauthn/authenticate/finish', async (req, res) => {
   }
 });
 
-// ── Finalize UPI Settlement (after vault verification) ──
+// ── Finalize UPI Settlement (after vault verification + UTR submission) ──
+// Atomic UTR claim + settlement in single transaction.
 app.post('/api/checkout/finalize-upi', verifyLimiter, async (req, res) => {
   try {
     const { sessionId, orderId, txnRef } = req.body || {};
@@ -1487,33 +1492,94 @@ app.post('/api/checkout/finalize-upi', verifyLimiter, async (req, res) => {
       return res.status(404).json({ success: false, error: 'SESSION_NOT_FOUND' });
     }
 
-    if(session.status!=='PENDING'||Date.now()>session.expiresAt)
-      return res.status(409).json({success:false,error:'ORDER_NOT_ACTIVE'});
-    const claim=await observeClaim(db.pgPool,orderId,txnRef,'VAULT_FINALIZE');
-    if(claim.error)return res.status(400).json({success:false,error:claim.error});
-    if(claim.conflict)return res.status(409).json({
-      success:false,verified:false,state:'CONFLICTING_EVIDENCE',error:'UTR_CLAIM_REPLAY'
-    });
-    // A WebAuthn assertion authenticates the user/device, NOT a bank credit.
-    // Preserve the UTR correlation; do not post SUCCESS or financial entries.
-    await db.updateSessionState(orderId, 'VERIFY_WINDOW');
-    await authChallenges.delete(sessionId);
-    return res.status(202).json({
-      success:true,verified:false,settled:false,
-      orderId,utr:txnRef,state:'UTR_OBSERVED',
-      code:'APP_RETURN_NOT_BANK_CONFIRMATION'
-    });
+    if (session.status !== 'PENDING' || Date.now() > session.expiresAt)
+      return res.status(409).json({ success: false, error: 'ORDER_NOT_ACTIVE' });
+
+    // Atomic UTR claim + settlement in single SERIALIZABLE transaction
+    const pgPool = db.pgPool;
+    if (!pgPool) return res.status(503).json({ success: false, error: 'POSTGRES_REQUIRED' });
+
+    const amountPaise = String(Math.round(Number(session.challengeAmount) * 100));
+    if (!/^[1-9][0-9]{0,15}$/.test(amountPaise)) {
+      return res.status(400).json({ success: false, error: 'AMOUNT_INVALID' });
+    }
+
+    const cleanUtr = String(txnRef).replace(/\D/g, '');
+    if (!/^\d{12}$/.test(cleanUtr)) {
+      return res.status(400).json({ success: false, error: 'UTR_FORMAT' });
+    }
+
+    const now = Date.now();
+    const payload = {
+      source: 'VAULT_FINALIZE',
+      eventId: `vault_finalize_${orderId}_${now}`,
+      statementEntryId: `vault_${stored.sessionId}`,
+      orderId: session.orderId,
+      merchantId: session.merchant_id || 'mer_default',
+      direction: 'CREDIT',
+      status: 'POSTED',
+      bankEvidence: 'VAULT_UTR_CORRELATED',
+      utr: cleanUtr,
+      payeeVpa: session.vpa_address || MERCHANT_UPI_ID,
+      amountPaise,
+      creditedAt: now
+    };
+
+    const payloadHash = crypto.createHash('sha256').update(JSON.stringify(payload)).digest('hex');
+    const { reconcileCreditWithUtrClaim } = require('./financial/reconciliation-webhook');
+    const result = await reconcileCreditWithUtrClaim(pgPool, payload, 'VAULT_FINALIZE', payloadHash, 'VAULT_FINALIZE');
+
+    if (result.state === 'POSTED' && !result.replayed) {
+      await authChallenges.delete(sessionId);
+      try { broadcastOrderSuccess(session.orderId, { amount: session.baseAmount, baseAmount: session.baseAmount, vpaAddress: session.vpa_address || MERCHANT_UPI_ID, senderVpa: null, utr: cleanUtr, txId: result.txId, timestamp: now }); } catch (_) {}
+      return res.json({
+        success: true,
+        verified: true,
+        settled: true,
+        orderId,
+        utr: cleanUtr,
+        txId: result.txId,
+        amount: session.challengeAmount,
+        state: 'SETTLED',
+        message: 'Payment settled via Vault + UTR.'
+      });
+    }
+    if (result.state === 'QUARANTINED') {
+      return res.status(202).json({
+        success: false,
+        verified: false,
+        settled: false,
+        state: 'QUARANTINED',
+        orderId,
+        utr: cleanUtr,
+        reason: result.reason,
+        message: 'Settlement quarantined - manual review required.'
+      });
+    }
+    if (result.state === 'CONFLICTING_EVIDENCE') {
+      return res.status(409).json({
+        success: false,
+        verified: false,
+        settled: false,
+        state: 'CONFLICTING_EVIDENCE',
+        orderId,
+        utr: cleanUtr,
+        error: 'UTR_CLAIM_REPLAY'
+      });
+    }
+    return res.status(500).json({ success: false, error: 'SETTLEMENT_FAILED' });
   } catch (err) {
-    console.error('[UPI Finalize] Error:',err);
-    return res.status(500).json({success:false,error:'FINALIZE_UNAVAILABLE'});
+    console.error('[UPI Finalize] Error:', err);
+    return res.status(500).json({ success: false, error: 'FINALIZE_UNAVAILABLE' });
   }
 });
 // ═════════════════════════════════════════════════════════════════════
 // TASK 15: DEBUG / DIAGNOSTIC ENDPOINTS — Full flow trace for testing
 // These let you see every step of the UPI rail and exactly where it fails.
 // ═════════════════════════════════════════════════════════════════════
+// All debug endpoints require admin authentication (X-Admin-Key header).
 // Step-by-step flow trace for an order
-app.get('/api/debug/flow/:orderId', async (req, res) => {
+app.get('/api/debug/flow/:orderId', requireAdminAuth, async (req, res) => {
   try {
     const { orderId } = req.params;
     const session = await db.findSessionByOrderId(orderId);
@@ -1557,7 +1623,7 @@ app.get('/api/debug/flow/:orderId', async (req, res) => {
 });
 
 // Full session state dump
-app.get('/api/debug/session/:orderId', async (req, res) => {
+app.get('/api/debug/session/:orderId', requireAdminAuth, async (req, res) => {
   try {
     const { orderId } = req.params;
     const session = await db.findSessionByOrderId(orderId);
@@ -1575,7 +1641,7 @@ app.get('/api/debug/session/:orderId', async (req, res) => {
 });
 
 // List all VPAs with velocity status
-app.get('/api/debug/vpas', async (req, res) => {
+app.get('/api/debug/vpas', requireAdminAuth, async (req, res) => {
   try {
     const vpas = db.getAllActiveVPAs ? await db.getAllActiveVPAs() : [];
     const now = Date.now();

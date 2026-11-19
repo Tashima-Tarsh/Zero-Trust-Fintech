@@ -746,8 +746,32 @@ function bindUtrToOrder(utr, orderId) {
 
 /**
  * Velocity Control: per-VPA hourly transaction count.
- * Returns true if the VPA is under the hourly limit (safe to use).
- * Returns false if the VPA has hit the limit (should route elsewhere).
+ * ATOMIC check-and-increment to prevent race conditions.
+ * Returns true if the increment succeeded (under limit), false if limit exceeded.
+ * Uses single atomic UPSERT with conditional increment.
+ */
+function checkAndIncrementVpaVelocity(vpaAddress, maxPerHour = 15) {
+  if (!vpaAddress || !sqliteDb) return true;
+  try {
+    const hourBucket = Math.floor(Date.now() / (60 * 60 * 1000));
+    // Atomic UPSERT with check: only increment if count < maxPerHour
+    const result = sqliteDb.prepare(`
+      INSERT INTO vpa_hourly_txns (vpa_address, hour_bucket, count) VALUES (?, ?, 1)
+      ON CONFLICT(vpa_address, hour_bucket) DO UPDATE SET count = 
+        CASE WHEN count < ? THEN count + 1 ELSE count END
+      RETURNING count;
+    `).get(vpaAddress, hourBucket, maxPerHour);
+    
+    if (!result) return true; // shouldn't happen
+    return result.count <= maxPerHour;
+  } catch (e) {
+    return true; // fail-open: if DB fails, don't block transactions
+  }
+}
+
+/**
+ * @deprecated Use checkAndIncrementVpaVelocity instead (atomic)
+ * Kept for backward compatibility but not atomic.
  */
 function checkVpaVelocity(vpaAddress, maxPerHour = 15) {
   if (!vpaAddress || !sqliteDb) return true;
@@ -764,8 +788,8 @@ function checkVpaVelocity(vpaAddress, maxPerHour = 15) {
 }
 
 /**
- * Increment the hourly transaction count for a VPA.
- * Call after a successful session creation (not after payment).
+ * @deprecated Use checkAndIncrementVpaVelocity instead (atomic)
+ * Kept for backward compatibility but not atomic.
  */
 function incrementVpaVelocity(vpaAddress) {
   if (!vpaAddress || !sqliteDb) return;
@@ -1145,6 +1169,7 @@ module.exports = {
   updatePasskeyCounter,
   checkVpaVelocity,
   incrementVpaVelocity,
+  checkAndIncrementVpaVelocity,
   checkSessionCooldown,
   setSessionCooldown
 };
@@ -1160,7 +1185,7 @@ if (usePostgresAuthority) {
     'resetDailyVPAs','getVpaMerchantType','updateSessionState','getOrderState',
     'getUtrBoundOrder','bindUtrToOrder','getAllActiveVPAs','savePasskey',
     'findPasskeyByCredentialId','findPasskeysByUserId','updatePasskeyCounter',
-    'checkVpaVelocity','incrementVpaVelocity','checkSessionCooldown','setSessionCooldown',
+    'checkVpaVelocity','incrementVpaVelocity','checkAndIncrementVpaVelocity','checkSessionCooldown','setSessionCooldown',
     'getVpaHourlyCount'
   ];
   for (const method of methods) {

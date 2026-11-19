@@ -191,4 +191,136 @@ function createReconciliationRouter({getPool,onSettled=()=>{}}){
   });
   return router;
 }
-module.exports={initializeReconciliationSchema,createReconciliationRouter,reconcileCredit};
+/**
+ * Atomic UTR claim + settlement in single SERIALIZABLE transaction.
+ * Combines observeClaim + reconcileCredit to prevent race conditions
+ * where two parallel requests claim the same UTR on different orders.
+ * 
+ * @param {Pool} pool - PostgreSQL pool
+ * @param {Object} payload - Reconciliation payload (same as reconcileCredit)
+ * @param {string} source - Source identifier
+ * @param {string} payloadHash - SHA256 hash of payload
+ * @param {string} utrClaimSource - Source for UTR claim (e.g., 'CFC', 'VAULT_FINALIZE')
+ * @returns {Object} Result with state, orderId, utr, txId, etc.
+ */
+async function reconcileCreditWithUtrClaim(pool, payload, source, payloadHash, utrClaimSource = 'CFC') {
+  const e = validateCredit(payload, source);
+  const c = await pool.connect();
+  let active = false;
+  try {
+    await c.query('BEGIN ISOLATION LEVEL SERIALIZABLE');
+    active = true;
+    
+    // Step 1: Atomic UTR claim with advisory lock (same as observeClaim)
+    await c.query('SELECT pg_advisory_xact_lock(hashtext($1))', [e.utr]);
+    const prior = await c.query(
+      'SELECT order_id FROM disha_untrusted_utr_claims ' +
+      'WHERE utr = $1 AND order_id <> $2 LIMIT 1', [e.utr, e.orderId]);
+    
+    if (prior.rowCount > 0) {
+      await c.query('COMMIT');
+      active = false;
+      return { state: 'CONFLICTING_EVIDENCE', orderId: e.orderId, reason: 'UTR_BOUND_TO_OTHER_ORDER', replayed: false };
+    }
+    
+    // Record the UTR claim
+    await c.query(
+      'INSERT INTO disha_untrusted_utr_claims(order_id, utr, source, observed_at) ' +
+      'VALUES($1, $2, $3, $4) ON CONFLICT DO NOTHING',
+      [e.orderId, e.utr, utrClaimSource, Date.now()]
+    );
+    
+    // Step 2: Reconciliation (same logic as reconcileCredit but within same transaction)
+    const original = await c.query(
+      'SELECT payload_hash, status, transaction_id FROM disha_reconciliation_inbox ' +
+      'WHERE source = $1 AND event_id = $2 FOR UPDATE', [source, e.eventId]);
+    
+    if (original.rowCount) {
+      const o = original.rows[0];
+      if (o.payload_hash !== payloadHash) throw fail('CREDIT_EVENT_REPLAY_MISMATCH');
+      if (o.status === 'POSTED') {
+        await c.query('COMMIT'); active = false;
+        return { state: 'POSTED', orderId: e.orderId, txId: o.transaction_id, replayed: true };
+      }
+    } else {
+      await c.query(
+        'INSERT INTO disha_reconciliation_inbox(source, event_id, payload_hash, order_id, ' +
+        'merchant_id, utr, amount_paise, payee_vpa, credited_at) VALUES($1, $2, $3, $4, $5, $6, $7, $8, $9)',
+        [source, e.eventId, payloadHash, e.orderId, e.merchantId, e.utr, e.amountPaise, e.payeeVpa, e.creditedAt]);
+    }
+
+    const q = await c.query(
+      'SELECT s.*, o.merchant_id AS saas_merchant_id FROM sessions s ' +
+      'LEFT JOIN saas_merchant_orders o ON o.session_id = s.session_id ' +
+      'WHERE s.order_id = $1 FOR UPDATE OF s', [e.orderId]);
+    const s = q.rows[0];
+    let reason = null;
+    if (!s) reason = 'UNKNOWN_ORDER';
+    else if ((s.saas_merchant_id || 'mer_default') !== e.merchantId) reason = 'MERCHANT_MISMATCH';
+    else if (String(s.vpa_address).toLowerCase() !== e.payeeVpa) reason = 'PAYEE_MISMATCH';
+    else if (rupeesToPaise(String(s.challenge_amount)) !== e.amountPaise) reason = 'AMOUNT_MISMATCH';
+    else if (e.creditedAt < Number(s.created_at) - 30000 ||
+             e.creditedAt > Number(s.expires_at) + 60000) reason = 'OUTSIDE_PAYMENT_WINDOW';
+    else if (s.status === 'SUCCESS') reason = 'ORDER_ALREADY_POSTED';
+    if (!reason) {
+      const bound = await c.query('SELECT order_id FROM utr_order_bindings WHERE utr = $1 FOR UPDATE', [e.utr]);
+      if (bound.rowCount && bound.rows[0].order_id !== e.orderId) reason = 'UTR_BOUND_TO_OTHER_ORDER';
+    }
+    if (!reason) {
+      const previous = await c.query('SELECT order_id FROM transactions WHERE utr = $1 OR order_id = $2 LIMIT 1',
+        [e.utr, e.orderId]);
+      if (previous.rowCount) reason = 'DUPLICATE_CREDIT';
+    }
+    if (reason) {
+      await c.query(
+        "UPDATE disha_reconciliation_inbox SET status = 'QUARANTINED', reason = $3, processed_at = now() " +
+        "WHERE source = $1 AND event_id = $2", [source, e.eventId, reason]);
+      await c.query('COMMIT'); active = false;
+      return { state: 'QUARANTINED', orderId: e.orderId, reason, replayed: false };
+    }
+
+    const merchant = e.merchantId;
+    const suffix = crypto.createHash('sha256').update(merchant).digest('hex').slice(0, 22);
+    const bank = merchant === 'mer_default' ? 'acc_bank_01' : 'acc_b_' + suffix;
+    const revenue = merchant === 'mer_default' ? 'acc_rev_01' : 'acc_r_' + suffix;
+    const txId = 'tx_' + crypto.randomBytes(8).toString('hex');
+    const amount = paiseToRupees(e.amountPaise);
+    
+    await c.query(
+      'INSERT INTO transactions (id, order_id, utr, amount_paise, amount, vpa_address, credited_at, source, merchant_id, status) ' +
+      'VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)',
+      [txId, e.orderId, e.utr, e.amountPaise, amount, e.payeeVpa, e.creditedAt, source, e.merchantId, 'POSTED']
+    );
+    await c.query(
+      'INSERT INTO ledger_entries (id, transaction_id, account_id, entry_type, amount_paise, description, created_at) ' +
+      'VALUES ($1, $2, $3, $4, $5, $6, $7), ($8, $2, $9, $10, $11, $6, $7), ($12, $2, $13, $14, $15, $6, $7)',
+      [
+        'le_' + crypto.randomBytes(8).toString('hex'), txId, bank, 'DEBIT', e.amountPaise,
+        `Credit received: ${e.utr} for order ${e.orderId}`, e.creditedAt,
+        'le_' + crypto.randomBytes(8).toString('hex'), revenue, 'CREDIT', e.amountPaise,
+        `Revenue: ${e.utr} for order ${e.orderId}`,
+        'le_' + crypto.randomBytes(8).toString('hex'), merchant, 'BALANCE', 0,
+        `Balance adjustment for ${e.utr}`
+      ]
+    );
+    await c.query('UPDATE sessions SET status = $1, utr = $2, state = $3, updated_at = now() WHERE order_id = $4',
+      ['SUCCESS', e.utr, 'VERIFIED', e.orderId]);
+    await c.query(
+      'INSERT INTO utr_order_bindings (utr, order_id, bound_at) VALUES ($1, $2, $3) ' +
+      'ON CONFLICT (utr) DO UPDATE SET order_id = EXCLUDED.order_id, bound_at = EXCLUDED.bound_at',
+      [e.utr, e.orderId, e.creditedAt]
+    );
+    await c.query(
+      "UPDATE disha_reconciliation_inbox SET status = 'POSTED', transaction_id = $3, processed_at = now() " +
+      "WHERE source = $1 AND event_id = $2", [source, e.eventId, txId]
+    );
+    
+    await c.query('COMMIT'); active = false;
+    return { state: 'POSTED', orderId: e.orderId, utr: e.utr, txId, amount, vpaAddress: e.payeeVpa, replayed: false };
+  } catch (err) {
+    if (active) try { await c.query('ROLLBACK') } catch (_) {}
+    throw err;
+  } finally { c.release() }
+}
+
+module.exports = { initializeReconciliationSchema, createReconciliationRouter, reconcileCredit, reconcileCreditInternal, reconcileCreditWithUtrClaim };

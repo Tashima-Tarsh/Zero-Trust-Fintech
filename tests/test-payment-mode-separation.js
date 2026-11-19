@@ -59,8 +59,9 @@ const db={
  getVpaMerchantType:async vpa=>vpa.includes('@ypbiz')
   ?{accountType:'MERCHANT',mcc:'5411',holderName:'Merchant'}
   :{accountType:'PERSONAL',mcc:null,holderName:'Personal'},
- saveSession:async session=>saved.push(session),
- incrementVpaVelocity:async vpa=>counter.push(vpa)
+saveSession:async session=>saved.push(session),
+  checkAndIncrementVpaVelocity:async vpa=>{counter.push(vpa);return true;},
+  incrementVpaVelocity:async vpa=>counter.push(vpa)
 };
 const ctx={db,crypto,buildUpiUri,sanitizeTxnRef:x=>x,MERCHANT_UPI_ID:'person@oksbi',
  MERCHANT_NAME:'Personal',process:{env:{DISHA_COMPANY_P2M_VPA:'company@ypbiz'}}};
