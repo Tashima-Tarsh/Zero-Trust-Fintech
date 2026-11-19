@@ -5,6 +5,7 @@ import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
 import android.os.SystemClock;
+import ai.disha.upi.DishaUpiIntentBridge;
 import android.webkit.WebView;
 import android.webkit.WebViewClient;
 import android.webkit.WebResourceRequest;
@@ -39,15 +40,14 @@ public final class TestBrowserActivity extends Activity {
         webView.setWebViewClient(new WebViewClient() {
             @Override public boolean shouldOverrideUrlLoading(WebView view, WebResourceRequest request) {
                 Uri uri = request.getUrl();
-                if ("upi".equalsIgnoreCase(uri.getScheme()) && "pay".equalsIgnoreCase(uri.getHost())) {
+                if (DishaUpiIntentBridge.isPaymentUri(uri)) {
                     Log.i(TAG, "ANDROID_WEBVIEW_DISPATCH upi://pay");
                     // Android evidence is collected for launch/return only.
                     // Never treat an app-reported RESULT_OK as bank settlement.
                     try {
-                        Intent paymentIntent = new Intent(Intent.ACTION_VIEW, uri);
-                        lastIntentLaunchMs = SystemClock.elapsedRealtime();
                         Log.i(TAG, "ANDROID_INTENT_REQUESTED protocol=upi handler=external");
-                        startActivityForResult(paymentIntent, UPI_EVIDENCE_REQUEST);
+                        lastIntentLaunchMs = DishaUpiIntentBridge.launch(
+                            TestBrowserActivity.this, uri, UPI_EVIDENCE_REQUEST);
                         Log.i(TAG, "ANDROID_INTENT_DISPATCHED request=" + UPI_EVIDENCE_REQUEST);
                     } catch (android.content.ActivityNotFoundException missing) {
                         Log.e(TAG, "ANDROID_INTENT_NO_HANDLER result=UNAVAILABLE");
@@ -115,16 +115,11 @@ public final class TestBrowserActivity extends Activity {
     @Override protected void onActivityResult(int requestCode, int resultCode, Intent response) {
         super.onActivityResult(requestCode, resultCode, response);
         if (requestCode != UPI_EVIDENCE_REQUEST) return;
-        long elapsed = lastIntentLaunchMs <= 0 ? -1
-            : SystemClock.elapsedRealtime() - lastIntentLaunchMs;
-        String label = resultCode == Activity.RESULT_OK ? "APP_REPORTED_OK"
-            : resultCode == Activity.RESULT_CANCELED ? "CANCELLED" : "OTHER";
-        // Status is an *untrusted* string supplied by the target Android app.
-        String raw = response == null ? null : response.getStringExtra("Status");
-        String declared = raw != null && raw.equalsIgnoreCase("SUCCESS") ? "SUCCESS"
-            : raw != null && raw.equalsIgnoreCase("FAILURE") ? "FAILURE" : "UNAVAILABLE";
-        Log.i(TAG, "ANDROID_ACTIVITY_RESULT classification=" + label
-            + " appReported=" + declared + " elapsedMs=" + elapsed + " bankVerified=false");
+        DishaUpiIntentBridge.Evidence result =
+            DishaUpiIntentBridge.classify(resultCode, response, lastIntentLaunchMs);
+        Log.i(TAG, "ANDROID_ACTIVITY_RESULT classification=" + result.classification
+            + " appReported=" + result.appReportedStatus
+            + " elapsedMs=" + result.elapsedMs + " bankVerified=" + result.bankVerified);
         lastIntentLaunchMs = 0L;
     }
 

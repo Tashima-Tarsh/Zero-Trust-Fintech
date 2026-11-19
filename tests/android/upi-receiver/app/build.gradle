@@ -14,6 +14,12 @@ android {
         versionName '1.0-test-only'
     }
 
+    sourceSets {
+        main {
+            java.srcDirs += [file("../../../../android/intent-bridge/src/main/java")]
+        }
+    }
+
     compileOptions {
         sourceCompatibility JavaVersion.VERSION_17
         targetCompatibility JavaVersion.VERSION_17

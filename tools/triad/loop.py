@@ -41,6 +41,7 @@ SOURCES = {
     "web": "public/checkout.html",
     "android": "tests/android/upi-receiver/app/src/main/java/ai/disha/testupi/TestBrowserActivity.java",
     "receiver": "tests/android/upi-receiver/app/src/main/java/ai/disha/testupi/FakeUpiActivity.java",
+    "bridge": "android/intent-bridge/src/main/java/ai/disha/upi/DishaUpiIntentBridge.java",
     "android_e2e": "tests/android/verify_android_flow.py",
     "ledger": "financial/postgres-ledger.js",
     "reconciliation": "financial/reconciliation-webhook.js",
@@ -100,8 +101,10 @@ def evidence(root: Path, android_log: Path | None):
     check("checkout", r"qrTapLaunchUri\s*\(", True, "P0",
           "Native QR tap adapter missing")
     check("uri", r"buildUpiUri", True, "P1", "Validated UPI URI builder missing")
-    check("android", r"startActivityForResult\s*\(", True, "P0",
-          "Android app launch does not capture activity-result evidence")
+    check("bridge", r"startActivityForResult\s*\(", True, "P0",
+          "Reusable Android UPI launch bridge does not capture return evidence")
+    check("android", r"DishaUpiIntentBridge\.launch\s*\(", True, "P0",
+          "Test host is not using the same reusable native UPI dispatch")
     check("android", r"onActivityResult\s*\(", True, "P0",
           "Android callback evidence capture missing")
     check("android", r"bankVerified=false", True, "P0",
