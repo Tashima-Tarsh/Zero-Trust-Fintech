@@ -454,7 +454,7 @@ function createMerchantApi({db,getAuth,buildUpiUri,platformControl}) {
     const orderId=id('PAY_'),sessionId=crypto.randomBytes(24).toString('hex');
     const paymentReference='PAY'+crypto.randomBytes(12).toString('hex').toUpperCase();
     const createdAt=now(),expiresAt=createdAt+180000;
-    let receiving,checkoutUri;
+    let receiving,checkoutUri,accountType;
     try{
       await c.query('BEGIN');
       const requestedVpa = val(req.body.vpaAddress,150).toLowerCase();
@@ -468,7 +468,7 @@ function createMerchantApi({db,getAuth,buildUpiUri,platformControl}) {
         receiving = await selectMerchantVPA(c, req.merchant.id, amount);
         if(!receiving)throw fail(409,'No healthy receiving UPI ID available');
       }
-      const accountType=String(receiving.account_type||'').toUpperCase();
+      accountType=String(receiving.account_type||'').toUpperCase();
       const requestedMode=String(req.body.paymentMode||'').trim().toUpperCase();
       if(requestedMode&&!['P2P','P2M'].includes(requestedMode))
         throw fail(400,'INVALID_PAYMENT_MODE');
