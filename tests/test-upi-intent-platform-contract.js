@@ -51,7 +51,7 @@ for(const [app,pkg] of Object.entries(appPackages)){
   assert.equal(targeted.split('#Intent')[0],chromeIntent.split('#Intent')[0].replace(
    original.slice(original.indexOf('?')+1),type.slice(type.indexOf('?')+1)),
    'App selection cannot alter the P2P or P2M payment fields');
-  const fb=targeted.match(/S\\.browser_fallback_url=([^;]+)/)?.[1];
+  const fb=targeted.split('S.browser_fallback_url=')[1]?.split(';')[0];
   assert.equal(new URL(decodeURIComponent(fb)).searchParams.get('paymentRef'),'PAY_123456',
    'App missing fallback must recover the original order');
  }
