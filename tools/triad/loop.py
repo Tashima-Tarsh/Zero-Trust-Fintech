@@ -210,6 +210,7 @@ def archify_candidate(repo: Path, output: Path):
         "connections": [
             {**{"from": a, "to": b, "label": label},
              **({"labelAt": [414, 179]} if label == "Native QR tap" else {}),
+             **({"labelAt": [414, 389]} if label == "Scannable QR" else {}),
              **({"labelAt": [442, 569]} if label == "Verify source + artifacts" else {}),
              **({"labelAt": [848, 389]} if label == "Diagnostic artifacts" else {})}
             for a, b, label in edges],
