@@ -3,6 +3,7 @@ name: PostgreSQL financial invariants
 on:
   pull_request:
     paths:
+      - 'db.js'
       - 'financial/**'
       - 'merchant-api.js'
       - 'server.js'
@@ -15,6 +16,7 @@ on:
       - 'tests/test-postgres-financial-core.js'
       - 'tests/test-postgres-checkout-store.js'
       - 'tests/test-postgres-legacy-sessions.js'
+      - 'tests/test-postgres-checkout-bootstrap.js'
       - 'tests/test-postgres-migration.js'
       - 'tests/test-postgres-switch.js'
       - 'tests/test-postgres-http.js'
@@ -76,6 +78,8 @@ jobs:
         run: node tests/test-postgres-checkout-store.js
       - name: Verify legacy PostgreSQL sessions table upgrade
         run: node tests/test-postgres-legacy-sessions.js
+      - name: Reproduce and repair missing Railway checkout fields before serving sessions
+        run: node tests/test-postgres-checkout-bootstrap.js
       - name: Rehearse SQLite-to-PostgreSQL migration
         run: node tests/test-postgres-migration.js
       - name: Verify PostgreSQL-only cutover switch
