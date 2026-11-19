@@ -70,6 +70,16 @@ const {buildStore}=require('../financial/postgres-store');
     assert.equal(await db.checkVpaVelocity('test@upi',1),true);
     await db.incrementVpaVelocity('test@upi');
     assert.equal(await db.checkVpaVelocity('test@upi',1),false);
+    // Atomic limit under contention: exactly three of ten simultaneous
+    // attempts may consume a fresh VPA hourly slot, never more.
+    const rateTestVpa='ci_velocity_'+suffix+'@upi';
+    const attempts=await Promise.all(Array.from({length:10},
+      ()=>db.checkAndIncrementVpaVelocity(rateTestVpa,3)));
+    assert.equal(attempts.filter(Boolean).length,3,
+      'PostgreSQL must enforce the hourly cap under concurrency');
+    assert.equal(await db.getVpaHourlyCount(rateTestVpa),3);
+    assert.equal(await db.checkAndIncrementVpaVelocity(rateTestVpa,3),false,
+      'Rejected velocity attempts must not increase the counter');
     await db.setSessionCooldown(orderId,120000);
     assert.equal((await db.checkSessionCooldown(orderId)).inCooldown,true);
     const result=await db.atomicSettle(orderId,utr,'500.01','test@upi');
