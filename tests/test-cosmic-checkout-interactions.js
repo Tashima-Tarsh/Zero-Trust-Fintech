@@ -1,102 +1,52 @@
 'use strict';
-const assert=require('node:assert/strict');
-const fs=require('node:fs');
-const vm=require('node:vm');
-const path=require('node:path');
-const src=fs.readFileSync(path.join(__dirname,'../public/cosmic-checkout.js'),'utf8');
+const assert=require('node:assert/strict'),vm=require('node:vm'),fs=require('node:fs'),path=require('node:path');
+const source=fs.readFileSync(path.join(__dirname,'../public/cosmic-checkout.js'),'utf8');
 const model=require('../public/cosmic-checkout-model.js');
-const uri='upi://pay?pa=shop%40oksbi&am=500.00&cu=INR';
-const id='ORD_TEST_1234',token='a'.repeat(48);
-const uiIds=['payAmount','btnOneTouch','checkoutStatus','oneTouchFallback','paymentQr','qrExpiry','receiptAmount','receiptOrder','receiptUtr','checkingHelp','saveReceipt','shareReceipt','showQr','backToApps','checkingApps'];
-const nodes={};
-function element(name){return nodes[name]||(nodes[name]={id:name,textContent:'',hidden:true,href:'#',disabled:false,dataset:{},
- classList:{toggle(){}},events:{},addEventListener(type,fn){this.events[type]=fn},removeAttribute(){},replaceChildren(){}})}
-uiIds.forEach(element);
-const stages=['initial','methods','qr','checking','receipt'].map(stage=>({dataset:{stage},hidden:stage!=='initial'}));
-const apps=['gpay','phonepe','paytm','cred'].map(app=>({dataset:{app},events:{},addEventListener(type,fn){this.events[type]=fn}}));
-const callbacks={};
-const document={body:{dataset:{checkout:'merchant'}},visibilityState:'visible',
- querySelectorAll(key){return key==='[data-stage]'?stages:apps},
- getElementById:element,addEventListener(key,fn){callbacks[key]=fn}};
-const location={search:'?orderId='+id+'&token='+token,assign(link){location.opened=link}};
-const state={ledger:'PENDING',utr:null,authorized:0,handoff:false,hidden:0,posted:0,qr:null,failAuth:true};
-let preferred='phonepe'; // Returning user's preference must NOT auto-launch after async WebAuthn
-const vault={getPendingOrderId:()=>state.handoff?id:null,
- authorize:async()=>{state.authorized++;
-  if(state.failAuth){
-   const error=new Error('The operation either timed out or was not allowed. See: https://www.w3.org/TR/webauthn-2/#sctn-privacy-considerations-client.');
-   error.name='NotAllowedError';
-   throw error;
-  }
-  return {sessionId:'f'.repeat(32)}
- },
- beginHandoff:(order,session,checkoutToken)=>{assert.equal(order,id);assert.equal(checkoutToken,token);state.handoff=true},
- requestEvidence:()=>state.handoff&&state.hidden?{eventId:'evt_test',token,orderId:id,evidence:{}}:null,
- markBackgrounded:()=>state.hidden++,
- acknowledgeEvidence:()=>({success:true,verified:false,settled:false}),
- launchUPI:link=>{location.opened=link}};
-const window={DISHACosmicCheckoutModel:model,DISHAOneTouchVault:vault,
- QRCode:function(target,params){state.qr=params.text},
- addEventListener:(k,fn)=>{callbacks[k]=fn},print(){}};
-window.QRCode.CorrectLevel={M:1};
-const fetch=async link=>{
- if(link.includes('/api/merchant/public/order/'))return {ok:true,json:async()=>({success:true,order:{
-  id,amount:500,upi_uri:uri,expires_at:Date.now()+180000,status:'PENDING'}})};
- if(link.includes('/api/ledger/'))return {ok:true,json:async()=>({
-  success:true,status:state.ledger,utr:state.utr,challengeAmount:500})};
- if(link==='/api/vault/evidence'){state.posted++;return {ok:true,json:async()=>({success:true,state:'RETURN_OBSERVED_NO_UTR'})}}
- throw Error('Unexpected URL: '+link);
-};
-const navigator={userAgent:'Android',share:null};
-const localStorage={getItem:()=>preferred,setItem:(key,value)=>{preferred=value}};
-vm.runInNewContext(src,{window,document,location,navigator,localStorage,fetch,
- URLSearchParams,Date,Intl,console,setInterval:()=>1,clearInterval(){}});
-const active=()=>stages.find(x=>!x.hidden)?.dataset.stage;
-async function flush(){for(let i=0;i<20;i++)await Promise.resolve()}
+const uri='upi://pay?pa=merchant@oksbi&pn=Merchant&am=500.00&cu=INR&tn=Invoice';
+function mount(status='PENDING'){
+ const nodes={},events={},stages=['initial','methods','qr','checking','receipt'].map(stage=>({dataset:{stage},hidden:stage!=='qr'}));
+ const node=k=>nodes[k]||(nodes[k]={textContent:'',href:'#',disabled:true,hidden:true,dataset:{},attrs:{},events:{},
+  addEventListener(k,v){this.events[k]=v},setAttribute(k,v){this.attrs[k]=v},getAttribute(k){return this.attrs[k]},
+  removeAttribute(k){delete this.attrs[k]},replaceChildren(){},classList:{toggle(){}}});
+ const data={status,utr:null,qr:null,prompt:0};
+ const document={body:{dataset:{checkout:'merchant'}},visibilityState:'visible',getElementById:node,
+  querySelectorAll:q=>q==='[data-stage]'?stages:[],addEventListener:(k,v)=>events[k]=v};
+ const location={href:'https://checkout.example/merchant-checkout.html?orderId=ORD_TEST_1234&token='+('a'.repeat(48)),
+  search:'?orderId=ORD_TEST_1234&token='+('a'.repeat(48))};
+ const window={DISHACosmicCheckoutModel:model,DISHAOneTouchVault:{getPendingOrderId:()=>null,requestEvidence:()=>null,
+  authorize(){data.prompt++;throw Error('Unexpected credential prompt')}},
+  QRCode:function(_,options){data.qr=options.text},addEventListener:(k,v)=>events[k]=v};
+ window.QRCode.CorrectLevel={M:1};
+ const fetch=async url=>{
+  if(url.includes('/api/merchant/public/order/'))return {ok:true,json:async()=>({success:true,order:{
+   id:'ORD_TEST_1234',upi_uri:uri,amount:500,expires_at:Date.now()+180000,status}})};
+  if(url.includes('/api/ledger/'))return {ok:true,json:async()=>({
+   status:data.status,utr:data.utr,challengeAmount:500})};
+  throw Error('Unexpected fetch '+url);
+ };
+ vm.runInNewContext(source,{window,document,location,navigator:{userAgent:'Mozilla/5.0 (Linux; Android 15)'},
+  URL,URLSearchParams,Date,Intl,console,fetch,setInterval:()=>1,clearInterval(){},
+  sessionStorage:{getItem:()=>null,setItem(){}}});
+ return {nodes,events,stages,data};
+}
+async function flush(){for(let i=0;i<35;i++)await Promise.resolve()}
+const active=app=>app.stages.find(s=>!s.hidden)?.dataset.stage;
 (async()=>{
- await flush();
- assert.equal(active(),'initial');
- assert.equal(nodes.btnOneTouch.disabled,false);
- nodes.showQr.events.click();
- assert.equal(active(),'initial','QR cannot bypass Vault');
- await nodes.btnOneTouch.events.click();
- assert.equal(state.authorized,1);
- assert.equal(active(),'initial','Rejected device authorization must never advance checkout');
- assert.match(nodes.checkoutStatus.textContent,/^Error\b/,'Customer should see short Error message');
- assert.doesNotMatch(nodes.checkoutStatus.textContent,/The operation|timed out|w3\.org|WebAuthn|NotAllowedError/i,
-  'Internal WebAuthn privacy errors must not appear in checkout UI');
- assert.equal(nodes.btnOneTouch.disabled,false,'Customer should be able to retry');
- state.failAuth=false;
- await nodes.btnOneTouch.events.click();
- assert.equal(state.authorized,2);
- assert.equal(active(),'methods');
- assert.equal(location.opened,undefined,'No Android intent without a fresh post-passkey app tap');
- nodes.showQr.events.click();
- assert.equal(active(),'qr');
- assert.equal(state.qr,uri);
- nodes.backToApps.events.click();
- apps[1].events.click();
- assert.equal(preferred,'phonepe');
- assert.match(location.opened,/phonepe/);
- assert.equal(state.handoff,true);
- document.visibilityState='hidden';callbacks.visibilitychange();
- document.visibilityState='visible';callbacks.visibilitychange();
- await flush();
- assert.equal(state.posted,1);
- assert.equal(active(),'checking','Unclassified browser return cannot create payment receipt');
- assert.equal(model.needsPaymentMethodRetry({handoffAt:1000,returnedAt:1800,returnParams:{}}),true,
-  'Immediate pre-PIN exit should preserve UPI choice and QR fallback');
- assert.equal(model.needsPaymentMethodRetry({handoffAt:1000,returnedAt:22000,returnParams:{}}),false,
-  'Long app return is a normal pending-evidence journey');
- assert.equal(model.needsPaymentMethodRetry({handoffAt:1000,returnedAt:4500,returnParams:{Status:'FAILURE'}}),true,
-  'App-reported rejection is not a completed bank failure');
- assert.equal(model.needsPaymentMethodRetry({handoffAt:1000,returnedAt:4500,returnParams:{Status:'SUCCESS'}}),false,
-  'App status success requires financial confirmation, not a forced retry');
- state.ledger='SUCCESS';state.utr='123456789012';
- callbacks.focus();await flush();
- assert.equal(active(),'receipt','Server-confirmed ledger permits receipt');
- assert.equal(nodes.receiptUtr.textContent,'123456789012');
- callbacks.focus();await flush();
- assert.equal(active(),'receipt','Browser focus must never erase an authoritative completed receipt');
- console.log('COSMIC_INTERACTIONS_PASS: auth gate, QR, native app, browser evidence and ledger receipt');
-})().catch(e=>{console.error(e);process.exitCode=1});
+ const running=mount();await flush();
+ assert.equal(active(running),'qr');
+ assert.equal(running.data.qr,uri);
+ assert.equal(running.nodes.qrTapToPay.href,uri);
+ assert.equal(running.data.prompt,0);
+ running.events.focus();await flush();
+ assert.equal(active(running),'qr','Browser focus or scan alone is not a payment');
+ running.data.status='SUCCESS';running.data.utr='123456789012';
+ running.events.focus();await flush();
+ assert.equal(active(running),'receipt','Ledger credit updates original browser from any paying device');
+ const expired=mount('EXPIRED');await flush();
+ assert.equal(active(expired),'qr');
+ assert.equal(expired.nodes.qrTapToPay.href,'#');
+ assert.equal(expired.nodes.qrTapToPay.getAttribute('aria-disabled'),'true');
+ assert.equal(expired.data.qr,null,'Expired payment link must never show scannable QR');
+ assert.match(expired.nodes.checkoutStatus.textContent,/expired/i);
+ console.log('COSMIC_INTERACTIONS_PASS: QR-first, passive cross-device status, expired QR blocked');
+})().catch(err=>{console.error(err);process.exitCode=1});

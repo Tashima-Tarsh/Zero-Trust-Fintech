@@ -59,6 +59,9 @@ assert.match(runner,/intent-logcat-live\.txt/,
   const html=await(await fetch(origin+'/merchant-checkout.html')).text();
   assert.match(html,/<button id="btnOneTouch"[\s\S]*?<span>Pay<\/span>/,'Checkout must show compact Pay CTA while retaining Vault handler');
   assert.doesNotMatch(html,/Touch to Pay/);
+  assert.match(html,/<section data-stage="qr"[^>]*aria-label="UPI QR checkout"/);
+  assert.match(html,/id="qrTapToPay"/);
+  assert.match(html,/id="shareCheckout"/);
   assert.match(html,/cosmic-checkout\.js/);
   // Regression: the real checkout HTML must load its exact JS/CSS URLs from
   // this fixture, not just legacy root assets that the page no longer uses.

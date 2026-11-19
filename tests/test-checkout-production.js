@@ -26,8 +26,11 @@ for(const html of [generic,merchant]){
  assert.match(html,/\/cosmic-checkout\.js/);
  assert.match(html,/src="\/assets\/disha-8-2-wordmark-cropped\.png"/);
  assert.match(html,/id="btnOneTouch"/);
+ assert.match(html,/data-stage="initial"[^>]*hidden/);
+ assert.match(html,/id="qrTapToPay"/);
+ assert.match(html,/id="shareCheckout"/);
  assert.match(html,/data-stage="methods"[^>]*hidden/);
- assert.match(html,/data-stage="qr"[^>]*hidden/);
+ assert.match(html,/data-stage="qr"[^>]*aria-label="UPI QR checkout"/);
  assert.match(html,/data-stage="checking"[^>]*hidden/);
  assert.match(html,/data-stage="receipt"[^>]*hidden/);
  assert.doesNotMatch(html,/WebAuthn Secured UPI Checkout|NPCI Clearing|WhatsApp|T\+0 Settlement/);
