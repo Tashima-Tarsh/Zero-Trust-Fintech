@@ -10,6 +10,7 @@
 async function ensureCheckoutSessionSchema(pg) {
   if (!pg || typeof pg.query !== 'function') throw new TypeError('PostgreSQL client required');
   await pg.query("ALTER TABLE sessions ADD COLUMN IF NOT EXISTS upi_uri TEXT");
+  await pg.query("ALTER TABLE sessions ADD COLUMN IF NOT EXISTS payment_type TEXT CHECK(payment_type IN ('P2P','P2M'))");
   await pg.query("ALTER TABLE sessions ADD COLUMN IF NOT EXISTS state TEXT NOT NULL DEFAULT 'WAITING'");
   await pg.query("ALTER TABLE sessions ADD COLUMN IF NOT EXISTS customer_id TEXT");
 
@@ -17,10 +18,10 @@ async function ensureCheckoutSessionSchema(pg) {
   const result = await pg.query(
     "SELECT column_name FROM information_schema.columns " +
     "WHERE table_schema=current_schema() AND table_name='sessions' " +
-    "AND column_name IN ('upi_uri','state','customer_id')"
+    "AND column_name IN ('upi_uri','state','customer_id','payment_type')"
   );
   const found = new Set(result.rows.map(row => row.column_name));
-  for (const name of ['upi_uri', 'state', 'customer_id']) {
+  for (const name of ['upi_uri', 'state', 'customer_id', 'payment_type']) {
     if (!found.has(name)) throw new Error('POSTGRES_CHECKOUT_SCHEMA_MISSING_' + name.toUpperCase());
   }
 }

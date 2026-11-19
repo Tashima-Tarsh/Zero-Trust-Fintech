@@ -98,6 +98,7 @@ CREATE TABLE IF NOT EXISTS sessions (
     txn_ref VARCHAR(128) UNIQUE NOT NULL,
     vpa_address VARCHAR(128) NOT NULL,
     upi_uri TEXT, -- Immutable issued bank-scannable QR and native intent payload
+    payment_type VARCHAR(3) CHECK(payment_type IN ('P2P','P2M')), -- Explicit immutable issued mode; NULL for unclassifiable historical sessions
     status VARCHAR(32) NOT NULL DEFAULT 'PENDING' CHECK(status IN ('PENDING', 'SUCCESS', 'EXPIRED', 'FAILED')),
     utr VARCHAR(32),
     state VARCHAR(32) NOT NULL DEFAULT 'WAITING' CHECK(state IN ('WAITING', 'VERIFY_WINDOW', 'VERIFIED', 'EXPIRED')),

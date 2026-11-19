@@ -6,6 +6,7 @@ ALTER TABLE vpa_pool ADD COLUMN IF NOT EXISTS mcc TEXT;
 ALTER TABLE sessions ADD COLUMN IF NOT EXISTS state TEXT NOT NULL DEFAULT 'WAITING';
 ALTER TABLE sessions ADD COLUMN IF NOT EXISTS customer_id TEXT;
 ALTER TABLE sessions ADD COLUMN IF NOT EXISTS upi_uri TEXT;
+ALTER TABLE sessions ADD COLUMN IF NOT EXISTS payment_type TEXT CHECK(payment_type IN ('P2P','P2M'));
 DROP INDEX IF EXISTS idx_sessions_unique_active_amount;
 ALTER TABLE sessions DROP CONSTRAINT IF EXISTS sessions_state_check;
 ALTER TABLE sessions ADD CONSTRAINT sessions_state_check
