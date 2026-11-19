@@ -10,7 +10,7 @@ const http=require('node:http');
 const {Pool}=require('pg');
 const {createMerchantApi}=require('../merchant-api');
 const {buildUpiUri}=require('../utils/upi-intent');
-const {initializeReconciliationSchema,createReconciliationRouter}=require('../financial/reconciliation-webhook');
+const {initializeReconciliationSchema,createReconciliationRouter,reconcileCreditInternal,reconcileCreditWithUtrClaim}=require('../financial/reconciliation-webhook');
 
 (async()=>{
   const url=process.env.TEST_DATABASE_URL;
@@ -140,6 +140,59 @@ const {initializeReconciliationSchema,createReconciliationRouter}=require('../fi
     result=await post(event(stranger,{merchantId:tenant}));
     assert.equal(result.data.reason,'MERCHANT_MISMATCH');
     assert.equal(callbacks.length,2);
+
+    // The internal export must be functional, not a dummy added to satisfy require().
+    assert.equal(typeof reconcileCreditInternal,'function');
+    assert.equal(typeof reconcileCreditWithUtrClaim,'function');
+    const claimSession=await newSession();
+    const claimCredit=event(claimSession);
+    const claimHash=crypto.createHash('sha256').update(JSON.stringify(claimCredit)).digest('hex');
+    // Browser/receipt assertions can refer to a real UTR on the wrong order.
+    // They must remain observable without blocking a legitimate verified credit.
+    const allegedOrder='ORD_UNTRUSTED_'+nonce;
+    await pool.query(
+      'INSERT INTO disha_untrusted_utr_claims(order_id,utr,source,observed_at) '+
+      'VALUES($1,$2,$3,$4)',
+      [allegedOrder,claimCredit.utr,'CFC',Date.now()]);
+    const settled=await reconcileCreditWithUtrClaim(pool,claimCredit,source,claimHash,'VAULT_FINALIZE');
+    assert.equal(settled.state,'POSTED','A verified credit can settle despite an untrusted conflicting UTR claim');
+    assert.equal(settled.replayed,false);
+    let postings=await pool.query(
+      "SELECT p.side,p.amount_paise FROM disha_core_postings p JOIN disha_core_journals j "+
+      "ON p.journal_id=j.journal_id WHERE j.order_id=$1 ORDER BY side",
+      [claimSession.orderId]);
+    assert.deepEqual(postings.rows.map(r=>[r.side,String(r.amount_paise)]),
+      [['CREDIT','50001'],['DEBIT','50001']],'Atomic UTR claim must use exactly two balanced core postings');
+    let observations=await pool.query(
+      'SELECT order_id FROM disha_untrusted_utr_claims WHERE utr=$1',
+      [claimCredit.utr]);
+    assert.equal(observations.rowCount,2,'Keep both untrusted UTR observations as evidence');
+    const replaySettled=await reconcileCreditWithUtrClaim(pool,claimCredit,source,claimHash,'VAULT_FINALIZE');
+    assert.equal(replaySettled.state,'POSTED');
+    assert.equal(replaySettled.replayed,true,'Atomic claim must preserve event idempotency');
+    assert.equal((await pool.query('SELECT count(*)::int n FROM transactions WHERE utr=$1',
+      [claimCredit.utr])).rows[0].n,1,'Replay cannot create a second credit');
+    const reusedOrder=await newSession();
+    const reusedCredit=event(reusedOrder,{utr:claimCredit.utr});
+    const reusedHash=crypto.createHash('sha256').update(JSON.stringify(reusedCredit)).digest('hex');
+    const reuse=await reconcileCreditWithUtrClaim(pool,reusedCredit,source,reusedHash,'CFC');
+    assert.equal(reuse.state,'QUARANTINED');
+    assert.equal(reuse.reason,'UTR_BOUND_TO_OTHER_ORDER','Authoritative UTR binding rejects cross-order reuse');
+    assert.equal((await pool.query('SELECT count(*)::int n FROM disha_core_journals WHERE order_id=$1',
+      [reusedOrder.orderId])).rows[0].n,0,'No duplicate journal on a different order');
+    // WebAuthn + customer-submitted UTR is an observation, not a verified statement.
+    const vaultOrder=await newSession();
+    const vaultEvent=event(vaultOrder,{
+      source:'VAULT_FINALIZE',bankEvidence:'VAULT_UTR_CORRELATED'
+    });
+    const vaultHash=crypto.createHash('sha256').update(JSON.stringify(vaultEvent)).digest('hex');
+    await assert.rejects(
+      reconcileCreditWithUtrClaim(pool,vaultEvent,'VAULT_FINALIZE',vaultHash,'VAULT_FINALIZE'),
+      e=>e.code==='CREDIT_SOURCE_NOT_VERIFIED');
+    assert.equal((await pool.query('SELECT count(*)::int n FROM transactions WHERE order_id=$1',
+      [vaultOrder.orderId])).rows[0].n,0,'Unverified Vault evidence cannot write a payment transaction');
+    console.log('ATOMIC_UTR_RECONCILIATION_PASS: balanced journal, idempotent replay, claim evidence, authoritative reuse guard.');
+
     console.log('FINANCIAL_RECONCILIATION_INTEGRATION_PASS: HMAC, replay, signed source, '+
       'quarantine, UTR, amount, payee, atomic journals, tenant isolation and notifications.');
   }finally{
