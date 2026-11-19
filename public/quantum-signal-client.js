@@ -55,12 +55,36 @@
   write(s.orderId,state);
   return response;
  }
+ const inFlight=new Map();
+ async function deliver(s,packet){
+  if(inFlight.has(packet.eventId))return inFlight.get(packet.eventId);
+  const promise=request('event',packet,s.token,true).then(reply=>{
+   const fresh=read(s.orderId);
+   if(fresh){
+    fresh.queue=(fresh.queue||[]).filter(x=>x.eventId!==packet.eventId);
+    write(s.orderId,fresh);
+   }
+   return reply;
+  }).finally(()=>inFlight.delete(packet.eventId));
+  inFlight.set(packet.eventId,promise);
+  return promise;
+ }
+ async function flush(s){
+  if(!restore(s))return null;
+  const queue=read(s.orderId)?.queue||[];
+  const results=await Promise.allSettled(queue.map(packet=>deliver(s,packet)));
+  const ok=results.filter(x=>x.status==='fulfilled');
+  return ok.length?ok[ok.length-1].value:null;
+ }
  async function signal(s,eventKind,app='generic',returnParams={}){
   const state=read(s.orderId);
   if(!state||!restore(s))return null;
   const packet={orderId:s.orderId,token:s.token,nonce:state.nonce,
    eventId:secureId(),eventKind,app,returnParams};
-  return request('event',packet,s.token,true);
+  const queue=state.queue||[];
+  if(queue.length>=12)throw Error('Evidence queue temporarily full');
+  queue.push(packet);state.queue=queue;write(s.orderId,state);
+  return deliver(s,packet);
  }
  function handoff(s,app='generic'){
   const state=read(s.orderId);
@@ -83,19 +107,28 @@
   void signal(s,'BACKGROUND',state.lastApp).catch(()=>{});
  }
  async function returned(s){
-  if(!s)return null;
+  if(!s||!restore(s))return null;
   const state=read(s.orderId);
-  if(!state?.pending||!restore(s))return null;
-  // A return can be observed even when the UPI app returned no reference.
+  if(!state?.pending){
+   // Retry the *original frozen event IDs* after network errors or reloads.
+   if(!(state?.queue?.length))return null;
+   const retried=await Promise.allSettled([
+    flush(s),Promise.resolve(auth()?.submitReturnEvidence?.(s.orderId))
+   ]);
+   return retried[0].status==='fulfilled'?retried[0].value:null;
+  }
+  // A return may be observed without a UTR. The first packet is frozen.
   state.pending=false;state.hidden=false;write(s.orderId,state);
   const result=await Promise.allSettled([
    signal(s,'RETURN',state.lastApp,fields()),
    Promise.resolve(auth()?.submitReturnEvidence?.(s.orderId))
   ]);
+  await flush(s);
   return result[0].status==='fulfilled'?result[0].value:null;
  }
  async function status(s){
   if(!restore(s))return null;
+  await flush(s).catch(()=>{});
   const url='/api/quantum-signal/status/'+encodeURIComponent(s.orderId)+
    '?token='+encodeURIComponent(s.token);
   const res=await fetch(url,{cache:'no-store',credentials:'same-origin'});
