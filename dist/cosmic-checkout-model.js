@@ -36,15 +36,20 @@
 // Android Chrome supports intent:// with a direct user gesture. The
  // bank-scannable UPI QR remains unchanged and Android WebViews still get upi://pay.
  function qrTapLaunchUri(uri,userAgent,checkoutFallbackHref){
-  const valid=qrPayload(uri),ua=String(userAgent||'');
-  const chromeAndroid=/Android/i.test(ua)&&/Chrome\/\d+/i.test(ua);
-  const webView=/(?:;|\s)wv(?:\)|;|\s)|\bVersion\/4\.0\b/i.test(ua);
-  if(!chromeAndroid||webView)return valid;
-  const params=valid.slice(valid.indexOf('?')+1);
-  const fallback=checkoutFallbackUrl(checkoutFallbackHref);
-  return 'intent://pay?'+params+
-   '#Intent;scheme=upi;action=android.intent.action.VIEW;'+
-   (fallback?'S.browser_fallback_url='+encodeURIComponent(fallback)+';':'')+'end';
+   const valid=qrPayload(uri),ua=String(userAgent||'');
+   // Use targeted intent for ALL Android browsers (except WebView), same as appTapLaunchUri
+   if(!supportsTargetedAppLaunch(ua))return valid;
+   const params=valid.slice(valid.indexOf('?')+1);
+   const fallback=checkoutFallbackUrl(checkoutFallbackHref);
+   // Build intent with fallback chain: GPay → PhonePe → Paytm → BHIM → generic
+   const packages={gpay:'com.google.android.apps.nbu.paisa.user',
+    phonepe:'com.phonepe.app',paytm:'net.one97.paytm',bhim:'in.org.npci.upiapp'};
+   const chain=['gpay','phonepe','paytm','bhim'];
+   const fallbackChain=chain.map(a=>packages[a]).join(';');
+   return 'intent://pay?'+params+
+    '#Intent;scheme=upi;action=android.intent.action.VIEW;'+
+    (fallback?'S.browser_fallback_url='+encodeURIComponent(fallback)+';':'')+
+    'S.browser_fallback_package='+encodeURIComponent(fallbackChain)+';end';
  }
 // Package-targeted intent with fallback chain: GPay → PhonePe → Paytm → BHIM → generic.
 // Prevents Android's last-used UPI app (e.g., Slice) from hijacking the payment.

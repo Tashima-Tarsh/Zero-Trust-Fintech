@@ -18,15 +18,15 @@ function mount(status='PENDING'){
   QRCode:function(_,options){data.qr=options.text},addEventListener:(k,v)=>events[k]=v};
  window.QRCode.CorrectLevel={M:1};
  const fetch=async url=>{
-  if(url.includes('/api/merchant/public/order/'))return {ok:true,json:async()=>({success:true,order:{
-   id:'ORD_TEST_1234',upi_uri:uri,amount:500,expires_at:Date.now()+180000,status}})};
-  if(url.includes('/api/ledger/'))return {ok:true,json:async()=>({
-   status:data.status,utr:data.utr,challengeAmount:500})};
-  throw Error('Unexpected fetch '+url);
+   if(url.includes('/api/merchant/public/order/'))return {ok:true,json:async()=>({success:true,order:{
+    id:'ORD_TEST_1234',upi_uri:uri,amount:500,expires_at:Date.now()+180000,status}})};
+   if(url.includes('/api/ledger/'))return {ok:true,json:async()=>({
+    status:data.status,utr:data.utr,challengeAmount:500})};
+   throw Error('Unexpected fetch '+url);
  };
  vm.runInNewContext(source,{window,document,location,navigator:{userAgent:'Mozilla/5.0 (Linux; Android 15)'},
-  URL,URLSearchParams,Date,Intl,console,fetch,setInterval:()=>1,clearInterval(){},
-  sessionStorage:{getItem:()=>null,setItem(){}}});
+   URL,URLSearchParams,Date,Intl,console,fetch,setInterval:()=>1,clearInterval(){},
+   sessionStorage:{getItem:()=>null,setItem(){}}});
  return {nodes,events,stages,data};
 }
 async function flush(){for(let i=0;i<35;i++)await Promise.resolve()}
@@ -35,7 +35,15 @@ const active=app=>app.stages.find(s=>!s.hidden)?.dataset.stage;
  const running=mount();await flush();
  assert.equal(active(running),'qr');
  assert.equal(running.data.qr,uri);
- assert.equal(running.nodes.qrTapToPay.href,uri);
+ // qrTapLaunchUri now returns targeted intent with fallback chain for ALL Android browsers
+ const qrHref=running.nodes.qrTapToPay.href;
+ assert.match(qrHref,/^intent:\/\/pay\?/,'QR tap link should be targeted Android intent');
+ // Should have fallback chain with all 4 apps (order doesn't matter, URL-encoded)
+assert.ok(qrHref.includes('com.google.android.apps.nbu.paisa.user'),'Should include GPay package');
+assert.ok(qrHref.includes('com.phonepe.app'),'Should include PhonePe package');
+assert.ok(qrHref.includes('net.one97.paytm'),'Should include Paytm package');
+assert.ok(qrHref.includes('in.org.npci.upiapp'),'Should include BHIM package');
+ assert.ok(qrHref.includes('upi_intent_fallback'),'Should have fallback URL with upi_intent_fallback');
  assert.equal(running.data.prompt,0);
  running.events.focus();await flush();
  assert.equal(active(running),'qr','Browser focus or scan alone is not a payment');

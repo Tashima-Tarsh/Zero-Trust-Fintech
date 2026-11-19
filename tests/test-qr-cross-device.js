@@ -22,16 +22,16 @@ function open(sharedToken){
   QRCode:function(_,options){state.qr=options.text},addEventListener:(k,v)=>events[k]=v};
  window.QRCode.CorrectLevel={M:1};
  const fetch=async url=>{
-  state.links.push(url);
-  if(url.startsWith('/api/session/')){
-   if(!url.includes('token='+token))return {ok:false,status:401,json:async()=>({success:false,error:'SESSION_TOKEN_REQUIRED'})};
-   return {ok:true,json:async()=>({success:true,session:{
-    orderId:order,sessionId:token,challengeAmount:1,expiresAt:Date.now()+180000,
-    status:'PENDING',merchantType:'PERSONAL',vpaAddress:'owner@oksbi'},upiLink:upi})};
-  }
-  if(url.startsWith('/api/ledger/'))return {ok:true,json:async()=>({
-   status:state.ledger,utr:state.ledger==='SUCCESS'?'123456789012':null})};
-  throw Error('Unexpected fetch '+url);
+   state.links.push(url);
+   if(url.startsWith('/api/session/')){
+    if(!url.includes('token='+token))return {ok:false,status:401,json:async()=>({success:false,error:'SESSION_TOKEN_REQUIRED'})};
+    return {ok:true,json:async()=>({success:true,session:{
+     orderId:order,sessionId:token,challengeAmount:1,expiresAt:Date.now()+180000,
+     status:'PENDING',merchantType:'PERSONAL',vpaAddress:'owner@oksbi'},upiLink:upi})};
+   }
+   if(url.startsWith('/api/ledger/'))return {ok:true,json:async()=>({
+    status:state.ledger,utr:state.ledger==='SUCCESS'?'123456789012':null})};
+   throw Error('Unexpected fetch '+url);
  };
  vm.runInNewContext(src,{window,document,location,navigator,URL,URLSearchParams,Date,Intl,fetch,console,
   setInterval:()=>1,clearInterval(){},sessionStorage:{getItem:()=>null,setItem(){}}});
@@ -42,9 +42,17 @@ async function flush(){for(let i=0;i<35;i++)await Promise.resolve()}
  const phone=open(token);await flush();
  assert.equal(phone.stages.find(x=>!x.hidden).dataset.stage,'qr');
  assert.equal(phone.state.qr,upi);
- assert.equal(phone.nodes.qrTapToPay.href,upi);
+ // qrTapLaunchUri now returns targeted intent with fallback chain for ALL Android browsers
+ const qrHref=phone.nodes.qrTapToPay.href;
+ assert.match(qrHref,/^intent:\/\/pay\?/,'QR tap link should be targeted Android intent');
+ // Should have fallback chain with all 4 apps (order doesn't matter, URL-encoded)
+assert.ok(qrHref.includes('com.google.android.apps.nbu.paisa.user'),'Should include GPay package');
+assert.ok(qrHref.includes('com.phonepe.app'),'Should include PhonePe package');
+assert.ok(qrHref.includes('net.one97.paytm'),'Should include Paytm package');
+assert.ok(qrHref.includes('in.org.npci.upiapp'),'Should include BHIM package');
+ assert.ok(qrHref.includes('upi_intent_fallback'),'Should have fallback URL with upi_intent_fallback');
  assert.match(phone.nodes.paymentTrackingStatus.textContent,/Awaiting confirmation/,
-  'Original browser shows that confirmation is pending when another phone scans');
+   'Original browser shows that confirmation is pending when another phone scans');
  assert.ok(phone.state.links.includes('/api/session/'+order+'?token='+token));
  assert.ok(!phone.state.links.some(link=>link.includes('/api/session/new')));
  await phone.nodes.shareCheckout.events.click();
