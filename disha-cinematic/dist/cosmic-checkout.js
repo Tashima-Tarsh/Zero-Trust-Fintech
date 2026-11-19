@@ -32,7 +32,7 @@
  function copyDebugReport(){
   if(!debug)return;
   const report='DISHA checkout diagnostic v2\n'+
-   'Payment reference: '+(orderId()||'not-created')+'\n'+
+   'Checkout session: '+(orderId()?'active':'not-created')+'\n'+
    'Device: '+device+'\n'+
    debugHistory.map(x=>x.time+' '+x.event+' '+x.code+' '+x.app).join('\n');
   if(navigator.clipboard?.writeText){
@@ -192,7 +192,7 @@
   receiptShown=true;
   trace('LEDGER_CONFIRMED');
   get('receiptAmount').textContent=format(record.challengeAmount||session.amount);
-  get('receiptPaymentRef').textContent='PAY '+String(session.orderId).replace(/^[^_]*_/, '');
+  get('receiptPaymentRef').textContent=new URLSearchParams(session.upiUri.split('?')[1]||'').get('tr')||'—';
   get('receiptUtr').textContent=record.utr;
   showStage('receipt');
   if(ledgerTicker)clearInterval(ledgerTicker);
@@ -414,7 +414,7 @@
   get('shareReceipt').addEventListener('click',async()=>{
    if(!receiptShown)return;
    const content='DISHA payment receipt\nAmount: '+format(session.amount)+
-    '\nPayment reference: '+session.orderId+'\nUPI reference: '+get('receiptUtr').textContent;
+    '\n'+(new URLSearchParams(session.upiUri.split('?')[1]||'').get('tr')?'TR: '+new URLSearchParams(session.upiUri.split('?')[1]||'').get('tr')+'\n':'')+'UPI reference: '+get('receiptUtr').textContent;
    try{
     if(navigator.share)await navigator.share({title:'DISHA payment receipt',text:content});
     else if(navigator.clipboard?.writeText){

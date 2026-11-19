@@ -52,6 +52,7 @@ const UNIT_TESTS = [
   'test-triad-agent-loop.js', // no-money P2P URL and UTR intent fixture
   'test-owner-production-provisioning.js', // verified owner, P2P/P2M isolation and no database wipe
   'test-platform-control-startup.js', // database connection assigned after owner service constructor
+  'test-production-no-internal-ids.js', // Customer-facing UI must not display DB identifiers
   'test-merchant-reference-ui.js', // matches approved premium lunar dashboard and frontend assets
   'test-celestial-merchant.js', // lunar glass merchant shell / Pony-tail invariants
   'test-saas-white-production.js', // no demo data; 12 live merchant routes and white layout
