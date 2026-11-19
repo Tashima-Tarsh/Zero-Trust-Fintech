@@ -269,9 +269,10 @@
   const anchor=get('qrTapToPay'),container=get('paymentQr');
   if(quantumEnabled&&!quantumReady){
    anchor.href='#';anchor.setAttribute('aria-disabled','true');
+   const proceed=get('vaultProceed');proceed.href='#';proceed.setAttribute('aria-disabled','true');
    get('upiAppOptions').hidden=true;
    container.replaceChildren();qrUri=null;
-   get('qrExpiry').textContent='Authorize DISHA Vault to unlock this payment request.';
+   get('qrExpiry').textContent='Preparing the protected payment session.';
    return;
   }
   if(expired()||['EXPIRED','FAILED','CANCELLED'].includes(session.initialStatus)){
@@ -282,6 +283,11 @@
   anchor.href=model.supportsNativeUPI(userAgent)
    ?model.qrTapLaunchUri(session.upiUri,userAgent,secureCheckoutUrl(true)):'#';
   anchor.setAttribute('aria-disabled','false');
+  if(quantumEnabled){
+   const proceed=get('vaultProceed');
+   proceed.href=anchor.href;
+   proceed.setAttribute('aria-disabled',model.supportsNativeUPI(userAgent)?'false':'true');
+  }
   const targeted=model.supportsTargetedAppLaunch(userAgent);
   get('upiAppOptions').hidden=!targeted;
   for(const link of document.querySelectorAll('[data-upi-app]')){
@@ -325,22 +331,23 @@
   void pollLedger();
  }
  function setEventHandlers(){
-  get('vaultProceed').addEventListener('click',async()=>{
-   if(!quantumEnabled||quantumReady||!session||expired())return;
-   const button=get('vaultProceed');button.disabled=true;
-   get('vaultStatus').textContent='Authorizing this payment with DISHA Vault…';
-   try{
-    if(!quantumClient)throw Error('Quantum Signal is unavailable');
-    const started=await quantumClient.authorizeAndStart(session);
-    quantumReady=true;button.hidden=true;
-    get('vaultStatus').textContent='Vault authorized · '+started.paymentType+
-     ' · This payment session is locked. Tap QR or choose a UPI app.';
-    trace('VAULT_AUTHORIZED','ORDER_BOUND');
-    renderQr();
-   }catch(error){
-    get('vaultStatus').textContent='Vault not authorized. '+String(error.message||'Retry.');
-    message('Could not authorize this payment. Retry Proceed.','info');
-   }finally{button.disabled=false}
+
+  // Native browser anchor navigation preserves Android's direct user gesture.
+  // Signal twin and ACK are established before this click.
+  get('vaultProceed').addEventListener('click',event=>{
+   if(!quantumEnabled||!quantumReady||!session||receiptShown||expired()||
+      !model.supportsNativeUPI(userAgent)||
+      ['EXPIRED','FAILED','CANCELLED'].includes(session.initialStatus)){
+    event.preventDefault();
+    message(expired()?'Payment window expired. Request a fresh link.':
+     'Preparing payment. Retry Proceed when the secure channel is ready.','info');
+    return;
+   }
+   try{quantumClient.handoff(session,'generic')}
+   catch(_){event.preventDefault();message('Trust channel unavailable. Retry Proceed.','error');return}
+   qrTapStartedAt=Date.now();qrAppBackgrounded=false;
+   trace('APP_DISPATCH','APP_GENERIC','generic');
+   // Allow the browser to navigate via this user-tapped link.
   });
   get('qrTapToPay').addEventListener('click',event=>{
    if(!session||receiptShown||expired()||
@@ -415,14 +422,15 @@
    const normalized=declared==='PERSONAL'?'P2P':declared==='MERCHANT'?'P2M':declared;
    if(requiredMode&&normalized!==requiredMode)throw Error('PAYMENT_MODE_MISMATCH');
    if(quantumEnabled){
-    const proceed=get('vaultProceed');
-    proceed.hidden=false;
-    quantumReady=Boolean(quantumClient?.restore(session));
-    proceed.hidden=quantumReady;
-    get('vaultStatus').textContent=quantumReady?
-      'Vault authorized · You can open the UPI application.':
-      'Proceed authorizes this session with your device passkey. No notification access required.';
     if(!quantumClient)throw Error('Quantum Signal client unavailable');
+    const proceed=get('vaultProceed');
+    proceed.hidden=!model.supportsNativeUPI(userAgent);
+    proceed.href='#';proceed.setAttribute('aria-disabled','true');
+    get('vaultStatus').textContent='Preparing DISHA two-way trust signal…';
+    quantumReady=Boolean(quantumClient.restore(session));
+    if(!quantumReady)await quantumClient.prepare(session);
+    quantumReady=true;
+    get('vaultStatus').textContent='Protected signal channel ready · one Proceed tap opens UPI.';
    }
    trace('ORDER_READY');
    saveSessionState();
