@@ -243,3 +243,11 @@ body[data-qr-primary="true"] .stage-qr .stage-copy{margin:12px auto 6px}
 body[data-qr-primary="true"] .qr-scan-line{display:none}
 .checkout-share-link{display:inline-block;margin-top:12px;padding:11px 5px;border:0;background:none;color:#d4dfff;text-decoration:underline;text-underline-offset:4px;font-size:12px;cursor:pointer}
 .checkout-share-link:hover{color:#fff}
+
+/* Explicit selection only on Chrome Android; the same QR remains app-neutral. */
+.upi-app-options{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;max-width:307px;margin:12px auto 0}
+.upi-app-options[hidden]{display:none}
+.upi-app-options a{display:flex;justify-content:center;align-items:center;min-height:42px;padding:8px;border:1px solid #a8c7ff60;border-radius:11px;background:#e4eeff10;color:#f3f5ff;font-size:12px;font-weight:650;text-decoration:none}
+.upi-app-options a:focus-visible{outline:3px solid #a8dfff;outline-offset:2px}
+.upi-app-options a[aria-disabled="true"]{opacity:.5;pointer-events:none}
+

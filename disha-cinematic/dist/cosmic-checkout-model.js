@@ -32,6 +32,23 @@
    '#Intent;scheme=upi;action=android.intent.action.VIEW;'+
    (fallback?'S.browser_fallback_url='+encodeURIComponent(fallback)+';':'')+'end';
  }
+ // A package-targeted Chrome Intent prevents Android's last-used UPI app
+ // (for example Slice) from silently replacing a customer's explicit choice.
+ function supportsTargetedAppLaunch(userAgent){
+  const ua=String(userAgent||'');
+  return /Android/i.test(ua)&&/Chrome\/\d+/i.test(ua)&&
+   !/(?:;|\s)wv(?:\)|;|\s)|\bVersion\/4\.0\b|SamsungBrowser\/|EdgA\/|OPR\//i.test(ua);
+ }
+ function appTapLaunchUri(uri,userAgent,checkoutFallbackHref,app){
+  const valid=qrPayload(uri);
+  const packages={gpay:'com.google.android.apps.nbu.paisa.user',
+   phonepe:'com.phonepe.app',paytm:'net.one97.paytm',bhim:'in.org.npci.upiapp'};
+  const pkg=packages[app];
+  if(!pkg)throw Error('Unsupported UPI app');
+  if(!supportsTargetedAppLaunch(userAgent))return valid;
+  return qrTapLaunchUri(valid,userAgent,checkoutFallbackHref)
+   .replace('#Intent;scheme=upi;','#Intent;scheme=upi;package='+pkg+';');
+ }
  function isSettled(record){
   return Boolean(record&&record.status==='SUCCESS'&&typeof record.utr==='string'&&/^[0-9]{12}$/.test(record.utr));
  }
@@ -50,7 +67,7 @@
   if(!Number.isFinite(n)||n<=0)throw Error('Invalid payment amount');
   return new Intl.NumberFormat('en-IN',{style:'currency',currency:'INR',maximumFractionDigits:2,minimumFractionDigits:2}).format(n);
  }
- const api=Object.freeze({qrPayload,qrTapLaunchUri,checkoutFallbackUrl,supportsNativeUPI,isSettled,formatINR,userFacingError});
+ const api=Object.freeze({qrPayload,qrTapLaunchUri,appTapLaunchUri,supportsTargetedAppLaunch,checkoutFallbackUrl,supportsNativeUPI,isSettled,formatINR,userFacingError});
  if(typeof module!=='undefined'&&module.exports)module.exports=api;
  root.DISHACosmicCheckoutModel=api;
 })(typeof window!=='undefined'?window:globalThis);
