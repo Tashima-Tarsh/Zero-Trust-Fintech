@@ -115,7 +115,7 @@
    paymentType:raw.paymentType,payeeVpa:raw.vpaAddress};
  }
  function saveAuthorizedSession(){
-  if(mode!=='generic'||!session)return;
+  if(mode!=='generic'||!session||query.has('orderId'))return;
   try{
    sessionStorage.setItem(resumeKey,JSON.stringify({
     ...session,requestedAmount:query.get('amount')||'1',savedAt:Date.now()
@@ -223,7 +223,8 @@
   const node=get('checkoutTimer');
   if(!node||!session)return;
   if(receiptShown){node.textContent='Payment confirmed';return}
-  const remaining=Math.max(0,Math.ceil((session.expiresAt-Date.now())/1000));
+  const remaining=['EXPIRED','FAILED','CANCELLED'].includes(session.initialStatus)
+   ?0:Math.max(0,Math.ceil((session.expiresAt-Date.now())/1000));
   const mm=String(Math.floor(remaining/60)).padStart(2,'0');
   const ss=String(remaining%60).padStart(2,'0');
   node.textContent=remaining?'Session expires in '+mm+':'+ss:'Session expired · Request a new payment link';
@@ -242,7 +243,8 @@
  }
  function handleQrExpiry(){
   if(!session||lastStage!=='qr')return;
-  const left=Math.max(0,Math.ceil((session.expiresAt-Date.now())/1000));
+  const left=['EXPIRED','FAILED','CANCELLED'].includes(session.initialStatus)
+   ?0:Math.max(0,Math.ceil((session.expiresAt-Date.now())/1000));
   get('qrExpiry').textContent=left>0?'QR valid for '+Math.floor(left/60)+':'+String(left%60).padStart(2,'0')+
     ' · Linked to this payment request':'Payment link expired — request a new link';
   get('paymentQr').classList.toggle('is-expired',left===0);
