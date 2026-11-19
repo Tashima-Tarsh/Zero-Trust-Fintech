@@ -361,23 +361,23 @@
      'Scan this QR with any UPI app (GPay, PhonePe, Paytm, BHIM, etc.).','info');
     return;
    }
-feat/frontend-3d-vault-premium-ui
+
+
    const now=Date.now();
    if(lastNativeLaunchAt&&now-lastNativeLaunchAt<nativeLaunchCooldownMs){
     event.preventDefault();
-    trace('APP_DUPLICATE_BLOCKED');
+
     message('UPI app was already opened. Return here before trying again.','info');
     return;
    }
    lastNativeLaunchAt=now;
    qrTapStartedAt=now;qrAppBackgrounded=false;
-
-   qrTapStartedAt=Date.now();qrAppBackgrounded=false;
    if(quantumEnabled&&quantumClient){
     try{quantumClient.handoff(session,'generic')}
     catch(_){event.preventDefault();message('Authorize Vault before paying.','error');return}
    }
-main
+
+
    trace('APP_DISPATCH','APP_GENERIC','generic');
   });
   for(const link of document.querySelectorAll('[data-upi-app]')){
@@ -423,15 +423,15 @@ main
   });
   document.addEventListener('visibilitychange',()=>{
    if(document.visibilityState==='hidden'){
-feat/frontend-3d-vault-premium-ui
+
+
     if(qrTapStartedAt&&!qrAppBackgrounded){
      qrAppBackgrounded=true;
      trace('BROWSER_HIDDEN');
     }
-
-    if(qrTapStartedAt)qrAppBackgrounded=true;
     if(quantumEnabled&&quantumReady&&quantumClient)quantumClient.background(session);
- main
+
+
    }else onReturn();
   });
   window.addEventListener('pageshow',onReturn);
@@ -441,9 +441,11 @@ feat/frontend-3d-vault-premium-ui
   setEventHandlers();showStage('qr');
   try{
    session=await getSession();
-feat/frontend-3d-vault-premium-ui
+
+
    trace('QR_OPEN');
-=======
+
+
    const declared=String(session.paymentType||'').toUpperCase();
    const normalized=declared==='PERSONAL'?'P2P':declared==='MERCHANT'?'P2M':declared;
    if(requiredMode&&normalized!==requiredMode)throw Error('PAYMENT_MODE_MISMATCH');
@@ -459,7 +461,8 @@ feat/frontend-3d-vault-premium-ui
     get('vaultStatus').textContent='Protected signal channel ready · one Proceed tap opens UPI.';
    }
    trace('ORDER_READY');
- main
+
+
    saveSessionState();
    setMoney(session.amount);
    setPaymentKind();
@@ -471,20 +474,20 @@ feat/frontend-3d-vault-premium-ui
     ?'Tap the QR to open your UPI app (GPay/PhonePe/Paytm/BHIM), or scan from another phone.'
     :'Scan this QR using your UPI app on another phone.';
    showStage('qr');tickSessionTimer();
-feat/frontend-3d-vault-premium-ui
+
+
    // Initialize 3D vault after session is ready
    if(window.DISHAVault3D&&!window.DISHAVault3D.isReduced()){
     setTimeout(()=>window.DISHAVault3D.init(),300);
    }
-   if(query.get('upi_intent_fallback')==='1')
-    message('UPI app did not open. Scan this QR from another phone.','info');
-=======
+
    if(query.get('upi_intent_fallback')==='1'){
     // Chrome's fallback indicates a failed external-app handoff, not a payment decision.
     trace('APP_ERROR','APP_NAVIGATION_ERROR');
     message('UPI app could not be opened. Choose another app or scan this QR from another phone.','info');
    }
- main
+
+
    await pollLedger();
    if(receiptShown)return;
    if(['EXPIRED','FAILED','CANCELLED'].includes(session.initialStatus)||expired())

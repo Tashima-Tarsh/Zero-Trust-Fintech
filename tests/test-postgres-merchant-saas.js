@@ -177,7 +177,7 @@ const {buildUpiUri}=require('../utils/upi-intent');
   assert.equal(earlier.data.order.upi_uri,initialUri,'Existing P2P payment must not mutate after VPA modification');
   await pg.query("UPDATE saas_merchant_vpas SET account_type='PERSONAL',mcc=NULL,holder_name='Acme Treasury' WHERE vpa_address=$1",
     ['acme'+nonce+'@oksbi']);
- feat/frontend-3d-vault-premium-ui
+
 
   // Regression: changing the existing primary receiving account from P2P to
   // bank-issued P2M via the merchant setup form must update the stored type/MCC.
@@ -216,7 +216,7 @@ const {buildUpiUri}=require('../utils/upi-intent');
     '?token='+encodeURIComponent(token));
   assert.equal(originalAfterRestore.data.order.upi_uri,initialUri);
 
-=======
+
   // Selected merchant lane must reject a personal VPA or implicit account rotation.
   let mismatched=await call('/api/merchant/payments',alice,'POST',{
    amount:'1.00',paymentMode:'P2M',vpaAddress:'finance'+nonce+'@oksbi'});
@@ -224,7 +224,8 @@ const {buildUpiUri}=require('../utils/upi-intent');
   mismatched=await call('/api/merchant/payments',alice,'POST',{
    amount:'1.00',paymentMode:'P2M'});
   assert.equal(mismatched.status,409,'P2M requires explicit merchant VPA');
- main
+
+
   const merchantVpa='counter'+nonce+'@ybl';
   let p2m=await call('/api/merchant/payments',alice,'POST',{
     amount:'1.00',paymentMode:'P2M',vpaAddress:merchantVpa,description:'Company receipt'});
