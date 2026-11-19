@@ -11,7 +11,10 @@
  let qrUri=null,lastStage='qr',expiryTicker=null,ledgerTicker=null;
  let expiryLogged=false;
  // Browser-only diagnostics for direct QR taps. Not evidence of a bank payment.
- let qrTapStartedAt=0,qrAppBackgrounded=false;
+ let qrTapStartedAt=0,qrAppBackgrounded=false,lastNativeLaunchAt=0;
+ // Prevent rapid repeated taps from dispatching another UPI activity while
+ // the first handoff is still opening or returning.
+ const nativeLaunchCooldownMs=6000;
  const userAgent=navigator.userAgent||'';
  const orderId=()=>session?.orderId||null;
  const debug=query.get('debug')==='1';
@@ -282,7 +285,7 @@
   tickSessionTimer();
   if(qrTapStartedAt&&qrAppBackgrounded){
    const early=Date.now()-qrTapStartedAt<12000;
-   trace('QR_APP_RETURN',early?'FAST':'NORMAL');
+   trace('BROWSER_RETURN',early?'RETURN_FAST':'RETURN_NORMAL');
    if(early&&lastStage==='qr')
     message('UPI app returned quickly. Check its payment history before retrying.','info');
    qrTapStartedAt=0;qrAppBackgrounded=false;
@@ -298,7 +301,15 @@
      'Scan this QR with a UPI app on another phone.','info');
     return;
    }
-   qrTapStartedAt=Date.now();qrAppBackgrounded=false;
+   const now=Date.now();
+   if(lastNativeLaunchAt&&now-lastNativeLaunchAt<nativeLaunchCooldownMs){
+    event.preventDefault();
+    trace('APP_DUPLICATE_BLOCKED');
+    message('UPI app was already opened. Return here before trying again.','info');
+    return;
+   }
+   lastNativeLaunchAt=now;
+   qrTapStartedAt=now;qrAppBackgrounded=false;
    trace('APP_DISPATCH','APP_GENERIC','generic');
   });
   get('shareCheckout').addEventListener('click',async()=>{
@@ -327,7 +338,10 @@
   });
   document.addEventListener('visibilitychange',()=>{
    if(document.visibilityState==='hidden'){
-    if(qrTapStartedAt)qrAppBackgrounded=true;
+    if(qrTapStartedAt&&!qrAppBackgrounded){
+     qrAppBackgrounded=true;
+     trace('BROWSER_HIDDEN');
+    }
    }else onReturn();
   });
   window.addEventListener('pageshow',onReturn);
@@ -337,7 +351,7 @@
   setEventHandlers();showStage('qr');
   try{
    session=await getSession();
-   trace('PAYMENT_READY');
+   trace('QR_OPEN');
    saveSessionState();
    setMoney(session.amount);
    setPaymentKind();
