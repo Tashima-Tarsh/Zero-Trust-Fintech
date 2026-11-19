@@ -152,9 +152,13 @@ def specialist_prompts(root: Path):
     return prompts
 
 def archify_candidate(repo: Path, output: Path):
+    revision = subprocess.run(["git", "rev-parse", "HEAD"], cwd=repo,
+                              capture_output=True, text=True, check=False)
+    sha = revision.stdout.strip() if revision.returncode == 0 else ""
+    pinned = bool(re.fullmatch(r"[0-9a-f]{40}", sha))
     def source(key):
         p = SOURCES[key]
-        if not (repo / p).is_file():
+        if not pinned or not (repo / p).is_file():
             return []
         return [{"path": p, "line": 1}]
     def node(i, kind, label, sub, x, y, key):
@@ -189,11 +193,16 @@ def archify_candidate(repo: Path, output: Path):
         ("triad", "tests", "Verify source + artifacts"),
         ("evidence", "tests", "Diagnostic artifacts"),
     ]
+    meta = {"title": "DISHA UPI Intent and Three-Tool Evidence Loop",
+            "output": "test-results/triad/architecture.html",
+            "quality_profile": "standard", "visual_preset": "blueprint"}
+    if pinned:
+        meta["repository"] = {
+            "url": "https://github.com/Tashima-Tarsh/Zero-Trust-Fintech",
+            "provider": "github", "link_mode": "web", "revision": sha}
     return {
         "schema_version": 1, "diagram_type": "architecture",
-        "meta": {"title": "DISHA UPI Intent and Three-Tool Evidence Loop",
-                 "output": "test-results/triad/architecture.html",
-                 "quality_profile": "standard", "visual_preset": "blueprint"},
+        "meta": meta,
         "components": nodes,
         "connections": [{"from": a, "to": b, "label": label} for a, b, label in edges],
         "cards": [
