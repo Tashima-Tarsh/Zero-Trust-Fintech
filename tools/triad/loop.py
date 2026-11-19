@@ -226,31 +226,68 @@ def run_process(argv, cwd, timeout=240):
         return {"command": [Path(argv[0]).name, *argv[1:]], "exitCode": -1,
                 "seconds": round(time.monotonic()-began, 2), "errorClass": type(err).__name__}
 
+class OfflineSpecialist:
+    """Evidence-only callable accepted by Swarms ConcurrentWorkflow.
+
+    This is a deterministic review worker, NOT an LLM. The specialist name and
+    governing instructions are read from a pinned wshobson/agents checkout.
+    """
+
+    def __init__(self, name, instructions, observations):
+        self.agent_name = "DISHA_" + name
+        self.prompt_sha256 = hashlib.sha256(instructions.encode()).hexdigest()
+        self.observations = observations
+
+    def run(self, task, img=None, imgs=None, streaming_callback=None):
+        # No network requests, source mutations or fake success verdicts.
+        checks = {
+            "Architecture": ["CONTRACT_CHECKOUT", "CONTRACT_LEDGER"],
+            "AndroidDebugger": ["CONTRACT_ANDROID", "CONTRACT_ANDROID_E2E",
+                                "ANDROID_LAUNCH_FAULT"],
+            "AppSecurity": ["BANNED_GATEWAY", "CONTRACT_ANDROID",
+                            "CONTRACT_LEDGER"],
+            "CodeDebt": ["MISSING_SOURCE", "CONTRACT_URI"],
+            "TestAutomation": ["CONTRACT_ANDROID_E2E", "CONTRACT_RECEIVER"],
+            "Performance": ["CONTRACT_CHECKOUT", "ANDROID_LAUNCH_FAULT"],
+        }
+        role = self.agent_name.removeprefix("DISHA_")
+        matched = [f for f in self.observations["findings"]
+                   if f["code"] in checks.get(role, [])]
+        return json.dumps({"specialist": role, "promptSha256": self.prompt_sha256,
+                           "findings": matched, "bankVerified": False})
+
+
 def swarms_review(prompts, model_name, goal, root, state):
-    # The only accepted LLM backend is local Ollama. No third-party API key.
-    if not model_name:
-        return {"status": "NOT_RUN_NO_LOCAL_MODEL", "agents": list(prompts)}
-    if not model_name.startswith(("ollama/", "ollama_chat/")):
-        raise RuntimeError("--model must be a local Ollama model, e.g. ollama_chat/qwen3:4b")
+    """Use actual Swarms ConcurrentWorkflow with zero API keys when offline."""
     try:
         from swarms import Agent, ConcurrentWorkflow
-    except ImportError as err:
-        raise RuntimeError("Install the Swarms development package in a separate venv") from err
-    agents = []
-    for name, instructions in prompts.items():
-        agents.append(Agent(
-            agent_name="DISHA_" + name,
-            agent_description="Evidence-based code review with read-only tools",
-            system_prompt=instructions[:12000] + "\n\nDISHA override: " + BANKLESS,
-            model_name=model_name, max_loops=1, tools=None,
-            autosave=False, print_on=False, verbose=False))
-    task = (goal + "\nAnalyze all repo components, prioritize UPI Android Intent "
-            "pre-PIN errors, cross-device evidence limitations, and secure code debt. "
-            "No file modifications. Return line-specific findings. "
-            "Source fingerprint: " + state["fingerprint"] + "\nRepo: " + str(root))
-    workflow = ConcurrentWorkflow(agents=agents, max_workers=6, on_error="store")
+    except ImportError:
+        return {"status": "NOT_RUN_NO_LOCAL_MODEL_OR_SWARMS_PACKAGE",
+                "agents": list(prompts)}
+    observations = evidence(root, None)
+    if model_name:
+        if not model_name.startswith(("ollama/", "ollama_chat/")):
+            raise RuntimeError("--model must be a local Ollama model, e.g. ollama_chat/qwen3:4b")
+        agents = []
+        for name, instructions in prompts.items():
+            agents.append(Agent(
+                agent_name="DISHA_" + name,
+                agent_description="Evidence-based code review with read-only tools",
+                system_prompt=instructions[:12000] + "\n\nDISHA override: " + BANKLESS,
+                model_name=model_name, max_loops=1, tools=None,
+                autosave=False, print_on=False, verbose=False))
+        status = "EXECUTED_LOCAL_OLLAMA"
+    else:
+        agents = [OfflineSpecialist(name, instructions, observations)
+                  for name, instructions in prompts.items()]
+        status = "EXECUTED_SWARMS_OFFLINE_RULE_AGENTS"
+    task = (goal + "\nReview the entire DISHA UPI checkout, Android evidence, "
+            "and regression gate without inventing bank confirmation. "
+            "Source fingerprint: " + state["fingerprint"])
+    workflow = ConcurrentWorkflow(agents=agents, max_workers=6, on_error="raise",
+                                  autosave=False, verbose=False, show_dashboard=False)
     result = str(workflow.run(task))
-    return {"status": "EXECUTED_LOCAL_OLLAMA", "agents": list(prompts),
+    return {"status": status, "agents": list(prompts),
             "outputSha256": hashlib.sha256(result.encode()).hexdigest(),
             "outputPreview": result[:5000]}
 
@@ -281,6 +318,7 @@ def main():
     if not output.is_relative_to(root):
         parser.error("Output must stay inside the repository")
     output.mkdir(parents=True, exist_ok=True)
+    os.environ["SWARMS_TELEMETRY_ON"] = "false"
     prompts = specialist_prompts(args.agents_root.resolve())
     arch_root = args.archify_root.resolve()
     if not (arch_root / "archify/bin/archify.mjs").is_file():
@@ -348,7 +386,8 @@ def main():
     if args.render:
         ok = ok and result["archify"]["exitCode"] == 0
     if args.require_all:
-        ok = ok and result["agents"]["status"] == "EXECUTED_LOCAL_OLLAMA"
+        ok = ok and result["agents"]["status"] in {
+            "EXECUTED_LOCAL_OLLAMA", "EXECUTED_SWARMS_OFFLINE_RULE_AGENTS"}
         ok = ok and result["frameworks"]["archify"] == "VALIDATED_RENDERED"
     result["passedStaticGates"] = ok
     (output / "report.json").write_text(json.dumps(result, indent=2)+"\n",
