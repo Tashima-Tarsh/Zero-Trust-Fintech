@@ -283,7 +283,7 @@ app.use('/api', (req,res,next) =>
 // One canonical merchant dashboard; checkout and its APIs remain public.
 app.get('/merchant-console.html', (req, res) => res.redirect(302, '/dashboard'));
 // Canonical checkout must run before static middleware, which otherwise serves
-// the obsolete public/checkout/index.html at /checkout/.
+// the retired alternative checkout pages.
 app.get(['/checkout', '/checkout/', '/pay', '/pay/'], (req, res) => {
   res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
   res.sendFile(path.join(__dirname, 'public', 'checkout.html'));

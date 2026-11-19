@@ -12,7 +12,7 @@ const worker=fs.readFileSync(path.join(root,'_worker.js'),'utf8');
 const routes=JSON.parse(fs.readFileSync(path.join(root,'_routes.json'),'utf8'));
 const checkout=fs.readFileSync(path.join(root,'checkout.html'),'utf8');
 
-const checkoutAssets=['checkout.html','merchant-checkout.html','cosmic-checkout.css','cosmic-checkout.js','cosmic-checkout-model.js','one-touch-vault.js','assets/disha-vault-sculpture.svg','assets/upi-googlepay.svg','assets/upi-phonepe.svg','assets/upi-paytm.svg'];
+const checkoutAssets=['checkout.html','merchant-checkout.html','cosmic-checkout.css','cosmic-checkout.js','cosmic-checkout-model.js','one-touch-vault.js','assets/upi-googlepay.svg','assets/upi-phonepe.svg','assets/upi-paytm.svg'];
 for(const name of checkoutAssets){
  const canonical=fs.readFileSync(path.join(root,name));
  for(const dir of ['dist','disha-cinematic/public','disha-cinematic/dist']){

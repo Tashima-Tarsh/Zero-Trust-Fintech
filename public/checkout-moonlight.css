@@ -70,54 +70,6 @@ body{isolation:isolate;overflow:hidden}
  scrollbar-width:thin;scrollbar-color:#6a7ba8 transparent;
  background:none!important;box-shadow:none!important;
 }
-.stage-initial{
- align-items:center;justify-content:center!important;
- flex:0 1 auto!important;
- padding-top:2px!important;padding-bottom:14px!important;
- overflow:visible!important;
-}
-.stage-initial .eyebrow{
- color:#d2e2fa;font-size:10px;letter-spacing:.34em;
- margin:2px 0 4px!important;
-}
-.stage-initial .amount{
- color:#fbfcff!important;font-size:clamp(40px,6.1vw,68px)!important;
- letter-spacing:-.063em;
- text-shadow:0 0 36px #97b5ef62,0 6px 25px #000;
- margin:0!important;
-}
-.vault-scene{
- width:clamp(150px,min(29vh,30vw),260px)!important;
- max-height:clamp(150px,29vh,260px)!important;
- margin:clamp(5px,2vh,22px) auto clamp(9px,2.4vh,23px)!important;
- flex:0 1 auto;
-}
-.vault-atmosphere{opacity:.67}
-.vault-art{filter:drop-shadow(0 0 24px #a5bcff70) contrast(1.12) saturate(1.1)}
-.stage-initial #btnOneTouch{
- width:clamp(136px,26vw,178px)!important;
- max-width:178px!important;
- min-height:46px!important;height:46px;
- padding:10px 22px!important;
- margin:0 auto!important;
- border:1px solid #f5f8ff!important;border-radius:999px!important;
- background:linear-gradient(120deg,#eaf5ff 0%,#b6d5ff 75%,#9dbfff 100%)!important;
- color:#071c3f!important;
- font-size:15px!important;font-weight:780;
- text-shadow:none;
- box-shadow:0 0 17px #92c6ff62,inset 0 1px #fff,0 5px 21px #0008!important;
- gap:0!important;
- transition:transform .18s ease,box-shadow .18s ease!important;
-}
-.stage-initial #btnOneTouch::before{display:none!important}
-.stage-initial #btnOneTouch .touch-icon,
-.stage-initial #btnOneTouch .action-arrow{display:none!important}
-.stage-initial #btnOneTouch:not(:disabled):hover{
- transform:translateY(-2px)!important;
- background:linear-gradient(120deg,#fff,#c6e2ff)!important;
- box-shadow:0 0 24px #a5d7ffb0,0 9px 26px #0007!important;
-}
-.stage-initial .button-help{font-size:11px;color:#c5d8f1;margin:10px 0 0!important;text-shadow:0 2px 6px #000}
 .checkout-footer{
  flex-shrink:0;position:relative;z-index:2;
  padding:10px 0 0!important;text-align:center;color:#9dadd0;
@@ -127,7 +79,7 @@ body{isolation:isolate;overflow:hidden}
  content:"NASA LRO Moon imagery";display:block;color:#8b9cb9;
  font-size:9px;margin-bottom:5px;letter-spacing:.04em;
 }
-[data-stage="methods"],[data-stage="qr"],[data-stage="checking"],[data-stage="receipt"]{
+[data-stage="qr"],[data-stage="receipt"]{
  width:100%;max-width:510px;margin:0 auto;
  text-align:center;
  background:transparent!important;
@@ -136,7 +88,6 @@ body{isolation:isolate;overflow:hidden}
  backdrop-filter:none!important;-webkit-backdrop-filter:none!important;
  padding:clamp(18px,3vh,25px)!important;
 }
-[data-stage="methods"] .app-choice{background:#d5e8ff0e}
 [data-stage="receipt"] .receipt-details{background:#080f2460;padding:4px 12px;border-radius:12px}
 [data-stage="receipt"] .receipt-actions .action-primary{width:100%}
 .checkout-status{
@@ -148,26 +99,18 @@ body{isolation:isolate;overflow:hidden}
  .nasa-moon{right:-32px;top:17px;width:clamp(105px,27vw,159px);opacity:.55}
  .checkout-shell{padding:12px 14px!important}
  .checkout-brand .logo{width:clamp(160px,42vw,196px)!important}
- .stage-initial .amount{font-size:clamp(39px,10vw,57px)!important}
- .vault-scene{width:clamp(160px,34vh,230px)!important;max-height:34vh!important}
- .stage-initial #btnOneTouch{width:150px!important;min-height:46px!important}
 }
 @media(max-width:420px){
  .checkout-shell{padding:11px 13px!important}
  .checkout-panel{max-height:calc(100dvh - 24px)}
  .checkout-brand{padding-bottom:8px!important}
  .stage{padding:8px 7px!important}
- .stage-initial .amount{font-size:clamp(38px,11vw,51px)!important}
- .vault-scene{width:clamp(155px,29vh,220px)!important;max-height:29vh!important}
- [data-stage="methods"],[data-stage="qr"],[data-stage="checking"],[data-stage="receipt"]{padding:14px!important}
+[data-stage="qr"],[data-stage="receipt"]{padding:14px!important}
  .checkout-footer{font-size:9px}
 }
 @media(max-height:620px){
  .checkout-shell{padding-top:8px!important;padding-bottom:8px!important}
  .checkout-brand{padding-bottom:4px!important}
- .vault-scene{width:clamp(120px,22vh,185px)!important;max-height:22vh!important;margin:2px auto 6px!important}
- .stage-initial #btnOneTouch{min-height:40px!important;height:40px}
- .stage-initial .button-help{margin-top:5px!important}
  .checkout-footer:before{display:none}
 }
 @media(prefers-reduced-motion:reduce){
@@ -181,18 +124,9 @@ body{isolation:isolate;overflow:hidden}
 
 
 /* Mobile intent reliability: provide a generic native-app chooser after Vault.
-   The first Pay tap authorizes; the subsequent UPI-app tap is the fresh user
-   gesture Chrome requires to launch an external payment application. */
-.app-choice-any{grid-column:1/-1;min-height:73px!important;flex-direction:row!important;gap:12px!important}
-.app-icon.any-upi{background:linear-gradient(140deg,#163f59,#27568d);color:#c4f5ff;font-size:25px;font-weight:800}
+   The first Pay tap authorizes;
 #oneTouchFallback{display:flex;justify-content:center;width:100%;min-height:42px;color:#bde3ff;border:1px solid #6e91cd70;background:#10264591}
 #oneTouchFallback[hidden]{display:none!important}
-[data-stage="methods"] .inline-note{font-size:12px;line-height:1.55;color:#d3e5f9}
-@media(max-height:670px){
- [data-stage="methods"] .app-choice{min-height:83px;gap:6px;padding:9px 6px}
- [data-stage="methods"] .app-icon{width:38px;height:38px;border-radius:12px}
- [data-stage="methods"] .app-icon img{width:25px;height:25px}
-}
 
 /* Backend-authoritative session TTL, visible on every stage without adding a card. */
 .checkout-timer{

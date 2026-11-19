@@ -22,39 +22,24 @@ button,a{font:inherit}button{cursor:pointer}button:disabled{opacity:.48;cursor:w
 .panel-topline span{height:3px;width:23px;border-radius:30px;background:#c3c8ff36}
 .panel-topline span:first-child{background:#a7b6ff9c}
 .stage{position:relative;min-height:520px;padding:32px clamp(22px,6vw,43px) 28px;text-align:center;animation:stageAppear .45s cubic-bezier(.2,.7,.2,1) both}
-.stage-initial{display:flex;flex-direction:column;align-items:center;justify-content:center;padding-top:9px}
 .eyebrow{margin:0 0 8px;font-size:10px;letter-spacing:.26em;font-weight:800;color:#a4b0db}
 .amount{font-size:clamp(42px,10vw,63px);font-weight:770;letter-spacing:-.055em;line-height:1.18;font-variant-numeric:tabular-nums;margin:0 0 3px;color:#f7f9ff;text-shadow:0 7px 40px #8290ff22}
-.vault-scene{position:relative;perspective:900px;width:min(100%,320px);aspect-ratio:1;margin:10px auto 14px;display:grid;place-items:center;transform-style:preserve-3d}
-.vault-aura{position:absolute;inset:13%;border-radius:50%;background:radial-gradient(circle,#696eff78 2%,#3559ce4d 36%,transparent 68%);filter:blur(29px);animation:auraPulse 5.8s ease-in-out infinite}
 .orbit{position:absolute;border-radius:50%;border:1px solid #8297ff7d;box-shadow:inset 0 0 18px #6a88fe10,0 0 11px #5179ff25}
 .orbit-one{width:77%;height:77%;transform:rotateX(68deg) rotateZ(28deg);animation:orbitOne 12s linear infinite}
 .orbit-two{width:68%;height:81%;border-color:#86dffc68;transform:rotateX(66deg) rotateY(51deg) rotateZ(15deg);animation:orbitTwo 17s linear infinite}
 .orbit-three{width:84%;height:65%;border-color:#bcb0ff54;transform:rotateX(73deg) rotateY(-40deg);animation:orbitThree 14s linear infinite}
-.vault-core{width:43%;aspect-ratio:1;display:grid;place-items:center;border-radius:50%;background:radial-gradient(circle at 34% 30%,#6779bd 0%,#353a94 28%,#171b4a 70%,#080d27 100%);box-shadow:inset -13px -17px 33px #01051cad,inset 8px 8px 28px #b3c8ff45,0 18px 48px #02052ca3,0 0 40px #606bdf6b;transform:translateZ(28px) rotateX(11deg);animation:coreFloat 5s ease-in-out infinite}
-.vault-core svg{width:70%;height:auto;filter:drop-shadow(0 0 7px #c2d0ff)}
 .orbital-dot{position:absolute;width:8px;height:8px;border-radius:50%;box-shadow:0 0 22px currentColor,0 0 8px currentColor;background:currentColor}
 .dot-a{color:#8fbdff;left:10%;top:46%;animation:particle1 9s ease-in-out infinite}
 .dot-b{color:#ad94ff;right:14%;bottom:27%;animation:particle2 12s ease-in-out infinite}
-.action-primary,.action-secondary,.fallback-anchor{display:flex;justify-content:center;align-items:center;gap:11px;width:100%;border-radius:14px;border:1px solid transparent;min-height:56px;font-size:14px;font-weight:740;letter-spacing:-.01em;line-height:1.3;text-decoration:none;transition:transform .18s ease,box-shadow .18s ease,border-color .18s ease;color:#fff}
+.action-primary,.action-secondary{display:flex;justify-content:center;align-items:center;gap:11px;width:100%;border-radius:14px;border:1px solid transparent;min-height:56px;font-size:14px;font-weight:740;letter-spacing:-.01em;line-height:1.3;text-decoration:none;transition:transform .18s ease,box-shadow .18s ease,border-color .18s ease;color:#fff}
 .action-primary{background:linear-gradient(115deg,#5765e9,#785cda 48%,#4e98d1);box-shadow:0 12px 36px #424fce4f,inset 0 1px #ffffff50;padding:13px 18px}
 .action-primary:not(:disabled):hover{transform:translateY(-2px);box-shadow:0 18px 39px #474acf66}
 .action-primary:disabled{opacity:.57}
 .touch-icon{font-size:22px;font-weight:550;line-height:1}.action-arrow{margin-left:auto;font-size:18px;font-weight:480}
-.button-help{margin:15px 0 0;color:#a8b6d7;font-size:11px;line-height:1.6}
 .stage h1{font-size:clamp(26px,6vw,33px);letter-spacing:-.045em;line-height:1.19;margin:12px 0 8px;font-weight:740}
 .stage-copy{max-width:365px;margin:0 auto 24px;color:#b3c0df;font-size:13px;line-height:1.7}
-.app-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin:27px 0 16px}
-.app-choice{min-width:0;display:flex;flex-direction:column;justify-content:center;align-items:center;gap:10px;border:1px solid #c4d3ff2b;background:linear-gradient(145deg,#ffffff14,#ffffff05);border-radius:18px;color:#eaf1ff;min-height:125px;padding:15px 6px;font-size:13px;font-weight:680;transition:transform .18s,border-color .18s,background .18s}
-.app-choice:hover,.app-choice:focus-visible{border-color:#adc3ff9a;background:#ffffff1e;transform:translateY(-2px)}
-.app-icon{width:53px;height:53px;display:grid;place-items:center;border-radius:17px;background:#fff;box-shadow:0 7px 19px #0003}
-.app-icon img{display:block;width:30px;height:30px}
-.app-icon.phonepe{background:#f0e8ff}.app-icon.paytm{background:#e8f9ff}
-.app-icon.cred{background:#080b12;color:#fff;font-size:25px;font-weight:900;letter-spacing:-.1em;border:1px solid #ffffff44}
 .action-secondary{min-height:52px;margin-top:13px;background:#ffffff0b;border-color:#c0cfff3e;color:#eff2ff;padding:13px 16px}
 .action-secondary:hover{background:#ffffff18;border-color:#b4bbff81}
-.fallback-anchor{background:#e5ebff;color:#26327d;margin:12px 0 0;font-size:13px;padding:14px}
-.fallback-anchor:hover{background:#fff}
 .mini-qr{font-size:23px;line-height:1}
 .inline-note{font-size:11px;color:#9caad2;line-height:1.65;margin:14px 0 0}
 .qr-visual{position:relative;isolation:isolate;margin:15px auto 12px;width:min(100%,307px);padding:13px;border-radius:24px;background:conic-gradient(from 55deg,#79c9f2,#7d71e9,#d29cfc,#6dbaf9,#8c7aeb,#79c9f2);box-shadow:0 10px 37px #4a63ca45;animation:qrBreathe 5s ease-in-out infinite}
@@ -101,25 +86,22 @@ button,a{font:inherit}button{cursor:pointer}button:disabled{opacity:.48;cursor:w
 @keyframes progress{0%{left:-35%}100%{left:100%}}
 @keyframes qrBreathe{0%,100%{box-shadow:0 10px 37px #4a63ca45}50%{box-shadow:0 12px 48px #6b7ced64}}
 @keyframes scanLine{0%,100%{top:12%;opacity:.25}50%{top:87%;opacity:.85}}
-@media(max-height:800px) and (min-width:550px){.checkout-shell{justify-content:flex-start}.checkout-panel{min-height:0}.stage{min-height:480px}.vault-scene{width:260px}}
+@media(max-height:800px) and (min-width:550px){.checkout-shell{justify-content:flex-start}.checkout-panel{min-height:0}.stage{min-height:480px}}
 @media(max-width:420px){
  .checkout-shell{padding:14px 12px 17px;justify-content:center}
  .checkout-brand{padding:10px 0 20px}
  .checkout-panel{min-height:0;border-radius:22px}
  .stage{min-height:495px;padding:25px 22px 25px}
- .stage-initial{min-height:493px}
- .vault-scene{width:min(100%,255px);margin:12px 0 19px}
  .amount{font-size:47px}
- .app-choice{min-height:112px}
  .qr-visual{max-width:290px;padding:11px}
  .qr-paper{min-height:264px}
  #paymentQr{min-height:240px}#paymentQr img,#paymentQr canvas{width:230px;height:230px}
  .checkout-footer{padding-top:15px}
 }
-@media(max-width:360px){.stage{padding:22px 16px}.app-grid{gap:9px}.app-choice{font-size:11px}.vault-scene{width:220px}.amount{font-size:42px}}
+@media(max-width:360px){.stage{padding:22px 16px}.amount{font-size:42px}}
 @media(prefers-reduced-motion:reduce){
  *,*:before,*:after{scroll-behavior:auto!important;animation:none!important;transition:none!important}
- .starfield,.orbit,.vault-core,.receipt-sculpture{will-change:auto}
+.starfield,.orbit,.receipt-sculpture{will-change:auto}
 }
 
 
@@ -165,67 +147,6 @@ body{background:#040817}
  filter:drop-shadow(0 3px 15px #8296ff73);
 }
 .stage{position:relative;z-index:1;min-height:500px}
-.stage-initial{
- min-height:467px;
- padding:9px clamp(22px,6vw,46px) 29px;
- justify-content:flex-start;gap:0;
-}
-.stage-initial .eyebrow{
- margin-top:9px;margin-bottom:5px;
- color:#c3d4fc;font-size:10px;font-weight:760;letter-spacing:.29em;
-}
-.stage-initial .amount{
- font-weight:760;font-size:clamp(45px,9vw,59px);
- letter-spacing:-.064em;
- color:#fafdff;
- text-shadow:0 5px 25px #09164ad4;
-}
-.vault-scene{
- width:min(100%,315px);aspect-ratio:1;
- margin:8px auto 10px;
- transform-style:preserve-3d;perspective:900px;
-}
-.vault-atmosphere{
- position:absolute;inset:8%;border-radius:50%;
- background:radial-gradient(circle,#678fd258 2%,#5350b331 43%,transparent 73%);
- filter:blur(27px);
- animation:auraPulse 6s ease-in-out infinite;
-}
-.vault-art{
- display:block;position:relative;z-index:1;
- width:100%;height:100%;object-fit:contain;
- mix-blend-mode:screen;
- filter:drop-shadow(0 0 23px #758bff65) contrast(1.12) saturate(1.12);
- -webkit-mask-image:radial-gradient(ellipse at 50% 50%,#000 40%,#000d 61%,transparent 77%);
- mask-image:radial-gradient(ellipse at 50% 50%,#000 40%,#000d 61%,transparent 77%);
- animation:sculptureDrift 7s ease-in-out infinite;
-}
-.vault-spectral-orbit{
- position:absolute;z-index:2;pointer-events:none;
- border:1px solid #8ac6ff31;border-radius:50%;
- width:72%;height:24%;top:46%;left:14%;
- transform:rotate(-14deg);
- box-shadow:0 0 18px #4373c315;
-}
-.vault-spectral-orbit-b{transform:rotate(27deg);opacity:.48}
-.stage-initial .action-primary{
- min-height:57px;
- margin-top:auto;
- background:linear-gradient(125deg,#e9efff 0%,#c4d2ff 59%,#95baff 100%);
- color:#0a1736;
- border:1px solid #f4f8ff;
- box-shadow:0 6px 23px #576dc86b, inset 0 1px #ffffff;
- border-radius:12px;
- font-size:14px;font-weight:790;
- text-shadow:none;
-}
-.stage-initial .action-primary:not(:disabled):hover{
- box-shadow:0 8px 29px #7194f99b,inset 0 1px #fff;
- background:linear-gradient(125deg,#fff,#dfebff 64%,#bfd1ff);
-}
-.stage-initial .button-help{
- margin:12px 0 0;color:#c9d1ed;font-size:11px;
-}
 .checkout-footer{color:#9ba7c9;padding-top:14px}
 @keyframes sculptureDrift{
  0%,100%{transform:translateY(2px) rotate(-2deg)}
@@ -235,36 +156,16 @@ body{background:#040817}
  .checkout-shell{padding:10px 11px 15px}
  .checkout-brand{padding:15px 10px 3px}
  .checkout-brand .logo{width:190px}
- .stage-initial{min-height:436px;padding:6px 25px 23px}
- .stage-initial .eyebrow{margin-top:6px}
- .stage-initial .amount{font-size:50px}
- .vault-scene{width:min(100%,263px);margin:5px auto 8px}
- .stage-initial .action-primary{min-height:54px}
 }
 @media(max-width:420px){
  .checkout-shell{padding:10px 10px 14px}
  .checkout-panel{border-radius:21px}
  .checkout-brand{padding:17px 10px 4px}
  .checkout-brand .logo{width:185px}
- .stage-initial{min-height:439px;padding:7px 22px 24px}
- .vault-scene{width:min(100%,260px);margin:6px auto 9px}
- .stage-initial .amount{font-size:49px}
- .stage-initial .action-primary{min-height:54px}
-}
-@media(max-width:360px){
- .stage-initial{padding-inline:17px;min-height:420px}
- .vault-scene{width:min(100%,239px)}
- .stage-initial .amount{font-size:43px}
 }
 @media(max-height:670px){
  .checkout-shell{padding-top:8px;padding-bottom:8px}
  .checkout-brand{padding-top:13px}
- .stage-initial{min-height:418px;padding-bottom:18px}
- .vault-scene{width:min(100%,240px);margin:1px auto}
-}
-@media(prefers-reduced-motion:reduce){
- .vault-art{animation:none!important;transform:none!important}
- .vault-atmosphere{animation:none!important}
 }
 
 @media print{
