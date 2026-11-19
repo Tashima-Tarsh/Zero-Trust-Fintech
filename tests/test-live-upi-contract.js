@@ -20,6 +20,7 @@ assert.throws(()=>buildUpiUri({kind:'P2P',pa:'not-a-vpa',pn:'Bank Payee',am:1,tn
 assert.throws(()=>buildUpiUri({kind:'P2M',pa:'',pn:'Bank Payee',am:1,mc:'5411',tr:'X123'}),/valid receiving UPI ID/);
 assert.equal(personal.searchParams.get('am'),'1.00');
 assert.equal(personal.searchParams.get('tn'),'DISHA checkout','No fabricated payment note');
+assert.doesNotMatch(context.build({...session,description:'UPI intent'}),/Order_/,'UPI note must not leak legacy identifier');
 assert.equal(personal.searchParams.get('mc'),null,'Personal VPA must never carry merchant category');
 assert.equal(personal.searchParams.get('tr'),null,'Personal transfer must not use fabricated merchant transaction ref');
 const merchant=new URL(context.build({...session,vpaAddress:'company@ypbiz',merchantType:'MERCHANT',mcc:'4705',txnRef:'TXN_ABC123'}));

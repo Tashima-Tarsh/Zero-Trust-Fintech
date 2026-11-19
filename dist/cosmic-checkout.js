@@ -25,7 +25,7 @@
  function copyDebugReport(){
   if(!debug)return;
   const report='DISHA checkout diagnostic v2\n'+
-   'Order: '+(orderId()||'not-created')+'\n'+
+   'Payment reference: '+(orderId()||'not-created')+'\n'+
    'Device: '+device+'\n'+
    debugHistory.map(x=>x.time+' '+x.event+' '+x.code+' '+x.app).join('\n');
   if(navigator.clipboard?.writeText){
@@ -161,10 +161,8 @@
     throw Error('Invalid payment amount. Open a valid payment link.');
    const recovered=await recoverAuthorizedSession(raw);
    if(recovered)return recovered;
-   const userId=vault.getDeviceUserId();
    url='/api/session/new?amount='+encodeURIComponent(amount.toFixed(2))+
-     '&description='+encodeURIComponent('DISHA checkout')+
-     '&userId='+encodeURIComponent(userId)+'&userName='+encodeURIComponent('Device user');
+     '&description='+encodeURIComponent('UPI intent');
   }
   const response=await fetch(url,{credentials:'same-origin',cache:'no-store'});
   const body=await response.json().catch(()=>({}));
@@ -193,7 +191,7 @@
   receiptShown=true;
   trace('LEDGER_CONFIRMED');
   get('receiptAmount').textContent=format(record.challengeAmount||session.amount);
-  get('receiptOrder').textContent=session.orderId;
+  get('receiptPaymentRef').textContent='PAY '+String(session.orderId).replace(/^[^_]*_/, '');
   get('receiptUtr').textContent=record.utr;
   showStage('receipt');
   if(ledgerTicker)clearInterval(ledgerTicker);
@@ -461,7 +459,7 @@
   get('shareReceipt').addEventListener('click',async()=>{
    if(!receiptShown)return;
    const content='DISHA 8.2 payment receipt\nAmount: '+format(session.amount)+
-    '\nOrder: '+session.orderId+'\nUPI reference: '+get('receiptUtr').textContent+'\nStatus: Completed';
+    '\nPayment reference: '+session.orderId+'\nUPI reference: '+get('receiptUtr').textContent+'\nStatus: Completed';
    try{
     if(navigator.share)await navigator.share({title:'DISHA payment receipt',text:content});
     else if(navigator.clipboard){await navigator.clipboard.writeText(content);message('Receipt details copied.')}
@@ -490,16 +488,16 @@
      }
     }catch(_){}
    }
-   trace('ORDER_READY');
+   trace('PAYMENT_READY');
    saveAuthorizedSession();
    setMoney(session.amount);
    setPaymentKind();
-   get('checkoutOrderLabel').textContent='Order · '+session.orderId;
+   get('checkoutPaymentIdentity').textContent='UPI intent · '+(session.payeeVpa||new URLSearchParams(session.upiUri.split('?')[1]||'').get('pa')||'');
    const params=new URLSearchParams(session.upiUri.split('?')[1]||'');
    get('checkoutNote').textContent=params.get('tn')||'';
    get('qrTapToPayHint').textContent=model.supportsNativeUPI(userAgent)
      ?'Tap the QR to open an installed UPI app, or scan from another phone.'
-     :'Scan with a UPI app on your phone. This page tracks the same order.';
+     :'Scan with a UPI app on your phone. This page tracks this payment.';
    showStage('qr');
    tickSessionTimer();
    // Resolve a verified recorded credit even after the original checkout TTL.

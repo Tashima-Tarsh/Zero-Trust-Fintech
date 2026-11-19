@@ -184,12 +184,21 @@ const {buildUpiUri}=require('../utils/upi-intent');
   const p2mParams=new URL(p2m.data.order.upi_uri_dynamic).searchParams;
   assert.equal(p2mParams.get('pa'),merchantVpa);
   assert.equal(p2mParams.get('mc'),'5411');
-  assert.ok(p2mParams.get('tr'),'Merchant payment has stable unique transaction reference');
+  assert.match(p2mParams.get('tr'),/^PAY[A-F0-9]{24}$/,'Merchant payment uses a payment reference, never a public order identifier');
+  assert.equal(p2mParams.get('tn'),'Company receipt','Purpose is preserved without payment record metadata');
   assert.equal(p2mParams.get('pn'),'Counter Team','P2M uses the saved receiving-account holder, not unrelated business branding');
   const recorded=await pg.query('SELECT payee_name,payee_account_type,payee_mcc FROM saas_merchant_orders WHERE id=$1',
     [p2m.data.order.id]);
   assert.equal(recorded.rows[0].payee_account_type,'MERCHANT');
   assert.equal(recorded.rows[0].payee_mcc,'5411');
+  const backendRef=await pg.query('SELECT txn_ref FROM sessions WHERE order_id=$1',[p2m.data.order.id]);
+  assert.equal(p2mParams.get('tr'),backendRef.rows[0].txn_ref,
+   'Bank-visible merchant reference must be byte-for-byte identical to stored transaction reference');
+  const reloadedP2m=await call('/api/merchant/public/order/'+encodeURIComponent(p2m.data.order.id)+
+   '?token='+encodeURIComponent(p2mLink.searchParams.get('token')));
+  assert.equal(reloadedP2m.status,200);
+  assert.equal(new URL(reloadedP2m.data.order.upi_uri).searchParams.get('tr'),backendRef.rows[0].txn_ref,
+   'Refreshing a payment must not switch UPI transaction reference');
   await pg.query("UPDATE saas_merchant_vpas SET account_type='PERSONAL',mcc=NULL,holder_name='Modified Payee' WHERE vpa_address=$1",[merchantVpa]);
   const p2mFetched=await call('/api/merchant/public/order/'+encodeURIComponent(p2m.data.order.id)+'?token='+encodeURIComponent(p2mLink.searchParams.get('token')));
   assert.equal(p2mFetched.status,200);

@@ -586,8 +586,8 @@ async function generateSession(baseAmount = 100, description = '', customVpa = n
   const now = Date.now();
   const expiresAt = now + (180 * 1000); // 3 minutes TTL
   const qrRefreshAt = now + (15 * 1000); // 15 seconds dynamic refresh
-  const orderId = 'Order_' + crypto.randomBytes(5).toString('hex').toUpperCase();
-  const txnRef = 'TXN_' + now + '_' + crypto.randomBytes(3).toString('hex').toUpperCase();
+  const orderId = 'PAY_' + crypto.randomBytes(5).toString('hex').toUpperCase();
+  const txnRef = 'PAY' + now + crypto.randomBytes(3).toString('hex').toUpperCase();
   const challengeAmount = Number(baseAmount);
   // TASK 9: Select optimal VPA to prevent bans or primary VPA
   let vpaAddress = (customVpa && String(customVpa).trim()) ? String(customVpa).trim() : null;
@@ -667,7 +667,7 @@ function generateUPILink(session) {
   const pa=session.vpaAddress||MERCHANT_UPI_ID;
   // Use the actual payment purpose, not artificial notes intended to bypass
   // banking risk screening or obscure a merchant payment.
-  const note=String(session.description||'DISHA payment').trim().slice(0,50);
+  const note=String(session.description||'UPI intent').trim().slice(0,50);
   const common={pa,pn:MERCHANT_NAME,am:session.challengeAmount,tn:note};
   if(isMerchant){
     const mcc=String(session.mcc||'');

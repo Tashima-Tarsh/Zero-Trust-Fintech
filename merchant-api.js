@@ -20,7 +20,7 @@ const accountConfig = input => {
   if(type==='MERCHANT'&&(!/^\d{4}$/.test(mcc)||mcc==='0000'))throw fail(400,'Provide a valid four-digit MCC from your bank or acquirer');
   return {type,mcc};
 };
-function upi(o,holder,amount,description,orderId){
+function upi(o,holder,amount,description,paymentReference){
   const type=String(o.account_type||'').toUpperCase();
   if(!['PERSONAL','MERCHANT'].includes(type))
     throw fail(409,'UPI_ACCOUNT_TYPE_UNVERIFIED');
@@ -33,7 +33,7 @@ function upi(o,holder,amount,description,orderId){
     if(!/^\d{4}$/.test(String(o.mcc||''))||o.mcc==='0000')
       throw fail(409,'BANK_ISSUED_MCC_REQUIRED_FOR_P2M');
     return buildUpiUri({...base,kind:'P2M',mc:o.mcc,
-      tr:orderId.replace(/[^A-Za-z0-9]/g,'').slice(0,35)});
+      tr:paymentReference});
   }
   return buildUpiUri({...base,kind:'P2P'});
 }
@@ -218,7 +218,7 @@ function createMerchantApi({db,getAuth,buildUpiUri,platformControl}) {
     const token=String(req.query.token||'');
     if(!/^[0-9a-f]{24,64}$/i.test(token))throw fail(401,'Payment link token required');
     const r=await db.pgPool.query(
-      "SELECT o.*,m.business_name,s.status,s.utr FROM saas_merchant_orders o "+
+      "SELECT o.*,m.business_name,s.status,s.utr,s.txn_ref FROM saas_merchant_orders o "+
       "JOIN saas_merchants m ON m.id=o.merchant_id "+
       "JOIN sessions s ON s.session_id=o.session_id WHERE o.id=$1 AND o.session_id=$2",
       [req.params.orderId,token]);
@@ -239,7 +239,7 @@ function createMerchantApi({db,getAuth,buildUpiUri,platformControl}) {
       payee={...payee,...prior.rows[0]};
     }
     const uri=upi(payee,payee.holder_name||o.business_name,
-      amount,o.description||'Payment',o.id);
+      amount,o.description||'Payment',o.txn_ref||o.id.replace(/[^A-Za-z0-9]/g,'').slice(0,35));
     res.set('Cache-Control','no-store').json({success:true,order:{
       id:o.id,amount,business_name:o.business_name,vpa_address:o.vpa_address,
       payee_name:payee.holder_name||o.business_name,
@@ -443,9 +443,10 @@ function createMerchantApi({db,getAuth,buildUpiUri,platformControl}) {
     if(BigInt(paise)<100n||BigInt(paise)>BigInt(Math.floor(maxPayment()*100)))throw fail(400,'Amount exceeds the configured UPI payment limit');
     const amount=Number(paise)/100;
     const description=val(req.body.description||'Payment',100);
-    const externalReference=val(req.body.orderId,100);
+    const externalReference=val(req.body.paymentReference??req.body.orderId,100);
     const c=await db.pgPool.connect();
-    const orderId=id('ORD_'),sessionId=crypto.randomBytes(24).toString('hex');
+    const orderId=id('PAY_'),sessionId=crypto.randomBytes(24).toString('hex');
+    const paymentReference='PAY'+crypto.randomBytes(12).toString('hex').toUpperCase();
     const createdAt=now(),expiresAt=createdAt+180000;
     let receiving,checkoutUri;
     try{
@@ -467,8 +468,8 @@ function createMerchantApi({db,getAuth,buildUpiUri,platformControl}) {
       const payeeName=val(receiving.holder_name||req.merchant.business_name,100);
       // Validate exact P2P/P2M URI before persisting the order.
       const payee={vpa_address:receiving.vpa_address,account_type:accountType,mcc:receiving.mcc};
-      checkoutUri=upi(payee,payeeName,amount,description,orderId);
-      const txnRef=id('TXN_');
+      checkoutUri=upi(payee,payeeName,amount,description,paymentReference);
+      const txnRef=paymentReference;
       await c.query(
         'INSERT INTO sessions(session_id,order_id,challenge_amount,base_amount,txn_ref,vpa_address,status,state,created_at,expires_at,qr_refresh_at) '+
         "VALUES($1,$2,$3,$3,$4,$5,'PENDING','WAITING',$6,$7,$8)",
