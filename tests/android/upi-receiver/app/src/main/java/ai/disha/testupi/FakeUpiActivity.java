@@ -21,7 +21,10 @@ public final class FakeUpiActivity extends Activity {
         final String am = uri == null ? "" : uri.getQueryParameter("am");
         final String cu = uri == null ? "" : uri.getQueryParameter("cu");
         final String mc = uri == null ? null : uri.getQueryParameter("mc");
-        Log.i("DISHA_UPI_TEST", "RECEIVED pa="+pa+" pn="+pn+" am="+am+" cu="+cu+" mc="+mc);
+        final String tr = uri == null ? null : uri.getQueryParameter("tr");
+        final String tn = uri == null ? null : uri.getQueryParameter("tn");
+        Log.i("DISHA_UPI_TEST", "RECEIVED pa="+pa+" pn="+pn+" am="+am+" cu="+cu+
+            " mc="+mc+" tr="+tr+" tn="+tn);
 
         LinearLayout card = new LinearLayout(this);
         card.setBackgroundColor(Color.WHITE);

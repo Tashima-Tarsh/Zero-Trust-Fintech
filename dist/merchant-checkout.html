@@ -11,14 +11,11 @@
 <meta name="referrer" content="no-referrer">
 
 <link rel="preload" href="/assets/disha-8-2-wordmark-cropped.png" as="image">
-<link rel="preload" href="/assets/disha-vault-sculpture.svg" as="image">
 <link rel="stylesheet" href="/api/runtime-assets/cosmic-checkout.css?v=qr-first-20261119">
 <link rel="stylesheet" href="/api/runtime-assets/checkout-moonlight.css?v=moonlight1">
 <script defer src="/vendor/qrcode.min.js"></script>
-<script defer src="/vendor/simplewebauthn.umd.js"></script>
-<script defer src="/api/runtime-assets/one-touch-vault.js?v=upi-trace-20261119"></script>
 <script defer src="/api/runtime-assets/cosmic-checkout-model.js?v=intent-retry-20261119"></script>
-<script defer src="/api/runtime-assets/cosmic-checkout.js?v=qr-first-20261119"></script>
+<script defer src="/api/runtime-assets/cosmic-checkout.js?v=upi-direct-20261119"></script>
 </head>
 <body data-qr-primary="true" data-checkout="merchant">
 <div class="universe" aria-hidden="true">
@@ -32,35 +29,6 @@
    <img src="/assets/disha-8-2-wordmark-cropped.png" width="240" height="60" alt="DISHA 8.2" class="logo">
   </header>
   <p id="checkoutTimer" class="checkout-timer" role="timer" aria-live="off">Preparing secure session…</p>
-  <section data-stage="initial" class="stage stage-initial" aria-label="Legacy authorization" hidden>
-   <p class="eyebrow">PAYMENT</p>
-   <div class="vault-scene" aria-hidden="true">
-    <div class="vault-atmosphere"></div>
-    <img class="vault-art" src="/assets/disha-vault-sculpture.svg" width="320" height="320" alt="" decoding="async">
-    <span class="vault-spectral-orbit vault-spectral-orbit-a"></span>
-    <span class="vault-spectral-orbit vault-spectral-orbit-b"></span>
-   </div>
-   <button id="btnOneTouch" type="button" class="action-primary" disabled>
-    <span>Pay</span>
-   </button>
-   <p class="button-help">Continue securely with your device</p>
-  </section>
-
-  <section data-stage="methods" class="stage" aria-label="Choose payment app" hidden>
-   <p class="eyebrow">CONTINUE PAYMENT</p><h1>Pay with your UPI app.</h1>
-   <p class="stage-copy">Choose the app you prefer, or scan the QR code.</p>
-   <div class="app-grid" aria-label="UPI applications">
-    <button id="app-gpay" type="button" class="app-choice" data-app="gpay"><span class="app-icon google"><img src="/assets/upi-googlepay.svg" alt="" width="31" height="31"></span><span>Google Pay</span></button>
-    <button id="app-phonepe" type="button" class="app-choice" data-app="phonepe"><span class="app-icon phonepe"><img src="/assets/upi-phonepe.svg" alt="" width="31" height="31"></span><span>PhonePe</span></button>
-    <button id="app-paytm" type="button" class="app-choice" data-app="paytm"><span class="app-icon paytm"><img src="/assets/upi-paytm.svg" alt="" width="31" height="31"></span><span>Paytm</span></button>
-    <button id="app-cred" type="button" class="app-choice" data-app="cred"><span class="app-icon cred" aria-hidden="true">C</span><span>CRED / UPI</span></button>
-    <button id="app-any" type="button" class="app-choice app-choice-any" data-app="generic"><span class="app-icon any-upi" aria-hidden="true">₹</span><span>Any UPI app</span></button>
-   </div>
-   <a id="oneTouchFallback" class="fallback-anchor" href="#" hidden>Try another UPI app <span aria-hidden="true">↗</span></a>
-   <button id="showQr" type="button" class="action-secondary"><span class="mini-qr" aria-hidden="true">▦</span> Show dynamic QR <span class="action-arrow" aria-hidden="true">→</span></button>
-   <p class="inline-note">If an app does not open, try Any UPI app or scan the QR. Open this checkout in your phone's browser to use installed UPI apps.</p>
-  </section>
-
   <section data-stage="qr" class="stage stage-qr" aria-label="UPI QR checkout">
     <p class="eyebrow">ONE QR · TWO WAYS TO PAY</p>
     <h1>Scan or tap to pay.</h1>
@@ -69,24 +37,16 @@
     <p class="stage-copy">Tap the QR on this phone, or scan it with a UPI app on another phone.</p>
     <a id="qrTapToPay" class="qr-tap-link" href="#" aria-disabled="true" aria-label="Tap QR to open a UPI app on this phone">
      <div class="qr-visual">
-      <div class="qr-paper"><div id="paymentQr" role="img" aria-label="Order-specific UPI payment QR"></div></div>
+      <div class="qr-paper"><div id="paymentQr" role="img" aria-label="Payment-specific UPI payment QR"></div></div>
      </div>
     </a>
     <p class="qr-expiry" id="qrExpiry">Preparing your payment code…</p>
-    <p id="qrTapToPayHint" class="inline-note">Your payment details stay linked to this order.</p>
-    <p id="checkoutOrderLabel" class="inline-note" aria-live="polite"></p>
+    <p id="qrTapToPayHint" class="inline-note">Your payment details stay linked to this payment.</p>
+    <p id="checkoutPaymentIdentity" class="inline-note" aria-live="polite"></p>
+    <p id="paymentTrackingStatus" class="inline-note" role="status" aria-live="polite">Payment status · Checking…</p>
     <p id="checkoutNote" class="inline-note"></p>
     <button id="shareCheckout" type="button" class="checkout-share-link">Share checkout link with another phone</button>
    </section>
-
-  <section data-stage="checking" class="stage stage-checking" aria-label="Checking payment" hidden>
-   <p class="eyebrow">PAYMENT STATUS</p>
-   <div class="receipt-sculpture" aria-hidden="true"><div class="paper-back"></div><div class="paper-front"><span></span><span></span><span></span><i></i></div><div class="receipt-halo"></div></div>
-   <h1>Checking your payment.</h1>
-   <p class="stage-copy" id="checkingHelp">We’ll update this page when your payment is confirmed.</p>
-   <div class="indeterminate" aria-label="Waiting for payment status"><span></span></div>
-   <button id="checkingApps" type="button" class="action-secondary">Choose another payment method <span class="action-arrow" aria-hidden="true">→</span></button>
-  </section>
 
   <section data-stage="receipt" class="stage stage-receipt" aria-label="Payment receipt" hidden>
    <p class="eyebrow">PAYMENT RECEIPT</p>
@@ -95,7 +55,7 @@
    <div id="receiptAmount" class="receipt-amount">—</div>
    <p class="receipt-subline">Recorded payment</p>
    <div class="receipt-details">
-    <div><span>Payment reference</span><strong id="receiptOrder">—</strong></div>
+    <div><span>Payment reference</span><strong id="receiptPaymentRef">—</strong></div>
     <div><span>UPI reference</span><strong id="receiptUtr">—</strong></div>
     <div><span>Status</span><strong class="receipt-confirmed">Completed</strong></div>
    </div>

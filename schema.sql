@@ -97,6 +97,7 @@ CREATE TABLE IF NOT EXISTS sessions (
     base_amount NUMERIC(10, 2) NOT NULL,
     txn_ref VARCHAR(128) UNIQUE NOT NULL,
     vpa_address VARCHAR(128) NOT NULL,
+    upi_uri TEXT, -- Immutable issued bank-scannable QR and native intent payload
     status VARCHAR(32) NOT NULL DEFAULT 'PENDING' CHECK(status IN ('PENDING', 'SUCCESS', 'EXPIRED', 'FAILED')),
     utr VARCHAR(32),
     state VARCHAR(32) NOT NULL DEFAULT 'WAITING' CHECK(state IN ('WAITING', 'VERIFY_WINDOW', 'VERIFIED', 'EXPIRED')),

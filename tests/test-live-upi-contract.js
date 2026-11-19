@@ -20,6 +20,7 @@ assert.throws(()=>buildUpiUri({kind:'P2P',pa:'not-a-vpa',pn:'Bank Payee',am:1,tn
 assert.throws(()=>buildUpiUri({kind:'P2M',pa:'',pn:'Bank Payee',am:1,mc:'5411',tr:'X123'}),/valid receiving UPI ID/);
 assert.equal(personal.searchParams.get('am'),'1.00');
 assert.equal(personal.searchParams.get('tn'),'DISHA checkout','No fabricated payment note');
+assert.doesNotMatch(context.build({...session,description:'UPI intent'}),/Order_/,'UPI note must not leak legacy identifier');
 assert.equal(personal.searchParams.get('mc'),null,'Personal VPA must never carry merchant category');
 assert.equal(personal.searchParams.get('tr'),null,'Personal transfer must not use fabricated merchant transaction ref');
 const merchant=new URL(context.build({...session,vpaAddress:'company@ypbiz',merchantType:'MERCHANT',mcc:'4705',txnRef:'TXN_ABC123'}));
@@ -31,10 +32,14 @@ assert.equal(merchant.searchParams.get('tr'),'TXNABC123');
 assert.equal(merchant.searchParams.get('pa'),'company@ypbiz');
 assert.match(context.build({...session,vpaAddress:'company@ypbiz',merchantType:'MERCHANT',mcc:'4705',txnRef:'TXN_ABC123'}),/pa=company@ypbiz(?:&|$)/);
 assert.equal(merchant.searchParams.get('am'),'1.00');
+const frozen=merchant.toString();
+assert.equal(context.build({...session,upiUri:frozen,merchantType:'PERSONAL',description:'Changed'}),frozen,
+ 'Reopening a payment must never rebuild a different P2P/P2M intent');
 assert.throws(()=>context.build({...session,merchantType:'MERCHANT',mcc:'0000'}),/BANK_VERIFIED_MCC_REQUIRED/);
 assert.throws(()=>context.build({...session,merchantType:'MERCHANT',mcc:null}),/BANK_VERIFIED_MCC_REQUIRED/);
 assert.throws(()=>context.build({...session,merchantType:'UNCLASSIFIED'}),/UNKNOWN_UPI_ACCOUNT_CLASSIFICATION/);
-assert.match(source,/generateUPILink\(session\);\s*await db\.saveSession\(session\)/,'Must validate UPI before session saved');
+assert.match(source,/session\.upiUri=generateUPILink\(session\);\s*await db\.saveSession\(session\)/,
+ 'Must freeze validated UPI URI before session persistence');
 assert.ok(source.includes('requestedVpa.toLowerCase() === primaryVpa'),"Public checkout may only use owner's receiving VPA");
 assert.ok(!source.includes('Metadata Shield'),'Must not obscure commercial transactions');
 console.log('P2P_P2M_INTENT_CONTRACT_PASS: consistent merchant classification, truthful notes, no pre-PIN malformed MCC.');

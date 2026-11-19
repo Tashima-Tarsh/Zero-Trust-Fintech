@@ -5,6 +5,16 @@
  */
 
 const assert = require('assert');
+// Router tests must never import fake VPAs into a developer's real SQLite store.
+const fs=require('node:fs'),os=require('node:os'),path=require('node:path');
+if(process.env.NODE_ENV==='production')throw Error('VPA_ROUTER_TEST_REFUSES_PRODUCTION');
+const isolated=fs.mkdtempSync(path.join(os.tmpdir(),'disha-vpa-router-ci-'));
+process.env.DATA_DIR=isolated;
+process.env.DB_BACKEND='sqlite';
+process.env.DATABASE_URL='';
+process.env.MERCHANT_UPI_ID='primary-fixture@oksbi';
+process.env.MERCHANT_NAME='Test-only Primary';
+process.on('exit',()=>fs.rmSync(isolated,{recursive:true,force:true}));
 const db = require('../db');
 const VPARouter = require('../vpa-router');
 const { VPAImporter, parseCSV } = require('../vpa-importer');
@@ -12,6 +22,17 @@ const { VPAImporter, parseCSV } = require('../vpa-importer');
 (async () => {
   console.log('🧪 Starting DISHA 8.2 — 1000 VPA Anti-Ban System Tests...\n');
   await db.initDb();
+  // Explicit test-only receiver pool: production startup seeds no demo VPAs.
+  const fixtures=[
+    ['vpa_axis_test','ci-axis@okaxis','CI Axis'],
+    ['vpa_icici_02','ci-icici@okicici','CI ICICI'],
+    ['vpa_yes_test','ci-yes@ybl','CI YES']
+  ];
+  const insert=db.sqliteDb.prepare(
+    "INSERT OR IGNORE INTO vpa_pool(id,vpa_address,holder_name,bank_name,status,health_score,"+
+    "preferred_time_slot,merchant_id,created_at) VALUES(?,?,?,'CI Bank','ACTIVE',99,'ANY','mer_default',?)"
+  );
+  for(const [id,vpa,holder] of fixtures)insert.run(id,vpa,holder,Date.now());
 
   const router = db.vpaRouter || new VPARouter(db);
   const importer = db.vpaImporter || new VPAImporter(db);

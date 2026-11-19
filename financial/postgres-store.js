@@ -15,7 +15,7 @@ function fromRow(r) {
   return {
     sessionId:r.session_id, orderId:r.order_id,
     challengeAmount:asNum(r.challenge_amount),baseAmount:asNum(r.base_amount),
-    txnRef:r.txn_ref, vpaAddress:r.vpa_address,status:r.status,state:r.state,
+    txnRef:r.txn_ref, vpaAddress:r.vpa_address,upiUri:r.upi_uri||null,status:r.status,state:r.state,
     customerId:r.customer_id,utr:r.utr,
     createdAt:asNum(r.created_at),expiresAt:asNum(r.expires_at),
     qrRefreshAt:asNum(r.qr_refresh_at)
@@ -39,16 +39,16 @@ function buildStore(pg, vpaRouter) {
   }
   async function saveSession(s) {
     await pg.query(
-      'INSERT INTO sessions (session_id,order_id,challenge_amount,base_amount,txn_ref,vpa_address,status,state,customer_id,created_at,expires_at,qr_refresh_at) ' +
-      'VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12) ' +
+      'INSERT INTO sessions (session_id,order_id,challenge_amount,base_amount,txn_ref,vpa_address,upi_uri,status,state,customer_id,created_at,expires_at,qr_refresh_at) ' +
+      'VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13) ' +
       'ON CONFLICT (order_id) DO UPDATE SET ' +
       'session_id=EXCLUDED.session_id,challenge_amount=EXCLUDED.challenge_amount,' +
       'base_amount=EXCLUDED.base_amount,txn_ref=EXCLUDED.txn_ref,' +
-      'vpa_address=EXCLUDED.vpa_address,status=EXCLUDED.status,state=EXCLUDED.state,' +
+      'vpa_address=EXCLUDED.vpa_address,upi_uri=COALESCE(sessions.upi_uri,EXCLUDED.upi_uri),status=EXCLUDED.status,state=EXCLUDED.state,' +
       'customer_id=EXCLUDED.customer_id,created_at=EXCLUDED.created_at,' +
       'expires_at=EXCLUDED.expires_at,qr_refresh_at=EXCLUDED.qr_refresh_at',
       [s.sessionId,s.orderId,s.challengeAmount,s.baseAmount,s.txnRef,
-        s.vpaAddress,s.status,s.state||'WAITING',s.customerId||null,
+        s.vpaAddress,s.upiUri||null,s.status,s.state||'WAITING',s.customerId||null,
         s.createdAt,s.expiresAt,s.qrRefreshAt]
     );
   }
@@ -152,8 +152,8 @@ function buildStore(pg, vpaRouter) {
     return r.rowCount===1;
   }
   async function getVpaMerchantType(vpa) {
-    const r=await scalar(pg,'SELECT account_type,mcc FROM vpa_pool WHERE vpa_address=$1',[vpa]);
-    return {accountType:r?.account_type||'PERSONAL',mcc:r?.mcc||null};
+    const r=await scalar(pg,'SELECT account_type,mcc,holder_name FROM vpa_pool WHERE vpa_address=$1',[vpa]);
+    return {accountType:r?.account_type||'PERSONAL',mcc:r?.mcc||null,holderName:r?.holder_name||null};
   }
   async function getAllActiveVPAs() {
     return (await pg.query("SELECT vpa_address,holder_name,bank_name,account_type,mcc,status,health_score FROM vpa_pool WHERE status='ACTIVE'")).rows;
@@ -166,7 +166,7 @@ function buildStore(pg, vpaRouter) {
     const route=await vpaRouter.selectVPA(merchantId,amount,region,hour,sender);
     if(!route?.vpaAddress)throw new Error('NO_HEALTHY_VPA_AVAILABLE');
     const mt=await getVpaMerchantType(route.vpaAddress);
-    return { ...route,merchantType:mt.accountType,mcc:mt.mcc };
+    return { ...route,merchantType:mt.accountType,mcc:mt.mcc,holderName:mt.holderName||route.holderName||null };
   }
   async function getLedgerVerification(txId) {
     const rows=(await pg.query('SELECT entry_type, amount FROM ledger_entries WHERE transaction_id=$1',[txId])).rows;

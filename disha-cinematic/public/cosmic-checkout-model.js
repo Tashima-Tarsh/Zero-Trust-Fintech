@@ -1,18 +1,6 @@
 /* DISHA checkout presentation policy: no financial state inferred from browser return. */
 (function(root){
  'use strict';
- const APPS=Object.freeze({
-   gpay:{package:'com.google.android.apps.nbu.paisa.user',ios:'gpay://upi/pay?'},
-   phonepe:{package:'com.phonepe.app',ios:'phonepe://upi/pay?'},
-   paytm:{package:'net.one97.paytm',ios:'paytmmp://pay?'},
-   cred:{package:null,ios:null},
-   generic:{package:null,ios:null}
- });
- function safeApp(value){
-  const v=String(value||'').toLowerCase().trim().replace(/\s+/g,'');
-  if(v==='googlepay'||v==='google-pay')return 'gpay';
-  return Object.hasOwn(APPS,v)?v:'generic';
- }
  function qrPayload(uri){
   if(typeof uri!=='string'||!/^upi:\/\/pay\?[a-z]+=/i.test(uri))throw Error('A valid UPI payment URI is required');
   const query=new URLSearchParams(uri.slice(uri.indexOf('?')+1));
@@ -31,52 +19,38 @@
    return page.href;
   }catch(_){return ''}
  }
- function buildAppUrl(uri,app,userAgent,checkoutHref){
-  const valid=qrPayload(uri),selected=APPS[safeApp(app)];
+ // Android Chrome supports intent:// with a direct user gesture. The
+ // bank-scannable UPI QR remains unchanged and Android WebViews still get upi://pay.
+ function qrTapLaunchUri(uri,userAgent,checkoutFallbackHref){
+  const valid=qrPayload(uri),ua=String(userAgent||'');
+  const chromeAndroid=/Android/i.test(ua)&&/Chrome\/\d+/i.test(ua);
+  const webView=/(?:;|\s)wv(?:\)|;|\s)|\bVersion\/4\.0\b/i.test(ua);
+  if(!chromeAndroid||webView)return valid;
   const params=valid.slice(valid.indexOf('?')+1);
-  if(/Android/i.test(userAgent||'') && selected.package){
-   const fallback=checkoutFallbackUrl(checkoutHref);
-   return 'intent://pay?'+params+'#Intent;scheme=upi;package='+selected.package+
-     (fallback?';S.browser_fallback_url='+encodeURIComponent(fallback):'')+';end';
-  }
-  if(/iPhone|iPad|iPod/i.test(userAgent||'')&&selected.ios)
-   return selected.ios+params;
-  return valid;
+  const fallback=checkoutFallbackUrl(checkoutFallbackHref);
+  return 'intent://pay?'+params+
+   '#Intent;scheme=upi;action=android.intent.action.VIEW;'+
+   (fallback?'S.browser_fallback_url='+encodeURIComponent(fallback)+';':'')+'end';
  }
  function isSettled(record){
   return Boolean(record&&record.status==='SUCCESS'&&typeof record.utr==='string'&&/^[0-9]{12}$/.test(record.utr));
  }
  function userFacingError(error,context){
-  // WebAuthn NotAllowedError deliberately combines cancel, timeout and
-  // browser-policy cases for privacy. Never render error.message, the DOM
-  // exception name, diagnostic URLs or upstream response bodies in customer UI.
+  // Do not disclose browser, device or backend exception details in checkout.
   if(context==='load')
    return 'Error — Checkout could not load. Refresh or request a new payment link.';
   if(error && (error.name==='TypeError'||error.name==='NetworkError'))
    return 'Error — Connection unavailable. Please check your internet and try again.';
   if(context==='app')
-   return 'Error — Could not open the UPI app. Choose another app or use QR.';
-  return 'Error — Device verification could not be completed. Please try again.';
+   return 'Error — Could not open the UPI app. Scan the QR from another phone.';
+  return 'Error — This payment could not load. Please retry.';
  }
- // A quick app return may be a pre-PIN rejection, not payment failure.
- // Preserve app/QR retry choices without granting any financial status.
- function needsPaymentMethodRetry(evidence){
-  if(!evidence||typeof evidence!=='object')return false;
-  const params=evidence.returnParams||{};
-  const status=String(params.Status||params.status||'').toUpperCase();
-  if(['FAILURE','FAILED','CANCELLED','CANCELED'].includes(status))return true;
-  if(['SUCCESS','SUBMITTED','PENDING'].includes(status))return false;
-  const elapsed=Number(evidence.returnedAt)-Number(evidence.handoffAt);
-  return Number.isFinite(elapsed)&&elapsed>=0&&elapsed<12000&&
-   !params.txnId&&!params.ApprovalRefNo;
- }
- function stageAfterAuthorization(){return 'methods'}
  function formatINR(value){
   const n=Number(value);
   if(!Number.isFinite(n)||n<=0)throw Error('Invalid payment amount');
   return new Intl.NumberFormat('en-IN',{style:'currency',currency:'INR',maximumFractionDigits:2,minimumFractionDigits:2}).format(n);
  }
- const api=Object.freeze({safeApp,qrPayload,buildAppUrl,checkoutFallbackUrl,supportsNativeUPI,isSettled,stageAfterAuthorization,needsPaymentMethodRetry,formatINR,userFacingError});
+ const api=Object.freeze({qrPayload,qrTapLaunchUri,checkoutFallbackUrl,supportsNativeUPI,isSettled,formatINR,userFacingError});
  if(typeof module!=='undefined'&&module.exports)module.exports=api;
  root.DISHACosmicCheckoutModel=api;
 })(typeof window!=='undefined'?window:globalThis);

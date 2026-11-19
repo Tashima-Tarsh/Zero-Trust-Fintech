@@ -18,7 +18,7 @@ OUT=Path("test-results/android")
 OUT.mkdir(parents=True,exist_ok=True)
 BASE="http://127.0.0.1:8765"
 CHECKOUT=("http://10.0.2.2:8765/merchant-checkout.html?"
-          "orderId=ORD_ANDROID_CI_1001&token="+("b"*48))
+          "paymentRef=PAY_ANDROID_CI_1001&token="+("b"*48))
 
 def run(args,timeout=35):
     try:
@@ -93,6 +93,12 @@ def set_state(value):
     with urllib.request.urlopen(req,timeout=10) as resp:
         assert json.load(resp)["status"]==value
 
+def set_kind(value):
+    req=urllib.request.Request(BASE+"/__test/kind?value="+urllib.parse.quote(value),
+        method="POST",headers={"X-CI-Fixture-Key":"CI_ANDROID_ONLY"})
+    with urllib.request.urlopen(req,timeout=10) as resp:
+        assert json.load(resp)["kind"]==value
+
 def fixture_info():
     with urllib.request.urlopen(BASE+"/health",timeout=10) as resp:
         return json.load(resp)
@@ -119,6 +125,8 @@ def test():
         and s["qrTarget"]["visible"] and not s["qrDisabled"],
         "Order-bound QR is ready without app selection or a passkey")
     assert fixture_state()=="PENDING"
+    assert page["qrHref"].startswith("upi://pay?"),(
+        "Android WebView must retain upi://pay; Chrome-only intent:// is not intercepted")
     screen("01-qr-checkout")
 
     print("A02: physical QR tap launches generic Android UPI intent",flush=True)
@@ -158,7 +166,27 @@ def test():
         and not s["qr"] and "expired" in s["status"].lower(),
         "Expired checkout disables QR and native UPI tap")
     screen("05-expired-qr-blocked")
-    print("ANDROID_COSMIC_P2P_E2E_PASS: same-phone QR tap, Android UPI handoff, cancellation, second-phone ledger receipt, expiry",flush=True)
+    print("A06: merchant-classified QR must retain real MCC and independent payment reference",flush=True)
+    set_state("PENDING")
+    set_kind("P2M")
+    adb("shell","am","force-stop","ai.disha.testupi",timeout=15)
+    adb("shell","am start -n ai.disha.testupi/.TestBrowserActivity --es url "+
+        shlex.quote(CHECKOUT),timeout=15)
+    merchant=wait_state(lambda s:s["stage"]=="qr" and "499.01" in s["amount"]
+        and s["qr"] and not s["qrDisabled"] and "P2M" in s["paymentKind"]
+        and s["readyState"]=="complete",
+        "P2M QR rendered with bank-classified merchant receiver")
+    screen("06-merchant-qr")
+    tap_native(states()[-1]["qrTarget"])
+    await_log("RECEIVED pa=qa-company@ypbiz")
+    await_log("mc=5411 tr=PAYAABBCCDDEEFF001122334455")
+    await_log("tn=Service payment")
+    screen("07-merchant-upi-handoff")
+    adb("shell","input","keyevent","KEYCODE_BACK")
+    wait_state(lambda s:s["stage"]=="qr" and s["qr"] and not s["qrDisabled"],
+        "Merchant cancellation remains pending with QR available")
+    assert fixture_state()=="PENDING"
+    print("ANDROID_COSMIC_P2P_E2E_PASS: P2P tap, cancel, cross-device receipt, expiry and P2M QR fields",flush=True)
 
 if __name__=="__main__":
     try:test()

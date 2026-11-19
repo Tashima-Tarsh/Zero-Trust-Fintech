@@ -125,9 +125,9 @@ public final class TestBrowserActivity extends Activity {
             "var qrTap=document.getElementById('qrTapToPay');" +
             "var active=Array.from(document.querySelectorAll('[data-stage]')).find(function(e){return !e.hidden});" +
             "return JSON.stringify({amount:v('payAmount'),stage:active?active.dataset.stage:'none'," +
-              "status:v('checkoutStatus'),checking:v('checkingHelp'),receiptUtr:v('receiptUtr')," +
+              "status:v('checkoutStatus'),paymentKind:v('paymentKind'),checking:v('checkingHelp'),receiptUtr:v('receiptUtr')," +
               "disabled:b?b.disabled:true,qr:!!document.querySelector('#paymentQr img, #paymentQr canvas')," +
-              "readyState:document.readyState,qrTarget:target(qrTap),qrDisabled:!qrTap||qrTap.getAttribute('aria-disabled')==='true',touchTarget:target(b),appTarget:target(app)});" +
+              "readyState:document.readyState,qrHref:qrTap?qrTap.getAttribute('href'):'',qrTarget:target(qrTap),qrDisabled:!qrTap||qrTap.getAttribute('aria-disabled')==='true',touchTarget:target(b),appTarget:target(app)});" +
             "})()";
         webView.evaluateJavascript(js, data -> Log.i(TAG, "CHECKOUT_DOM "+data));
     }

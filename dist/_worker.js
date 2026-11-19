@@ -4,6 +4,28 @@ export default {
   async fetch(request, env) {
     const url = new URL(request.url);
 
+    // Keep checkout shell and allowlisted client assets on Cloudflare Pages.
+    // Railway still handles payment session, ledger, merchant and auth APIs.
+    const checkoutFiles = new Set([
+      "cosmic-checkout.js", "cosmic-checkout-model.js",
+      "cosmic-checkout.css", "checkout-moonlight.css"
+    ]);
+    let localCheckout = null;
+    if (url.pathname === "/api/runtime/checkout" || url.pathname === "/api/runtime/merchant-checkout") {
+      localCheckout = url.pathname.endsWith("/merchant-checkout") ? "/merchant-checkout.html" : "/checkout.html";
+    } else if (url.pathname.startsWith("/api/runtime-assets/")) {
+      const filename = url.pathname.slice("/api/runtime-assets/".length);
+      if (checkoutFiles.has(filename)) localCheckout = "/" + filename;
+    }
+    if (localCheckout) {
+      const staticUrl = new URL(localCheckout + url.search, request.url);
+      const response = await env.ASSETS.fetch(new Request(staticUrl, request));
+      const headers = new Headers(response.headers);
+      headers.set("cache-control", "no-store");
+      headers.set("x-disha-edge", "cloudflare-pages-checkout");
+      return new Response(response.body, {status:response.status,headers});
+    }
+
     // Disallow the legacy public diagnostics console on the Pages edge.
     if (url.pathname === "/debug.html") {
       return new Response("Not found", { status: 404, headers: {"Cache-Control":"no-store"} });

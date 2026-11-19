@@ -24,12 +24,19 @@ const {buildStore}=require('../financial/postgres-store');
     const now=Date.now();
     await db.saveSession({
       sessionId:'sess_'+suffix,orderId,challengeAmount:'500.01',baseAmount:'500.01',
-      txnRef:'TXN_'+suffix,vpaAddress:'test@upi',status:'PENDING',state:'WAITING',
+      txnRef:'TXN_'+suffix,vpaAddress:'test@upi',
+      upiUri:'upi://pay?pa=test@upi&pn=Tester&am=500.01&cu=INR&mc=5411&tr=PAY'+suffix.slice(0,16),
+      status:'PENDING',state:'WAITING',
       createdAt:now,expiresAt:now+180000,qrRefreshAt:now+15000
     });
     let session=await db.findSessionByOrderId(orderId);
     assert.equal(session?.orderId,orderId);
     assert.equal(session?.challengeAmount,500.01);
+    const originalUpiUri=session.upiUri;
+    assert.match(originalUpiUri,/mc=5411/,'Merchant URI persists after database reload');
+    await pool.query("UPDATE vpa_pool SET account_type='PERSONAL',mcc=NULL WHERE vpa_address=$1",['test@upi']);
+    assert.equal((await db.findSessionByOrderId(orderId)).upiUri,originalUpiUri,
+     'Bank QR does not change even when VPA classification is edited');
     assert.equal((await db.findSessionByTxnRef('TXN_'+suffix)).sessionId,'sess_'+suffix);
     assert.equal((await db.getOrderState(orderId)).state,'WAITING');
     assert.equal(await db.bindUtrToOrder(utr,orderId),true);

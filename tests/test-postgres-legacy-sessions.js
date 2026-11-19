@@ -22,11 +22,12 @@ const {Pool}=require('pg');
   await c.query(sql); // Must remain idempotent.
   const r=await c.query("SELECT column_name FROM information_schema.columns WHERE table_schema=$1 AND table_name='sessions'",[schema]);
   const cols=new Set(r.rows.map(x=>x.column_name));
-  assert.ok(cols.has('state') && cols.has('customer_id'));
+  assert.ok(cols.has('state') && cols.has('customer_id') && cols.has('upi_uri'));
   await c.query("INSERT INTO sessions(session_id,order_id,challenge_amount,base_amount,txn_ref,vpa_address,status,created_at,expires_at,qr_refresh_at) VALUES('legacy','order',100,100,'tr','test@upi','PENDING',0,1000,0)");
-  const row=await c.query("SELECT state,customer_id FROM sessions WHERE session_id='legacy'");
+  const row=await c.query("SELECT state,customer_id,upi_uri FROM sessions WHERE session_id='legacy'");
   assert.equal(row.rows[0].state,'WAITING');
   assert.equal(row.rows[0].customer_id,null);
+  assert.equal(row.rows[0].upi_uri,null,'Legacy records are preserved without fabricated QR snapshots');
   console.log('Legacy production sessions migration: two-pass idempotence and default state PASS');
  }finally{
   if(active)try{await c.query('ROLLBACK');}catch(_){}
