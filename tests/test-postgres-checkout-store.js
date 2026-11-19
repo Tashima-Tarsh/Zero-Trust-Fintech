@@ -32,12 +32,31 @@ const {buildStore}=require('../financial/postgres-store');
     let session=await db.findSessionByOrderId(orderId);
     assert.equal(session?.orderId,orderId);
     assert.equal(session?.challengeAmount,500.01);
+    assert.equal(session.merchantType,'P2M','Merchant classification survives PostgreSQL reload');
+    assert.equal((await pool.query('SELECT payment_type FROM sessions WHERE order_id=$1',[orderId])).rows[0].payment_type,'P2M');
     const originalUpiUri=session.upiUri;
     assert.match(originalUpiUri,/mc=5411/,'Merchant URI persists after database reload');
     await pool.query("UPDATE vpa_pool SET account_type='PERSONAL',mcc=NULL WHERE vpa_address=$1",['test@upi']);
     assert.equal((await db.findSessionByOrderId(orderId)).upiUri,originalUpiUri,
      'Bank QR does not change even when VPA classification is edited');
     assert.equal((await db.findSessionByTxnRef('TXN_'+suffix)).sessionId,'sess_'+suffix);
+    const personalId='order_personal_'+suffix;
+    const personalUri='upi://pay?pa=personal@oksbi&pn=Personal&am=1.00&cu=INR&tn=Direct';
+    const personal={sessionId:'sess_p2p_'+suffix,orderId:personalId,
+      challengeAmount:'1.00',baseAmount:'1.00',txnRef:'P2P'+suffix,
+      vpaAddress:'personal@oksbi',upiUri:personalUri,merchantType:'PERSONAL',
+      status:'PENDING',state:'WAITING',createdAt:now,expiresAt:now+180000,qrRefreshAt:now+15000};
+    await db.saveSession(personal);
+    const personalReload=await db.findSessionByOrderId(personalId);
+    assert.equal(personalReload.merchantType,'P2P','P2P type persists after PostgreSQL reload');
+    assert.equal(personalReload.upiUri,personalUri,'Original P2P QR persists');
+    assert.equal((await pool.query('SELECT payment_type FROM sessions WHERE order_id=$1',[personalId])).rows[0].payment_type,'P2P');
+    await pool.query('UPDATE sessions SET payment_type=NULL WHERE order_id=$1',[personalId]);
+    assert.equal((await db.findSessionByOrderId(personalId)).merchantType,'P2P',
+      'Legacy P2P row without type derives it from original QR');
+    await assert.rejects(db.saveSession({...personal,merchantType:'MERCHANT'}),/SESSION_PAYMENT_TYPE_URI_CONFLICT/);
+    await assert.rejects(db.saveSession({...personal,challengeAmount:1.02}),/SESSION_AMOUNT_URI_CONFLICT/);
+    await assert.rejects(db.saveSession({...personal,vpaAddress:'attacker@upi'}),/SESSION_PAYEE_URI_CONFLICT/);
     assert.equal((await db.getOrderState(orderId)).state,'WAITING');
     assert.equal(await db.bindUtrToOrder(utr,orderId),true);
     assert.equal(await db.getUtrBoundOrder(utr),orderId);

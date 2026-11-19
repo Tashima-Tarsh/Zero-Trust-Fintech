@@ -697,7 +697,7 @@ async function generateSession(baseAmount = 100, description = '', customVpa = n
 // ═══════════════════════════════════════════════════════════════════
 function generateUPILink(session) {
   // QR, native tap, and shared checkout must use the identical issued bytes.
-  // A reloaded database session does not retain merchant classification.
+  // Stored payment_type is authoritative; legacy QR snapshots also preserve it.
   if(session.upiUri)return session.upiUri;
   // Never silently downgrade a merchant (P2M) account into a personal UPI
   // transfer, or manufacture bank/acquirer merchant classification.
@@ -811,7 +811,7 @@ app.get('/api/session/:orderId', async (req, res) => {
   let upiLink;
   try{upiLink=generateUPILink(session)}
   catch(_){return res.status(409).json({success:false,error:'PAYEE_URI_UNAVAILABLE'})}
-  res.set('Cache-Control','no-store').json({ success: true, session, upiLink });
+  res.set('Cache-Control','no-store').json({ success: true, session, paymentType:session.merchantType, upiLink });
 });
 
 // Order state polling endpoint for checkout page (mathematical time window: 15s-180s)

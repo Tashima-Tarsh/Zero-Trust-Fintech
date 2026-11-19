@@ -39,12 +39,15 @@ const {ensureCheckoutSessionSchema} = require('../financial/checkout-schema');
     assert.equal(row.created_at,'123456789');
     assert.equal(row.upi_uri,null,'Do not fabricate old QR bytes');
     assert.equal(row.customer_id,null,'Do not rewrite old sessions');
+    assert.equal(row.payment_type,null,'Do not invent a type for old sessions without UPI URI');
     assert.equal(row.state,'WAITING','New default must be safe');
     await client.query(
       "INSERT INTO sessions(session_id,order_id,challenge_amount,status,created_at,upi_uri) " +
       "VALUES ('new-session','new-order',1.00,'PENDING',123456790,'upi://pay?pa=test@upi&am=1.00&cu=INR')"
     );
     assert.match((await client.query("SELECT upi_uri FROM sessions WHERE order_id='new-order'")).rows[0].upi_uri,/^upi:\/\/pay\?/);
+    assert.equal((await client.query("SELECT payment_type FROM sessions WHERE order_id='new-order'")).rows[0].payment_type,null,
+      'Do not classify records bypassing the checkout writer');
     console.log('POSTGRES_CHECKOUT_BOOTSTRAP_PASS: legacy data preserved, missing column repaired, new checkout URI persisted');
   } finally {
     if (inTransaction) try { await client.query('ROLLBACK'); } catch (_) {}

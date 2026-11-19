@@ -21,6 +21,7 @@ const UNIT_TESTS = [
   'test-disha.js',        // challenge math, session, NPCI link, double-entry ledger
   'test-payment-classification-ui.js',
   'test-payment-mode-separation.js',
+  'test-p2p-session-type.js',
   'test-try-checkout-form.js',
   'test-frontend-local-imagery.js',
   'test-owner-runtime-delivery.js',
