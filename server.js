@@ -450,8 +450,7 @@ wss.on('connection', async (ws, req) => {
   }
   // Validate WebSocket Origin to prevent cross-site WebSocket hijacking
   const wsOrigin = req.headers.origin;
-  const allowedOrigin = ALLOWED_ORIGINS.length > 0 ? ALLOWED_ORIGINS[0] : null;
-  if (wsOrigin && allowedOrigin && wsOrigin !== allowedOrigin) {
+  if (wsOrigin && ALLOWED_ORIGINS.length > 0 && !ALLOWED_ORIGINS.includes(wsOrigin)) {
     ws.close(4403, 'Invalid origin');
     return;
   }
