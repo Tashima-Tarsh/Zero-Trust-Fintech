@@ -8,7 +8,8 @@ export default {
     // Railway still handles payment session, ledger, merchant and auth APIs.
     const checkoutFiles = new Set([
       "cosmic-checkout.js", "cosmic-checkout-model.js",
-      "cosmic-checkout.css", "checkout-moonlight.css"
+      "cosmic-checkout.css", "checkout-moonlight.css",
+      "one-touch-vault.js", "quantum-signal-client.js"
     ]);
     let localCheckout = null;
     if (url.pathname === "/api/runtime/checkout" || url.pathname === "/api/runtime/merchant-checkout") {

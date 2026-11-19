@@ -5,6 +5,9 @@
  const get=id=>document.getElementById(id);
  const mode=document.body.dataset.checkout==='merchant'?'merchant':'generic';
  const query=new URLSearchParams(location.search);
+ const quantumEnabled=query.get('qs')==='1';
+ const quantumClient=window.DISHAQuantumSignalClient||null;
+ let quantumReady=false;
  const requiredMode=mode==='generic'?'P2P':
   (/^\/p2m\/checkout\/?$/.test(location.pathname||'')?'P2M':null);
  const resumeKey='disha82:upi-payment-resume:v2';
@@ -257,12 +260,20 @@
   const u=new URL(mode==='merchant'?merchantPath:'/checkout',location.href);
   u.searchParams.set('paymentRef',session.orderId);
   u.searchParams.set('token',session.token);
+  if(quantumEnabled)u.searchParams.set('qs','1');
   if(forFallback)u.searchParams.set('upi_intent_fallback','1');
   return u.href;
  }
  function renderQr(){
   if(!session)return;
   const anchor=get('qrTapToPay'),container=get('paymentQr');
+  if(quantumEnabled&&!quantumReady){
+   anchor.href='#';anchor.setAttribute('aria-disabled','true');
+   get('upiAppOptions').hidden=true;
+   container.replaceChildren();qrUri=null;
+   get('qrExpiry').textContent='Authorize DISHA Vault to unlock this payment request.';
+   return;
+  }
   if(expired()||['EXPIRED','FAILED','CANCELLED'].includes(session.initialStatus)){
    anchor.href='#';anchor.setAttribute('aria-disabled','true');
    get('upiAppOptions').hidden=true;
@@ -294,6 +305,16 @@
  function onReturn(){
   if(!session||receiptShown||document.visibilityState==='hidden')return;
   tickSessionTimer();
+  if(quantumEnabled&&quantumReady&&quantumClient){
+   void quantumClient.returned(session).then(result=>{
+    if(!result)return;
+    const state=result.eventState||'';
+    if(state==='CONFLICTING_EVIDENCE')message('Returned payment details conflict with your order.','error');
+    else if(state==='UTR_CANDIDATE_UNVERIFIED')
+     message('UPI reference observed in app return. Evidence stored; verification pending.','info');
+    else message('Android/browser return recorded. Awaiting transaction evidence.','info');
+   }).catch(()=>message('Evidence connection unavailable. Your checkout remains pending.','info'));
+  }
   if(qrTapStartedAt&&qrAppBackgrounded){
    const early=Date.now()-qrTapStartedAt<12000;
    trace('BROWSER_RETURN',early?'RETURN_FAST':'RETURN_NORMAL');
@@ -304,6 +325,23 @@
   void pollLedger();
  }
  function setEventHandlers(){
+  get('vaultProceed').addEventListener('click',async()=>{
+   if(!quantumEnabled||quantumReady||!session||expired())return;
+   const button=get('vaultProceed');button.disabled=true;
+   get('vaultStatus').textContent='Authorizing this payment with DISHA Vault…';
+   try{
+    if(!quantumClient)throw Error('Quantum Signal is unavailable');
+    const started=await quantumClient.authorizeAndStart(session);
+    quantumReady=true;button.hidden=true;
+    get('vaultStatus').textContent='Vault authorized · '+started.paymentType+
+     ' · This payment session is locked. Tap QR or choose a UPI app.';
+    trace('VAULT_AUTHORIZED','ORDER_BOUND');
+    renderQr();
+   }catch(error){
+    get('vaultStatus').textContent='Vault not authorized. '+String(error.message||'Retry.');
+    message('Could not authorize this payment. Retry Proceed.','info');
+   }finally{button.disabled=false}
+  });
   get('qrTapToPay').addEventListener('click',event=>{
    if(!session||receiptShown||expired()||
       ['EXPIRED','FAILED','CANCELLED'].includes(session.initialStatus)||!model.supportsNativeUPI(userAgent)){
@@ -313,6 +351,10 @@
     return;
    }
    qrTapStartedAt=Date.now();qrAppBackgrounded=false;
+   if(quantumEnabled&&quantumClient){
+    try{quantumClient.handoff(session,'generic')}
+    catch(_){event.preventDefault();message('Authorize Vault before paying.','error');return}
+   }
    trace('APP_DISPATCH','APP_GENERIC','generic');
   });
   for(const link of document.querySelectorAll('[data-upi-app]')){
@@ -325,6 +367,10 @@
      return;
     }
     qrTapStartedAt=Date.now();qrAppBackgrounded=false;
+    if(quantumEnabled&&quantumClient){
+     try{quantumClient.handoff(session,link.dataset.upiApp)}
+     catch(_){event.preventDefault();message('Authorize Vault before paying.','error');return}
+    }
     trace('APP_DISPATCH','APP_TARGETED',link.dataset.upiApp);
    });
   }
@@ -355,6 +401,7 @@
   document.addEventListener('visibilitychange',()=>{
    if(document.visibilityState==='hidden'){
     if(qrTapStartedAt)qrAppBackgrounded=true;
+    if(quantumEnabled&&quantumReady&&quantumClient)quantumClient.background(session);
    }else onReturn();
   });
   window.addEventListener('pageshow',onReturn);
@@ -367,6 +414,16 @@
    const declared=String(session.paymentType||'').toUpperCase();
    const normalized=declared==='PERSONAL'?'P2P':declared==='MERCHANT'?'P2M':declared;
    if(requiredMode&&normalized!==requiredMode)throw Error('PAYMENT_MODE_MISMATCH');
+   if(quantumEnabled){
+    const proceed=get('vaultProceed');
+    proceed.hidden=false;
+    quantumReady=Boolean(quantumClient?.restore(session));
+    proceed.hidden=quantumReady;
+    get('vaultStatus').textContent=quantumReady?
+      'Vault authorized · You can open the UPI application.':
+      'Proceed authorizes this session with your device passkey. No notification access required.';
+    if(!quantumClient)throw Error('Quantum Signal client unavailable');
+   }
    trace('ORDER_READY');
    saveSessionState();
    setMoney(session.amount);
