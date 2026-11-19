@@ -1,49 +1,32 @@
-# DISHA Quantum Signal — one Proceed, server-device handshake
+# DISHA Quantum Signal — implemented session-twin handshake
 
-This review-only feature prepares an immutable P2P/P2M server order twin
-before an ordinary non-rooted Android customer taps **Proceed to UPI**.
+**Current branch status:** PR [#68](https://github.com/Tashima-Tarsh/Zero-Trust-Fintech/pull/68) **merged into main** on 19 November 2026. It remains opt-in with `qs=1` pending physical-device validation.
 
-## Opt-in routes
-- Personal: `/p2p?amount=1&qs=1`
-- Merchant: `/p2m/checkout?paymentRef=...&token=...&qs=1`
+## Business responsibility
 
-## How it operates
-1. The checkout establishes its authorized session from the server-issued order.
-2. The backend freezes payment kind, receiving VPA, amount in paise, TR and expiry.
-3. The browser calls `POST /api/quantum-signal/start` in session-bound mode.
-   It does not invoke a passkey prompt or request notification access.
-4. The server generates a 30-second unpredictable challenge with a hashed
-   PostgreSQL record (`POST /api/quantum-signal/challenge`).
-5. The browser acknowledges that challenge with the original order bearer +
-   CSRF (`POST /api/quantum-signal/ack`). Until acknowledged, event ingest
-   rejects attempts with `TRUST_ACK_REQUIRED`.
-6. A real user-tapped HTML link opens the server-issued UPI Intent. Both P2P
-   and P2M keep their separate original payment details.
-7. On browser lifecycle and UPI return, DISHA sends idempotent events and
-   any permitted visible transaction fields. Conflict and UTR replay
-   classification remain separate from ledger authority.
+Quantum Signal prepares an immutable P2P/P2M order twin, challenges the checkout browser, stores the matching ACK and records idempotent handoff/background/return observations. Together with DISHA Vault, these signals supply the order-bound context for the intended payer-debit evidence correlation model.
 
-The challenge establishes **two-way session channel continuity**; it is not
-proof of root status, device attestation or money received. The optional
-WebAuthn-authorized Vault client remains available separately for future
-higher-assurance workflows. No customer notification reader, APK, SMS,
-Accessibility Service, or other hardware is involved.
+**This implementation does not yet read an authenticated debit event from the payer's bank or inside Google Pay/PhonePe.** Any returned UTR is a candidate until trustworthy provenance is established.
 
-## Test gates
-- DISHA CI and real disposable PostgreSQL financial invariant tests.
-- Native Android Google Pay and PhonePe P2P / P2M handoff and return captures.
-- Strict matching of pa, am, mc and tr; no P2P/P2M fallback substitution.
-- Rejected forged, cross-order and expired handshakes.
-- No duplicate UTR, reused event ID or false receipt.
-- 100,000 simultaneously active checkout sessions: **not yet load-tested**.
+## API contract
 
-## n8n timing
-**Only after all release tests pass**, evaluate n8n for noncritical
-operational automation such as nightly summaries, incident/exception
-triage, scheduled CI reporting and housekeeping. Never put n8n in
-the synchronous customer Intent dispatch or the ledger posting path.
-For high concurrency use stateless Node.js servers, durable broker
-workers and PostgreSQL transactions; prove throughput with realistic
-load tests before choosing deployment sizing.
+1. `POST /api/quantum-signal/start` — bind original order, bearer and optional Vault authorization.
+2. `POST /api/quantum-signal/challenge` — issue 30-second cryptographically random challenge and persist hashed server record.
+3. `POST /api/quantum-signal/ack` — verify the original order/nonce/challenge; reject wrong, expired and cross-order responses.
+4. User taps the native `Proceed to UPI` anchor — no asynchronous prompt between gesture and Android Intent.
+5. `POST /api/quantum-signal/event` — bound `HANDOFF`, `BACKGROUND`, `RETURN` events with unique IDs and allowed return fields.
+6. `GET /api/quantum-signal/status/:orderId` — read order-scoped signal state.
 
-PR #68 remains draft and `qs=1` remains opt-in until those gates pass.
+Checkout opt-in paths:
+- Personal P2P: `/p2p?amount=1&qs=1`
+- Merchant P2M: `/p2m/checkout?paymentRef=...&token=...&qs=1`
+
+## Database
+
+`disha_quantum_twins`, `disha_quantum_handshakes` and `disha_quantum_events`. The original `pa`, amount in paise, payment kind, TR and session expiry are immutable. Vault authorization remains an optional higher-assurance path.
+
+## Release gate
+
+The Android emulator verifies Intent transport through a test receiver, not payment-app acceptance. Real Android pre-PIN behavior, payer-debit evidence authenticity, SaaS access, edge/backend release matching and 100K active-session load are still not established. Keep n8n outside the payment-critical path.
+
+See [canonical TDD/IDD](architecture/SYSTEM-ARCHITECTURE.md) and [full end-to-end Mermaid flow](architecture/END-TO-END-FLOW.md).
