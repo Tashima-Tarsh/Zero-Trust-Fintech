@@ -38,7 +38,7 @@
  }
  function restore(s){
   const old=read(s.orderId);
-  return Boolean(old?.nonce&&old?.vaultSessionId&&old?.token===s.token&&
+  return Boolean(old?.nonce&&old?.token===s.token&&
     old.acknowledged===true&&old.expiresAt>Date.now()&&/^[a-f0-9]{40}$/.test(old.nonce));
  }
 
