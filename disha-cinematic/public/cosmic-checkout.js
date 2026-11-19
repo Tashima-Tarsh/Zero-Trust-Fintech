@@ -5,6 +5,8 @@
  const get=id=>document.getElementById(id);
  const mode=document.body.dataset.checkout==='merchant'?'merchant':'generic';
  const query=new URLSearchParams(location.search);
+ const requiredMode=mode==='generic'?'P2P':
+  (/^\/p2m\/checkout\/?$/.test(location.pathname||'')?'P2M':null);
  const resumeKey='disha82:upi-payment-resume:v2';
  const stages=[...document.querySelectorAll('[data-stage]')];
  let session=null,polling=false,receiptShown=false;
@@ -251,7 +253,8 @@
  }
  // Chrome fallback returns to this exact payment, not a new amount-based session.
  function secureCheckoutUrl(forFallback=false){
-  const u=new URL(mode==='merchant'?'/merchant-checkout.html':'/checkout',location.href);
+  const merchantPath=requiredMode==='P2M'?'/p2m/checkout':'/merchant-checkout.html';
+  const u=new URL(mode==='merchant'?merchantPath:'/checkout',location.href);
   u.searchParams.set('paymentRef',session.orderId);
   u.searchParams.set('token',session.token);
   if(forFallback)u.searchParams.set('upi_intent_fallback','1');
@@ -361,6 +364,9 @@
   setEventHandlers();showStage('qr');
   try{
    session=await getSession();
+   const declared=String(session.paymentType||'').toUpperCase();
+   const normalized=declared==='PERSONAL'?'P2P':declared==='MERCHANT'?'P2M':declared;
+   if(requiredMode&&normalized!==requiredMode)throw Error('PAYMENT_MODE_MISMATCH');
    trace('ORDER_READY');
    saveSessionState();
    setMoney(session.amount);
@@ -384,7 +390,9 @@
     locked(session.initialStatus==='EXPIRED'||expired()?'This payment link expired. A recorded credit may still appear here.':'This payment did not complete.');
    ledgerTicker=setInterval(()=>{void pollLedger()},3500);
    expiryTicker=setInterval(tickSessionTimer,1000);
-  }catch(err){locked(model.userFacingError(err,'load'))}
+  }catch(err){locked(err?.message==='PAYMENT_MODE_MISMATCH'
+    ?'Payment type and receiving account do not match. Request the correct P2P or P2M payment link.'
+    :model.userFacingError(err,'load'))}
  }
  start();
 })();

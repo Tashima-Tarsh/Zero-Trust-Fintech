@@ -12,7 +12,7 @@ assert.ok(client.includes('function setPaymentKind()')&&client.includes('setPaym
 assert.ok(merchant.includes('payee_account_type')&&merchant.includes('payee_mcc'),'Merchant payment must snapshot account classification and MCC');
 assert.ok(merchant.includes('checkoutUri=upi(payee,payeeName,amount,description,paymentReference);'),'Merchant URI must be validated before committing payment session');
 assert.ok(merchant.includes('payee.holder_name||o.business_name'),'Customer must see frozen payee name');
-assert.ok(merchant.includes('checkout_url:link(orderId,sessionId,req.merchant.is_internal_test===true)'),
+assert.ok(merchant.includes('checkout_url:link(orderId,sessionId,req.merchant.is_internal_test===true,accountType)'),
  'Only internal owner test payment links automatically include opt-in debug=1');
 assert.ok(merchant.includes('payment_type:String(payee.account_type)'),'Merchant checkout must expose P2P/P2M type');
 assert.ok(server.includes('paymentType:String(session.merchantType)'),'Owner test checkout must expose P2P/P2M type');

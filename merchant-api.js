@@ -207,11 +207,14 @@ function createMerchantApi({db,getAuth,buildUpiUri,platformControl}) {
       'INSERT INTO saas_merchant_notifications(id,merchant_id,title,message,created_at) VALUES($1,$2,$3,$4,$5)',
       [id('note_'),merchantId,title,message,now()]);
   }
-  function link(paymentRef,token,internalTest=false){
+  function link(paymentRef,token,internalTest=false,accountType='PERSONAL'){
     // Owner test links bypass potentially stale Cloudflare static checkout HTML.
     // External merchant checkout links remain unchanged and private by default.
     const page=internalTest?'/api/runtime/merchant-checkout':'/merchant-checkout.html';
-    return page+'?paymentRef='+encodeURIComponent(paymentRef)+'&token='+encodeURIComponent(token)+
+    // New bank-registered merchant links have their own strict P2M route.
+    // Preserve historical personal merchant links without rewriting old orders.
+    const destination=String(accountType).toUpperCase()==='MERCHANT'?'/p2m/checkout':page;
+    return destination+'?paymentRef='+encodeURIComponent(paymentRef)+'&token='+encodeURIComponent(token)+
       (internalTest?'&debug=1':'');
   }
   router.get(['/merchant/public/payment/:paymentRef','/merchant/public/order/:orderId'],wrap(async(req,res)=>{
@@ -451,7 +454,7 @@ function createMerchantApi({db,getAuth,buildUpiUri,platformControl}) {
     const orderId=id('PAY_'),sessionId=crypto.randomBytes(24).toString('hex');
     const paymentReference='PAY'+crypto.randomBytes(12).toString('hex').toUpperCase();
     const createdAt=now(),expiresAt=createdAt+180000;
-    let receiving,checkoutUri;
+    let receiving,checkoutUri,accountType;
     try{
       await c.query('BEGIN');
       const requestedVpa = val(req.body.vpaAddress,150).toLowerCase();
@@ -465,7 +468,14 @@ function createMerchantApi({db,getAuth,buildUpiUri,platformControl}) {
         receiving = await selectMerchantVPA(c, req.merchant.id, amount);
         if(!receiving)throw fail(409,'No healthy receiving UPI ID available');
       }
-      const accountType=String(receiving.account_type||'').toUpperCase();
+      accountType=String(receiving.account_type||'').toUpperCase();
+      const requestedMode=String(req.body.paymentMode||'').trim().toUpperCase();
+      if(requestedMode&&!['P2P','P2M'].includes(requestedMode))
+        throw fail(400,'INVALID_PAYMENT_MODE');
+      if(requestedMode==='P2M'&&!requestedVpa)
+        throw fail(409,'P2M_REQUIRES_EXPLICIT_MERCHANT_VPA');
+      if(requestedMode&&requestedMode!==(accountType==='MERCHANT'?'P2M':'P2P'))
+        throw fail(409,'PAYMENT_MODE_ACCOUNT_TYPE_MISMATCH');
       // The payee visible to UPI must be the saved bank/account holder,
       // not an unrelated branding name for genuine P2M accounts.
       const payeeName=val(receiving.holder_name||req.merchant.business_name,100);
@@ -488,7 +498,8 @@ function createMerchantApi({db,getAuth,buildUpiUri,platformControl}) {
     res.status(201).json({success:true,order:{
       id:orderId,amount,description,vpa_address:receiving.vpa_address,
       status:'PENDING',expires_at:expiresAt,
-      upi_uri_dynamic:uri,checkout_url:link(orderId,sessionId,req.merchant.is_internal_test===true)
+      payment_type:accountType==='MERCHANT'?'P2M':'P2P',
+      upi_uri_dynamic:uri,checkout_url:link(orderId,sessionId,req.merchant.is_internal_test===true,accountType)
     }});
   }));
   router.get('/merchant/reports',wrap(async(req,res)=>{

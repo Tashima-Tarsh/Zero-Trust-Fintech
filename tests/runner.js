@@ -20,6 +20,7 @@ const TESTS_DIR = path.join(__dirname);
 const UNIT_TESTS = [
   'test-disha.js',        // challenge math, session, NPCI link, double-entry ledger
   'test-payment-classification-ui.js',
+  'test-payment-mode-separation.js',
   'test-owner-runtime-delivery.js', // role diagnostics, owner inbox, Railway/Cloudflare UI coherence // transparent P2P/P2M checkout and release criteria
   'test-live-upi-contract.js',
   'test-sqlite-upi-snapshot.js',

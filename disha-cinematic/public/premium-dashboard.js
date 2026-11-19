@@ -8,6 +8,7 @@ const money = value => new Intl.NumberFormat('en-IN',{style:'currency',currency:
 const num = value => new Intl.NumberFormat('en-IN').format(Number(value)||0);
 const date = value => value?new Date(Number(value)).toLocaleString('en-IN',{dateStyle:'medium',timeStyle:'short'}):'—';
 const plain = value => String(value||'').trim();
+const p2mOnly=()=>/(?:^|[?&])mode=P2M(?:&|$)/i.test(String(location.search||''));
 const views = {
  overview:['Overview','Your business activity, financial evidence and operational priorities'],
  intelligence:['Payment Intelligence','Order-bound UTR and evidence correlation'],
@@ -54,7 +55,7 @@ async function authInit(){
   });
  }
  clerk=window.Clerk;await clerk.load();
- if(!clerk.isSignedIn||!clerk.session){location.replace('/login');return false}
+ if(!clerk.isSignedIn||!clerk.session){location.replace(p2mOnly()?'/login?mode=P2M':'/login');return false}
  return true;
 }
 async function authHeaders(withBody=false){
@@ -400,7 +401,11 @@ async function loadVpas(){
 function populateSelect(){
  const select=$('#newVpa');if(!select)return;
  const previous=select.value;
- select.innerHTML='<option value="">Use primary active UPI ID</option>'+vpas.filter(v=>v.status==='ACTIVE').map(v=>
+ const merchantOnly=p2mOnly();
+ const candidates=vpas.filter(v=>v.status==='ACTIVE'&&
+  (!merchantOnly||String(v.account_type).toUpperCase()==='MERCHANT'));
+ select.innerHTML=(merchantOnly?'<option value="">Select an active P2M merchant UPI ID</option>':
+  '<option value="">Use primary active UPI ID</option>')+candidates.map(v=>
   '<option value="'+esc(v.vpa_address)+'">'+esc(v.vpa_address)+(v.is_default?' (Primary)':'')+'</option>').join('');
  if([...select.options].some(o=>o.value===previous))select.value=previous;
 }
@@ -448,10 +453,15 @@ async function createPayment(e){
  e.preventDefault();const button=e.submitter;busy(button,true);
  const amount=plain($('#newAmount').value);
  if(!/^\d+(?:\.\d{1,2})?$/.test(amount)){toast('Enter a valid amount up to two decimal places');busy(button,false);return}
+ if(p2mOnly()&&!vpas.some(v=>v.vpa_address===$('#newVpa').value&&
+   v.status==='ACTIVE'&&String(v.account_type).toUpperCase()==='MERCHANT')){
+  toast('Select an active merchant UPI ID for this P2M request.');busy(button,false);return;
+ }
  try{
   const response=await api('/api/merchant/payments',{method:'POST',body:JSON.stringify({
    amount,description:$('#newDesc').value.trim(),paymentReference:$('#newPaymentRef').value.trim(),
-   vpaAddress:$('#newVpa').value||null
+   vpaAddress:$('#newVpa').value||null,
+   paymentMode:p2mOnly()?'P2M':undefined
   })});
   created=response.order;showCreatedOrder(created);toast('Live payment request generated');
   await loadOverview();
