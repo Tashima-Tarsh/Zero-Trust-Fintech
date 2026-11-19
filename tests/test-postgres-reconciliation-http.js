@@ -158,7 +158,7 @@ const {initializeReconciliationSchema,createReconciliationRouter,reconcileCredit
     assert.equal(settled.state,'POSTED','A verified credit can settle despite an untrusted conflicting UTR claim');
     assert.equal(settled.replayed,false);
     let postings=await pool.query(
-      "SELECT side,amount_paise FROM disha_core_postings p JOIN disha_core_journals j "+
+      "SELECT p.side,p.amount_paise FROM disha_core_postings p JOIN disha_core_journals j "+
       "ON p.journal_id=j.journal_id WHERE j.order_id=$1 ORDER BY side",
       [claimSession.orderId]);
     assert.deepEqual(postings.rows.map(r=>[r.side,String(r.amount_paise)]),
