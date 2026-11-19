@@ -6,7 +6,11 @@
 const fs = require('fs');
 const path = require('path');
 
-const envFile = process.argv[2] || 'DISHA_8.2_Production.postman_environment.json';
+const envFile = process.argv[2] || 'DISHA_8.2_Local.postman_environment.json';
+if (/Production/i.test(path.basename(envFile)) && process.env.DISHA_ALLOW_PROD_POSTMAN !== '1') {
+  console.error('Production API tests are disabled by default. Confirm routes and set DISHA_ALLOW_PROD_POSTMAN=1 for authorized testing.');
+  process.exit(2);
+}
 const collectionFile = 'DISHA_8.2_Production.postman_collection.json';
 
 const collection = JSON.parse(fs.readFileSync(path.join(__dirname, collectionFile), 'utf8'));

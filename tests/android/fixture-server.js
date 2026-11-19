@@ -27,6 +27,8 @@ http.createServer((req,res)=>{
   ['/checkout-moonlight.css','text/css'],
   ['/cosmic-checkout.js','application/javascript'],
   ['/cosmic-checkout-model.js','application/javascript'],
+  ['/disha-vault-3d.js','application/javascript'],
+  ['/disha-vault-3d.css','text/css'],
   ['/one-touch-vault.js','application/javascript'],
   ['/quantum-signal-client.js','application/javascript'],
   ['/assets/disha-vault-sculpture.svg','image/svg+xml'],

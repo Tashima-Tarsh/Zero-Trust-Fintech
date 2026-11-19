@@ -306,8 +306,11 @@ function createMerchantApi({db,getAuth,buildUpiUri,platformControl}) {
       if(!owner.rowCount)throw fail(409,'This UPI ID belongs to another merchant workspace');
       await c.query('UPDATE saas_merchant_vpas SET is_default=(id=$2) WHERE merchant_id=$1',
         [req.merchant.id,owner.rows[0].id]);
-      await c.query('UPDATE saas_merchant_vpas SET holder_name=$3,bank_name=$4 WHERE merchant_id=$1 AND id=$2',
-        [req.merchant.id,owner.rows[0].id,holder,bank]);
+      // A setup update must persist the selected receiving account class.
+      // Otherwise a bank-issued P2M VPA silently remains PERSONAL/P2P and
+      // its new payment links omit mandatory merchant URI fields.
+      await c.query('UPDATE saas_merchant_vpas SET holder_name=$3,bank_name=$4,account_type=$5,mcc=$6 WHERE merchant_id=$1 AND id=$2',
+        [req.merchant.id,owner.rows[0].id,holder,bank,type.type,type.mcc]);
       await notify(c,req.merchant.id,'Workspace activated','Receiving UPI ID configured. Your workspace is ready.');
       await c.query('COMMIT');
     }catch(e){await c.query('ROLLBACK');throw e;}finally{c.release();}

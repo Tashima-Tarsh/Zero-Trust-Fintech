@@ -65,3 +65,7 @@ An ordinary merchant should not be able to inspect another business's receiving 
 A seller creates a ₹750 request. The customer sees the intended amount and receiving UPI account. The seller follows the request in Transactions; if the checkout returns unusual evidence, Vault and risk context are available. If a qualified matching credit is accounted for, the ledger and completed records reflect it. Reporting and export help the business close its books.
 
 [Receiving-account architecture](P2P-P2M-and-Receiving-Accounts.md) · [Records and receipts](Records-Reconciliation-and-Receipts.md) · [Home](Home.md)
+
+## Human-facing identifiers
+
+Merchant and owner views show human-readable payment labels, actual UTR/TR when available, amounts, states and evidence—not generated order, tenant or journal IDs. The backend continues to use immutable internal identifiers for authorization, secure row actions and audit correlation.

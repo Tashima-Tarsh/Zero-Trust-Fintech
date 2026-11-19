@@ -1,77 +1,55 @@
-# The DISHA payment journey — From order to receipt
+# DISHA 8.2 — End-to-End Payment Journey
 
-**A single business journey. Distinct responsibilities. Transparent outcomes.**
+The system is designed around **payer-side debit evidence, order-bound Vault records, Quantum Signal ACK and UTR/TR correlation**—not a conventional payment-aggregator hosted checkout.
 
-[Home](Home.md) · [Full architecture](Platform-Architecture.md) · [Vault architecture](Vault-Architecture.md)
+```mermaid
+sequenceDiagram
+ autonumber
+ actor Merchant
+ participant API as DISHA Backend
+ participant PG as PostgreSQL
+ participant Checkout as Android Chrome
+ participant Vault as DISHA Vault
+ participant Quantum as Quantum Signal
+ participant App as UPI Application
+ participant Evidence as Evidence Decision
+ Merchant->>API: Request exact P2P/P2M amount and recipient
+ API->>PG: Persist order, account class, TR and expiry
+ API-->>Checkout: Checkout page and original UPI URI
+ opt Higher-assurance Vault
+  Checkout->>Vault: Optional device authorization
+  Vault->>PG: Bind Vault session to original order
+ end
+ Checkout->>Quantum: Start twin
+ Quantum->>PG: Store order snapshot
+ Checkout->>Quantum: Request challenge
+ Quantum-->>Checkout: Short-lived challenge
+ Checkout->>Quantum: ACK original challenge
+ Quantum->>PG: Persist validated ACK
+ Checkout->>App: One deliberate Proceed / native Intent
+ Checkout->>Quantum: Record HANDOFF and BACKGROUND
+ alt UPI app rejects before PIN
+  App-->>Checkout: Browser resumes, if available
+  Checkout->>Quantum: Return observation and error category
+ else Payer authorizes in UPI app
+  App-->>Checkout: Permitted return fields, if provided
+  Checkout->>Quantum: RETURN with candidate UTR
+  opt Optional Vault evidence
+   Checkout->>Vault: Record device-bound observation
+  end
+  Note over App,Evidence: Actual authenticated payer-debit signal still requires its own provenance
+  Evidence->>Evidence: Match debit evidence, payee, exact amount, TR, UTR and replay constraints
+ end
+ Evidence->>PG: Persist validated decision or unresolved exception
+ PG-->>Merchant: Real merchant payment status and evidence timeline
+```
 
-## Eight connected moments
+## Final decision rule
 
-| Stage | Customer and merchant experience | DISHA responsibility |
-| :---: | --- | --- |
-| **01 — Create** | Merchant selects an amount, recipient and order reference | Preserve the original receiving details and validity window |
-| **02 — Present** | Customer opens a branded checkout with UPI apps and QR | Show the amount, exact payee and a three-minute timer |
-| **03 — Authorize** | Customer uses a supported device passkey | Bind the Vault handoff to the original order |
-| **04 — Hand off** | Customer opens a familiar UPI application | Preserve the intended UPI payment parameters |
-| **05 — Attempt** | The existing UPI app and banks process the attempt | Do not equate app activity with merchant credit |
-| **06 — Observe** | Browser returns, if supported | Record permitted return observations and classify discrepancies |
-| **07 — Match** | A qualified financial-credit record becomes available | Check the merchant, order, exact amount, recipient and reference |
-| **08 — Record** | The merchant sees a completed entry; customer receives a receipt | Maintain balanced accounting and make the result available |
+- **Completed:** independently authenticatable payment outcome, correct payee/amount/reference, no replay, accepted by the transaction state machine.
+- **Pending / exception:** source not available, app returns without a reference, event conflict, expiry or incomplete proof.
+- **Failed:** reported rejection or an observed matching terminal failure, without a fabricated completed ledger state.
 
-## The connected customer experience
+Browser return is an event in DISHA's trust timeline; it must not be confused with independently authenticated payer debit.
 
-~~~mermaid
-flowchart LR
- A["Merchant<br/>Creates order"]:::blue --> B["DISHA Checkout<br/>QR and UPI choice"]:::blue
- B --> C["DISHA Vault<br/>Device authorization"]:::purple
- C --> D["Existing UPI App<br/>Customer pays"]:::gray
- D --> E["DISHA Vault<br/>Return observation"]:::purple
- E --> F["Fraud Intelligence<br/>Evaluate context"]:::orange
- F --> G["Qualified Credit Matching"]:::green
- G --> H["Ledger<br/>Confirmed receipt"]:::green
- classDef blue fill:#103453,stroke:#38BDF8,color:#fff,stroke-width:2px;
- classDef purple fill:#30204F,stroke:#C084FC,color:#fff,stroke-width:2px;
- classDef orange fill:#472D18,stroke:#FBBF24,color:#fff,stroke-width:2px;
- classDef green fill:#103C31,stroke:#34D399,color:#fff,stroke-width:2px;
- classDef gray fill:#293241,stroke:#CBD5E1,color:#fff,stroke-width:2px;
-~~~
-
-The arrows describe the business journey, **not a claim that the app return creates a completed payment**. The final accounting step relies on its own qualified financial-credit record.
-
-## End-to-end outcome branching
-
-~~~mermaid
-flowchart TD
-  A["Customer attempts UPI payment"]:::external --> B["What did DISHA observe?"]:::vault
-  B --> C["Order and evidence analysis"]:::risk
-  C --> D{"Qualified financial credit available and exact match?"}:::risk
-  D -->|"Yes"| Y["Completed financial record"]:::money
-  Y --> R["Receipt and merchant ledger"]:::money
-  D -->|"No financial credit yet"| P["Awaiting confirmation"]:::experience
-  D -->|"Mismatch or duplicate"| Q["Exception review"]:::exception
-  P --> S["Merchant order timeline"]:::experience
-  Q --> S
-  classDef experience fill:#103453,stroke:#38BDF8,color:#fff,stroke-width:2px;
-  classDef vault fill:#30204F,stroke:#C084FC,color:#fff,stroke-width:2px;
-  classDef risk fill:#472D18,stroke:#FBBF24,color:#fff,stroke-width:2px;
-  classDef money fill:#103C31,stroke:#34D399,color:#fff,stroke-width:2px;
-  classDef exception fill:#4A1F31,stroke:#FB7185,color:#fff,stroke-width:2px;
-  classDef external fill:#293241,stroke:#CBD5E1,color:#fff,stroke-width:2px;
-~~~
-
-## Three viewpoints of the same order
-
-**Customer** — A clear amount, receiving UPI identity, payment options, secure device authorization and an understandable status.
-
-**Merchant** — An order-specific request, available device evidence, discrepancies, completed financial records, exports and customer-service context.
-
-**Platform owner** — Merchant access governance, separately controlled business workspaces and oversight of incidents and financial exceptions.
-
-## The business meaning of common outcomes
-
-- **Pending:** An order exists, but a financially completed record has not been established.
-- **Observed:** DISHA has evidence of part of the checkout journey; this is not the same as bank-credit evidence.
-- **Expired:** The customer-facing request window has ended; a genuinely credited transfer may still require proper reconciliation.
-- **Exception:** One or more claimed or qualified fields conflict with the intended order.
-- **Completed:** Qualified financial evidence matches the original order and is represented in a balanced financial record.
-
-[Fraud intelligence](Fraud-and-Risk-Protection.md) · [Records and receipts](Records-Reconciliation-and-Receipts.md) · [Home](Home.md)
+The detailed sequence, decision tree and every exception are maintained in [the canonical Mermaid flow](../architecture/END-TO-END-FLOW.md).

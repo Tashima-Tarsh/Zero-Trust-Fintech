@@ -17,6 +17,17 @@ assert.match(activity,/snapshotHandler\.postDelayed\(this, 1200\)/,
   'WebView must emit periodic DOM snapshots itself');
 assert.match(activity,/WEBVIEW_RENDER_PROCESS_GONE/,
   'WebView renderer failures must be visible in CI');
+assert.match(activity,/DishaUpiIntentBridge\.launch\(/,
+  'Android test host must use the reusable native UPI bridge');
+const bridge=fs.readFileSync(path.join(__dirname,'..','android','intent-bridge','src','main','java','ai','disha','upi','DishaUpiIntentBridge.java'),'utf8');
+assert.match(bridge,/startActivityForResult\(intent, requestCode\)/,
+  'Native bridge must capture real activity-return evidence');
+assert.match(bridge,/bankVerified = false/,
+  'App result must never directly authorize a payment receipt');
+assert.match(activity,/ANDROID_ACTIVITY_RESULT classification=/,
+  'Android activity result must be reported separately from financial confirmation');
+assert.match(activity,/bankVerified=false/,
+  'A successful Android return is not proof money arrived');
 assert.match(harness,/shlex\.quote\(CHECKOUT\)/,
   'ADB shell must quote ampersands so the checkout bearer token is not stripped');
 assert.match(activity,/CHECKOUT_FIXTURE_TOKEN_MISSING/,

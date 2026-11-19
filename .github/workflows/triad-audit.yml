@@ -1,0 +1,114 @@
+name: DISHA triad architecture + agent evidence audit
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - '.github/workflows/triad-audit.yml'
+      - 'tools/triad/**'
+      - 'tests/android/**'
+      - 'tests/test-android-fixture.js'
+      - 'public/cosmic-checkout.js'
+      - 'public/cosmic-checkout-model.js'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: triad-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  contract:
+    name: Triad orchestration + Android evidence contract
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+      - name: Python syntax and deterministic triad tests
+        run: |
+          python -m py_compile tools/triad/loop.py
+          python -m unittest discover -s tools/triad -p 'test_*.py' -v
+      - name: Android evidence and unit contract
+        run: |
+          npm ci --ignore-scripts
+          node tests/test-android-fixture.js
+          node tests/test-upi-intent-handoff.js
+          node tests/test-triad-agent-loop.js
+
+  full-audit:
+    name: Actual wshobson + Archify offline review
+    if: github.event_name == 'workflow_dispatch' || github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    needs: contract
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - name: Fetch pinned wshobson specialist source
+        uses: actions/checkout@v4
+        with:
+          repository: wshobson/agents
+          ref: 42203085cfc5736204bf0f6d436dff7e1da0bf3f
+          path: .external/agents
+          sparse-checkout: |
+            plugins/comprehensive-review/agents
+            plugins/debugging-toolkit/agents
+            plugins/codebase-cleanup/agents
+            plugins/performance-testing-review/agents
+      - name: Fetch pinned Archify renderer source
+        uses: actions/checkout@v4
+        with:
+          repository: tt-a1i/archify
+          ref: 44781293f38728baf04dbad33ce1a0cef8c39cca
+          path: .external/archify
+          sparse-checkout: |
+            archify
+            package.json
+            package-lock.json
+            scripts
+      - name: Fetch pinned Swarms source
+        uses: actions/checkout@v4
+        with:
+          repository: kyegomez/swarms
+          ref: 76c5e34a341c568668d29e532434c7e852edd297
+          path: .external/swarms
+          sparse-checkout: |
+            swarms
+            pyproject.toml
+            SKILL.md
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install development-only tools
+        run: |
+          npm ci --ignore-scripts
+          npm ci --prefix .external/archify --ignore-scripts
+          npm ci --prefix .external/archify/archify --ignore-scripts
+          python -m pip install --disable-pip-version-check "swarms==17.0.3"
+      - name: Run actual Swarms offline workers, Archify finalize, wshobson roles and verify DISHA
+        env:
+          ARCHIFY_UPDATE_CHECK_DISABLED: '1'
+          DISHA_NO_BANK_API: '1'
+        run: |
+          python tools/triad/loop.py \
+            --agents-root .external/agents \
+            --archify-root .external/archify \
+            --render --verify --require-all --iterations 8
+      - name: Upload evidence and validated architecture
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: disha-triad-audit-artifacts
+          path: test-results/triad/
+          retention-days: 14

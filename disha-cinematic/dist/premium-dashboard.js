@@ -244,7 +244,7 @@ async function setupMerchant(event){
 }
 function orderTable(rows,compact=false){
  if(!rows.length)return '<tr><td colspan="'+(compact?5:7)+'" class="empty">No real payment records in this view.</td></tr>';
- return rows.map(o=>'<tr><td><strong>'+esc(o.id)+'</strong></td><td>'+esc(date(o.created_at))+
+ return rows.map(o=>'<tr><td><strong>'+esc(o.description||'Payment')+'</strong></td><td>'+esc(date(o.created_at))+
   '</td><td>'+money(o.amount)+'</td><td>'+esc(o.vpa_address)+'</td>'+
   (compact?'':'<td>'+esc(o.utr||'—')+'</td>')+
   '<td><span class="state '+esc(String(o.status).toLowerCase())+'">'+esc(o.status)+'</span></td>'+
@@ -313,11 +313,11 @@ async function merchantEvidence(){
 }
 function evidenceTable(rows,mode){
  if(!rows.length)return '<div class="empty">No recorded merchant orders in this workspace.</div>';
- const heading=mode==='vault'?'<th>Order</th><th>Vault outcome</th><th>Reference candidate</th><th>Payment status</th>':'<th>Order</th><th>Amount</th><th>UTR</th><th>Observed evidence</th><th>Recorded status</th>';
+ const heading=mode==='vault'?'<th>Payment</th><th>Vault outcome</th><th>Reference candidate</th><th>Payment status</th>':'<th>Payment</th><th>Amount</th><th>UTR</th><th>Observed evidence</th><th>Recorded status</th>';
  const cells=rows.map(o=>{
   const outcome=o.vault_outcome||'No Vault observation';
-  if(mode==='vault')return '<tr><td>'+esc(o.id)+'</td><td>'+esc(outcome)+(o.vault_correlation?.selectedApp?'<small class="sub"> · App: '+esc(o.vault_correlation.selectedApp)+' · Return: '+esc(o.vault_correlation.browserAppReturnMs??'—')+'ms</small>':'')+'</td><td>'+esc(o.vault_utr_candidate||'Not provided')+'</td><td>'+esc(o.status)+'</td></tr>';
-  return '<tr><td>'+esc(o.id)+'<small>'+esc(o.vpa_address)+'</small></td><td>'+esc(money(o.amount))+'</td><td>'+esc(o.utr||'Not recorded')+'</td><td>'+esc(outcome)+'</td><td>'+esc(o.status)+'</td></tr>';
+  if(mode==='vault')return '<tr><td>'+esc(o.description||'Payment')+'</td><td>'+esc(outcome)+(o.vault_correlation?.selectedApp?'<small class="sub"> · App: '+esc(o.vault_correlation.selectedApp)+' · Return: '+esc(o.vault_correlation.browserAppReturnMs??'—')+'ms</small>':'')+'</td><td>'+esc(o.vault_utr_candidate||'Not provided')+'</td><td>'+esc(o.status)+'</td></tr>';
+  return '<tr><td>'+esc(o.description||'Payment')+'<small>'+esc(o.vpa_address)+'</small></td><td>'+esc(money(o.amount))+'</td><td>'+esc(o.utr||'Not recorded')+'</td><td>'+esc(outcome)+'</td><td>'+esc(o.status)+'</td></tr>';
  }).join('');
  return '<table class="merchant-op-table"><thead><tr>'+heading+'</tr></thead><tbody>'+cells+'</tbody></table>';
 }
@@ -337,8 +337,8 @@ async function loadLedger(){
   const d=await api('/api/merchant/ledger');
   if(!d.connected){summary.textContent='Financial journal schema is not provisioned';body.innerHTML='<div class="empty">No journal data available.</div>';return}
   summary.textContent='Posted journals: '+num(d.summary?.posted||0)+' · Amount: '+money(Number(d.summary?.posted_paise||0)/100);
-  body.innerHTML=d.journals.length?'<table class="merchant-op-table"><thead><tr><th>Journal</th><th>Order</th><th>Amount</th><th>State</th><th>Posted</th></tr></thead><tbody>'+
-    d.journals.map(j=>'<tr><td>'+esc(j.journal_id)+'</td><td>'+esc(j.order_id)+'</td><td>'+esc(money(Number(j.amount_paise)/100))+'</td><td>'+esc(j.state)+'</td><td>'+esc(j.posted_at||'Not posted')+'</td></tr>').join('')+'</tbody></table>':'<div class="empty">No financial journal records exist for this tenant.</div>';
+  body.innerHTML=d.journals.length?'<table class="merchant-op-table"><thead><tr><th>Entry</th><th>Payment</th><th>Amount</th><th>State</th><th>Posted</th></tr></thead><tbody>'+
+    d.journals.map(j=>'<tr><td>Recorded entry</td><td>Payment</td><td>'+esc(money(Number(j.amount_paise)/100))+'</td><td>'+esc(j.state)+'</td><td>'+esc(j.posted_at||'Not posted')+'</td></tr>').join('')+'</tbody></table>':'<div class="empty">No financial journal records exist for this tenant.</div>';
  }catch(e){summary.textContent='Ledger unavailable';body.textContent=e.message}
 }
 
@@ -357,7 +357,7 @@ async function loadPayments(){
 function showOrder(id){
  const o=orders.find(x=>x.id===id);if(!o)return;
  const detail=$('#txDetails');detail.style.display='block';
- detail.innerHTML='<div class="module-head"><h2>Payment '+esc(o.id)+'</h2><button type="button" class="btn tiny" id="closeDetail">Close ×</button></div>'+
+ detail.innerHTML='<div class="module-head"><h2>Payment details</h2><button type="button" class="btn tiny" id="closeDetail">Close ×</button></div>'+
   '<div class="order-details">'+[
    ['Amount',money(o.amount)],['Status',esc(o.status)],['Receiving UPI',esc(o.vpa_address)],
    ['UTR',esc(o.utr||'Not recorded')],['Created',esc(date(o.created_at))],
@@ -472,7 +472,7 @@ function showCreatedOrder(o){
  const box=$('#createResult');box.className='';
  box.innerHTML='<div class="qr-result"><div class="qr-shell"><div id="createdQr"></div></div>'+
   '<div class="qr-copy"><div class="overline">REQUEST CREATED</div><div class="pay-amount">'+money(o.amount)+'</div>'+
-  '<p>'+esc(o.id)+'</p><p>Receiving '+esc(o.vpa_address)+'</p>'+
+  '<p>Payment request ready</p><p>Receiving '+esc(o.vpa_address)+'</p>'+
   '<div class="form-actions">'+
   '<button type="button" class="btn tiny" data-copy="'+esc(link)+'">Copy payment link</button>'+
   '<button type="button" class="btn tiny ghost" data-copy="'+esc(o.upi_uri_dynamic)+'">Copy UPI URI</button>'+

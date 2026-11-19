@@ -86,17 +86,33 @@ assert.throws(()=>model.appTapLaunchUri(original,chromeUa,fallback,'arbitrary_pa
 
 const click=client.slice(client.indexOf("get('qrTapToPay').addEventListener('click'"),client.indexOf("get('shareCheckout').addEventListener"));
 assert.match(click,/trace\('APP_DISPATCH'/);
-assert.match(click,/qrTapStartedAt=Date\.now\(\)/);
+assert.match(click,/qrTapStartedAt=now;/,'Native handoff must retain the same synchronous gesture');
+assert.match(click,/lastNativeLaunchAt&&now-lastNativeLaunchAt<nativeLaunchCooldownMs/,'Rapid duplicate payment app launches must be suppressed');
+assert.match(click,/event\.preventDefault\(\);\s*trace\('APP_DUPLICATE_BLOCKED'\)/,'Duplicate touches are consumed locally');
 assert.doesNotMatch(click,/\bawait\b|fetch\(|authorize\(/,
  'Native QR link must preserve synchronous user gesture');
 assert.match(client,/qrAppBackgrounded/);
 assert.match(client,/qrTapLaunchUri\(session\.upiUri,userAgent,secureCheckoutUrl\(true\)\)/);
 assert.match(client,/UPI app returned quickly/);
 assert.match(java,/shouldOverrideUrlLoading\(WebView view, WebResourceRequest request\)/);
-assert.match(java,/"upi"\.equalsIgnoreCase\(uri\.getScheme\(\)\)/);
-assert.match(java,/"pay"\.equalsIgnoreCase\(uri\.getHost\(\)\)/);
-assert.match(java,/new Intent\(Intent\.ACTION_VIEW, uri\)/);
+const nativeBridge=read('android/intent-bridge/src/main/java/ai/disha/upi/DishaUpiIntentBridge.java');
+assert.match(java,/DishaUpiIntentBridge\.isPaymentUri\(uri\)/);
+assert.match(java,/DishaUpiIntentBridge\.launch\(/);
+assert.match(nativeBridge,/"upi"\.equalsIgnoreCase\(uri\.getScheme\(\)\)/);
+assert.match(nativeBridge,/"pay"\.equalsIgnoreCase\(uri\.getHost\(\)\)/);
+assert.match(nativeBridge,/new Intent\(Intent\.ACTION_VIEW, uri\)/);
+assert.match(nativeBridge,/bankVerified = false/);
 assert.match(java,/return false;/,'HTTP(S) navigation must not be hijacked as UPI intents');
+const fakeReceiver=read('tests/android/upi-receiver/app/src/main/java/ai/disha/testupi/FakeUpiActivity.java');
+const androidE2e=read('tests/android/verify_android_flow.py');
+assert.match(fakeReceiver,/"PRE_PIN_FAILURE"/);
+assert.match(fakeReceiver,/"APP_REPORTED_SUCCESS"/);
+assert.match(fakeReceiver,/setResult\(Activity\.RESULT_CANCELED, result\)/);
+assert.match(fakeReceiver,/setResult\(Activity\.RESULT_OK, result\)/);
+assert.match(androidE2e,/ANDROID_ACTIVITY_RESULT classification=CANCELLED appReported=FAILURE/);
+assert.match(androidE2e,/ANDROID_ACTIVITY_RESULT classification=APP_REPORTED_OK appReported=SUCCESS/);
+assert.match(androidE2e,/assert fixture_info\(\)\["evidenceCount"\]==0/);
+
 const personal=new URL(buildUpiUri({kind:'P2P',pa:'person@oksbi',pn:'Person',am:1,tn:'Medical'}));
 assert.equal(personal.searchParams.get('mc'),null);
 assert.equal(personal.searchParams.get('tr'),null);

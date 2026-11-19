@@ -16,7 +16,10 @@
  let qrUri=null,lastStage='qr',expiryTicker=null,ledgerTicker=null;
  let expiryLogged=false;
  // Browser-only diagnostics for direct QR taps. Not evidence of a bank payment.
- let qrTapStartedAt=0,qrAppBackgrounded=false;
+ let qrTapStartedAt=0,qrAppBackgrounded=false,lastNativeLaunchAt=0;
+ // Prevent rapid repeated taps from dispatching another UPI activity while
+ // the first handoff is still opening or returning.
+ const nativeLaunchCooldownMs=6000;
  const userAgent=navigator.userAgent||'';
  const orderId=()=>session?.orderId||null;
  const debug=query.get('debug')==='1';
@@ -29,7 +32,7 @@
  function copyDebugReport(){
   if(!debug)return;
   const report='DISHA checkout diagnostic v2\n'+
-   'Payment reference: '+(orderId()||'not-created')+'\n'+
+   'Checkout session: '+(orderId()?'active':'not-created')+'\n'+
    'Device: '+device+'\n'+
    debugHistory.map(x=>x.time+' '+x.event+' '+x.code+' '+x.app).join('\n');
   if(navigator.clipboard?.writeText){
@@ -189,10 +192,11 @@
   receiptShown=true;
   trace('LEDGER_CONFIRMED');
   get('receiptAmount').textContent=format(record.challengeAmount||session.amount);
-  get('receiptPaymentRef').textContent='PAY '+String(session.orderId).replace(/^[^_]*_/, '');
+  get('receiptPaymentRef').textContent=new URLSearchParams(session.upiUri.split('?')[1]||'').get('tr')||'—';
   get('receiptUtr').textContent=record.utr;
   showStage('receipt');
   if(ledgerTicker)clearInterval(ledgerTicker);
+  if(window.DISHAVault3D)window.DISHAVault3D.destroy();
  }
  async function pollLedger(){
   if(!session||polling||receiptShown||document.visibilityState==='hidden')return;
@@ -354,14 +358,26 @@
       ['EXPIRED','FAILED','CANCELLED'].includes(session.initialStatus)||!model.supportsNativeUPI(userAgent)){
     event.preventDefault();
     message(expired()?'Payment window expired. Request a fresh link.':
-     'Scan this QR with a UPI app on another phone.','info');
+     'Scan this QR with any UPI app (GPay, PhonePe, Paytm, BHIM, etc.).','info');
     return;
    }
-   qrTapStartedAt=Date.now();qrAppBackgrounded=false;
+
+
+   const now=Date.now();
+   if(lastNativeLaunchAt&&now-lastNativeLaunchAt<nativeLaunchCooldownMs){
+    event.preventDefault();
+    trace('APP_DUPLICATE_BLOCKED');
+    message('UPI app was already opened. Return here before trying again.','info');
+    return;
+   }
+   lastNativeLaunchAt=now;
+   qrTapStartedAt=now;qrAppBackgrounded=false;
    if(quantumEnabled&&quantumClient){
     try{quantumClient.handoff(session,'generic')}
     catch(_){event.preventDefault();message('Authorize Vault before paying.','error');return}
    }
+
+
    trace('APP_DISPATCH','APP_GENERIC','generic');
   });
   for(const link of document.querySelectorAll('[data-upi-app]')){
@@ -398,7 +414,7 @@
   get('shareReceipt').addEventListener('click',async()=>{
    if(!receiptShown)return;
    const content='DISHA payment receipt\nAmount: '+format(session.amount)+
-    '\nPayment reference: '+session.orderId+'\nUPI reference: '+get('receiptUtr').textContent;
+    '\n'+(new URLSearchParams(session.upiUri.split('?')[1]||'').get('tr')?'TR: '+new URLSearchParams(session.upiUri.split('?')[1]||'').get('tr')+'\n':'')+'UPI reference: '+get('receiptUtr').textContent;
    try{
     if(navigator.share)await navigator.share({title:'DISHA payment receipt',text:content});
     else if(navigator.clipboard?.writeText){
@@ -407,8 +423,15 @@
   });
   document.addEventListener('visibilitychange',()=>{
    if(document.visibilityState==='hidden'){
-    if(qrTapStartedAt)qrAppBackgrounded=true;
+
+
+    if(qrTapStartedAt&&!qrAppBackgrounded){
+     qrAppBackgrounded=true;
+     trace('BROWSER_HIDDEN');
+    }
     if(quantumEnabled&&quantumReady&&quantumClient)quantumClient.background(session);
+
+
    }else onReturn();
   });
   window.addEventListener('pageshow',onReturn);
@@ -418,6 +441,11 @@
   setEventHandlers();showStage('qr');
   try{
    session=await getSession();
+
+
+   trace('QR_OPEN');
+
+
    const declared=String(session.paymentType||'').toUpperCase();
    const normalized=declared==='PERSONAL'?'P2P':declared==='MERCHANT'?'P2M':declared;
    if(requiredMode&&normalized!==requiredMode)throw Error('PAYMENT_MODE_MISMATCH');
@@ -433,6 +461,8 @@
     get('vaultStatus').textContent='Protected signal channel ready · one Proceed tap opens UPI.';
    }
    trace('ORDER_READY');
+
+
    saveSessionState();
    setMoney(session.amount);
    setPaymentKind();
@@ -441,14 +471,23 @@
    get('paymentTrackingStatus').textContent='Payment status · Awaiting confirmation';
    get('checkoutNote').textContent=params.get('tn')||'Service';
    get('qrTapToPayHint').textContent=model.supportsNativeUPI(userAgent)
-    ?'Tap the QR for your UPI app, or scan from another phone.'
+    ?'Tap the QR to open your UPI app (GPay/PhonePe/Paytm/BHIM), or scan from another phone.'
     :'Scan this QR using your UPI app on another phone.';
    showStage('qr');tickSessionTimer();
+
+
+   // Initialize 3D vault after session is ready
+   if(window.DISHAVault3D&&!window.DISHAVault3D.isReduced()){
+    setTimeout(()=>window.DISHAVault3D.init(),300);
+   }
+
    if(query.get('upi_intent_fallback')==='1'){
     // Chrome's fallback indicates a failed external-app handoff, not a payment decision.
     trace('APP_ERROR','APP_NAVIGATION_ERROR');
     message('UPI app could not be opened. Choose another app or scan this QR from another phone.','info');
    }
+
+
    await pollLedger();
    if(receiptShown)return;
    if(['EXPIRED','FAILED','CANCELLED'].includes(session.initialStatus)||expired())

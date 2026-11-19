@@ -16,7 +16,27 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  android-compile:
+    name: Compile Android test receiver before emulator allocation
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - name: Checkout application and test harness
+        uses: actions/checkout@v4
+      - name: Set up Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Set up reproducible Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.11.1'
+      - name: Compile the Android test APK
+        run: gradle -p tests/android/upi-receiver :app:assembleDebug --no-daemon --console=plain
+
   android-p2p-e2e:
+    needs: android-compile
     name: Android ${{ matrix.api-level }} - browser to UPI intent
     runs-on: ubuntu-latest
     timeout-minutes: 55

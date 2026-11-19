@@ -17,7 +17,7 @@ assert.ok(merchant.includes('checkout_url:link(orderId,sessionId,req.merchant.is
 assert.ok(merchant.includes('payment_type:String(payee.account_type)'),'Merchant checkout must expose P2P/P2M type');
 assert.ok(server.includes('paymentType:String(session.merchantType)'),'Owner test checkout must expose P2P/P2M type');
 assert.ok(owner.includes('reconciliationConfigured')&&owner.includes('NO_GO_UNTIL_BANK_EVIDENCE'),'Owner settings cannot claim bank acceptance without evidence');
-assert.ok(ownerUI.includes('Merchant release gate')&&ownerUI.includes('Credit reconciliation'),'Owner dashboard must display production blockers');
+assert.ok(ownerUI.includes('Merchant release gate')&&ownerUI.includes('Transaction evidence'),'Owner dashboard must display production blockers');
 assert.ok(owner.includes('LEFT JOIN saas_merchant_orders o ON o.id=s.order_id'),
  'Super Admin Vault must include direct P2P sessions that lack merchant order records');
 assert.ok(owner.includes('publicCheckout:{receivingVpa:publicVpa'),

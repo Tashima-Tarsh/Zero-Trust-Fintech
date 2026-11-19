@@ -106,6 +106,30 @@ P2 = additional regression.
 | A17 | P1 | Android OEM devices: stock Pixel, Samsung, Xiaomi and OnePlus | Physical/manual |
 | A18 | P1 | Do not register a real bank account or enter a UPI PIN in an emulator | Policy/manual |
 
+#### New negative-path emulator coverage (PR #63)
+
+The test-only receiver now supports two explicit outcomes triggered by the
+Android E2E runner while a real native UPI activity is in the foreground:
+
+- `PRE_PIN_FAILURE`: the fake app returns `RESULT_CANCELED` with
+  `Status=FAILURE`. The checkout must keep the same PENDING request and
+  must not create a receipt.
+- `APP_REPORTED_SUCCESS`: the fake app returns `RESULT_OK` with
+  `Status=SUCCESS` **without transferring money**. The checkout must
+  still remain PENDING and must not create a receipt.
+
+The runner verifies a **fresh** native activity-return log, the unchanged
+fixture ledger, and zero submitted vault events. These are regression tests
+only; neither scenario reproduces GPay/PhonePe's internal pre-PIN validation.
+
+**Still blocked for release:** physical Android Chrome + real registered UPI
+apps, with a real issued P2P/P2M receiving account and an independently
+confirmed small-value test. Record the app, Android version, whether the
+correct payee/amount appeared, the exact *redacted* pre-PIN error text,
+and compare the bank-issued QR to the DISHA URI using
+`node scripts/upi-acceptance-harness.js`. Never upload a PIN, bearer token,
+account balance, or a full customer logcat into public CI artifacts.
+
 ### Verification, security, callback and accounting
 
 | ID | Priority | Action / expected result | Mode |

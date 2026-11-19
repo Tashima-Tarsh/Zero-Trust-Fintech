@@ -16,6 +16,10 @@ for(const html of [home,selector]){
  assert.match(html,/href="\/p2p\?amount=1"/);
  assert.match(html,/href="\/p2m"/);
 }
+assert.match(home,/<div class="header-checkout" role="group"/,'Both checkout options belong in the header');
+assert.doesNotMatch(home,/class="payment-lanes"|class="lane-options"/,'No full-height homepage payment lane section');
+assert.match(selector,/class="choose"/);
+assert.doesNotMatch(selector,/min-height:255px|margin-top:70px/,'Checkout mode chooser must stay compact');
 assert.match(p2mPage,/\/login\?mode=P2M/);
 assert.match(p2mPage,/\/dashboard\?mode=P2M#create/);
 assert.match(personal,/data-required-payment-type="P2P"/);
