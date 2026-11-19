@@ -1,35 +1,9 @@
 name: Android P2P UPI emulator E2E (no real transfer)
 
 on:
+  # Real-device / Android Studio testing is the default.
+  # The heavyweight GitHub Android emulator matrix runs only by explicit request.
   workflow_dispatch:
-  pull_request:
-    paths:
-      - '.github/workflows/android-p2p-emulator.yml'
-      - 'tests/android/**'
-      - 'public/merchant-checkout.html'
-      - 'public/checkout.html'
-      - 'public/cosmic-checkout.js'
-      - 'public/cosmic-checkout-model.js'
-      - 'public/one-touch-vault.js'
-      - 'public/cosmic-checkout.css'
-      - 'public/checkout-moonlight.css'
-      - 'utils/upi-intent.js'
-      - 'tests/test-upi-intent-handoff.js'
-      - 'public/vendor/qrcode.min.js'
-  push:
-    branches: [main]
-    paths:
-      - '.github/workflows/android-p2p-emulator.yml'
-      - 'tests/android/**'
-      - 'public/merchant-checkout.html'
-      - 'public/checkout.html'
-      - 'public/cosmic-checkout.js'
-      - 'public/cosmic-checkout-model.js'
-      - 'public/one-touch-vault.js'
-      - 'public/cosmic-checkout.css'
-      - 'public/checkout-moonlight.css'
-      - 'utils/upi-intent.js'
-      - 'tests/test-upi-intent-handoff.js'
 
 permissions:
   contents: read
