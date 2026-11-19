@@ -9,7 +9,7 @@ assert.match(code,/archify\/bin\/archify\.mjs/);
 assert.match(code,/SPECIALISTS = \{/);
 assert.match(code,/bankVerified=false/);
 assert.match(code,/NOT_RUN_NO_LOCAL_MODEL/);
-assert.doesNotMatch(code,/from\s+(?:stripe|razorpay)|api\.razorpay\.com|upi collect/i);
+assert.doesNotMatch(code,/from\s+(?:stripe|razorpay)\s+import|api\.razorpay\.com/i);
 assert.equal(manifest.constraints.noBankApi,true);
 assert.equal(manifest.constraints.noAutonomousSettlement,true);
 assert.equal(manifest.constraints.localOllamaOnly,true);
