@@ -115,8 +115,9 @@ class TriadTests(unittest.TestCase):
             output = subprocess.run(cmd, capture_output=True, text=True)
             self.assertEqual(output.returncode, 0, output.stderr)
             report = json.loads((root / "test-results/triad/report.json").read_text())
-            self.assertEqual(report["frameworks"]["swarms"],
-                             "NOT_RUN_NO_LOCAL_MODEL")
+            self.assertIn(report["frameworks"]["swarms"],
+                          {"NOT_RUN_NO_LOCAL_MODEL_OR_SWARMS_PACKAGE",
+                           "EXECUTED_SWARMS_OFFLINE_RULE_AGENTS"})
             self.assertFalse(report["limits"]["realPaymentValidated"])
             self.assertFalse(report["limits"]["bankAPIUsed"])
             rejected = subprocess.run(cmd + ["--model", "openai/gpt-4o"],

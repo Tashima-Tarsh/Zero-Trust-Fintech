@@ -26,7 +26,10 @@ git -C .external/archify checkout 44781293f38728baf04dbad33ce1a0cef8c39cca
 npm ci --prefix .external/archify
 \`\`\`
 
-Default offline scan uses stdlib Python and Node, **no LLM inference**:
+Default offline scan uses stdlib Python and Node for source inspection.
+When Swarms is installed, its real ConcurrentWorkflow runs six deterministic
+specialist workers with no LLM or external API; when it is not installed the
+report explicitly says the framework was not run:
 
 \`\`\`powershell
 python tools/triad/loop.py --agents-root .external/agents --archify-root .external/archify --render --verify --iterations 8

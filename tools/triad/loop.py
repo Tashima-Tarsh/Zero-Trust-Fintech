@@ -259,6 +259,8 @@ class OfflineSpecialist:
 
 def swarms_review(prompts, model_name, goal, root, state):
     """Use actual Swarms ConcurrentWorkflow with zero API keys when offline."""
+    if model_name and not model_name.startswith(("ollama/", "ollama_chat/")):
+        raise RuntimeError("--model must be a local Ollama model, e.g. ollama_chat/qwen3:4b")
     try:
         from swarms import Agent, ConcurrentWorkflow
     except ImportError:
@@ -266,8 +268,6 @@ def swarms_review(prompts, model_name, goal, root, state):
                 "agents": list(prompts)}
     observations = evidence(root, None)
     if model_name:
-        if not model_name.startswith(("ollama/", "ollama_chat/")):
-            raise RuntimeError("--model must be a local Ollama model, e.g. ollama_chat/qwen3:4b")
         agents = []
         for name, instructions in prompts.items():
             agents.append(Agent(
