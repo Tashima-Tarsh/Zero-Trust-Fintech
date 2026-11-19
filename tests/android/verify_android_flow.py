@@ -235,13 +235,8 @@ def test():
         and s["qr"] and not s["qrDisabled"] and "P2M" in s["paymentKind"]
         and s["readyState"]=="complete",
         "P2M QR rendered with bank-classified merchant receiver")
-feat/frontend-3d-vault-premium-ui
     screen("08-merchant-qr")
     tap_native(states()[-1]["qrTarget"])
-=======
-    screen("06-merchant-qr")
-    tap_and_await_native_dispatch()
- main
     await_log("RECEIVED pa=qa-company@ypbiz")
     await_log("mc=5411 tr=PAYAABBCCDDEEFF001122334455")
     await_log("tn=Service payment")

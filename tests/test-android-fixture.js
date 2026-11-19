@@ -7,6 +7,13 @@ const fs=require('node:fs');
 // Regression: never use Android ActivityManager's launch wait as a DOM poll.
 const harness=fs.readFileSync(path.join(__dirname,'android','verify_android_flow.py'),'utf8');
 const activity=fs.readFileSync(path.join(__dirname,'android','upi-receiver','app','src','main','java','ai','disha','testupi','TestBrowserActivity.java'),'utf8');
+// A previous frontend merge left raw conflict text in this Python harness while
+// Node/PostgreSQL CI stayed green. Assert source integrity in everyday CI.
+const strayMergeLine=harness.split(/\r?\n/).find(line=>
+  /^(?:<{7}|={7}|>{7}|(?:feat|fix)\/[A-Za-z0-9._/-]+| main)\s*$/.test(line));
+assert.equal(strayMergeLine,undefined,
+  'Unresolved merge marker in Android E2E Python test: '+String(strayMergeLine));
+
 assert.doesNotMatch(harness,/am start -W|["']-W["']/,
   'ActivityManager -W must not be used to poll the WebView');
 assert.doesNotMatch(harness,/command\(["']snapshot["']\)/,
