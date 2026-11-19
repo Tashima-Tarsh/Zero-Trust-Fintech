@@ -25,7 +25,15 @@ for (const dir of DIRS) {
     const filePath = path.join(dirPath, entry.name);
     checked++;
     try {
-      execSync('node --check "' + filePath + '"', { stdio: 'pipe' });
+      if (entry.name === '_worker.js') {
+        // Cloudflare Pages Workers are ES modules, not Node CommonJS files.
+        execSync('node --input-type=module --check', {
+          input: fs.readFileSync(filePath),
+          stdio: 'pipe'
+        });
+      } else {
+        execSync('node --check "' + filePath + '"', { stdio: 'pipe' });
+      }
     } catch (err) {
       failed++;
       errors.push(filePath);
