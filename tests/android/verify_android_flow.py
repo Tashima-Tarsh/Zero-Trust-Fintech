@@ -89,7 +89,7 @@ def await_new_log(marker, offset, timeout=35):
         if marker in log()[offset:]:
             return
         time.sleep(0.6)
-    raise AssertionError("Fresh native event missing: "+marker+"\\n"+log()[-2000:])
+    raise AssertionError("Fresh native event missing: "+marker+"\n"+log()[-2000:])
 
 def simulate_receiver_outcome(outcome):
     assert outcome in ("PRE_PIN_FAILURE", "APP_REPORTED_SUCCESS")
@@ -187,8 +187,9 @@ def test():
 
     print("A05: UPI cancellation keeps original QR and order pending",flush=True)
     reopen_test_receiver()
+    before_back=len(log())
     adb("shell","input","keyevent","KEYCODE_BACK")
-    await_log("ANDROID_ACTIVITY_RESULT classification=CANCELLED",timeout=25)
+    await_new_log("ANDROID_ACTIVITY_RESULT classification=CANCELLED",before_back,timeout=25)
     await_log("bankVerified=false")
     wait_state(lambda s:s["stage"]=="qr" and s["qr"] and s["receiptUtr"]!="123456789012",
         "A cancelled transfer cannot create a receipt")
@@ -228,8 +229,9 @@ def test():
     await_log("mc=5411 tr=PAYAABBCCDDEEFF001122334455")
     await_log("tn=Service payment")
     screen("09-merchant-upi-handoff")
+    before_merchant_back=len(log())
     adb("shell","input","keyevent","KEYCODE_BACK")
-    await_log("ANDROID_ACTIVITY_RESULT classification=CANCELLED")
+    await_new_log("ANDROID_ACTIVITY_RESULT classification=CANCELLED",before_merchant_back)
     wait_state(lambda s:s["stage"]=="qr" and s["qr"] and not s["qrDisabled"],
         "Merchant cancellation remains pending with QR available")
     assert fixture_state()=="PENDING"
