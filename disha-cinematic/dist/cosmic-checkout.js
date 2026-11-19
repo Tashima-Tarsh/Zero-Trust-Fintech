@@ -50,7 +50,7 @@
  // response, device identifier or transaction data are collected.
  function trace(event,code='OK',app='none'){
   if(!debug||!session?.token||!session?.orderId)return;
-  const selected=['gpay','phonepe','paytm','cred','generic'].includes(app)?app:'none';
+  const selected=['gpay','phonepe','paytm','bhim','cred','generic'].includes(app)?app:'none';
   try{
    debugHistory.push({time:new Date().toISOString(),event,code,app:selected});
    if(debugHistory.length>45)debugHistory.shift();
@@ -293,7 +293,7 @@
   tickSessionTimer();
   if(qrTapStartedAt&&qrAppBackgrounded){
    const early=Date.now()-qrTapStartedAt<12000;
-   trace('QR_APP_RETURN',early?'FAST':'NORMAL');
+   trace('BROWSER_RETURN',early?'RETURN_FAST':'RETURN_NORMAL');
    if(early&&lastStage==='qr')
     message('UPI app returned quickly. Check its payment history before retrying.','info');
    qrTapStartedAt=0;qrAppBackgrounded=false;
@@ -361,7 +361,7 @@
   setEventHandlers();showStage('qr');
   try{
    session=await getSession();
-   trace('PAYMENT_READY');
+   trace('ORDER_READY');
    saveSessionState();
    setMoney(session.amount);
    setPaymentKind();
@@ -373,8 +373,11 @@
     ?'Tap the QR for your UPI app, or scan from another phone.'
     :'Scan this QR using your UPI app on another phone.';
    showStage('qr');tickSessionTimer();
-   if(query.get('upi_intent_fallback')==='1')
-    message('UPI app did not open. Scan this QR from another phone.','info');
+   if(query.get('upi_intent_fallback')==='1'){
+    // Chrome's fallback indicates a failed external-app handoff, not a payment decision.
+    trace('APP_ERROR','APP_NAVIGATION_ERROR');
+    message('UPI app could not be opened. Choose another app or scan this QR from another phone.','info');
+   }
    await pollLedger();
    if(receiptShown)return;
    if(['EXPIRED','FAILED','CANCELLED'].includes(session.initialStatus)||expired())

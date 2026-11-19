@@ -2,9 +2,23 @@
 (function(root){
  'use strict';
  function qrPayload(uri){
-  if(typeof uri!=='string'||!/^upi:\/\/pay\?[a-z]+=/i.test(uri))throw Error('A valid UPI payment URI is required');
+  if(typeof uri!=='string'||!/^upi:\/\/pay\?/i.test(uri))
+   throw Error('A valid UPI payment URI is required');
   const query=new URLSearchParams(uri.slice(uri.indexOf('?')+1));
-  if(!query.get('pa')||!query.get('am')||query.get('cu')!=='INR')throw Error('Incomplete UPI payment URI');
+  // Revalidate the server URI before native dispatch without changing QR bytes.
+  for(const key of ['pa','am','cu']){
+   if(query.getAll(key).length!==1)throw Error('Incomplete UPI payment URI');
+  }
+  const payee=query.get('pa'),rawAmount=query.get('am');
+  if(!/^[a-zA-Z0-9.\-_]{2,256}@[a-zA-Z][a-zA-Z0-9]{1,63}$/.test(payee))
+   throw Error('Invalid receiving UPI ID');
+  if(query.get('cu')!=='INR'||!/^[0-9]+(?:\.[0-9]{1,2})?$/.test(rawAmount)||
+     !Number.isFinite(Number(rawAmount))||Number(rawAmount)<0.01||Number(rawAmount)>100000)
+   throw Error('Invalid UPI amount or currency');
+  const mc=query.get('mc'),tr=query.get('tr');
+  if((mc!==null||tr!==null)&&
+     (!/^\d{4}$/.test(mc||'')||mc==='0000'||!/^[A-Za-z0-9]{1,35}$/.test(tr||'')))
+   throw Error('Incomplete merchant UPI payment URI');
   return uri;
  }
  function supportsNativeUPI(userAgent){
