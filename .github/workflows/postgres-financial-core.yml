@@ -10,6 +10,7 @@ on:
       - 'utils/trust-score.js'
       - 'tests/test-postgres-utr-evidence-http.js'
       - 'tests/test-postgres-vault-evidence-http.js'
+      - 'tests/test-postgres-quantum-signal-http.js'
       - 'tests/test-vault-browser-evidence.js'
       - 'tests/test-postgres-merchant-saas.js'
       - 'migrations/001_financial_core.sql'
@@ -96,3 +97,5 @@ jobs:
         run: node tests/test-postgres-reconciliation-http.js
       - name: Prove Vault evidence handoff cannot fabricate payment success
         run: node tests/test-postgres-vault-evidence-http.js
+      - name: Prove Quantum Signal twin isolation against real PostgreSQL
+        run: node tests/test-postgres-quantum-signal-http.js
