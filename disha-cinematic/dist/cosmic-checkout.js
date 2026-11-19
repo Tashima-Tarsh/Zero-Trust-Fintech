@@ -456,7 +456,6 @@
   get('showQr').addEventListener('click',()=>{
    if(authorized && !expired()){trace('QR_OPEN');showStage('qr')}
   });
-  get('backToApps').addEventListener('click',()=>showStage('methods'));
   get('checkingApps').addEventListener('click',()=>showStage('methods'));
   get('saveReceipt').addEventListener('click',()=>{if(receiptShown)window.print()});
   get('shareReceipt').addEventListener('click',async()=>{
