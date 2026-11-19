@@ -5,7 +5,7 @@
 # DISHA 8.2
 ### Direct UPI. Device-bound trust. Merchant-owned intelligence.
 
-**P2P + P2M checkout · DISHA Vault · Quantum Signal handshake · UTR/TR correlation · Merchant SaaS**
+**P2P + P2M checkout · DISHA Vault · Quantum Signal handshake · UTR/TR correlation · Merchant Workspace**
 
 [Product website](https://disha8-2.thenitishkr.in/) · [Architecture](docs/architecture/SYSTEM-ARCHITECTURE.md) · [End-to-end flow](docs/architecture/END-TO-END-FLOW.md) · [Testing & release](docs/architecture/TEST-AND-RELEASE.md)
 
@@ -21,6 +21,16 @@ DISHA 8.2 is an innovative, self-hosted software layer around existing Indian UP
 
 This is a **product direction, not a claim that direct payer-bank evidence is already technically accessible**. The merged handshake proves DISHA session-channel continuity. The independent debit-event source and real-phone acceptance still require demonstration.
 
+## Try Checkout and merchant operations
+
+Use **[Try Checkout](https://disha8-2.thenitishkr.in/choose-payment)** to choose P2P or P2M, enter an exact INR amount and a receiving UPI ID, and continue to a real, time-limited payment request. Public P2P accepts only the configured personal receiving account; an unknown receiving handle is rejected. For P2M, Clerk sign-in is required and the prefilled request is issued only against an active bank-registered merchant receiving account and its real MCC.
+
+Once issued, the payment amount, recipient and P2M transaction reference are bound to the original order; the Quantum Signal challenge/ACK and optional device Vault complement the Android intent and return evidence path. No simulated financial completion is created by this form.
+
+**The merchant workspace** has a single primary creation action in its main header, a simplified quick-request navigation and concise role-neutral access messaging. Customer-facing views do not expose private Super Admin email addresses, and the backend still enforces identity and tenancy checks.
+
+**Locally served image system:** the Mars Perseverance landing scene is the merchant login visual; the spacecraft image is the checkout backdrop; the Earth-at-night photograph is shared by the landing page and merchant operations. All are optimized derivatives of the user-supplied images, stored in each deployment mirror. The official DISHA logo is unchanged. Visual layers never control payment status.
+
 ## Six connected layers
 
 | Layer | Merchant benefit | Repository status |
@@ -29,7 +39,7 @@ This is a **product direction, not a claim that direct payer-bank evidence is al
 | **DISHA Vault** | Optional device authorization and order-bound handoff/return evidence | Implemented |
 | **Quantum Signal** | Server payment twin, challenge, browser ACK, idempotent journey events | **PR #68 merged**, activated with `qs=1` |
 | **Evidence intelligence** | UTR/TR correlation, recipient/amount checks, event conflicts and replay detection | Partial; true payer-debit provenance unresolved |
-| **Merchant Command Centre** | Onboarding, receiving VPAs, real requests, statuses, timeline, risk and exports | Implemented; staging/production sign-in validation needed |
+| **Merchant Operations** | Onboarding, receiving VPAs, real requests, statuses, timeline, risk and exports | Implemented; staging/production sign-in validation needed |
 | **Owner Control** | Tenant approval, access, incident monitoring, operational evidence, read-only finance | Implemented; end-to-end release check needed |
 
 ## The flow in one view
