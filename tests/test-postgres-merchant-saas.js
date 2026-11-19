@@ -176,6 +176,44 @@ const {buildUpiUri}=require('../utils/upi-intent');
   assert.equal(earlier.data.order.upi_uri,initialUri,'Existing P2P payment must not mutate after VPA modification');
   await pg.query("UPDATE saas_merchant_vpas SET account_type='PERSONAL',mcc=NULL,holder_name='Acme Treasury' WHERE vpa_address=$1",
     ['acme'+nonce+'@oksbi']);
+
+  // Regression: changing the existing primary receiving account from P2P to
+  // bank-issued P2M via the merchant setup form must update the stored type/MCC.
+  const upgradedSetup=await call('/api/merchant/setup',alice,'POST',{
+    businessName:'Acme '+nonce,primaryVpa:'acme'+nonce+'@oksbi',
+    primaryHolderName:'Acme Treasury',primaryBankName:'SBI',
+    accountType:'MERCHANT',mcc:'5411'});
+  assert.equal(upgradedSetup.status,200);
+  const afterUpgrade=await call('/api/merchant/vpas',alice);
+  const updatedPrimary=afterUpgrade.data.vpas.find(x=>x.vpa_address==='acme'+nonce+'@oksbi');
+  assert.equal(updatedPrimary.account_type,'MERCHANT','Existing VPA must not silently remain P2P');
+  assert.equal(updatedPrimary.mcc,'5411','Bank MCC must persist on existing account');
+  const upgradedPayment=await call('/api/merchant/payments',alice,'POST',{
+    amount:'1.00',vpaAddress:'acme'+nonce+'@oksbi',description:'Merchant classification test'});
+  assert.equal(upgradedPayment.status,201);
+  const upgradedParams=new URL(upgradedPayment.data.order.upi_uri_dynamic).searchParams;
+  assert.equal(upgradedParams.get('mc'),'5411');
+  assert.match(upgradedParams.get('tr'),/^PAY[A-F0-9]{24}$/);
+  const newToken=new URL(upgradedPayment.data.order.checkout_url,base).searchParams.get('token');
+  const reloadedUpgrade=await call('/api/merchant/public/payment/'+encodeURIComponent(upgradedPayment.data.order.id)+
+    '?token='+encodeURIComponent(newToken));
+  assert.equal(reloadedUpgrade.data.order.payment_type,'P2M');
+  assert.equal(reloadedUpgrade.data.order.upi_uri,upgradedPayment.data.order.upi_uri_dynamic);
+
+  // Restoring a personal account changes future requests only, never a
+  // previously issued P2M link or an earlier P2P link.
+  const restoredSetup=await call('/api/merchant/setup',alice,'POST',{
+    businessName:'Acme '+nonce,primaryVpa:'acme'+nonce+'@oksbi',
+    primaryHolderName:'Acme Treasury',primaryBankName:'SBI',
+    accountType:'PERSONAL',mcc:''});
+  assert.equal(restoredSetup.status,200);
+  const upgradedAfterRestore=await call('/api/merchant/public/payment/'+encodeURIComponent(upgradedPayment.data.order.id)+
+    '?token='+encodeURIComponent(newToken));
+  assert.equal(upgradedAfterRestore.data.order.upi_uri,upgradedPayment.data.order.upi_uri_dynamic);
+  const originalAfterRestore=await call('/api/merchant/public/order/'+encodeURIComponent(order.id)+
+    '?token='+encodeURIComponent(token));
+  assert.equal(originalAfterRestore.data.order.upi_uri,initialUri);
+
   const merchantVpa='counter'+nonce+'@ybl';
   let p2m=await call('/api/merchant/payments',alice,'POST',{
     amount:'1.00',vpaAddress:merchantVpa,description:'Company receipt'});
