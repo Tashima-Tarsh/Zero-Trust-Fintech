@@ -7,6 +7,7 @@
 const { join } = require('path');
 const crypto = require('crypto');
 const { prepareSqliteDatabasePath } = require('./utils/sqlite-storage');
+const {resolvePaymentType} = require('./financial/payment-session-type');
 const VPARouter = require('./vpa-router');
 const { VPAImporter, parseCSV } = require('./vpa-importer');
 
@@ -208,6 +209,7 @@ function setupSqliteTables() {
       txn_ref TEXT UNIQUE NOT NULL,
       vpa_address TEXT NOT NULL,
     upi_uri TEXT,
+    payment_type TEXT CHECK(payment_type IN ('P2P','P2M')),
     status TEXT NOT NULL DEFAULT 'PENDING',
     state TEXT NOT NULL DEFAULT 'WAITING',
     customer_id TEXT,
@@ -351,6 +353,7 @@ function setupSqliteTables() {
   // data or any financial row while upgrading the table.
   const sessionColumns=new Set(sqliteDb.prepare('PRAGMA table_info(sessions)').all().map(c=>c.name));
   if(!sessionColumns.has('upi_uri'))sqliteDb.exec('ALTER TABLE sessions ADD COLUMN upi_uri TEXT');
+  if(!sessionColumns.has('payment_type'))sqliteDb.exec("ALTER TABLE sessions ADD COLUMN payment_type TEXT CHECK(payment_type IN ('P2P','P2M'))");
 
   // Seed default Chart of Accounts
   const seedAccounts = [
@@ -498,10 +501,11 @@ function getAllActiveVPAs() {
 
 // Session Management (TASK 3)
 function saveSession(session) {
+  const paymentType=resolvePaymentType(session);
   if (sqliteDb) {
     sqliteDb.prepare(`
-      INSERT INTO sessions (session_id, order_id, challenge_amount, base_amount, txn_ref, vpa_address, upi_uri, status, state, customer_id, created_at, expires_at, qr_refresh_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO sessions (session_id, order_id, challenge_amount, base_amount, txn_ref, vpa_address, upi_uri, status, state, customer_id, created_at, expires_at, qr_refresh_at, payment_type)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       ON CONFLICT(order_id) DO UPDATE SET
         session_id = excluded.session_id,
         challenge_amount = excluded.challenge_amount,
@@ -514,7 +518,8 @@ function saveSession(session) {
         customer_id = excluded.customer_id,
         created_at = excluded.created_at,
         expires_at = excluded.expires_at,
-        qr_refresh_at = excluded.qr_refresh_at
+        qr_refresh_at = excluded.qr_refresh_at,
+        payment_type = COALESCE(sessions.payment_type, excluded.payment_type)
     `).run(
       session.sessionId,
       session.orderId,
@@ -528,7 +533,8 @@ function saveSession(session) {
       session.customerId || null,
       session.createdAt,
       session.expiresAt,
-      session.qrRefreshAt
+      session.qrRefreshAt,
+      paymentType
     );
   }
 }
@@ -545,6 +551,8 @@ function findSessionByOrderId(orderId) {
       txnRef: row.txn_ref,
       vpaAddress: row.vpa_address,
       upiUri: row.upi_uri || null,
+      merchantType:resolvePaymentType({paymentType:row.payment_type,upiUri:row.upi_uri,
+        vpaAddress:row.vpa_address,challengeAmount:row.challenge_amount}),
       status: row.status,
       state: row.state,
       customerId: row.customer_id,
@@ -569,6 +577,8 @@ function findSessionByTxnRef(txnRef) {
       txnRef: row.txn_ref,
       vpaAddress: row.vpa_address,
       upiUri: row.upi_uri || null,
+      merchantType:resolvePaymentType({paymentType:row.payment_type,upiUri:row.upi_uri,
+        vpaAddress:row.vpa_address,challengeAmount:row.challenge_amount}),
       status: row.status,
       utr: row.utr,
       createdAt: row.created_at,
@@ -602,6 +612,8 @@ function findSessionByAmount(amount) {
       txnRef: row.txn_ref,
       vpaAddress: row.vpa_address,
       upiUri: row.upi_uri || null,
+      merchantType:resolvePaymentType({paymentType:row.payment_type,upiUri:row.upi_uri,
+        vpaAddress:row.vpa_address,challengeAmount:row.challenge_amount}),
       status: row.status,
       utr: row.utr,
       createdAt: row.created_at,

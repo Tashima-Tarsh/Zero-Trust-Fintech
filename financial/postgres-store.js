@@ -6,6 +6,7 @@
  */
 const crypto = require('node:crypto');
 const { rupeesToPaise } = require('./money');
+const {resolvePaymentType} = require('./payment-session-type');
 
 const scalar = async (pg, sql, args = []) => (await pg.query(sql, args)).rows[0] || null;
 const nowMs = () => Date.now();
@@ -15,7 +16,10 @@ function fromRow(r) {
   return {
     sessionId:r.session_id, orderId:r.order_id,
     challengeAmount:asNum(r.challenge_amount),baseAmount:asNum(r.base_amount),
-    txnRef:r.txn_ref, vpaAddress:r.vpa_address,upiUri:r.upi_uri||null,status:r.status,state:r.state,
+    txnRef:r.txn_ref, vpaAddress:r.vpa_address,upiUri:r.upi_uri||null,
+    merchantType:resolvePaymentType({paymentType:r.payment_type,upiUri:r.upi_uri,
+      vpaAddress:r.vpa_address,challengeAmount:r.challenge_amount}),
+    status:r.status,state:r.state,
     customerId:r.customer_id,utr:r.utr,
     createdAt:asNum(r.created_at),expiresAt:asNum(r.expires_at),
     qrRefreshAt:asNum(r.qr_refresh_at)
@@ -38,18 +42,20 @@ function buildStore(pg, vpaRouter) {
     return fromRow(row);
   }
   async function saveSession(s) {
+    const paymentType=resolvePaymentType(s);
     await pg.query(
-      'INSERT INTO sessions (session_id,order_id,challenge_amount,base_amount,txn_ref,vpa_address,upi_uri,status,state,customer_id,created_at,expires_at,qr_refresh_at) ' +
-      'VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13) ' +
+      'INSERT INTO sessions (session_id,order_id,challenge_amount,base_amount,txn_ref,vpa_address,upi_uri,status,state,customer_id,created_at,expires_at,qr_refresh_at,payment_type) ' +
+      'VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14) ' +
       'ON CONFLICT (order_id) DO UPDATE SET ' +
       'session_id=EXCLUDED.session_id,challenge_amount=EXCLUDED.challenge_amount,' +
       'base_amount=EXCLUDED.base_amount,txn_ref=EXCLUDED.txn_ref,' +
       'vpa_address=EXCLUDED.vpa_address,upi_uri=COALESCE(sessions.upi_uri,EXCLUDED.upi_uri),status=EXCLUDED.status,state=EXCLUDED.state,' +
       'customer_id=EXCLUDED.customer_id,created_at=EXCLUDED.created_at,' +
-      'expires_at=EXCLUDED.expires_at,qr_refresh_at=EXCLUDED.qr_refresh_at',
+      'expires_at=EXCLUDED.expires_at,qr_refresh_at=EXCLUDED.qr_refresh_at,'+
+      'payment_type=COALESCE(sessions.payment_type,EXCLUDED.payment_type)',
       [s.sessionId,s.orderId,s.challengeAmount,s.baseAmount,s.txnRef,
         s.vpaAddress,s.upiUri||null,s.status,s.state||'WAITING',s.customerId||null,
-        s.createdAt,s.expiresAt,s.qrRefreshAt]
+        s.createdAt,s.expiresAt,s.qrRefreshAt,paymentType]
     );
   }
   async function updateSessionStatus(id,status,utr=null) {

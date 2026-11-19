@@ -30,10 +30,34 @@ const assert=require('node:assert/strict'),db=require('./db');
   status:'PENDING',state:'WAITING',createdAt:now,expiresAt:now+180000,qrRefreshAt:now+15000};
  db.saveSession(payment);
  assert.equal(db.findSessionByOrderId(payment.orderId).upiUri,uri,'QR must survive session reload');
+ assert.equal(db.findSessionByOrderId(payment.orderId).merchantType,'P2M','Merchant classification survives SQLite reload');
+ assert.equal(db.findSessionByTxnRef(payment.txnRef).merchantType,'P2M','Txn ref lookup preserves merchant classification');
  assert.equal(db.findSessionByTxnRef(payment.txnRef).upiUri,uri,'Evidence matching must see exact original QR');
  db.saveSession({...payment,upiUri:uri.replace('mc=8099','mc=5812')});
  assert.equal(db.findSessionByOrderId(payment.orderId).upiUri,uri,
   'Existing payment URI is write-once, not editable after issuance');
+ // Public personal checkout must not be rejected after save/reload.
+ const personalUri='upi://pay?pa=verified-payee@oksbi&pn=Verified%20Payee&am=1.00&cu=INR&tn=Personal';
+ const personal={...payment,sessionId:'b'.repeat(32),orderId:'PAY_P2P_12345',
+  txnRef:'PAYP2P12345',upiUri:personalUri,merchantType:'PERSONAL'};
+ db.saveSession(personal);
+ assert.equal(db.findSessionByOrderId(personal.orderId).merchantType,'P2P',
+   'SQLite personal payment type survives database reload');
+ assert.equal(db.findSessionByOrderId(personal.orderId).upiUri,personalUri,
+   'P2P QR must not gain a merchant MCC or TR');
+ assert.equal(db.findSessionByTxnRef(personal.txnRef).merchantType,'P2P');
+ const stored=db.sqliteDb.prepare('SELECT payment_type,upi_uri FROM sessions WHERE order_id=?').get(personal.orderId);
+ assert.equal(stored.payment_type,'P2P','Persist the personal classification');
+ db.sqliteDb.prepare('UPDATE sessions SET payment_type=NULL WHERE order_id=?').run(personal.orderId);
+ assert.equal(db.findSessionByOrderId(personal.orderId).merchantType,'P2P',
+   'Legacy P2P must be recovered from its immutable QR');
+ assert.throws(()=>db.saveSession({...personal,merchantType:'MERCHANT'}),
+  /SESSION_PAYMENT_TYPE_URI_CONFLICT/,'Personal URI cannot be upgraded to merchant');
+ assert.throws(()=>db.saveSession({...personal,vpaAddress:'attacker@upi'}),
+  /SESSION_PAYEE_URI_CONFLICT/,'Payee switch forbidden');
+ assert.throws(()=>db.saveSession({...personal,challengeAmount:5}),
+  /SESSION_AMOUNT_URI_CONFLICT/,'Amount switch forbidden');
+
  console.log('UPI_SQLITE_SNAPSHOT_PASS: configured VPA only, fake rows paused, QR bytes survive reload');
  db.sqliteDb.close();
 })().catch(err=>{console.error(err);process.exitCode=1});
