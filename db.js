@@ -403,6 +403,10 @@ async function setupPostgresTables() {
   const fs = require('fs');
   const sql = fs.readFileSync(join(__dirname, 'schema.sql'), 'utf-8');
   await pgPool.query(sql);
+  // Existing PostgreSQL tables do not gain new columns through CREATE TABLE IF NOT EXISTS.
+  // Repair only additive checkout fields before the first payment session can be created.
+  const {ensureCheckoutSessionSchema} = require('./financial/checkout-schema');
+  await ensureCheckoutSessionSchema(pgPool);
 }
 
 // Memory tracking for VPA pattern masking fallback
