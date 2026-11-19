@@ -52,6 +52,16 @@ assert.match(nativeBridge,/"pay"\.equalsIgnoreCase\(uri\.getHost\(\)\)/);
 assert.match(nativeBridge,/new Intent\(Intent\.ACTION_VIEW, uri\)/);
 assert.match(nativeBridge,/bankVerified = false/);
 assert.match(java,/return false;/,'HTTP(S) navigation must not be hijacked as UPI intents');
+const fakeReceiver=read('tests/android/upi-receiver/app/src/main/java/ai/disha/testupi/FakeUpiActivity.java');
+const androidE2e=read('tests/android/verify_android_flow.py');
+assert.match(fakeReceiver,/"PRE_PIN_FAILURE"/);
+assert.match(fakeReceiver,/"APP_REPORTED_SUCCESS"/);
+assert.match(fakeReceiver,/setResult\(Activity\.RESULT_CANCELED, result\)/);
+assert.match(fakeReceiver,/setResult\(Activity\.RESULT_OK, result\)/);
+assert.match(androidE2e,/ANDROID_ACTIVITY_RESULT classification=CANCELLED appReported=FAILURE/);
+assert.match(androidE2e,/ANDROID_ACTIVITY_RESULT classification=APP_REPORTED_OK appReported=SUCCESS/);
+assert.match(androidE2e,/assert fixture_info\(\)\["evidenceCount"\]==0/);
+
 const personal=new URL(buildUpiUri({kind:'P2P',pa:'person@oksbi',pn:'Person',am:1,tn:'Medical'}));
 assert.equal(personal.searchParams.get('mc'),null);
 assert.equal(personal.searchParams.get('tr'),null);
