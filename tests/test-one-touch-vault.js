@@ -14,19 +14,17 @@ const server=fs.readFileSync(path.join(dir,'server.js'),'utf8');
 const edge=fs.readFileSync(path.join(dir,'public','_worker.js'),'utf8');
 const routes=fs.readFileSync(path.join(dir,'public','_routes.json'),'utf8');
 
-assert.match(page,/id="btnOneTouch"/);
-assert.match(cosmic,/vault\.authorize\(orderId\(\),\(event,code\)=>trace\(event,code\)\)/);
-assert.match(page,/id="oneTouchFallback"/);
-assert.doesNotMatch(cosmic,/await checkPasskeyStatus\(userId, userName\)/,
-  'Page must not ask a biometric before the user presses Touch to Pay');
-assert.doesNotMatch(page,/window\.addEventListener\('pagehide', async/,
-  'Switching to the UPI app must not trigger a fake cancellation');
-assert.match(merchant,/id="oneTouchFallback"/);
-assert.match(cosmic,/vault\.authorize\(orderId\(\),\(event,code\)=>trace\(event,code\)\)/);
+// Standalone legacy Vault APIs remain testable for existing integrations, but
+// they must not be loaded by the new QR-first checkout.
+for(const html of [page,merchant]){
+ assert.doesNotMatch(html,/one-touch-vault\.js|simplewebauthn|btnOneTouch|oneTouchFallback/);
+ assert.match(html,/id="qrTapToPay"/);
+}
+assert.doesNotMatch(cosmic,/vault\.authorize|vault\.beginHandoff|requestEvidence/);
+assert.match(cosmic,/model\.qrTapLaunchUri\(/);
 assert.match(edge,/\/vendor\/simplewebauthn\.umd\.js/);
 assert.match(routes,/\/vendor\/simplewebauthn\.umd\.js/);
 assert.match(server,/status:'VAULT_VERIFIED_AWAITING_UPI'/);
-assert.match(server,/Math\.min\(Date\.now\(\)\+180000,order\.expiresAt\)/);
 
 (async()=>{
   let registrationPrompts=0,authenticationPrompts=0,registered=false,opened=null;

@@ -9,16 +9,13 @@ const script=fs.readFileSync(path.join(__dirname,'../public/one-touch-vault.js')
 const merchant=fs.readFileSync(path.join(__dirname,'../public/merchant-checkout.html'),'utf8');
 const checkout=fs.readFileSync(path.join(__dirname,'../public/checkout.html'),'utf8');
 const cosmic=fs.readFileSync(path.join(__dirname,'../public/cosmic-checkout.js'),'utf8');
-assert.match(cosmic,/vault\.beginHandoff\(orderId\(\),vaultSessionId,session\.token,chosen\)/);
-assert.match(cosmic,/const packet=vault\.requestEvidence\(orderId\(\)\)/);
-assert.match(cosmic,/vault\.acknowledgeEvidence\(orderId\(\),packet\.eventId,result\)/);
-for(const page of [cosmic]){
- assert.match(page,/fetch\('\/api\/vault\/evidence'/);
- assert.ok(page.indexOf('vault.requestEvidence(')<page.indexOf("fetch('/api/vault/evidence'"),
- 'Browser must request evidence before transmitting');
- assert.ok(page.indexOf("fetch('/api/vault/evidence'")<page.indexOf('vault.acknowledgeEvidence('),
- 'Browser must acknowledge only after server storage');
+// The historical Vault evidence module is still tested for compatibility;
+ // the new public Intent+QR checkout must never invoke it.
+for(const html of [merchant,checkout]){
+ assert.doesNotMatch(html,/one-touch-vault\.js|simplewebauthn/);
+ assert.match(html,/id="qrTapToPay"/);
 }
+assert.doesNotMatch(cosmic,/vault\.|\/api\/vault\/evidence/);
 assert.doesNotMatch(cosmic,/finalizePayment\(orderId, txnRef/,
  'Browser return can never finalize a financial transfer');
 (async()=>{

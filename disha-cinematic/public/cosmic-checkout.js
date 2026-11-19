@@ -354,7 +354,7 @@
    await pollLedger();
    if(receiptShown)return;
    if(['EXPIRED','FAILED','CANCELLED'].includes(session.initialStatus)||expired())
-    locked('This payment is no longer active. A credited payment may still appear here.');
+    locked(session.initialStatus==='EXPIRED'||expired()?'This payment link expired. A recorded credit may still appear here.':'This payment did not complete.');
    ledgerTicker=setInterval(()=>{void pollLedger()},3500);
    expiryTicker=setInterval(tickSessionTimer,1000);
   }catch(err){locked(model.userFacingError(err,'load'))}

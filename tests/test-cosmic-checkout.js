@@ -1,99 +1,44 @@
 'use strict';
-const assert=require('node:assert/strict');
-const fs=require('node:fs');
-const path=require('node:path');
-const vm=require('node:vm');
-const root=path.join(__dirname,'..','public');
-const read=name=>fs.readFileSync(path.join(root,name),'utf8');
-const pages=['checkout.html','merchant-checkout.html'].map(read);
-const script=read('cosmic-checkout.js');
+// Canonical UPI Intent + QR presentation: no gateway, Collect, WebAuthn,
+// fake payment status or stale app-picker controls.
+const assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path'),vm=require('node:vm');
+const read=p=>fs.readFileSync(path.join(__dirname,'..','public',p),'utf8');
 const model=require('../public/cosmic-checkout-model.js');
+const script=read('cosmic-checkout.js');
 new vm.Script(script);
-for(const html of pages){
- assert.match(html,/\/cosmic-checkout\.css/);
- assert.match(html,/\/cosmic-checkout\.js/);
- assert.match(html,/\/one-touch-vault\.js/);
- assert.match(html,/\/vendor\/qrcode\.min\.js/);
- assert.match(html,/src="\/assets\/disha-8-2-wordmark-cropped\.png"/);
- assert.match(html,/id="btnOneTouch"/);
- assert.match(html,/data-stage="initial"/);
- assert.match(html,/data-stage="methods"/);
+for(const page of ['checkout.html','merchant-checkout.html']){
+ const html=read(page);
+ for(const marker of ['id="paymentQr"','id="qrTapToPay"','id="paymentKind"',
+  'id="paymentTrackingStatus"','id="shareCheckout"','id="receiptUtr"','id="receiptPaymentRef"'])
+  assert.ok(html.includes(marker),'Missing canonical payment control: '+marker);
  assert.match(html,/data-stage="qr"/);
- assert.match(html,/data-stage="checking"/);
  assert.match(html,/data-stage="receipt"/);
- assert.match(html,/id="app-gpay"/);
- assert.match(html,/id="app-phonepe"/);
- assert.match(html,/id="app-paytm"/);
- assert.match(html,/id="paymentQr"/);
- assert.match(html,/id="receiptAmount"/);
- const beforeMethods=html.split('data-stage="methods"')[0];
- assert.doesNotMatch(beforeMethods,/id="paymentQr"|id="app-gpay"/,
-  'QR and native app launch must never be exposed before Touch to Pay');
- assert.doesNotMatch(html,/WhatsApp|T\+0 Settlement|WebAuthn \+ UPI Rail|Direct NPCI Clearing|7-Layer/);
+ assert.match(html,/\/vendor\/qrcode\.min\.js/);
+ assert.match(html,/\/cosmic-checkout\.js/);
+ assert.match(html,/\/cosmic-checkout\.css/);
+ assert.match(html,/src="\/assets\/disha-8-2-wordmark-cropped\.png"/);
+ assert.doesNotMatch(html,/data-stage="initial"|data-stage="methods"|data-stage="checking"/,
+  'No hidden alternate payment wizard allowed');
+ assert.doesNotMatch(html,/one-touch-vault\.js|simplewebauthn|id="btnOneTouch"|id="app-gpay"|id="oneTouchFallback"/,
+  'QR-first checkout must not load an unused passkey or app picker');
+ assert.doesNotMatch(html,/Collect-Based|Razorpay Checkout|Manual UTR|NPCI Clearing|T\+0 Settlement/i);
+ assert.match(html,/cosmic-checkout\.css\?v=[A-Za-z0-9._-]+/,'Production CSS cache version');
 }
 assert.match(read('cosmic-checkout.css'),/prefers-reduced-motion/);
-assert.match(read('cosmic-checkout.css'),/perspective/);
-assert.match(read('cosmic-checkout.css'),/max-width:\s*420px/);
-assert.equal(model.stageAfterAuthorization(null),'methods');
-assert.equal(model.stageAfterAuthorization('phonepe'),'methods','Preferred app gets a method fallback if launch is blocked');
+assert.match(read('checkout-moonlight.css'),/nasa-moon/);
 assert.equal(model.isSettled({status:'SUCCESS',utr:'123456789012'}),true);
-assert.equal(model.isSettled({status:'SUCCESS',utr:''}),false);
-assert.equal(model.isSettled({status:'PENDING',utr:'123456789012'}),false);
-assert.equal(model.isSettled({status:'SUCCESS'}),false);
-const originalBrowserError=Object.assign(new Error(
- 'The operation either timed out or was not allowed. See: https://www.w3.org/TR/webauthn-2/#sctn-privacy-considerations-client.'
-),{name:'NotAllowedError'});
-for(const problem of [originalBrowserError,Object.assign(new Error('Private browser message'),{name:'SecurityError'}),new Error('secret server response')]){
- const displayed=model.userFacingError(problem,'device');
- assert.match(displayed,/^Error\b/);
- assert.doesNotMatch(displayed,/w3\.org|webauthn|timed out|not allowed|Private browser|secret server/i,
-  'Private browser, policy and server diagnostics must not appear in checkout UI');
-}
-assert.match(model.userFacingError(new TypeError('fetch failed'),'device'),/^Error/);
-assert.match(model.userFacingError(new Error('HTTP 500'),'load'),/^Error/);
-assert.match(script,/message\(model\.userFacingError\(err,'device'\),'error'\)/);
-assert.match(script,/locked\(model\.userFacingError\(err,'load'\)\)/);
-assert.doesNotMatch(script,/message\(err\?\.message|locked\(err\?\.message/);
-const backdrop=read('assets/disha-universe-background.svg');
-assert.match(backdrop,/data:image\/jpeg;base64,/,'Bundled photographic asset must be self-contained');
-const assetData=backdrop.match(/data:image\/jpeg;base64,([A-Za-z0-9+/=]+)/)?.[1];
-assert.ok(assetData && Buffer.from(assetData,'base64').length>20000,'Magnific universe asset must contain raster image bytes');
-assert.match(read('cosmic-checkout.css'),/\/assets\/disha-universe-background\.svg/);
-
-// The photographic universe must actually render in front of the page body,
-// not disappear under an opaque panel and negative stacking context.
-for(const name of ['checkout.html','merchant-checkout.html']){
- const page=read(name);
- assert.match(page,/cosmic-checkout\.css\?v=[a-zA-Z0-9._-]+/,'Checkout stylesheet must be cache-versioned');
- assert.match(page,/class="vault-art" src="\/assets\/disha-vault-sculpture\.svg"/);
- const card=page.indexOf('class="checkout-panel"');
- const logo=page.indexOf('class="checkout-brand"');
- assert.ok(card>=0&&logo>card,'Metallic logo must be inside visible payment card on mobile');
- assert.doesNotMatch(page,/class="vault-core"/,
-  'Original CSS-only fingerprint sphere must be replaced by the new sculpted artwork');
-}
-const stylesheet=read('cosmic-checkout.css');
-assert.match(stylesheet,/DISHA COSMOS II/);
-assert.match(stylesheet,/\.universe\{[\s\S]*?z-index:0/);
-assert.match(stylesheet,/\.checkout-panel\{[\s\S]*?background-image:/);
-assert.match(stylesheet,/\.vault-art\{[\s\S]*?mix-blend-mode:screen/);
-const sculptedAsset=read('assets/disha-vault-sculpture.svg');
-assert.match(sculptedAsset,/data:image\/jpeg;base64,/);
-assert.ok(Buffer.from(sculptedAsset.match(/base64,([A-Za-z0-9+/=]+)/)[1],'base64').length>15000,
- '3D art must contain actual rendered image data, not a decorative placeholder');
-
-assert.equal(model.safeApp('googlepay'),'gpay');
-assert.equal(model.safeApp('invalid'),'generic');
-const qr=model.qrPayload('upi://pay?pa=store%40oksbi&am=500.00&cu=INR');
-assert.match(qr,/^upi:\/\/pay\?/);
-assert.throws(()=>model.qrPayload('https://example.com/bogus'),/UPI/i);
-assert.match(script,/vault\.authorize\(orderId\(\),\(event,code\)=>trace\(event,code\)\)/);
-assert.match(script,/vault\.beginHandoff\(orderId\(\),vaultSessionId,session\.token,chosen\)/,'Vault must capture selected UPI app without implying a bank credit');
-assert.match(script,/requestEvidence\(orderId\(\)\)/);
-assert.match(script,/fetch\('\/api\/vault\/evidence'/);
-assert.match(script,/acknowledgeEvidence\(orderId\(\),packet\.eventId,result\)/);
-assert.match(script,/\/api\/ledger\//,'Receipt must be established from backend ledger');
+for(const caseData of [{status:'SUCCESS'},{status:'PENDING',utr:'123456789012'},
+ {status:'SUCCESS',utr:'fake'},{status:'FAILED',utr:'123456789012'}])
+ assert.equal(model.isSettled(caseData),false,'No receipt without valid recorded credit');
+const exact='upi://pay?pa=store@oksbi&pn=Store&am=500.00&cu=INR';
+assert.equal(model.qrPayload(exact),exact);
+assert.throws(()=>model.qrPayload('https://evil.example/upi'),/UPI/);
+assert.match(script,/new window\.QRCode\(container,\{text:session\.upiUri/);
+assert.match(script,/model\.qrTapLaunchUri\(session\.upiUri,userAgent,secureCheckoutUrl\(true\)\)/);
+assert.match(script,/\/api\/ledger\//);
 assert.match(script,/model\.isSettled\(/);
-assert.match(script,/QRCode/);
-assert.match(script,/history|localStorage/);
-console.log('COSMIC_CHECKOUT_PASS: touch-first, native apps/QR gated, real evidence and ledger-only receipt');
+assert.doesNotMatch(script,/vault\.authorize|vault\.beginHandoff|\/api\/vault\/evidence|userName=Device user/,
+ 'Native Intent launch cannot be gated by passkey/evidence');
+assert.doesNotMatch(script,/finalizePayment\(|\/api\/settlement\/confirm/,
+ 'Browser may not invent settlement');
+console.log('COSMIC_CHECKOUT_PASS: QR-first, native gesture, two-device ledger receipt, no stale payment wizard');

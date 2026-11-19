@@ -58,7 +58,7 @@ assert.match(runner,/intent-logcat-live\.txt/,
   assert.equal(uri.searchParams.has('tr'),false,'Personal UPI QR must not fabricate merchant reference');
   assert.equal(data.order.status,'PENDING','opening link never settles payment');
   const html=await(await fetch(origin+'/merchant-checkout.html')).text();
-  assert.match(html,/<button id="btnOneTouch"[\s\S]*?<span>Pay<\/span>/,'Checkout must show compact Pay CTA while retaining Vault handler');
+  assert.doesNotMatch(html,/btnOneTouch|oneTouchFallback|data-stage="methods"/,'One QR must replace the legacy passkey/app picker');
   assert.doesNotMatch(html,/Touch to Pay/);
   assert.match(html,/<section data-stage="qr"[^>]*aria-label="UPI QR checkout"/);
   assert.match(html,/id="qrTapToPay"/);
@@ -69,7 +69,6 @@ assert.match(runner,/intent-logcat-live\.txt/,
   const required=[
    '/api/runtime-assets/cosmic-checkout.css',
    '/api/runtime-assets/checkout-moonlight.css',
-   '/api/runtime-assets/one-touch-vault.js',
    '/api/runtime-assets/cosmic-checkout-model.js',
    '/api/runtime-assets/cosmic-checkout.js'
   ];

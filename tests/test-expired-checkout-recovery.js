@@ -5,7 +5,7 @@ const assert=require('node:assert/strict');
 const fs=require('node:fs'),vm=require('node:vm'),path=require('node:path');
 const src=fs.readFileSync(path.join(__dirname,'../public/cosmic-checkout.js'),'utf8');
 const model=require('../public/cosmic-checkout-model.js');
-const start=src.indexOf('async function recoverAuthorizedSession(requestedAmount){');
+const start=src.indexOf('async function recoverSessionState(requestedAmount){');
 const end=src.indexOf(' async function getSession(){',start);
 assert.ok(start>0&&end>start,'Canonical checkout recovery code is required');
 const functionSource=src.slice(start,end);
@@ -18,12 +18,12 @@ const original={
 async function recover(old,status){
  const context={
   sessionStorage:{getItem:()=>JSON.stringify(old)},
-  resumeKey:'disha82:cosmic-authorized-checkout:v1',
+  resumeKey:'disha82:upi-payment-resume:v2',
   model,
   fetch:async()=>({ok:true,json:async()=>status}),
   Date,Number,JSON,encodeURIComponent
  };
- vm.runInNewContext(functionSource+'\nthis.recover=recoverAuthorizedSession;',context);
+ vm.runInNewContext(functionSource+'\nthis.recover=recoverSessionState;',context);
  return context.recover('1');
 }
 (async()=>{
