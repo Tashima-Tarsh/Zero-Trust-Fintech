@@ -37,14 +37,30 @@ vm.runInContext(worker.replace('export default','globalThis.edge ='),context,{fi
 (async()=>{
  let upstream=0,assets=0;
  context.fetch=async()=>{upstream++;return new Response('Bad Gateway',{status:502})};
- const env={ASSETS:{fetch:async request=>{assets++;const u=new URL(request.url);assert.equal(u.pathname,'/checkout.html');return new Response(checkout,{status:200,headers:{'content-type':'text/html'}})}}};
+ const env={ASSETS:{fetch:async request=>{assets++;const u=new URL(request.url);
+  assert.ok(['/checkout.html','/merchant-checkout.html','/cosmic-checkout.js','/cosmic-checkout-model.js',
+   '/cosmic-checkout.css','/checkout-moonlight.css'].includes(u.pathname),'Allowed Pages asset '+u.pathname);
+  const body=u.pathname.endsWith('.js')?'// DISHA static checkout JS':checkout;
+  return new Response(body,{status:200,headers:{'content-type':u.pathname.endsWith('.js')?'text/javascript':'text/html'}});
+ }}};
  for(const route of ['/checkout','/checkout/','/pay','/pay/']){
   const res=await context.edge.fetch(new Request('https://disha8-2.thenitishkr.in'+route),env);
   assert.equal(res.status,200,route+' must remain static even if Railway is down');
   assert.match(await res.text(),/<html/i);
  }
- assert.equal(upstream,0,'Canonical checkout must not contact Railway for the HTML shell');
- assert.equal(assets,4);
+ for(const url of [
+  '/api/runtime/checkout?amount=1',
+  '/api/runtime/merchant-checkout?paymentRef=PAY_EXAMPLE&token=aaa',
+  '/api/runtime-assets/cosmic-checkout.js?v=ci',
+  '/api/runtime-assets/cosmic-checkout-model.js',
+  '/api/runtime-assets/cosmic-checkout.css',
+  '/api/runtime-assets/checkout-moonlight.css'
+ ]){
+  const result=await context.edge.fetch(new Request('https://disha8-2.thenitishkr.in'+url),env);
+  assert.equal(result.status,200,'Static checkout asset failed '+url);
+ }
+ assert.equal(upstream,0,'Checkout HTML, CSS, and JS must work without Railway');
+ assert.equal(assets,10);
  const api=await context.edge.fetch(new Request('https://disha8-2.thenitishkr.in/api/merchant/public/order/example'),env);
  assert.equal(api.status,502,'Dynamic merchant payment order depends on Railway backend');
  assert.equal(upstream,1);
