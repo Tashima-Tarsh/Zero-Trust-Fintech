@@ -204,7 +204,12 @@ def archify_candidate(repo: Path, output: Path):
         "schema_version": 1, "diagram_type": "architecture",
         "meta": meta,
         "components": nodes,
-        "connections": [{"from": a, "to": b, "label": label} for a, b, label in edges],
+        "connections": [
+            {**{"from": a, "to": b, "label": label},
+             **({"labelAt": [414, 179]} if label == "Native QR tap" else {}),
+             **({"labelAt": [442, 569]} if label == "Verify source + artifacts" else {}),
+             **({"labelAt": [848, 389]} if label == "Diagnostic artifacts" else {})}
+            for a, b, label in edges],
         "cards": [
             {"dot": "cyan", "title": "Source-backed audit",
              "items": ["Swarms coordinates specialist reviews from wshobson/agents",
