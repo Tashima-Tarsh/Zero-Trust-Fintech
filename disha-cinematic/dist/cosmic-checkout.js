@@ -191,6 +191,7 @@
   get('receiptUtr').textContent=record.utr;
   showStage('receipt');
   if(ledgerTicker)clearInterval(ledgerTicker);
+  if(window.DISHAVault3D)window.DISHAVault3D.destroy();
  }
  async function pollLedger(){
   if(!session||polling||receiptShown||document.visibilityState==='hidden')return;
@@ -298,7 +299,7 @@
       ['EXPIRED','FAILED','CANCELLED'].includes(session.initialStatus)||!model.supportsNativeUPI(userAgent)){
     event.preventDefault();
     message(expired()?'Payment window expired. Request a fresh link.':
-     'Scan this QR with a UPI app on another phone.','info');
+     'Scan this QR with any UPI app (GPay, PhonePe, Paytm, BHIM, etc.).','info');
     return;
    }
    const now=Date.now();
@@ -360,9 +361,13 @@
    get('paymentTrackingStatus').textContent='Payment status · Awaiting confirmation';
    get('checkoutNote').textContent=params.get('tn')||'Service';
    get('qrTapToPayHint').textContent=model.supportsNativeUPI(userAgent)
-    ?'Tap the QR for your UPI app, or scan from another phone.'
+    ?'Tap the QR to open your UPI app (GPay/PhonePe/Paytm/BHIM), or scan from another phone.'
     :'Scan this QR using your UPI app on another phone.';
    showStage('qr');tickSessionTimer();
+   // Initialize 3D vault after session is ready
+   if(window.DISHAVault3D&&!window.DISHAVault3D.isReduced()){
+    setTimeout(()=>window.DISHAVault3D.init(),300);
+   }
    if(query.get('upi_intent_fallback')==='1')
     message('UPI app did not open. Scan this QR from another phone.','info');
    await pollLedger();

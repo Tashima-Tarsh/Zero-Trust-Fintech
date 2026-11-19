@@ -13,9 +13,11 @@
 <link rel="preload" href="/assets/disha-8-2-wordmark-cropped.png" as="image">
 <link rel="stylesheet" href="/api/runtime-assets/cosmic-checkout.css?v=qr-first-20261119">
 <link rel="stylesheet" href="/api/runtime-assets/checkout-moonlight.css?v=moonlight1">
+<link rel="stylesheet" href="/api/runtime-assets/disha-vault-3d.css?v=vault1">
 <script defer src="/vendor/qrcode.min.js"></script>
 <script defer src="/api/runtime-assets/cosmic-checkout-model.js?v=intent-retry-20261119"></script>
 <script defer src="/api/runtime-assets/cosmic-checkout.js?v=upi-direct-20261119"></script>
+<script defer src="/api/runtime-assets/disha-vault-3d.js?v=vault1"></script>
 </head>
 <body data-qr-primary="true" data-checkout="merchant">
 <div class="universe" aria-hidden="true">
@@ -25,6 +27,7 @@
 </div>
 <main class="checkout-shell" aria-label="DISHA payment checkout">
  <article class="checkout-panel" aria-label="UPI payment">
+  <div id="dishaVault3d" aria-hidden="true"></div>
   <header class="checkout-brand">
    <img src="/assets/disha-8-2-wordmark-cropped.png" width="240" height="60" alt="DISHA 8.2" class="logo">
   </header>

@@ -1,0 +1,17 @@
+/* DISHA 8.2 — 3D Vault presentation layer */
+#dishaVault3d{
+ position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);
+ width:280px;height:280px;pointer-events:none;z-index:0;
+ opacity:.25;filter:blur(1px);
+}
+#dishaVault3d canvas{display:block;width:100%;height:100%}
+.vault-fallback{
+ display:grid;place-items:center;width:100%;height:100%;
+ font-size:120px;color:#8b9dff;opacity:.4;
+ text-shadow:0 0 40px #8b9dff80;
+}
+@media(max-width:768px){#dishaVault3d{width:180px;height:180px;opacity:.18}}
+@media(max-width:640px){#dishaVault3d{width:150px;height:150px;opacity:.16}}
+@media(max-width:420px){#dishaVault3d{width:120px;height:120px;opacity:.14}}
+@media(min-width:1200px){#dishaVault3d{width:340px;height:340px;opacity:.3}}
+@media(prefers-reduced-motion:reduce){#dishaVault3d{opacity:.15;filter:none}}
