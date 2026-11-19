@@ -1,48 +1,24 @@
-<div align="center">
+# DISHA 8.2 — Product Knowledge Centre
 
-<img src="../../public/assets/disha-8-2-wordmark-cropped.png" width="330" alt="DISHA 8.2 official logo">
+<img src="../../public/assets/disha-8-2-wordmark-cropped.png" alt="DISHA 8.2 official logo" width="320">
 
-# DISHA 8.2 Product Knowledge Centre
+**Direct UPI checkout, DISHA Vault, Quantum Signal and merchant-controlled transaction intelligence.**
 
-**The money moves on UPI. The intelligence belongs to you.**
+DISHA is designed for businesses that want direct P2P or correctly bank-registered P2M UPI payment initiation without a payment aggregator in the intended payment path. It creates exact order-bound requests and connects Android app handoff, a two-way session handshake, device evidence and UTR/TR correlation.
 
-*Direct checkout · DISHA Vault · Fraud intelligence · Merchant operations · Financial records*
+### Start here
 
-</div>
+- [Product vision and commercial model](Product-Vision-and-Value.md)
+- [Platform architecture and technology stack](Platform-Architecture.md)
+- [Complete payment journey and Mermaid sequence](End-to-End-Journey.md)
+- [DISHA Vault](DISHA-Vault.md) and [Vault architecture](Vault-Architecture.md)
+- [P2P, P2M and receiving accounts](P2P-P2M-and-Receiving-Accounts.md)
+- [Fraud and evidence controls](Fraud-and-Risk-Protection.md)
+- [Merchant and owner workspaces](Merchant-and-Owner-Workspaces.md)
+- [Transactions, ledger and receipts](Records-Reconciliation-and-Receipts.md)
+- [Pricing](Commercial-Model-and-Savings.md)
+- [Frequently asked questions](FAQ.md)
 
----
+**Engineering source of truth:** [TDD/IDD](../architecture/SYSTEM-ARCHITECTURE.md) · [End-to-end design](../architecture/END-TO-END-FLOW.md) · [Release tests](../architecture/TEST-AND-RELEASE.md).
 
-## Explore the DISHA universe
-
-| Product experience | What you'll discover |
-| --- | --- |
-| [**Product vision and value**](Product-Vision-and-Value.md) | The payment-management problem DISHA solves |
-| [**Complete platform architecture**](Platform-Architecture.md) | The full customer, Vault, risk, payment and accounting system |
-| [**End-to-end customer journey**](End-to-End-Journey.md) | All eight moments from a merchant request to a recorded outcome |
-| [**DISHA Vault**](DISHA-Vault.md) | Why an authorized payment journey is more valuable than a screenshot |
-| [**Inside DISHA Vault**](Vault-Architecture.md) | Device authorization, evidence lifecycle, classification and merchant timeline |
-| [**Fraud intelligence**](Fraud-and-Risk-Protection.md) | Amount, recipient, reference, timing and exception decisions |
-| [**Merchant and owner workspaces**](Merchant-and-Owner-Workspaces.md) | Merchant operations and separately controlled platform administration |
-| [**P2P, P2M and receiving accounts**](P2P-P2M-and-Receiving-Accounts.md) | Personal versus bank-issued merchant UPI journeys |
-| [**Financial records and receipts**](Records-Reconciliation-and-Receipts.md) | Matching, accounting, exceptions and customer receipts |
-| [**Commercial model and savings**](Commercial-Model-and-Savings.md) | One-time software ownership and evidence-based operating economics |
-| [**Frequently asked questions**](FAQ.md) | Straight answers about how DISHA works |
-
-## DISHA's central architecture
-
-~~~mermaid
-flowchart LR
- A["Merchant order"]:::blue --> B["Customer UPI checkout"]:::blue
- B --> C["Vault evidence"]:::purple
- C --> D["Risk intelligence"]:::orange
- D --> E["Qualified financial matching"]:::green
- E --> F["Merchant ledger and receipt"]:::green
- classDef blue fill:#103453,stroke:#38BDF8,color:#fff,stroke-width:2px;
- classDef purple fill:#30204F,stroke:#C084FC,color:#fff,stroke-width:2px;
- classDef orange fill:#472D18,stroke:#FBBF24,color:#fff,stroke-width:2px;
- classDef green fill:#103C31,stroke:#34D399,color:#fff,stroke-width:2px;
-~~~
-
-The customer keeps using their own UPI app. DISHA brings business order identity, permitted evidence, fraud analysis and financial records together in a merchant-owned experience.
-
-**[Explore the DISHA website](https://disha8-2.thenitishkr.in/) · [Request merchant access](https://disha8-2.thenitishkr.in/request-access) · [Contact](mailto:nitish@thenitishkr.in)**
+**Release status:** Quantum Signal code merged, opt-in `qs=1`. Actual Android pre-PIN acceptance and authenticatable payer-debit evidence remain open validation gates. No simulated transaction is presented as a real success.
