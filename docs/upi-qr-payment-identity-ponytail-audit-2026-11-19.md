@@ -23,3 +23,14 @@ It checks `pa`, `pn`, `mc`, `tr`, `am`, `cu`, duplicated fields, merchant classi
 
 ## Not inspected or not established
 A full line-by-line review of every other repository subsystem (AI website assets, n8n jobs, Python alternate application, all dashboard styling) was not performed. Real Google Pay/PhonePe physical-device transactions, the customer's real banking identity, and the configured receiving account's bank-side status are not accessible through the CI emulator.
+
+## Mobile-web and native-app platform mapping (November 2026 review)
+- Razorpay's UPI Intent docs describe an intent application opened with payment details prefilled, then UPI authorization. **This flow is transport guidance, not a reason to integrate Razorpay into DISHA.**
+- Android browser: keep a native user-initiated `upi://pay` anchor on the QR itself; never require a passkey, preemptive PIN, or asynchronous gateway request to launch it.
+- Android WebView embedding: the host `WebViewClient.shouldOverrideUrlLoading` must intercept only valid `upi://pay` and forward it to `Intent.ACTION_VIEW`. The DISHA test host already follows this pattern and returns `false` for ordinary `https://` navigation. Razorpay's sample uses an overly broad Boolean condition; do not copy that branch.
+- Desktop: display the same bank-scannable UPI QR and poll the original page's payment status. Do not attempt to force a native app on desktop.
+- iOS: specific PSP app-scheme handling may be needed; a plain `upi://pay` tap is not guaranteed to be handled by every iOS browser. Android emulator success cannot establish iOS acceptance.
+- The Razorpay-specific `webview_intent`, Razorpay.js, Android SDK, and Razorpay payment APIs do not belong in this zero-gateway product. The banned **UPI Collect** model (push request to payer's VPA) is not implemented and its MCC restrictions do not apply generically to UPI Intent.
+- Google Pay's public UPI documentation describes `pa`, `pn`, `mc`, `tr`, `tn`, `am`, `cu` for **merchant** app payments. The issuer's real merchant VPA and classification are prerequisites; adding those fields to an unregistered personal VPA is not a substitute for merchant onboarding.
+- The new QR tap diagnostic observes the browser becoming hidden and then visible. A fast return produces an **informational** message, never a failed/paid financial state. When the browser never backgrounds, the application has no reliable proof it launched.
+- Sources reviewed: https://razorpay.com/docs/payments/payment-methods/upi/upi-intent , https://razorpay.com/docs/payments/payment-gateway/web-integration/custom/features/webview/upi-intent-android , https://razorpay.com/docs/payments/payment-gateway/web-integration/custom/payment-methods/upi-intent-mweb , and https://developers.google.com/pay/india/api/android/in-app-payments .

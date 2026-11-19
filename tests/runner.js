@@ -22,7 +22,8 @@ const UNIT_TESTS = [
   'test-payment-classification-ui.js',
   'test-owner-runtime-delivery.js', // role diagnostics, owner inbox, Railway/Cloudflare UI coherence // transparent P2P/P2M checkout and release criteria
   'test-live-upi-contract.js',
-  'test-upi-acceptance-harness.js', // authentic P2P/P2M URI fields, strict MCC and payee isolation
+  'test-upi-acceptance-harness.js',
+  'test-upi-intent-platform-contract.js', // authentic P2P/P2M URI fields, strict MCC and payee isolation
   'test-npci-intent.js',  // NPCI URI builder / parser / timestamp
   'test-upi-intent-handoff.js',
   'test-qr-cross-device.js',

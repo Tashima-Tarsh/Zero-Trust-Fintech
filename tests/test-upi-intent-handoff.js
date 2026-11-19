@@ -27,7 +27,7 @@ function start(userAgent){
  };
  vm.runInNewContext(source,{window,document,location,navigator,URL,URLSearchParams,Date,Intl,fetch,console,
   sessionStorage:{getItem:()=>null,setItem(){}},setInterval:()=>1,clearInterval(){}});
- return {nodes,state,events,stages};
+ return {nodes,state,events,stages,document};
 }
 async function flush(){for(let i=0;i<35;i++)await Promise.resolve()}
 (async()=>{
@@ -44,6 +44,17 @@ async function flush(){for(let i=0;i<35;i++)await Promise.resolve()}
  assert.equal(prevented,false,'Tap must preserve native anchor navigation to UPI app');
  assert.equal(mobile.state.prompt,0,'No passkey prompt before native QR tap');
  assert.ok(!uri.includes(token),'Browser bearer token is not embedded in payment QR');
+ mobile.document.visibilityState='hidden';
+ mobile.events.visibilitychange();
+ mobile.document.visibilityState='visible';
+ mobile.events.visibilitychange();
+ await flush();
+ assert.equal(mobile.stages.find(x=>!x.hidden).dataset.stage,'qr',
+  'Early app return must retain QR instead of claiming payment');
+ assert.match(mobile.nodes.checkoutStatus.textContent,/UPI app returned quickly/,
+  'A pre-PIN-like early return should be visible and accurately classified');
+ assert.notEqual(mobile.nodes.receiptUtr.textContent,'123456789012',
+  'App return is not a credit');
  await mobile.nodes.shareCheckout.events.click();
  const shared=new URL(mobile.state.shared);
  assert.equal(shared.searchParams.get('paymentRef'),order);

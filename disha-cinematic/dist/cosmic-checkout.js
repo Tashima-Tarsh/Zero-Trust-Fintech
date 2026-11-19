@@ -13,6 +13,8 @@
  let loading=false,polling=false,evidenceSending=false,receiptShown=false;
  let qrUri=null,lastStage='initial',expiryTicker=null,ledgerTicker=null;
  let missingBackgroundLogged=false,expiryLogged=false;
+ // Browser-only diagnostics for direct QR taps. Not evidence of a bank payment.
+ let qrTapStartedAt=0,qrAppBackgrounded=false;
  const userAgent=navigator.userAgent||'';
  const orderId=()=>session?.orderId||null;
  const debug=query.get('debug')==='1';
@@ -382,6 +384,17 @@
    void pollLedger(); // A previously established ledger credit still wins.
    return;
   }
+  // Report a fast QR-app return without inferring payment state or claiming PIN entry.
+  // A page focus without a recorded background event is not proof an app opened.
+  if(qrTapStartedAt&&qrAppBackgrounded){
+   const elapsed=Date.now()-qrTapStartedAt;
+   qrTapStartedAt=0;qrAppBackgrounded=false;
+   if(lastStage==='qr'){
+    trace('QR_APP_RETURN',elapsed<12000?'RETURN_FAST':'RETURN_NORMAL','generic');
+    if(elapsed<12000)
+     message('UPI app returned quickly. Check its payment status before trying again.','info');
+   }
+  }
   // A focus/pageshow event alone does not establish that Android actually
   // opened a UPI app. Some apps reject the intent before their PIN screen.
   // Require a browser-observed background/return event (or explicit return
@@ -422,6 +435,8 @@
     message('Scan this QR with a UPI app on another phone.','info');
     return;
    }
+   qrTapStartedAt=Date.now();
+   qrAppBackgrounded=false;
    trace('APP_DISPATCH','APP_GENERIC','generic');
   });
   get('shareCheckout').addEventListener('click',async()=>{
@@ -469,6 +484,10 @@
   });
   document.addEventListener('visibilitychange',()=>{
    if(document.visibilityState==='hidden'){
+    if(qrTapStartedAt&&Date.now()-qrTapStartedAt<180000){
+     qrAppBackgrounded=true;
+     trace('QR_APP_BACKGROUND','OBSERVED','generic');
+    }
     if(handoffStarted){vault.markBackgrounded(orderId());trace('BROWSER_HIDDEN')}
    }else onReturn();
   });
