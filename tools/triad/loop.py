@@ -34,7 +34,7 @@ EXTS = {".js", ".cjs", ".mjs", ".jsx", ".ts", ".tsx", ".json", ".py",
         ".java", ".kt", ".sql", ".html", ".css", ".sh", ".ps1", ".yml", ".yaml"}
 SKIP = {".git", ".external", "node_modules", ".venv", ".next", "coverage",
         "__pycache__", "test-results", ".archify", "agent_workspace", ".gradle",
-        "build", "dist", "disha-cinematic", "zero-trust-fintech-production"}
+        "build", "dist"}
 SOURCES = {
     "checkout": "public/cosmic-checkout.js",
     "uri": "utils/upi-intent.js",
@@ -56,16 +56,19 @@ BANKLESS = (
 )
 
 def source_files(root: Path):
-    for p in sorted(root.rglob("*")):
-        if not p.is_file() or p.suffix.lower() not in EXTS:
-            continue
-        if any(part in SKIP or part.startswith(".git") for part in p.relative_to(root).parts):
-            continue
-        try:
-            if p.stat().st_size <= 2_000_000:
-                yield p
-        except OSError:
-            continue
+    # Walk all authored workstreams (including the cinematic and production
+    # subtrees), while skipping generated dist/vendor output at traversal time.
+    for base, dirs, filenames in os.walk(root, followlinks=False):
+        dirs[:] = sorted(d for d in dirs if d not in SKIP and not d.startswith(".git"))
+        for name in sorted(filenames):
+            p = Path(base) / name
+            if p.is_symlink() or p.suffix.lower() not in EXTS:
+                continue
+            try:
+                if p.stat().st_size <= 2_000_000:
+                    yield p
+            except OSError:
+                continue
 
 def inventory(root: Path):
     h = hashlib.sha256()
@@ -208,8 +211,12 @@ def archify_candidate(repo: Path, output: Path):
 def run_process(argv, cwd, timeout=240):
     began = time.monotonic()
     try:
+        safe_env = dict(os.environ)
+        safe_env["ARCHIFY_UPDATE_CHECK_DISABLED"] = "1"
+        safe_env["SWARMS_TELEMETRY_ON"] = "false"
         p = subprocess.run(argv, cwd=cwd, text=True, stdout=subprocess.PIPE,
-                           stderr=subprocess.STDOUT, timeout=timeout, check=False)
+                           stderr=subprocess.STDOUT, timeout=timeout, check=False,
+                           env=safe_env)
         # Logs can include credentials from unrelated test runs; store status
         # and a bounded SHA256, never raw stdout in audit artifacts.
         digest = hashlib.sha256(p.stdout.encode("utf-8", errors="replace")).hexdigest()
@@ -255,6 +262,8 @@ def main():
     parser.add_argument("--model", default="", help="Optional LOCAL ollama_chat/model")
     parser.add_argument("--goal", default="Fix DISHA Android UPI Intent and checkout evidence")
     parser.add_argument("--iterations", type=int, default=4)
+    parser.add_argument("--watch-seconds", type=int, default=0,
+                        help="Optional bounded local source-change watch between iterations")
     parser.add_argument("--android-log", type=Path)
     parser.add_argument("--output-dir", type=Path, default=Path("test-results/triad"))
     parser.add_argument("--render", action="store_true", help="Run actual Archify finalize")
@@ -263,6 +272,8 @@ def main():
     args = parser.parse_args()
     if not 1 <= args.iterations <= 20:
         parser.error("Iterations must be between 1 and 20; unbounded repair loops are unsafe")
+    if not 0 <= args.watch_seconds <= 3600:
+        parser.error("Watch timeout must be 0-3600 seconds")
     root = args.repo_root.resolve()
     if not (root / "package.json").is_file():
         parser.error("Not a DISHA repository")
@@ -278,15 +289,24 @@ def main():
     previous = None
     for iteration in range(1, args.iterations + 1):
         state = inventory(root)
+        if previous == state["fingerprint"]:
+            break  # No new evidence; looping would invent progress.
         diag = evidence(root, args.android_log)
         snapshots.append({"iteration": iteration, "fingerprint": state["fingerprint"],
                           "sourceFiles": state["count"], "findings": diag["findings"],
                           "androidEvidence": diag["android"]})
-        if previous == state["fingerprint"]:
-            break  # No new evidence; looping would invent progress.
         previous = state["fingerprint"]
-        # A safe loop does not let an AI silently patch payment code.
-        break
+        if not args.watch_seconds or iteration == args.iterations:
+            break
+        # On a developer workstation, observe committed corrections and
+        # rerun only after source actually changes; no uncontrolled recursion.
+        deadline = time.monotonic() + args.watch_seconds
+        while time.monotonic() < deadline:
+            time.sleep(min(2.0, max(0.1, deadline - time.monotonic())))
+            if inventory(root)["fingerprint"] != previous:
+                break
+        else:
+            break
     state = inventory(root)
     result = {
         "goal": args.goal, "revision": run_process(["git", "rev-parse", "--short", "HEAD"], root),
