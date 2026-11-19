@@ -65,7 +65,7 @@ assert.equal(model.qrPayload(merchantOriginal),merchantOriginal,'Valid merchant 
 
 assert.equal(model.supportsTargetedAppLaunch(chromeUa),true);
 assert.equal(model.supportsTargetedAppLaunch(webViewUa),false,'Embedded WebView needs raw upi://pay');
-assert.equal(model.supportsTargetedAppLaunch('Mozilla/5.0 (Linux; Android 15) SamsungBrowser/26 Chrome/129'),false);
+assert.equal(model.supportsTargetedAppLaunch('Mozilla/5.0 (Linux; Android 15) SamsungBrowser/26 Chrome/129'),true,'Samsung Browser gets targeted intent with fallback chain');
 const appPackages={gpay:'com.google.android.apps.nbu.paisa.user',phonepe:'com.phonepe.app',
  paytm:'net.one97.paytm',bhim:'in.org.npci.upiapp'};
 for(const [app,pkg] of Object.entries(appPackages)){

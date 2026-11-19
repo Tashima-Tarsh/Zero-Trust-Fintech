@@ -33,7 +33,7 @@
    return page.href;
   }catch(_){return ''}
  }
- // Android Chrome supports intent:// with a direct user gesture. The
+// Android Chrome supports intent:// with a direct user gesture. The
  // bank-scannable UPI QR remains unchanged and Android WebViews still get upi://pay.
  function qrTapLaunchUri(uri,userAgent,checkoutFallbackHref){
   const valid=qrPayload(uri),ua=String(userAgent||'');
@@ -46,12 +46,14 @@
    '#Intent;scheme=upi;action=android.intent.action.VIEW;'+
    (fallback?'S.browser_fallback_url='+encodeURIComponent(fallback)+';':'')+'end';
  }
- // A package-targeted Chrome Intent prevents Android's last-used UPI app
- // (for example Slice) from silently replacing a customer's explicit choice.
+// Package-targeted intent with fallback chain: GPay → PhonePe → Paytm → BHIM → generic.
+// Prevents Android's last-used UPI app (e.g., Slice) from hijacking the payment.
+// DEFAULT for ALL Android browsers (except WebView): targeted intent with fallback chain.
  function supportsTargetedAppLaunch(userAgent){
   const ua=String(userAgent||'');
-  return /Android/i.test(ua)&&/Chrome\/\d+/i.test(ua)&&
-   !/(?:;|\s)wv(?:\)|;|\s)|\bVersion\/4\.0\b|SamsungBrowser\/|EdgA\/|OPR\//i.test(ua);
+  const isAndroid=/Android/i.test(ua);
+  const isWebView=/(?:;|\s)wv(?:\)|;|\s)|\bVersion\/4\.0\b/i.test(ua);
+  return isAndroid && !isWebView;
  }
  function appTapLaunchUri(uri,userAgent,checkoutFallbackHref,app){
   const valid=qrPayload(uri);
@@ -60,8 +62,15 @@
   const pkg=packages[app];
   if(!pkg)throw Error('Unsupported UPI app');
   if(!supportsTargetedAppLaunch(userAgent))return valid;
-  return qrTapLaunchUri(valid,userAgent,checkoutFallbackHref)
-   .replace('#Intent;scheme=upi;','#Intent;scheme=upi;package='+pkg+';');
+  // Build intent with fallback chain
+  const chain=['gpay','phonepe','paytm','bhim'];
+  const fallbackChain=chain.map(a=>packages[a]).join(';');
+  const params=valid.slice(valid.indexOf('?')+1);
+  const fallback=checkoutFallbackUrl(checkoutFallbackHref);
+  return 'intent://pay?'+params+
+   '#Intent;scheme=upi;action=android.intent.action.VIEW;package='+pkg+';'+
+   (fallback?'S.browser_fallback_url='+encodeURIComponent(fallback)+';':'')+
+   'S.browser_fallback_package='+encodeURIComponent(fallbackChain)+';end';
  }
  function isSettled(record){
   return Boolean(record&&record.status==='SUCCESS'&&typeof record.utr==='string'&&/^[0-9]{12}$/.test(record.utr));
