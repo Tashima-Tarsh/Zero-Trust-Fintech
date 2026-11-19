@@ -6,6 +6,7 @@
 const express=require('express');
 const crypto=require('node:crypto');
 const {getClerkVerifiedEmail}=require('./utils/platform-clerk-identity');
+const {createOwnerObservability}=require('./operations/owner-observability');
 const id=(p)=>p+crypto.randomBytes(12).toString('hex');
 const val=(s,max=200)=>String(s??'').trim().slice(0,max);
 const err=(status,message)=>Object.assign(new Error(message),{status});
@@ -13,6 +14,8 @@ const EMAIL=/^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const safeName=s=>val(s,160).replace(/[\u0000-\u001f]/g,'');
 function createPlatformControl({db,getAuth,clerkEmailResolver=getClerkVerifiedEmail}){
  const router=express.Router();
+ const observability=createOwnerObservability({getPool:()=>pool});
+ const frontendLimiter=new Map();
  let pool=db.pgPool;
  const active=()=>process.env.DISHA_INVITE_ONLY_ENABLED==='true';
  // Single Super Admin policy. Legacy owner email/user ID deployment variables
@@ -114,6 +117,13 @@ function createPlatformControl({db,getAuth,clerkEmailResolver=getClerkVerifiedEm
     "ALTER TABLE saas_merchants ADD COLUMN IF NOT EXISTS approved_at BIGINT;"+
     "CREATE UNIQUE INDEX IF NOT EXISTS uq_disha_approved_email ON saas_merchants(lower(approved_email)) WHERE approved_email IS NOT NULL;"
    );
+   // Separate low-risk operational table: no financial rows are changed.
+   await pool.query(
+    "CREATE TABLE IF NOT EXISTS disha_frontend_error_events ("+
+    "id TEXT PRIMARY KEY,page TEXT NOT NULL,category TEXT NOT NULL,component TEXT NOT NULL,"+
+    "created_at BIGINT NOT NULL);"+
+    "CREATE INDEX IF NOT EXISTS idx_disha_frontend_error_time ON disha_frontend_error_events(created_at DESC);"
+   );
    // Idempotent configuration: never erase or reassign historical transactions.
    if(active()&&EMAIL.test(ownerEmail()))await ensureOwnerTestTenant();
    console.log('[Platform Control] initialized; controlled access '+(active()?'ENABLED':'not yet activated'));
@@ -186,6 +196,48 @@ function createPlatformControl({db,getAuth,clerkEmailResolver=getClerkVerifiedEm
     [request,business,contact,email,val(body.phone,30),val(body.category,100),val(body.estimatedVolume,80),ts]);
    res.status(202).set('Cache-Control','no-store').json({success:true,message:'Access request received. Our team will review your application.',reference:request});
  }));
+ // First-party, privacy-minimized browser diagnostics. No message, stack, IP,
+ // account, UPI URI, bank result, token or free-form URL is ever persisted.
+ router.post('/public/frontend-error',wrap(async(req,res)=>{
+   const fetchSite=String(req.get('sec-fetch-site')||'');
+   if(fetchSite&&fetchSite!=='same-origin'&&fetchSite!=='none')throw err(403,'Cross-origin telemetry rejected');
+   const origin=String(req.get('origin')||'');
+   if(origin){
+    let url;try{url=new URL(origin)}catch{throw err(403,'Invalid telemetry origin')}
+    const publicOrigin=new URL(process.env.PUBLIC_BASE_URL||'https://disha8-2.thenitishkr.in');
+    const allow=new Set([publicOrigin.host,req.get('host')]);
+    if(!allow.has(url.host)||url.protocol!=='https:')throw err(403,'Telemetry origin not allowed');
+   }
+   const payload=req.body||{};
+   if(typeof payload!=='object'||Array.isArray(payload)||JSON.stringify(payload).length>450)
+     throw err(400,'Invalid browser error event');
+   const page=String(payload.page||'');
+   const category=String(payload.category||'');
+   const component=String(payload.component||'');
+   if(!['/','/owner','/dashboard','/login','/checkout','/p2p','/p2m','/p2m/checkout',
+         '/merchant-checkout.html','/choose-payment','/request-access'].includes(page)||
+      !['JS_ERROR','UNHANDLED_REJECTION','RESOURCE_ERROR'].includes(category)||
+      !['OWNER','MERCHANT','CHECKOUT','LOGIN','LANDING'].includes(component))
+     throw err(400,'Invalid browser error classification');
+   const key=String(req.ip||'unknown'),now=Date.now();
+   const history=(frontendLimiter.get(key)||[]).filter(t=>now-t<3600000);
+   if(history.length>=12)throw err(429,'Too many error reports');
+   history.push(now);frontendLimiter.set(key,history);
+   if(frontendLimiter.size>10000)frontendLimiter.clear();
+   const eventId=id('fe_'),label='Client-reported '+category+' in '+component+' ('+page+')';
+   await pool.query("INSERT INTO disha_frontend_error_events(id,page,category,component,created_at) VALUES($1,$2,$3,$4,$5)",
+     [eventId,page,category,component,now]);
+   // This is a browser-reported WARNING, not an independently verified outage.
+   // Coalesce repeated events and avoid converting a client report to CRITICAL.
+   await pool.query(
+     "INSERT INTO disha_platform_incidents(id,severity,service,summary,status,created_at,updated_at) "+
+     "SELECT $1,'WARNING','frontend',$2,'OPEN',$3,$3 WHERE NOT EXISTS ("+
+     "SELECT 1 FROM disha_platform_incidents WHERE service='frontend' AND summary=$2 "+
+     "AND created_at>$4 AND status IN ('OPEN','ACKNOWLEDGED'))",
+     [id('inc_'),label,now,now-3600000]);
+   observability.invalidate();
+   res.status(202).set('Cache-Control','no-store').json({success:true,recorded:true});
+ }));
  router.use((req,res,next)=>{
    (async()=>{
      // Super Admin identity is independent of merchant invite-only state.
@@ -197,6 +249,10 @@ function createPlatformControl({db,getAuth,clerkEmailResolver=getClerkVerifiedEm
      next();
    })().catch(next);
  });
+ router.get('/owner/observability',wrap(async(req,res)=>{
+   const status=await observability.get();
+   res.set('Cache-Control','no-store').json({success:true,...status});
+ }));
  router.get('/owner/me',wrap(async(req,res)=>{
    const t=await pool.query("SELECT id,business_name,is_internal_test FROM saas_merchants WHERE id=$1 AND is_internal_test=TRUE",[ownerTenantId()]);
    res.set('Cache-Control','no-store').json({success:true,role:'PLATFORM_OWNER',superAdmin:true,ownerEmail:SUPER_ADMIN_EMAIL,
@@ -438,7 +494,11 @@ function createPlatformControl({db,getAuth,clerkEmailResolver=getClerkVerifiedEm
 
  router.get('/owner/incidents',wrap(async(req,res)=>{
    const r=await pool.query("SELECT * FROM disha_platform_incidents ORDER BY created_at DESC LIMIT 100");
-   res.set('Cache-Control','no-store').json({success:true,incidents:r.rows,telemetry:{application:'NOT_CONNECTED',frontend:'NOT_CONNECTED',deployment:'NOT_CONNECTED'}});
+   const status=await observability.get();
+   res.set('Cache-Control','no-store').json({success:true,incidents:r.rows,
+     telemetry:{application:status.services.postgres,frontend:status.services.frontend,
+       deployment:status.services.railway,github:status.services.github}});
+
  }));
  router.get('/owner/audit',wrap(async(req,res)=>{
    const r=await pool.query("SELECT id,actor_id,action,target_id,created_at FROM disha_platform_audit ORDER BY created_at DESC LIMIT 200");

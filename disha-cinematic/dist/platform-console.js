@@ -34,6 +34,49 @@ async function api(path,options={}){
 }
 const titles={overview:'Platform Overview',requests:'Access Requests',tenants:'Tenant Management',onboarding:'Merchant Onboarding',transactions:'All Transactions',trust:'Trust & Evidence',ledger:'Reconciliation & Ledger',analytics:'Platform Analytics',incidents:'Errors & Bugs',infrastructure:'Infrastructure Health',integrations:'Automation & Integrations',settings:'Platform Settings'};
 function select(screen){if(!titles[screen])screen='overview';$$('.owner-screen').forEach(x=>x.classList.toggle('active',x.id==='screen-'+screen));$$('[data-screen]').forEach(b=>b.classList.toggle('active',b.dataset.screen===screen));$('#screen-title').textContent=titles[screen];if(location.hash!=='#'+screen)history.replaceState(null,'','#'+screen);$('#console-nav').classList.remove('open');$('#nav-backdrop').classList.remove('open');window.scrollTo(0,0);load(screen).catch(e=>notice(e.message))}
+function prettyState(value){
+ return ({CONNECTED:'Connected',PARTIAL:'Partially connected',NOT_CONFIGURED:'Not configured',
+   UNAVAILABLE:'Unavailable'})[value]||'Unavailable';
+}
+function showServiceStatus(container,items,services){
+ const node=$(container);if(!node)return;
+ node.replaceChildren();
+ items.forEach(([key,title])=>{
+  const value=services?.[key]||{status:'UNAVAILABLE',detail:'Probe did not return a result'};
+  const row=document.createElement('div');row.className='monitor-entry';
+  row.dataset.monitorState=value.status||'UNAVAILABLE';
+  const heading=document.createElement('b');heading.textContent=title;
+  const body=document.createElement('span');
+  const status=document.createElement('strong');status.className='monitor-status';
+  status.textContent=prettyState(value.status);
+  const detail=document.createElement('small');
+  const metrics=value.metrics&&typeof value.metrics==='object'
+    ?Object.entries(value.metrics).filter(([,v])=>v!==null&&v!=='').slice(0,7)
+       .map(([k,v])=>k.replace(/([A-Z])/g,' $1')+': '+String(v)).join(' · '):'';
+  detail.textContent=(value.detail||'No detail available')+(metrics?' | '+metrics:'');
+  body.append(status,detail);row.append(heading,body);node.appendChild(row);
+ });
+}
+async function showOperations(screen){
+ const services=(await api('/owner/observability')).services;
+ if(screen==='infrastructure'){
+  let apiHealth={status:'UNAVAILABLE',detail:'The backend health endpoint did not respond'};
+  try{const r=await fetch('/health',{cache:'no-store'});if(r.ok){
+   const data=await r.json();apiHealth=data.status==='healthy'?
+      {status:'CONNECTED',detail:'Backend health endpoint responded'}:
+      {status:'UNAVAILABLE',detail:'Backend reports '+String(data.status||'unknown').slice(0,30)};
+  }}catch(_){}
+  showServiceStatus('#owner-infrastructure-connections',
+   [['platformApi','Platform API'],['railway','Railway deployment'],
+    ['postgres','PostgreSQL operational metrics'],['cloudflare','Cloudflare edge analytics']],
+    {...services,platformApi:apiHealth});
+ }else{
+  showServiceStatus('#owner-integration-connections',
+   [['n8n','n8n workflow monitoring'],['webhooks','Reconciliation webhook intake'],
+    ['github','GitHub Actions telemetry'],['frontend','Frontend error monitoring']],services);
+ }
+}
+
 function field(value,label){return '<article class="metric"><label>'+esc(label)+'</label><strong>'+esc(value)+'</strong><small>Recorded platform data</small></article>'}
 async function load(screen){
  notice('');
@@ -57,9 +100,9 @@ async function load(screen){
        rows.map(e=>'<tr><td>'+esc(e.created_at?new Date(e.created_at).toLocaleString('en-IN'):'—')+'</td><td>Checkout event</td><td>'+esc(e.app)+' / '+esc(e.device)+'</td><td>'+esc(e.event)+'</td><td>'+esc(e.code)+'</td></tr>').join('');
    }catch(_){tbody.innerHTML='<tr><td colspan="5">Checkout diagnostics could not be retrieved. Retry after confirming backend availability.</td></tr>';}
  }
- if(screen==='incidents'){const r=await api('/owner/incidents');incidents=r.incidents||[];$('#incident-kpis').innerHTML=field(incidents.filter(x=>x.status==='OPEN').length,'Open recorded incidents')+field(incidents.filter(x=>x.severity==='CRITICAL').length,'Critical incidents')+field('Unavailable','Frontend monitoring')+field('Unavailable','Deployment monitoring');
+ if(screen==='incidents'){const r=await api('/owner/incidents');incidents=r.incidents||[];$('#incident-kpis').innerHTML=field(incidents.filter(x=>x.status==='OPEN').length,'Open recorded incidents')+field(incidents.filter(x=>x.severity==='CRITICAL').length,'Critical incidents')+field(r.telemetry?.frontend?.status==='CONNECTED'?String(r.telemetry.frontend.metrics?.events24h??0):prettyState(r.telemetry?.frontend?.status),'Browser errors / 24h')+field(r.telemetry?.deployment?.status==='CONNECTED'?r.telemetry.deployment.metrics?.deploymentStatus||'Known':prettyState(r.telemetry?.deployment?.status),'Railway deployment');
  $('#incidents-body').innerHTML=incidents.length?incidents.map(i=>'<tr><td><span class="state">'+esc(i.severity)+'</span></td><td>'+esc(i.service)+'</td><td>'+esc(i.summary)+'</td><td>'+esc(i.status)+'</td><td>'+when(i.created_at)+'</td><td>'+(i.status==='RESOLVED'?'Resolved':'<button data-incident="'+esc(i.id)+'" data-inc-status="'+(i.status==='OPEN'?'ACKNOWLEDGED':'RESOLVED')+'">'+(i.status==='OPEN'?'Acknowledge':'Resolve')+'</button>')+'</td></tr>').join(''):'<tr><td colspan="6">No incidents recorded in the platform incident store. External telemetry is not connected.</td></tr>';
- $('#telemetry-body').innerHTML=Object.entries(r.telemetry||{}).map(([k,v])=>'<div><b>'+esc(k)+'</b><span>'+esc(v)+'</span></div>').join('');}
+ showServiceStatus('#telemetry-body',[['application','PostgreSQL application'],['frontend','Browser error reporting'],['deployment','Railway deploy'],['github','GitHub Actions']],r.telemetry||{});}
  if(screen==='settings'){
    const c=await api('/owner/configuration');
    const output=[];
@@ -81,7 +124,7 @@ async function load(screen){
    $('#owner-configuration').innerHTML=output.join('');
  }
  if(screen==='settings'){const r=await api('/owner/audit');$('#audit-body').innerHTML=(r.events||[]).slice(0,35).map(e=>'<div><b>'+esc(e.action)+'</b><span>'+when(e.created_at)+'</span></div>').join('')||'No audit events recorded yet.';}
- if(screen==='infrastructure'){try{const r=await fetch('/health',{cache:'no-store'});if(!r.ok)throw Error('HTTP '+r.status);const j=await r.json();$('#infra-api').textContent=j.status||'Responding'}catch(e){$('#infra-api').textContent='Unavailable: '+e.message;}}
+ if(screen==='infrastructure'||screen==='integrations')await showOperations(screen);
 }
 document.addEventListener('click',async event=>{
  const nav=event.target.closest('[data-screen]');if(nav){select(nav.dataset.screen);return}

@@ -23,7 +23,9 @@ const UNIT_TESTS = [
   'test-payment-mode-separation.js',
   'test-try-checkout-form.js',
   'test-frontend-local-imagery.js',
-  'test-owner-runtime-delivery.js', // role diagnostics, owner inbox, Railway/Cloudflare UI coherence // transparent P2P/P2M checkout and release criteria
+  'test-owner-runtime-delivery.js',
+  'test-owner-observability.js',
+  'test-owner-frontend-ingest-http.js', // role diagnostics, owner inbox, Railway/Cloudflare UI coherence // transparent P2P/P2M checkout and release criteria
   'test-live-upi-contract.js',
   'test-sqlite-upi-snapshot.js',
   'test-upi-acceptance-harness.js',

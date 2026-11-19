@@ -255,7 +255,7 @@ if (process.env.NODE_ENV === 'production') {
 // Serve first-party runtime JS/CSS from Railway, not a potentially stale
 // Cloudflare Pages static deployment. Strict names prevent file traversal.
 const RUNTIME_ASSETS=new Set([
- 'platform-console.js','platform-console.css','premium-dashboard.js',
+ 'platform-console.js','platform-console.css','frontend-monitor.js','premium-dashboard.js',
  'premium.css','saas-white.css','merchant-mars.css','merchant-celestial.css',
  'merchant-reference.css','merchant-vpa-import.js','cosmic-checkout.js',
  'cosmic-checkout-model.js','cosmic-checkout.css','checkout-moonlight.css',

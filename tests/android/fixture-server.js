@@ -26,6 +26,7 @@ http.createServer((req,res)=>{
   ['/cosmic-checkout.css','text/css'],
   ['/checkout-moonlight.css','text/css'],
   ['/cosmic-checkout.js','application/javascript'],
+  ['/frontend-monitor.js','application/javascript'],
   ['/cosmic-checkout-model.js','application/javascript'],
   ['/disha-vault-3d.js','application/javascript'],
   ['/disha-vault-3d.css','text/css'],
