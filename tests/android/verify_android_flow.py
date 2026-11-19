@@ -125,6 +125,8 @@ def test():
         and s["qrTarget"]["visible"] and not s["qrDisabled"],
         "Order-bound QR is ready without app selection or a passkey")
     assert fixture_state()=="PENDING"
+    assert page["qrHref"].startswith("upi://pay?"),(
+        "Android WebView must retain upi://pay; Chrome-only intent:// is not intercepted")
     screen("01-qr-checkout")
 
     print("A02: physical QR tap launches generic Android UPI intent",flush=True)

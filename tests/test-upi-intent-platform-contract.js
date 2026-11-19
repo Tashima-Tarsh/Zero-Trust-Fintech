@@ -20,12 +20,28 @@ for(const page of ['public/checkout.html','public/merchant-checkout.html']){
 assert.ok(!Object.keys(pkg.dependencies||{}).some(x=>/razorpay/i.test(x)),'No Razorpay SDK dependency');
 assert.equal(model.supportsNativeUPI('Mozilla/5.0 (Linux; Android 15) Chrome'),true);
 assert.equal(model.supportsNativeUPI('Mozilla/5.0 (Windows NT 10.0)'),false);
+const original='upi://pay?pa=person@oksbi&pn=Person&am=1.00&cu=INR';
+const chromeUa='Mozilla/5.0 (Linux; Android 15) AppleWebKit/537.36 Chrome/157.0 Mobile Safari/537.36';
+const webViewUa='Mozilla/5.0 (Linux; Android 15; wv) Version/4.0 Chrome/157.0 Mobile Safari/537.36';
+const fallback='https://checkout.example/checkout?paymentRef=PAY_123456&token='+('b'.repeat(48));
+const chromeIntent=model.qrTapLaunchUri(original,chromeUa,fallback);
+assert.match(chromeIntent,/^intent:\/\/pay\?pa=person@oksbi/);
+assert.match(chromeIntent,/#Intent;scheme=upi;action=android.intent.action.VIEW;/);
+const fallbackCode=chromeIntent.match(/S\.browser_fallback_url=([^;]+)/)?.[1];
+assert.ok(fallbackCode,'Missing same-payment browser fallback');
+assert.equal(new URL(decodeURIComponent(fallbackCode)).searchParams.get('paymentRef'),'PAY_123456');
+assert.equal(new URL(decodeURIComponent(fallbackCode)).searchParams.get('upi_intent_fallback'),'1');
+assert.equal(model.qrTapLaunchUri(original,webViewUa,fallback),original,'WebView must keep upi://pay');
+assert.equal(model.qrTapLaunchUri(original,'Mozilla/5.0 (Windows NT 10.0)',fallback),original);
+assert.equal(model.qrTapLaunchUri(original,'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X)',fallback),original);
+assert.ok(!original.includes('token'),'Scannable QR carries no browser token');
 const click=client.slice(client.indexOf("get('qrTapToPay').addEventListener('click'"),client.indexOf("get('shareCheckout').addEventListener"));
 assert.match(click,/trace\('APP_DISPATCH'/);
 assert.match(click,/qrTapStartedAt=Date\.now\(\)/);
 assert.doesNotMatch(click,/\bawait\b|fetch\(|authorize\(/,
  'Native QR link must preserve synchronous user gesture');
 assert.match(client,/qrAppBackgrounded/);
+assert.match(client,/qrTapLaunchUri\(session\.upiUri,userAgent,secureCheckoutUrl\(true\)\)/);
 assert.match(client,/UPI app returned quickly/);
 assert.match(java,/shouldOverrideUrlLoading\(WebView view, WebResourceRequest request\)/);
 assert.match(java,/"upi"\.equalsIgnoreCase\(uri\.getScheme\(\)\)/);

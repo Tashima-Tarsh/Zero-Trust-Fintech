@@ -256,6 +256,14 @@
    qrUri=null;
   }
  }
+ // Chrome fallback returns to this exact payment, not a new amount-based session.
+ function secureCheckoutUrl(forFallback=false){
+  const u=new URL(mode==='merchant'?'/merchant-checkout.html':'/checkout',location.href);
+  u.searchParams.set('paymentRef',session.orderId);
+  u.searchParams.set('token',session.token);
+  if(forFallback)u.searchParams.set('upi_intent_fallback','1');
+  return u.href;
+ }
  function renderQr(){
   if(!session)return;
   const anchor=get('qrTapToPay'),container=get('paymentQr');
@@ -263,7 +271,8 @@
    anchor.href='#';anchor.setAttribute('aria-disabled','true');
    container.replaceChildren();qrUri=null;handleQrExpiry();return;
   }
-  anchor.href=model.supportsNativeUPI(userAgent)?session.upiUri:'#';
+  anchor.href=model.supportsNativeUPI(userAgent)
+   ?model.qrTapLaunchUri(session.upiUri,userAgent,secureCheckoutUrl(true)):'#';
   anchor.setAttribute('aria-disabled','false');
   if(qrUri!==session.upiUri){
    container.replaceChildren();
@@ -443,9 +452,7 @@
    if(!session?.token||!session?.orderId)return;
    // Sharing the browser checkout intentionally grants access to that order.
    // Its token is never placed in the bank-scannable UPI payment QR.
-   const link=new URL(mode==='merchant'?'/merchant-checkout.html':'/checkout',location.href);
-   link.searchParams.set('paymentRef',session.orderId);
-   link.searchParams.set('token',session.token);
+   const link=new URL(secureCheckoutUrl());
    try{
     if(navigator.share)await navigator.share({title:'DISHA 8.2 payment details',url:link.href});
     else if(navigator.clipboard?.writeText){
@@ -520,6 +527,8 @@
      :'Scan with a UPI app on your phone. This page tracks this payment.';
    showStage('qr');
    tickSessionTimer();
+   if(query.get('upi_intent_fallback')==='1')
+    message('No UPI application opened. Scan this QR on another phone or try again in your browser.','info');
    // Resolve a verified recorded credit even after the original checkout TTL.
    await pollLedger();
    if(receiptShown)return;

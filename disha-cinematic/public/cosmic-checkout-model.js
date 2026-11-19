@@ -43,6 +43,19 @@
    return selected.ios+params;
   return valid;
  }
+ // Android Chrome supports intent:// with a direct user gesture. The
+ // bank-scannable UPI QR remains unchanged and Android WebViews still get upi://pay.
+ function qrTapLaunchUri(uri,userAgent,checkoutFallbackHref){
+  const valid=qrPayload(uri),ua=String(userAgent||'');
+  const chromeAndroid=/Android/i.test(ua)&&/Chrome\/\d+/i.test(ua);
+  const webView=/(?:;|\s)wv(?:\)|;|\s)|\bVersion\/4\.0\b/i.test(ua);
+  if(!chromeAndroid||webView)return valid;
+  const params=valid.slice(valid.indexOf('?')+1);
+  const fallback=checkoutFallbackUrl(checkoutFallbackHref);
+  return 'intent://pay?'+params+
+   '#Intent;scheme=upi;action=android.intent.action.VIEW;'+
+   (fallback?'S.browser_fallback_url='+encodeURIComponent(fallback)+';':'')+'end';
+ }
  function isSettled(record){
   return Boolean(record&&record.status==='SUCCESS'&&typeof record.utr==='string'&&/^[0-9]{12}$/.test(record.utr));
  }
@@ -76,7 +89,7 @@
   if(!Number.isFinite(n)||n<=0)throw Error('Invalid payment amount');
   return new Intl.NumberFormat('en-IN',{style:'currency',currency:'INR',maximumFractionDigits:2,minimumFractionDigits:2}).format(n);
  }
- const api=Object.freeze({safeApp,qrPayload,buildAppUrl,checkoutFallbackUrl,supportsNativeUPI,isSettled,stageAfterAuthorization,needsPaymentMethodRetry,formatINR,userFacingError});
+ const api=Object.freeze({safeApp,qrPayload,qrTapLaunchUri,buildAppUrl,checkoutFallbackUrl,supportsNativeUPI,isSettled,stageAfterAuthorization,needsPaymentMethodRetry,formatINR,userFacingError});
  if(typeof module!=='undefined'&&module.exports)module.exports=api;
  root.DISHACosmicCheckoutModel=api;
 })(typeof window!=='undefined'?window:globalThis);

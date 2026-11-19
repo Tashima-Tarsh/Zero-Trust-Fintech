@@ -127,7 +127,7 @@ public final class TestBrowserActivity extends Activity {
             "return JSON.stringify({amount:v('payAmount'),stage:active?active.dataset.stage:'none'," +
               "status:v('checkoutStatus'),paymentKind:v('paymentKind'),checking:v('checkingHelp'),receiptUtr:v('receiptUtr')," +
               "disabled:b?b.disabled:true,qr:!!document.querySelector('#paymentQr img, #paymentQr canvas')," +
-              "readyState:document.readyState,qrTarget:target(qrTap),qrDisabled:!qrTap||qrTap.getAttribute('aria-disabled')==='true',touchTarget:target(b),appTarget:target(app)});" +
+              "readyState:document.readyState,qrHref:qrTap?qrTap.getAttribute('href'):'',qrTarget:target(qrTap),qrDisabled:!qrTap||qrTap.getAttribute('aria-disabled')==='true',touchTarget:target(b),appTarget:target(app)});" +
             "})()";
         webView.evaluateJavascript(js, data -> Log.i(TAG, "CHECKOUT_DOM "+data));
     }
