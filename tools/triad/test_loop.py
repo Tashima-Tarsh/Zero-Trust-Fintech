@@ -25,7 +25,7 @@ class TriadTests(unittest.TestCase):
             elif key == "uri":
                 data = "function buildUpiUri(){}"
             elif key == "android":
-                data = "startActivityForResult();onActivityResult();bankVerified=false;"
+                data = "DishaUpiIntentBridge.launch();onActivityResult();bankVerified=false;"
             elif key == "android_e2e":
                 data = "ANDROID_ACTIVITY_RESULT"
             elif key == "receiver":
