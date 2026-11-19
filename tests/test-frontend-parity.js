@@ -10,7 +10,12 @@ function listFiles(dir,base=''){
  }).sort();
 }
 const source=path.join(root,'public'),files=listFiles(source);
-assert.ok(files.length>=65,'Canonical frontend appears incomplete');
+// Obsolete checkout pages and fake QR assets are intentionally removed.
+ // Count alone cannot verify a real, runnable checkout.
+assert.ok(files.length>=50,'Canonical frontend appears incomplete');
+for(const required of ['checkout.html','merchant-checkout.html','cosmic-checkout.js',
+ 'cosmic-checkout-model.js','cosmic-checkout.css','vendor/qrcode.min.js','_worker.js'])
+ assert.ok(files.includes(required),'Missing canonical UPI Intent file: '+required);
 for(const output of ['dist','disha-cinematic/public','disha-cinematic/dist']){
  const dir=path.join(root,output);
  for(const file of files){

@@ -36,7 +36,10 @@ permissions:
 
 concurrency:
   group: android-p2p-${{ github.ref }}
-  cancel-in-progress: true
+  # Let an emulator test finish across successive PR commits; otherwise
+  # a fresh code commit cancels both running Android 35/37 jobs before
+  # they can produce a pass/fail verdict.
+  cancel-in-progress: false
 
 jobs:
   android-p2p-e2e:
