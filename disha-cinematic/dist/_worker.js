@@ -26,6 +26,26 @@ export default {
       return new Response(response.body, {status:response.status,headers});
     }
 
+    // The selected payment account type determines which static checkout loads.
+    // P2M never falls through to /checkout or /api/session/new.
+    const paymentPages={
+      "/choose-payment":"/payment-modes.html",
+      "/choose-payment/":"/payment-modes.html",
+      "/p2p":"/checkout.html",
+      "/p2p/":"/checkout.html",
+      "/p2m":"/p2m.html",
+      "/p2m/":"/p2m.html",
+      "/p2m/checkout":"/merchant-checkout.html",
+      "/p2m/checkout/":"/merchant-checkout.html"
+    };
+    if(paymentPages[url.pathname]){
+      const assetUrl=new URL(paymentPages[url.pathname]+url.search,request.url);
+      const response=await env.ASSETS.fetch(new Request(assetUrl,request));
+      const headers=new Headers(response.headers);
+      headers.set("cache-control","no-store");
+      return new Response(response.body,{status:response.status,headers});
+    }
+
     // Disallow the legacy public diagnostics console on the Pages edge.
     if (url.pathname === "/debug.html") {
       return new Response("Not found", { status: 404, headers: {"Cache-Control":"no-store"} });
