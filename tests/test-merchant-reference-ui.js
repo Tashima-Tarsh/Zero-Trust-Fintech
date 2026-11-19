@@ -10,8 +10,8 @@ const html=read('merchant-console.html'),js=read('premium-dashboard.js'),css=rea
 assert.match(html,/merchant-reference\.css\?v=reference-/);
 assert.ok(html.indexOf('merchant-reference.css')>html.indexOf('merchant-celestial.css'),'Reference styles load LAST');
 assert.ok(html.includes('assets/disha-8-2-wordmark-cropped.png'),'Original wordmark retained');
-assert.ok(html.includes('https://eoimages.gsfc.nasa.gov/images/imagerecords/79000/79793/city_lights_africa_8k.jpg'),'Dashboard must use verified NASA Black Marble observational Earth image');
-assert.ok(html.includes('class="celestial-earth-photo"'),'NASA image must exist in live DOM, not be a CSS illustration');
+assert.ok(!html.includes('eoimages.gsfc.nasa.gov'),'Broken remote Earth image must not load');
+assert.ok(html.includes('class="celestial-earth"'),'Decorative Earth layer retained');
 assert.ok(!css.includes('earth-night-horizon.svg'),'Polygon earth must never be rendered by the final stylesheet');
 assert.ok(css.includes('disha-nasa-earth-float'),'Actual Earth image requires optional restrained motion');
 assert.ok(css.includes('prefers-reduced-motion:reduce'),'Animation must respect reduced motion');

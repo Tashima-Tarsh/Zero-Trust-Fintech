@@ -13,12 +13,14 @@ const routes=JSON.parse(read('public/_routes.json'));
 for(const html of [home,selector]){
  assert.match(html,/data-payment-mode="P2P"/);
  assert.match(html,/data-payment-mode="P2M"/);
- assert.match(html,/href="\/p2p\?amount=1"/);
- assert.match(html,/href="\/p2m"/);
+ assert.match(html,/data-payment-mode="P2P"/);
+ assert.match(html,/data-payment-mode="P2M"/);
 }
 assert.match(home,/<div class="header-checkout" role="group"/,'Both checkout options belong in the header');
 assert.doesNotMatch(home,/class="payment-lanes"|class="lane-options"/,'No full-height homepage payment lane section');
 assert.match(selector,/class="choose"/);
+assert.match(selector,/id="tryCheckoutForm"/);
+assert.ok(read("public/try-checkout.js").includes("fetch(\u0027/api/session/new?"));
 assert.doesNotMatch(selector,/min-height:255px|margin-top:70px/,'Checkout mode chooser must stay compact');
 assert.match(p2mPage,/\/login\?mode=P2M/);
 assert.match(p2mPage,/\/dashboard\?mode=P2M#create/);

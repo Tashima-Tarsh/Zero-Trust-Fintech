@@ -3,51 +3,42 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<meta name="referrer" content="no-referrer">
-<meta name="color-scheme" content="dark">
 <meta name="robots" content="noindex,follow">
-<meta name="theme-color" content="#08090f">
-<title>Checkout · P2P or P2M · DISHA 8.2</title>
-<meta name="description" content="Choose P2P personal or P2M merchant UPI checkout.">
+<meta name="referrer" content="strict-origin-when-cross-origin">
+<meta name="theme-color" content="#08101f">
+<title>Try DISHA Checkout — P2P / P2M</title>
+<meta name="description" content="Prepare an exact-amount DISHA payment request with your configured receiving UPI ID.">
 <link rel="icon" href="/assets/disha-8-2-wordmark-cropped.png">
-<style>
-:root{color-scheme:dark;font-family:system-ui,Arial,sans-serif;color:#faf4ec;background:#08090f}
-*{box-sizing:border-box}
-body{margin:0;min-height:100vh;background:radial-gradient(circle at 80% 5%,#5d29365a,transparent 44%),#08090f}
-a{color:inherit;text-decoration:none}
-.shell{max-width:920px;margin:auto;padding:16px clamp(12px,4vw,38px) 35px}
-.top{display:flex;align-items:center;justify-content:space-between;gap:12px;min-height:58px}
-.top img{height:44px;width:170px;object-fit:contain;object-position:left}
-.back{color:#fbb087;font-size:13px}
-.choose{margin-top:16px;padding:18px clamp(14px,3vw,25px);border:1px solid #f8ab7c52;border-radius:18px;background:#ffffff08}
-.choose-head{display:flex;align-items:center;gap:15px;flex-wrap:wrap;margin-bottom:12px}
-.choose h1{font-size:clamp(20px,3.3vw,28px);letter-spacing:-.035em;line-height:1.2;margin:0}
-.choose-label{color:#fbb087;font-weight:800;font-size:11px;letter-spacing:.12em}
-.options{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
-.option{display:flex;align-items:center;justify-content:space-between;gap:12px;min-height:56px;padding:11px 15px;border:1px solid #ffc29883;border-radius:12px;background:linear-gradient(115deg,#35232a,#1b1b26)}
-.option:hover{border-color:#ffd5b4;background:#493039}
-.option:focus-visible,.back:focus-visible{outline:3px solid #ffc298;outline-offset:3px}
-.option b{font-size:18px;letter-spacing:-.02em}
-.option span{font-size:12px;color:#d6c6bd}
-.option em{font-style:normal;color:#ffbd8e;font-weight:800}
-.note{font-size:12px;color:#c9bfc1;line-height:1.5;margin:12px 0 0}
-@media(max-width:490px){.shell{padding:10px 12px}.top img{width:142px;height:38px}.choose{padding:15px 11px}.choose h1{font-size:21px}.options{gap:7px}.option{padding:10px 9px;min-height:56px;gap:6px}.option b{font-size:17px}.option span{display:none}.option em{font-size:14px}}
-@media(prefers-reduced-motion:reduce){*{scroll-behavior:auto!important}}
-</style>
+<link rel="stylesheet" href="/try-checkout.css?v=ponytail-1">
+<script defer src="/try-checkout.js?v=ponytail-1"></script>
 </head>
 <body>
-<main class="shell">
-<header class="top">
-<a href="/" aria-label="DISHA home"><img src="/assets/disha-8-2-wordmark-cropped.png" alt="DISHA 8.2"></a>
-<a class="back" href="/">Back to home</a>
+<main class="try-shell">
+<header class="try-header">
+<a href="/" aria-label="DISHA 8.2 home"><img src="/assets/disha-8-2-wordmark-cropped.png" alt="DISHA 8.2" width="188" height="52"></a>
+<a href="/" class="back-link">Back to DISHA</a>
 </header>
-<section class="choose" aria-label="Choose checkout type">
-<div class="choose-head"><span class="choose-label">CHECKOUT</span><h1>Choose your UPI payment type</h1></div>
-<nav class="options" aria-label="Checkout modes">
-<a class="option" data-payment-mode="P2P" href="/p2p?amount=1" aria-label="P2P personal receiving account"><b>P2P</b><span>Personal UPI</span><em>→</em></a>
-<a class="option" data-payment-mode="P2M" href="/p2m" aria-label="P2M registered merchant receiving account"><b>P2M</b><span>Merchant UPI</span><em>→</em></a>
-</nav>
-<p class="note">P2P uses a personal receiving account. P2M uses a bank-registered merchant account and its authorized MCC. DISHA keeps these flows separate.</p>
+<section class="choose" aria-labelledby="try-title">
+<p class="eyebrow">DISHA / DIRECT UPI CHECKOUT</p>
+<h1 id="try-title">Prepare your payment.</h1>
+<p class="intro">Choose the receiving account type, enter your details and continue to the actual UPI checkout.</p>
+<form id="tryCheckoutForm" novalidate>
+<fieldset class="mode-field">
+<legend>Payment type</legend>
+<div class="mode-options" role="group" aria-label="Receiving account type">
+<button type="button" class="mode active" data-payment-mode="P2P" aria-pressed="true"><strong>P2P</strong><span>Personal receiving UPI</span></button>
+<button type="button" class="mode" data-payment-mode="P2M" aria-pressed="false"><strong>P2M</strong><span>Registered merchant UPI</span></button>
+</div>
+</fieldset>
+<div class="inputs">
+<label for="tryAmount">Amount in INR<input id="tryAmount" name="amount" type="number" min="0.01" max="100000" step="0.01" inputmode="decimal" value="1.00" required autocomplete="off"></label>
+<label for="tryVpa">Receiving UPI ID<input id="tryVpa" name="vpa" type="text" maxlength="256" placeholder="youraccount@bank" required autocapitalize="none" autocomplete="off" spellcheck="false"></label>
+</div>
+<p id="modeDescription" class="mode-description">P2P uses the configured personal receiving account. The receiving handle must be authorized on DISHA.</p>
+<div id="tryError" class="try-error" role="alert" hidden></div>
+<button type="submit" class="continue">Continue to UPI <span aria-hidden="true">↗</span></button>
+</form>
+<p class="fine">The next page issues one time-limited payment request. DISHA never asks for your UPI PIN. P2M access requires an approved merchant account and bank-issued MCC.</p>
 </section>
 </main>
 </body>

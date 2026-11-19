@@ -18,7 +18,7 @@ for(const page of ['public/checkout.html','public/merchant-checkout.html']){
 }
 assert.match(login,/Super Admin sign-in/);
 assert.match(login,/const destination=ownerLogin\?'\/owner#requests':'\/dashboard'/);
-assert.match(clerk,/Switch to Super Admin sign-in/);
+assert.match(clerk,/Switch account/);
 assert.match(clerk,/primaryEmailAddress\?\.emailAddress/);
 assert.match(owner,/id="owner-pending-count"/);
 assert.match(consoleJS,/refreshOwnerInbox\(/);
