@@ -188,7 +188,7 @@ function createQuantumSignalRouter({getPool}){
    const twin=(await pg.query('SELECT payment_kind,expires_at FROM disha_quantum_twins WHERE order_id=$1',
      [req.params.orderId])).rows[0];
    const recent=(await pg.query('SELECT outcome,decision,utr_candidate,correlation FROM disha_quantum_events '+
-     'WHERE order_id=$1 ORDER BY observed_at DESC LIMIT 1',[req.params.orderId])).rows[0];
+     'WHERE order_id=$1 ORDER BY CASE WHEN event_kind='RETURN' THEN 0 ELSE 1 END, observed_at DESC LIMIT 1',[req.params.orderId])).rows[0];
    return res.set('Cache-Control','no-store').json({success:true,
     initialized:Boolean(twin),paymentType:twin?.payment_kind||null,expiresAt:twin?.expires_at||null,
     eventState:recent?.outcome||'AWAITING_VAULT_AUTHORIZATION',
