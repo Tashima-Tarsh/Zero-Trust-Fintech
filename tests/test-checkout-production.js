@@ -29,7 +29,7 @@ for(const html of [generic,merchant]){
  assert.match(html,/data-stage="initial"[^>]*hidden/);
  assert.match(html,/id="qrTapToPay"/);
  assert.match(html,/id="shareCheckout"/);
- for(const name of [...script.matchAll(/get\\('([A-Za-z][A-Za-z0-9]*)'\\)\\.addEventListener\\(/g)].map(m=>m[1]))
+ for(const name of [...script.matchAll(/get\('([A-Za-z][A-Za-z0-9]*)'\)\.addEventListener\(/g)].map(m=>m[1]))
   assert.ok(html.includes('id="'+name+'"'),'JS handler references missing checkout control: '+name);
  assert.match(html,/data-stage="methods"[^>]*hidden/);
  assert.match(html,/data-stage="qr"[^>]*aria-label="UPI QR checkout"/);
