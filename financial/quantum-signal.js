@@ -78,7 +78,7 @@ async function initializeQuantumSignal(pg){
  if(!pg)return;
  await pg.query(
   'CREATE TABLE IF NOT EXISTS disha_quantum_twins ('+
-  'order_id TEXT PRIMARY KEY, vault_session_id TEXT NOT NULL REFERENCES disha_vault_authorizations(vault_session_id),'+
+  'order_id TEXT PRIMARY KEY, vault_session_id TEXT REFERENCES disha_vault_authorizations(vault_session_id),'+
   'nonce TEXT NOT NULL, payment_kind TEXT NOT NULL,amount_paise TEXT NOT NULL,'+
   'payee_vpa TEXT NOT NULL,txn_ref TEXT NOT NULL,created_at BIGINT NOT NULL,expires_at BIGINT NOT NULL);'+
   'CREATE TABLE IF NOT EXISTS disha_quantum_events ('+
@@ -87,7 +87,13 @@ async function initializeQuantumSignal(pg){
   'source TEXT NOT NULL,return_fields JSONB NOT NULL,outcome TEXT NOT NULL,decision TEXT NOT NULL,'+
   'utr_candidate TEXT,correlation JSONB NOT NULL);'+
   'CREATE INDEX IF NOT EXISTS idx_qs_events_order ON disha_quantum_events(order_id,observed_at DESC);'+
-  'CREATE INDEX IF NOT EXISTS idx_qs_events_utr ON disha_quantum_events(utr_candidate) WHERE utr_candidate IS NOT NULL;'
+  'CREATE INDEX IF NOT EXISTS idx_qs_events_utr ON disha_quantum_events(utr_candidate) WHERE utr_candidate IS NOT NULL;'+
+  'ALTER TABLE disha_quantum_twins ALTER COLUMN vault_session_id DROP NOT NULL;'+
+  "ALTER TABLE disha_quantum_twins ADD COLUMN IF NOT EXISTS authorization_mode TEXT NOT NULL DEFAULT 'VAULT';"+
+  'CREATE TABLE IF NOT EXISTS disha_quantum_handshakes ('+
+  'order_id TEXT PRIMARY KEY REFERENCES disha_quantum_twins(order_id) ON DELETE CASCADE,'+
+  'challenge_id TEXT NOT NULL,challenge_hash TEXT NOT NULL,expires_at BIGINT NOT NULL,'+
+  'acked_at BIGINT);'
  );
 }
 function createQuantumSignalRouter({getPool}){
@@ -107,29 +113,88 @@ function createQuantumSignalRouter({getPool}){
   const c=await pg.connect();let tx=false;
   try{
    csrf(req,token);
-   if(!validHex(vaultSessionId))throw fail(403,'VAULT_SESSION_REQUIRED');
+   if(vaultSessionId!=null&&!validHex(vaultSessionId))throw fail(403,'VAULT_SESSION_INVALID');
    await c.query('BEGIN');tx=true;
    const s=await authorizedOrder(c,orderId,token),time=now();
    if(s.status!=='PENDING'||time>=Number(s.expires_at))throw fail(409,'ORDER_INACTIVE');
-   const vault=(await c.query(
-    'SELECT order_id,checkout_token_hash,expires_at FROM disha_vault_authorizations WHERE vault_session_id=$1',
-    [vaultSessionId])).rows[0];
-   if(!vault||vault.order_id!==orderId||time>=Number(vault.expires_at)||
-    !ctEqual(vault.checkout_token_hash,sha(token)))throw fail(403,'VAULT_AUTHORIZATION_INVALID');
+   let vault=null;
+   if(vaultSessionId!=null){
+    vault=(await c.query(
+     'SELECT order_id,checkout_token_hash,expires_at FROM disha_vault_authorizations WHERE vault_session_id=$1',
+     [vaultSessionId])).rows[0];
+    if(!vault||vault.order_id!==orderId||time>=Number(vault.expires_at)||
+     !ctEqual(vault.checkout_token_hash,sha(token)))throw fail(403,'VAULT_AUTHORIZATION_INVALID');
+   }
    const snap=snapshot(s);
    const existing=(await c.query('SELECT * FROM disha_quantum_twins WHERE order_id=$1 FOR UPDATE',[orderId])).rows[0];
-   if(existing&&existing.vault_session_id!==vaultSessionId)throw fail(409,'ORDER_ALREADY_BOUND_TO_VAULT');
+   if(existing&&String(existing.vault_session_id||'')!==String(vaultSessionId||''))
+    throw fail(409,'ORDER_ALREADY_BOUND_TO_DIFFERENT_AUTH');
    const nonce=existing?.nonce||crypto.randomBytes(20).toString('hex');
-   const expiresAt=Math.min(Number(s.expires_at),Number(vault.expires_at));
+   const expiresAt=vault?Math.min(Number(s.expires_at),Number(vault.expires_at)):Number(s.expires_at);
    if(!existing)await c.query('INSERT INTO disha_quantum_twins ('+
-    'order_id,vault_session_id,nonce,payment_kind,amount_paise,payee_vpa,txn_ref,created_at,expires_at) '+
-    'VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9)',[orderId,vaultSessionId,nonce,snap.kind,
-      snap.amountPaise,snap.payee,snap.txnRef,time,expiresAt]);
+    'order_id,vault_session_id,nonce,payment_kind,amount_paise,payee_vpa,txn_ref,created_at,expires_at,authorization_mode) '+
+    'VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)',[orderId,vaultSessionId||null,nonce,snap.kind,
+      snap.amountPaise,snap.payee,snap.txnRef,time,expiresAt,vault?'VAULT':'SESSION']);
    await c.query('COMMIT');tx=false;
    return res.set('Cache-Control','no-store').status(existing?200:201).json({
     success:true,orderId,nonce,paymentType:snap.kind,expiresAt,
-    authorizationDecision:'YES',deviceIntegrity:'UNKNOWN',paymentDecision:'UNKNOWN'
+    authorizationDecision:'YES',authorizationMode:existing?.authorization_mode||(vault?'VAULT':'SESSION'),
+    deviceIntegrity:'UNKNOWN',paymentDecision:'UNKNOWN'
    });
+  }catch(e){if(tx)await c.query('ROLLBACK').catch(()=>{});return error(res,e)}
+  finally{c.release()}
+ });
+
+ // One-time channel-continuity handshake. An ACK never asserts payment success.
+ r.post('/challenge',async(req,res)=>{
+  const pg=getPool();if(!pg)return error(res,fail(503,'POSTGRES_REQUIRED'));
+  const {orderId,token,nonce}=req.body||{};
+  const c=await pg.connect();let tx=false;
+  try{
+   csrf(req,token);
+   await c.query('BEGIN');tx=true;
+   const session=await authorizedOrder(c,orderId,token);
+   if(session.status!=='PENDING')throw fail(409,'ORDER_INACTIVE');
+   const twin=(await c.query('SELECT * FROM disha_quantum_twins WHERE order_id=$1 FOR UPDATE',[orderId])).rows[0];
+   if(!twin||!ctEqual(twin.nonce,nonce))throw fail(403,'QUANTUM_SESSION_NOT_AUTHORIZED');
+   const time=now(),expiresAt=Math.min(Number(twin.expires_at),time+30000);
+   if(time>=expiresAt)throw fail(410,'SIGNAL_WINDOW_CLOSED');
+   const challenge=crypto.randomBytes(24).toString('hex');
+   const challengeId='hc_'+crypto.randomBytes(16).toString('hex');
+   await c.query('INSERT INTO disha_quantum_handshakes(order_id,challenge_id,challenge_hash,expires_at,acked_at) '+
+    'VALUES($1,$2,$3,$4,NULL) ON CONFLICT(order_id) DO UPDATE SET '+
+    'challenge_id=EXCLUDED.challenge_id,challenge_hash=EXCLUDED.challenge_hash,'+
+    'expires_at=EXCLUDED.expires_at,acked_at=NULL',
+    [orderId,challengeId,sha(challenge),expiresAt]);
+   await c.query('COMMIT');tx=false;
+   return res.status(201).set('Cache-Control','no-store').json({
+    success:true,protocol:'DISHA-SIGNAL-V1',challengeId,challenge,expiresAt});
+  }catch(e){if(tx)await c.query('ROLLBACK').catch(()=>{});return error(res,e)}
+  finally{c.release()}
+ });
+ r.post('/ack',async(req,res)=>{
+  const pg=getPool();if(!pg)return error(res,fail(503,'POSTGRES_REQUIRED'));
+  const {orderId,token,nonce,challengeId,challenge}=req.body||{};
+  const c=await pg.connect();let tx=false;
+  try{
+   csrf(req,token);
+   if(!/^hc_[a-f0-9]{32}$/.test(challengeId||'')||
+      !/^[a-f0-9]{48}$/.test(challenge||''))throw fail(400,'INVALID_TRUST_ACK');
+   await c.query('BEGIN');tx=true;
+   await authorizedOrder(c,orderId,token);
+   const twin=(await c.query('SELECT nonce,expires_at FROM disha_quantum_twins WHERE order_id=$1',[orderId])).rows[0];
+   if(!twin||!ctEqual(twin.nonce,nonce))throw fail(403,'QUANTUM_SESSION_NOT_AUTHORIZED');
+   const hand=(await c.query('SELECT * FROM disha_quantum_handshakes WHERE order_id=$1 FOR UPDATE',[orderId])).rows[0];
+   if(!hand||hand.challenge_id!==challengeId||!ctEqual(hand.challenge_hash,sha(challenge)))
+    throw fail(403,'TRUST_ACK_REJECTED');
+   if(!hand.acked_at&&(now()>Number(hand.expires_at)||now()>Number(twin.expires_at)))
+    throw fail(410,'TRUST_CHALLENGE_EXPIRED');
+   if(!hand.acked_at)await c.query('UPDATE disha_quantum_handshakes SET acked_at=$2 WHERE order_id=$1',
+    [orderId,now()]);
+   await c.query('COMMIT');tx=false;
+   return res.set('Cache-Control','no-store').json({
+    success:true,acknowledged:true,protocol:'DISHA-SIGNAL-V1',
+    deviceIntegrity:'UNKNOWN',paymentDecision:'UNKNOWN'});
   }catch(e){if(tx)await c.query('ROLLBACK').catch(()=>{});return error(res,e)}
   finally{c.release()}
  });
@@ -147,6 +212,8 @@ function createQuantumSignalRouter({getPool}){
    await authorizedOrder(c,orderId,token);
    const twin=(await c.query('SELECT * FROM disha_quantum_twins WHERE order_id=$1 FOR UPDATE',[orderId])).rows[0];
    if(!twin||!ctEqual(twin.nonce,nonce))throw fail(403,'QUANTUM_SESSION_NOT_AUTHORIZED');
+   const ack=(await c.query('SELECT acked_at FROM disha_quantum_handshakes WHERE order_id=$1',[orderId])).rows[0];
+   if(!ack?.acked_at)throw fail(403,'TRUST_ACK_REQUIRED');
    const hash=sha(payload);
    const old=(await c.query('SELECT * FROM disha_quantum_events WHERE event_id=$1',[eventId])).rows[0];
    if(old){
