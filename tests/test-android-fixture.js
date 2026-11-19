@@ -41,8 +41,8 @@ assert.match(runner,/intent-logcat-live\.txt/,
    await new Promise(resolve=>setTimeout(resolve,120));
   }
   assert.ok(ready,'test fixture startup failed '+logs);
-  const order='ORD_ANDROID_CI_1001';
-  const url=origin+'/api/merchant/public/order/'+order+'?token='+('b'.repeat(48));
+  const order='PAY_ANDROID_CI_1001';
+  const url=origin+'/api/merchant/public/payment/'+order+'?token='+('b'.repeat(48));
   const noToken=await fetch(origin+'/api/merchant/public/order/'+order);
   assert.equal(noToken.status,404);
   const data=await(await fetch(url)).json();
@@ -55,6 +55,7 @@ assert.match(runner,/intent-logcat-live\.txt/,
   assert.equal(uri.searchParams.get('am'),'499.01');
   assert.equal(uri.searchParams.get('cu'),'INR');
   assert.equal(uri.searchParams.has('mc'),false,'P2P QR/URI must not include an MCC');
+  assert.equal(uri.searchParams.has('tr'),false,'Personal UPI QR must not fabricate merchant reference');
   assert.equal(data.order.status,'PENDING','opening link never settles payment');
   const html=await(await fetch(origin+'/merchant-checkout.html')).text();
   assert.match(html,/<button id="btnOneTouch"[\s\S]*?<span>Pay<\/span>/,'Checkout must show compact Pay CTA while retaining Vault handler');
@@ -114,7 +115,16 @@ assert.match(runner,/intent-logcat-live\.txt/,
   await change('COMPLETED');
   await change('EXPIRED');
   await change('FAILED');
-  console.log('ANDROID FIXTURE: exact P2P URI, missing MCC, QR asset, token, pending, completed, expired, failed PASS');
+  const changeKind=await fetch(origin+'/__test/kind?value=P2M',{
+   method:'POST',headers:{'X-CI-Fixture-Key':'CI_ANDROID_ONLY'}});
+  assert.equal(changeKind.status,200);
+  const p2m=new URL((await(await fetch(url)).json()).order.upi_uri);
+  assert.equal(p2m.searchParams.get('pa'),'qa-company@ypbiz');
+  assert.equal(p2m.searchParams.get('mc'),'5411');
+  assert.equal(p2m.searchParams.get('tr'),'PAYAABBCCDDEEFF001122334455');
+  assert.equal(p2m.searchParams.get('tn'),'Service payment');
+  assert.doesNotMatch(p2m.toString(),/Order_|ORD_/,'Payment note and reference never use legacy identifier prefixes');
+  console.log('ANDROID FIXTURE: P2P and P2M QR URI, merchant MCC, stable payment ref, token and status PASS');
  }finally{
   child.kill('SIGTERM');
   await new Promise(resolve=>{if(child.exitCode!==null)resolve();else{child.once('exit',resolve);setTimeout(resolve,1000)}});

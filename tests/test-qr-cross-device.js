@@ -13,7 +13,7 @@ function open(sharedToken){
  const document={body:{dataset:{checkout:'generic'}},visibilityState:'visible',getElementById:node,
   querySelectorAll:q=>q==='[data-stage]'?stages:[],addEventListener:(k,fn)=>events[k]=fn};
  const location={href:'https://disha.example/checkout?paymentRef='+order+'&token='+sharedToken,
-  search:'?orderId='+order+'&token='+sharedToken};
+  search:'?paymentRef='+order+'&token='+sharedToken};
  const navigator={userAgent:'Mozilla/5.0 (Linux; Android 15)',clipboard:{
   writeText:async text=>{state.shared=text}}};
  const window={DISHACosmicCheckoutModel:model,DISHAOneTouchVault:{

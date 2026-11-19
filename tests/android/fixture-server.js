@@ -2,8 +2,8 @@
 if(process.env.DISHA_ANDROID_FIXTURE_ONLY!=='1')throw Error('Android fixture is test-only');
 const http=require('node:http'),fs=require('node:fs'),path=require('node:path');
 const root=path.join(__dirname,'..','..','public'),port=8765;
-const orderId='ORD_ANDROID_CI_1001',token='b'.repeat(48),expiresAt=Date.now()+12*60*1000;
-let status='PENDING',vaultRegistered=false,vaultPrompts=0;
+const orderId='PAY_ANDROID_CI_1001',token='b'.repeat(48),expiresAt=Date.now()+12*60*1000;
+let status='PENDING',paymentKind='P2P',vaultRegistered=false,vaultPrompts=0;
 const CI_REGISTER_SESSION='a1'.repeat(16);
 const CI_AUTH_SESSION='b2'.repeat(16);
 const evidenceEvents=new Map();
@@ -12,7 +12,12 @@ const reply=(res,code,value,type='application/json')=>{
  res.end(type.includes('json')?JSON.stringify(value):value);
 };
 const uri=new URL('upi://pay');
-for(const [key,val] of Object.entries({pa:'qa-receiver@oksbi',pn:'DISHA QA Merchant',am:'499.01',cu:'INR',tn:'Automated test - no money'}))uri.searchParams.set(key,val);
+for(const [key,val] of Object.entries({pa:'qa-receiver@oksbi',pn:'DISHA QA Payee',am:'499.01',cu:'INR',tn:'UPI intent QA'}))uri.searchParams.set(key,val);
+const merchantUri=new URL('upi://pay');
+for(const [key,val] of Object.entries({
+ pa:'qa-company@ypbiz',pn:'QA Company',am:'499.01',cu:'INR',mc:'5411',
+ tr:'PAYAABBCCDDEEFF001122334455',tn:'Service payment'
+}))merchantUri.searchParams.set(key,val);
 http.createServer((req,res)=>{
  const url=new URL(req.url,'http://10.0.2.2:'+port);
  if(url.pathname==='/health')return reply(res,200,{ok:true,status,vaultRegistered,vaultPrompts,evidenceCount:evidenceEvents.size});
@@ -107,11 +112,21 @@ http.createServer((req,res)=>{
    status:status==='COMPLETED'?'SUCCESS':status,
    utr:status==='COMPLETED'?'123456789012':null,createdAt:Date.now()-45000});
  }
- if(url.pathname==='/api/merchant/public/order/'+orderId){
+ if(url.pathname==='/api/merchant/public/payment/'+orderId||
+    url.pathname==='/api/merchant/public/order/'+orderId){
   if(url.searchParams.get('token')!==token)return reply(res,404,{success:false,error:'Payment request not found'});
-  return reply(res,200,{success:true,order:{id:orderId,amount:499.01,business_name:'DISHA QA Merchant',
-   vpa_address:'qa-receiver@oksbi',description:'Automated device test',expires_at:expiresAt,
-   status,upi_uri:uri.toString()}});
+  const merchant=paymentKind==='P2M';
+  return reply(res,200,{success:true,order:{id:orderId,amount:499.01,
+   business_name:merchant?'QA Company':'DISHA QA Payee',
+   vpa_address:merchant?'qa-company@ypbiz':'qa-receiver@oksbi',
+   description:merchant?'Service payment':'UPI intent QA',payment_type:paymentKind,
+   expires_at:expiresAt,status,upi_uri:(merchant?merchantUri:uri).toString()}});
+ }
+ if(url.pathname==='/__test/kind'&&req.method==='POST'&&
+    req.headers['x-ci-fixture-key']==='CI_ANDROID_ONLY'){
+  const next=url.searchParams.get('value');
+  if(!['P2P','P2M'].includes(next))return reply(res,400,{error:'invalid kind'});
+  paymentKind=next;return reply(res,200,{ok:true,kind:paymentKind});
  }
  if(url.pathname==='/__test/state'&&req.method==='POST'&&req.headers['x-ci-fixture-key']==='CI_ANDROID_ONLY'){
   const value=url.searchParams.get('value');
