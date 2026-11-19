@@ -14,7 +14,21 @@ process.env.DB_BACKEND='sqlite';
 process.env.DATABASE_URL='';
 process.env.MERCHANT_UPI_ID='primary-fixture@oksbi';
 process.env.MERCHANT_NAME='Test-only Primary';
-process.on('exit',()=>fs.rmSync(isolated,{recursive:true,force:true}));
+function cleanupTempDir(dir) {
+  const maxRetries = 3;
+  for (let i = 0; i < maxRetries; i++) {
+    try {
+      fs.rmSync(dir, { recursive: true, force: true });
+      return;
+    } catch (e) {
+      if (i === maxRetries - 1) return; // give up on last retry
+      // Wait a bit before retry
+      require('node:fs').promises.writeFile(path.join(dir, '.cleanup-lock'), '').catch(()=>{});
+      setTimeout(() => {}, 50);
+    }
+  }
+}
+process.on('exit',()=>cleanupTempDir(isolated));
 const db = require('../db');
 const VPARouter = require('../vpa-router');
 const { VPAImporter, parseCSV } = require('../vpa-importer');

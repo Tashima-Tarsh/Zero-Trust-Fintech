@@ -4,10 +4,10 @@
 const assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path');
 const root=path.resolve(__dirname,'..');
 function listFiles(dir,base=''){
- return fs.readdirSync(dir,{withFileTypes:true}).flatMap(ent=>{
-  const rel=path.join(base,ent.name),full=path.join(dir,ent.name);
-  return ent.isDirectory()?listFiles(full,rel):[rel];
- }).sort();
+  return fs.readdirSync(dir,{withFileTypes:true}).flatMap(ent=>{
+    const rel=path.join(base,ent.name).replace(/\\/g,'/'),full=path.join(dir,ent.name);
+    return ent.isDirectory()?listFiles(full,rel):[rel];
+  }).sort();
 }
 const source=path.join(root,'public'),files=listFiles(source);
 // Obsolete checkout pages and fake QR assets are intentionally removed.

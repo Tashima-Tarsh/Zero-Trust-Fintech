@@ -617,7 +617,7 @@ async function generateSession(baseAmount = 100, description = '', customVpa = n
   const qrRefreshAt = now + (15 * 1000); // 15 seconds dynamic refresh
   const orderId = 'PAY_' + crypto.randomBytes(5).toString('hex').toUpperCase();
   const txnRef = 'PAY' + now + crypto.randomBytes(3).toString('hex').toUpperCase();
-  const challengeAmount = Number(baseAmount);
+const challengeAmount = Number(baseAmount);
   // TASK 9: Select optimal VPA to prevent bans or primary VPA
   let vpaAddress = (customVpa && String(customVpa).trim()) ? String(customVpa).trim() : null;
   let merchantType = 'P2P';
@@ -652,18 +652,25 @@ async function generateSession(baseAmount = 100, description = '', customVpa = n
       payeeName = routeObj.holderName || null;
     }
   } else {
-    // Velocity control: if custom VPA is at hourly limit, reject
-    if (!await db.checkAndIncrementVpaVelocity(vpaAddress)) {
-      throw new Error('VPA_VELOCITY_LIMIT');
-    }
+    // For custom VPA, FIRST validate merchant type, THEN check velocity
     const mt = await db.getVpaMerchantType(vpaAddress);
     merchantType = mt.accountType;
     vpaMcc = mt.mcc;
     payeeName = mt.holderName || null;
+    // This public endpoint is P2P ONLY. A receiving account classified as
+    // merchant (including the separately provisioned company VPA) must never
+    // be silently rendered as a P2P intent.
+    const classified=String(merchantType||'').toUpperCase();
+    const companyVpa=String(process.env.DISHA_COMPANY_P2M_VPA||'').trim().toLowerCase();
+    if(!['PERSONAL','P2P'].includes(classified)||
+       (companyVpa&&String(vpaAddress||'').toLowerCase()===companyVpa))
+      throw new Error('P2P_RECEIVER_ACCOUNT_TYPE_MISMATCH');
+    // Velocity control: if custom VPA is at hourly limit, reject
+    if (!await db.checkAndIncrementVpaVelocity(vpaAddress)) {
+      throw new Error('VPA_VELOCITY_LIMIT');
+    }
   }
-  // This public endpoint is P2P ONLY. A receiving account classified as
-  // merchant (including the separately provisioned company VPA) must never
-  // be silently rendered as a P2P intent.
+  // Final validation for P2P endpoint
   const classified=String(merchantType||'').toUpperCase();
   const companyVpa=String(process.env.DISHA_COMPANY_P2M_VPA||'').trim().toLowerCase();
   if(!['PERSONAL','P2P'].includes(classified)||
