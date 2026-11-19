@@ -44,6 +44,7 @@ async function flush(){for(let i=0;i<35;i++)await Promise.resolve()}
   'paymentRef='+order),'Fallback recovers the original payment');
  assert.equal(mobile.nodes.qrTapToPay.getAttribute('aria-disabled'),'false');
  assert.ok(mobile.nodes.payAmount.textContent.includes('1.00'));
+ assert.match(mobile.nodes.paymentTrackingStatus.textContent,/Awaiting confirmation/);
  assert.ok(mobile.nodes.paymentKind.textContent.includes('P2P'));
  let prevented=false;
  mobile.nodes.qrTapToPay.events.click({preventDefault(){prevented=true}});

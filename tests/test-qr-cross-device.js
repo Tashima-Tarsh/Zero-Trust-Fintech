@@ -43,6 +43,8 @@ async function flush(){for(let i=0;i<35;i++)await Promise.resolve()}
  assert.equal(phone.stages.find(x=>!x.hidden).dataset.stage,'qr');
  assert.equal(phone.state.qr,upi);
  assert.equal(phone.nodes.qrTapToPay.href,upi);
+ assert.match(phone.nodes.paymentTrackingStatus.textContent,/Awaiting confirmation/,
+  'Original browser shows that confirmation is pending when another phone scans');
  assert.ok(phone.state.links.includes('/api/session/'+order+'?token='+token));
  assert.ok(!phone.state.links.some(link=>link.includes('/api/session/new')));
  await phone.nodes.shareCheckout.events.click();

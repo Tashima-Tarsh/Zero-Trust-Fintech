@@ -207,6 +207,15 @@
    if(r.ok){
     const result=await r.json();
     if(model.isSettled(result)){createReceipt(result);return}
+    const tracker=get('paymentTrackingStatus');
+    if(tracker){
+     const state=String(result.status||'PENDING').toUpperCase();
+     tracker.textContent=state==='PENDING'
+      ?'Payment status · Awaiting confirmation'
+      :state==='EXPIRED'?'Payment status · Window expired, checking recorded credit'
+      :state==='FAILED'||state==='CANCELLED'?'Payment status · Not completed'
+      :'Payment status · Checking recorded credit';
+    }
     if(result.status==='FAILED'||result.status==='CANCELLED'){
      if(lastStage==='checking')get('checkingHelp').textContent='This payment did not complete. You can choose another payment method.';
     }
@@ -217,7 +226,9 @@
     if(lastStage==='checking')get('checkingHelp').textContent='The request window has ended. We will only show a receipt if confirmation is recorded.';
    }
   }catch(_){
-   // No false failure on a transient network interruption. Poll again.
+   // A network failure is not evidence of payment failure.
+   const tracker=get('paymentTrackingStatus');
+   if(tracker)tracker.textContent='Payment status · Connection unavailable, retrying';
   }finally{polling=false}
  }
  function tickSessionTimer(){
@@ -520,6 +531,7 @@
    setMoney(session.amount);
    setPaymentKind();
    get('checkoutPaymentIdentity').textContent='UPI intent · '+(session.payeeVpa||new URLSearchParams(session.upiUri.split('?')[1]||'').get('pa')||'');
+   get('paymentTrackingStatus').textContent='Payment status · Awaiting confirmation';
    const params=new URLSearchParams(session.upiUri.split('?')[1]||'');
    get('checkoutNote').textContent=params.get('tn')||'';
    get('qrTapToPayHint').textContent=model.supportsNativeUPI(userAgent)
