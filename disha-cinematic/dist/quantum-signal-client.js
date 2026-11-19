@@ -39,8 +39,32 @@
  function restore(s){
   const old=read(s.orderId);
   return Boolean(old?.nonce&&old?.vaultSessionId&&old?.token===s.token&&
-    old.expiresAt>Date.now()&&/^[a-f0-9]{40}$/.test(old.nonce));
+    old.acknowledged===true&&old.expiresAt>Date.now()&&/^[a-f0-9]{40}$/.test(old.nonce));
  }
+
+ async function acceptChallenge(s,response,vaultSessionId=null){
+  const nonce=response.nonce;
+  const challenge=await request('challenge',{orderId:s.orderId,token:s.token,nonce},s.token);
+  if(challenge.protocol!=='DISHA-SIGNAL-V1'||!challenge.challengeId||!challenge.challenge)
+   throw Error('Trust challenge missing');
+  const ack=await request('ack',{orderId:s.orderId,token:s.token,nonce,
+   challengeId:challenge.challengeId,challenge:challenge.challenge},s.token);
+  if(!ack.acknowledged||ack.protocol!=='DISHA-SIGNAL-V1')
+   throw Error('Trust handshake was not acknowledged');
+  const state={token:s.token,vaultSessionId,nonce,acknowledged:true,
+   expiresAt:Number(response.expiresAt),pending:false,lastApp:'generic',
+   hidden:false,lastEvidenceState:null};
+  write(s.orderId,state);
+  return response;
+ }
+ // Browser session continuity is prepared without a customer permission prompt.
+ async function prepare(s){
+  if(!s?.orderId||!s?.token)throw Error('Missing checkout session');
+  if(restore(s))return {success:true,alreadyPrepared:true};
+  const response=await request('start',{orderId:s.orderId,token:s.token},s.token);
+  return acceptChallenge(s,response);
+ }
+ // Optional separate passkey-verified path; not required for one-button checkout.
  async function authorizeAndStart(s){
   if(!s?.orderId||!s?.token)throw Error('Missing checkout session');
   const vault=auth();
@@ -49,11 +73,7 @@
   if(!proof?.sessionId)throw Error('Vault did not authorize this order');
   const response=await request('start',{orderId:s.orderId,token:s.token,
    vaultSessionId:proof.sessionId},s.token);
-  const state={token:s.token,vaultSessionId:proof.sessionId,nonce:response.nonce,
-   expiresAt:Number(response.expiresAt),pending:false,lastApp:'generic',hidden:false,
-   lastEvidenceState:null};
-  write(s.orderId,state);
-  return response;
+  return acceptChallenge(s,response,proof.sessionId);
  }
  const inFlight=new Map();
  async function deliver(s,packet){
@@ -89,8 +109,8 @@
  function handoff(s,app='generic'){
   const state=read(s.orderId);
   if(!state||!restore(s))throw Error('Authorize DISHA Vault before payment');
-  if(!state.pending){
-   // Authorize observation of one original handoff, never infer app payment.
+  if(!state.pending&&state.vaultSessionId){
+   // Separate high-assurance Vault handoff only when authorized.
    auth()?.beginHandoff?.(s.orderId,state.vaultSessionId,s.token,
     ['gpay','phonepe','paytm','cred','generic'].includes(app)?app:'generic');
   }
@@ -103,7 +123,7 @@
   const state=read(s.orderId);
   if(!state?.pending||state.hidden)return;
   state.hidden=true;write(s.orderId,state);
-  auth()?.markBackgrounded?.(s.orderId);
+  if(state.vaultSessionId)auth()?.markBackgrounded?.(s.orderId);
   void signal(s,'BACKGROUND',state.lastApp).catch(()=>{});
  }
  async function returned(s){
@@ -113,7 +133,7 @@
    // Retry the *original frozen event IDs* after network errors or reloads.
    if(!(state?.queue?.length))return null;
    const retried=await Promise.allSettled([
-    flush(s),Promise.resolve(auth()?.submitReturnEvidence?.(s.orderId))
+    flush(s),Promise.resolve(state.vaultSessionId?auth()?.submitReturnEvidence?.(s.orderId):null)
    ]);
    return retried[0].status==='fulfilled'?retried[0].value:null;
   }
@@ -121,7 +141,7 @@
   state.pending=false;state.hidden=false;write(s.orderId,state);
   const result=await Promise.allSettled([
    signal(s,'RETURN',state.lastApp,fields()),
-   Promise.resolve(auth()?.submitReturnEvidence?.(s.orderId))
+   Promise.resolve(state.vaultSessionId?auth()?.submitReturnEvidence?.(s.orderId):null)
   ]);
   await flush(s);
   return result[0].status==='fulfilled'?result[0].value:null;
@@ -136,6 +156,6 @@
   return res.json();
  }
  root.DISHAQuantumSignalClient=Object.freeze({
-  restore,authorizeAndStart,handoff,background,returned,status
+  restore,prepare,authorizeAndStart,handoff,background,returned,status
  });
 })(window);
