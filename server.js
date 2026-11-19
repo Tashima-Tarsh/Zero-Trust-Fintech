@@ -766,7 +766,10 @@ app.get('/api/session/:orderId', async (req, res) => {
   if (!token || token !== session.sessionId) {
     return res.status(401).json({ success: false, error: 'SESSION_TOKEN_REQUIRED' });
   }
-  res.json({ success: true, session });
+  let upiLink;
+  try{upiLink=generateUPILink(session)}
+  catch(_){return res.status(409).json({success:false,error:'PAYEE_URI_UNAVAILABLE'})}
+  res.set('Cache-Control','no-store').json({ success: true, session, upiLink });
 });
 
 // Order state polling endpoint for checkout page (mathematical time window: 15s-180s)
