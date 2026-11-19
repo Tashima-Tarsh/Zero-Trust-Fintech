@@ -98,7 +98,7 @@ async function testBrowserMount(file,method){
   assert.match(html,/data-mode="/,'Expose the selected auth mode');
   assert.match(html,new RegExp('data-mode="'+mode+'"'),'Page must have correct mode');
   assert.match(html,/aria-label="Merchant authentication"/);
-  assert.match(html,/forceRedirectUrl:destination/);
+  assert.match(html,/forceRedirectUrl:paymentDestination/);
   assert.match(html,/window\.Clerk\.mountSign/,'Clerk must own sign-in and signup');
  }
  // Uploaded metallic wordmark must be used, not rebuilt with generic text.
