@@ -50,7 +50,9 @@ for(const [name,component] of [['merchant-login.html','SignIn']]){
  assert.match(html,/DISHA_CLERK_CONFIG_READY/);
  assert.match(html,/window\.Clerk\.load\(/);
  assert.ok(html.includes('window.Clerk.mount'+component+'('));
- assert.match(html,/forceRedirectUrl:destination/);
+ assert.match(html,/forceRedirectUrl:paymentDestination/);
+ assert.match(html,/paymentDestination=.*!ownerLogin|paymentDestination=!ownerLogin/,
+  'Merchant P2M sign-in must retain its selected payment lane');
  assert.match(html,/routing:'hash'/);
  const inline=[...html.matchAll(/<script\b(?![^>]*\bsrc=)[^>]*>([\s\S]*?)<\/script>/gi)].map(m=>m[1]);
  assert.ok(inline.length);
