@@ -37,7 +37,9 @@ assert.equal(model.qrTapLaunchUri(original,'Mozilla/5.0 (iPhone; CPU iPhone OS 1
 assert.ok(!original.includes('token'),'Scannable QR carries no browser token');
 const click=client.slice(client.indexOf("get('qrTapToPay').addEventListener('click'"),client.indexOf("get('shareCheckout').addEventListener"));
 assert.match(click,/trace\('APP_DISPATCH'/);
-assert.match(click,/qrTapStartedAt=Date\.now\(\)/);
+assert.match(click,/qrTapStartedAt=now;/,'Native handoff must retain the same synchronous gesture');
+assert.match(click,/lastNativeLaunchAt&&now-lastNativeLaunchAt<nativeLaunchCooldownMs/,'Rapid duplicate payment app launches must be suppressed');
+assert.match(click,/event\.preventDefault\(\);\s*trace\('APP_DUPLICATE_BLOCKED'\)/,'Duplicate touches are consumed locally');
 assert.doesNotMatch(click,/\bawait\b|fetch\(|authorize\(/,
  'Native QR link must preserve synchronous user gesture');
 assert.match(client,/qrAppBackgrounded/);
