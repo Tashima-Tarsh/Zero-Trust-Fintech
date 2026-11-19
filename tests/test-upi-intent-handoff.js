@@ -10,8 +10,9 @@ function start(userAgent){
   addEventListener(k,fn){this.events[k]=fn},setAttribute(k,v){this.attrs[k]=v},getAttribute(k){return this.attrs[k]},
   removeAttribute(k){delete this.attrs[k]},replaceChildren(){},classList:{toggle(){}}});
  const state={qr:null,shared:null,ledger:'PENDING',utr:null,prompt:0};
+ const appNodes=['gpay','phonepe','paytm','bhim'].map(app=>Object.assign(node('app-'+app),{dataset:{upiApp:app}}));
  const document={body:{dataset:{checkout:'merchant'}},visibilityState:'visible',getElementById:node,
-  querySelectorAll:q=>q==='[data-stage]'?stages:[],addEventListener:(k,fn)=>events[k]=fn};
+  querySelectorAll:q=>q==='[data-stage]'?stages:q==='[data-upi-app]'?appNodes:[],addEventListener:(k,fn)=>events[k]=fn};
  const location={href:'https://checkout.example/merchant-checkout.html?orderId='+order+'&token='+token,
   search:'?orderId='+order+'&token='+token};
  const navigator={userAgent,clipboard:{writeText:async x=>{state.shared=x}}};
@@ -27,7 +28,7 @@ function start(userAgent){
  };
  vm.runInNewContext(source,{window,document,location,navigator,URL,URLSearchParams,Date,Intl,fetch,console,
   sessionStorage:{getItem:()=>null,setItem(){}},setInterval:()=>1,clearInterval(){}});
- return {nodes,state,events,stages,document};
+ return {nodes,state,events,stages,document,appNodes};
 }
 async function flush(){for(let i=0;i<35;i++)await Promise.resolve()}
 (async()=>{
@@ -35,6 +36,13 @@ async function flush(){for(let i=0;i<35;i++)await Promise.resolve()}
  await flush();
  assert.equal(mobile.stages.find(x=>!x.hidden).dataset.stage,'qr');
  assert.equal(mobile.state.qr,uri);
+ assert.equal(mobile.nodes.upiAppOptions.hidden,false,'Chrome Android provides explicit UPI app routing');
+ for(const link of mobile.appNodes){
+  assert.match(link.href,new RegExp('package='),
+   'Selected app must be explicitly targeted instead of opening the last-used Slice app');
+  assert.equal(link.getAttribute('aria-disabled'),'false');
+ }
+ assert.match(mobile.appNodes[0].href,/package=com\.google\.android\.apps\.nbu\.paisa\.user;/);
  const mobileTap=mobile.nodes.qrTapToPay.href;
  assert.match(mobileTap,/^intent:\/\/pay\?/,'Chrome uses Android Intent URI');
  assert.equal(mobile.state.qr,uri,'Scannable QR must retain raw UPI intent');
@@ -55,6 +63,8 @@ async function flush(){for(let i=0;i<35;i++)await Promise.resolve()}
  await flush();
  assert.equal(embedded.nodes.qrTapToPay.href,uri,'Native WebView needs raw upi://pay');
  assert.equal(embedded.state.qr,uri);
+ assert.equal(embedded.nodes.upiAppOptions.hidden,true,'WebView is generic, never tries Chrome package-targeted URI');
+ for(const link of embedded.appNodes)assert.equal(link.href,'#');
  mobile.document.visibilityState='hidden';
  mobile.events.visibilitychange();
  mobile.document.visibilityState='visible';
@@ -74,6 +84,8 @@ async function flush(){for(let i=0;i<35;i++)await Promise.resolve()}
  const desktop=start('Mozilla/5.0 (Windows NT 10.0)');
  await flush();
  assert.equal(desktop.state.qr,uri);
+ assert.equal(desktop.nodes.upiAppOptions.hidden,true,'Desktop retains scan-only QR');
+ for(const link of desktop.appNodes)assert.equal(link.href,'#');
  let blocked=false;
  desktop.nodes.qrTapToPay.events.click({preventDefault(){blocked=true}});
  assert.equal(blocked,true,'Desktop uses the same scan QR, not native payment intent');
