@@ -42,3 +42,15 @@ CREATE TABLE IF NOT EXISTS session_cooldowns (
 INSERT INTO disha_core_accounts (account_id,merchant_id,account_type)
 VALUES ('acc_bank_01','mer_default','ASSET'), ('acc_rev_01','mer_default','REVENUE')
 ON CONFLICT (account_id) DO NOTHING;
+
+-- UTR claims from untrusted sources (customer receipts, CFC, vault evidence)
+-- Used by reconcileCreditWithUtrClaim to prevent UTR reuse across orders
+CREATE TABLE IF NOT EXISTS disha_untrusted_utr_claims (
+    order_id TEXT NOT NULL,
+    utr TEXT NOT NULL,
+    source TEXT NOT NULL,
+    observed_at BIGINT NOT NULL,
+    PRIMARY KEY (utr, order_id)
+);
+CREATE INDEX IF NOT EXISTS idx_disha_untrusted_utr_claims_utr ON disha_untrusted_utr_claims(utr);
+CREATE INDEX IF NOT EXISTS idx_disha_untrusted_utr_claims_order ON disha_untrusted_utr_claims(order_id);

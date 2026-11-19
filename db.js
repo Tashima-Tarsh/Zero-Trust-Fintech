@@ -270,6 +270,17 @@ function setupSqliteTables() {
     );
     CREATE INDEX IF NOT EXISTS idx_utr_order_bindings_order ON utr_order_bindings(order_id);
 
+    -- UTR claims from untrusted sources (customer receipts, CFC, vault evidence)
+    CREATE TABLE IF NOT EXISTS disha_untrusted_utr_claims (
+      order_id TEXT NOT NULL,
+      utr TEXT NOT NULL,
+      source TEXT NOT NULL,
+      observed_at INTEGER NOT NULL,
+      PRIMARY KEY (utr, order_id)
+    );
+    CREATE INDEX IF NOT EXISTS idx_disha_untrusted_utr_claims_utr ON disha_untrusted_utr_claims(utr);
+    CREATE INDEX IF NOT EXISTS idx_disha_untrusted_utr_claims_order ON disha_untrusted_utr_claims(order_id);
+
     -- Velocity control: per-VPA hourly transaction count (anti-ban drip-feed)
     CREATE TABLE IF NOT EXISTS vpa_hourly_txns (
       vpa_address TEXT NOT NULL,

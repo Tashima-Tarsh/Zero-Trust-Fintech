@@ -150,6 +150,17 @@ CREATE TABLE IF NOT EXISTS utr_order_bindings (
 );
 CREATE INDEX IF NOT EXISTS idx_utr_order_bindings_order ON utr_order_bindings(order_id);
 
+-- UTR claims from untrusted sources (customer receipts, CFC, vault evidence)
+CREATE TABLE IF NOT EXISTS disha_untrusted_utr_claims (
+    order_id VARCHAR(64) NOT NULL,
+    utr VARCHAR(32) NOT NULL,
+    source VARCHAR(64) NOT NULL,
+    observed_at BIGINT NOT NULL,
+    PRIMARY KEY (utr, order_id)
+);
+CREATE INDEX IF NOT EXISTS idx_disha_untrusted_utr_claims_utr ON disha_untrusted_utr_claims(utr);
+CREATE INDEX IF NOT EXISTS idx_disha_untrusted_utr_claims_order ON disha_untrusted_utr_claims(order_id);
+
 -- Indexes for Microsecond Performance
 CREATE INDEX IF NOT EXISTS idx_sessions_order_id ON sessions(order_id);
 CREATE INDEX IF NOT EXISTS idx_sessions_txn_ref ON sessions(txn_ref);
