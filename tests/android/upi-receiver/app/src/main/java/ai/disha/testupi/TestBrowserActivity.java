@@ -122,11 +122,12 @@ public final class TestBrowserActivity extends Activity {
               "visible:r.width>0&&r.height>0&&getComputedStyle(el).display!='none'};}" +
             "var b=document.getElementById('btnOneTouch');" +
             "var app=document.getElementById('app-cred');" +
+            "var qrTap=document.getElementById('qrTapToPay');" +
             "var active=Array.from(document.querySelectorAll('[data-stage]')).find(function(e){return !e.hidden});" +
             "return JSON.stringify({amount:v('payAmount'),stage:active?active.dataset.stage:'none'," +
               "status:v('checkoutStatus'),checking:v('checkingHelp'),receiptUtr:v('receiptUtr')," +
               "disabled:b?b.disabled:true,qr:!!document.querySelector('#paymentQr img, #paymentQr canvas')," +
-              "readyState:document.readyState,touchTarget:target(b),appTarget:target(app)});" +
+              "readyState:document.readyState,qrTarget:target(qrTap),qrDisabled:!qrTap||qrTap.getAttribute('aria-disabled')==='true',touchTarget:target(b),appTarget:target(app)});" +
             "})()";
         webView.evaluateJavascript(js, data -> Log.i(TAG, "CHECKOUT_DOM "+data));
     }
