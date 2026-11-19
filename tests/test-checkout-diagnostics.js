@@ -11,7 +11,7 @@ for(const p of ['checkout.html','merchant-checkout.html']){
  const html=fs.readFileSync(path.join(__dirname,'../public',p),'utf8');
  assert.match(html,/id="checkoutDebugPanel"/,'Debug banner must be present on test checkout');
  assert.match(html,/id="checkoutDebugCopy"/,'Debug history must be copyable');
- assert.match(html,/diag-visible-20261119/,'Visible diagnostic JS must be cache-versioned');
+ assert.match(html,/\/api\/runtime-assets\/cosmic-checkout\.js\?v=[A-Za-z0-9._-]+/,'Checkout JS must be cache-versioned');
 }
 assert.match(checkoutScript,/diag\.hidden=false/,'Diagnostic panel visible only with opt-in');
 assert.match(checkoutScript,/if\(!debug\|\|!session\?\.token/,'No default customer telemetry');
