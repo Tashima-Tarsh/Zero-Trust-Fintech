@@ -10,7 +10,7 @@ const ticket={protocol:'DISHA-PROOF-TICKET-V2',orderId:id,nonce:'a'.repeat(40),
  amountPaise:'50000',payeeVpa:'receiver@oksbi',paymentType:'P2P',
  merchantCategory:'',merchantReference:'',paymentUriHash:'c'.repeat(64),
  expiresAt:Date.now()+90000};
-function launch(tampered=false,kind='P2P'){
+function launch(tampered=false,kind='P2P',checkoutMode='merchant'){
  const merchantUri='upi://pay?pa=business@ypbiz&pn=Business&am=500.00&cu=INR&mc=5411&tr=INV500';
  const selectedUri=kind==='P2M'?merchantUri:upi;
  const selectedPayee=kind==='P2M'?'business@ypbiz':'receiver@oksbi';
@@ -22,13 +22,18 @@ function launch(tampered=false,kind='P2P'){
   addEventListener(name,cb){this.events[name]=cb},
   setAttribute(k,v){this.attrs[k]=v},getAttribute(k){return this.attrs[k]},
   removeAttribute(k){delete this.attrs[k]},replaceChildren(){}});
- const body={dataset:{checkout:'merchant'}},doc={body,visibilityState:'visible',
+ const body={dataset:{checkout:checkoutMode}},doc={body,visibilityState:'visible',
   getElementById:node,querySelectorAll:q=>q==='[data-stage]'?stages:[],
   addEventListener(name,cb){events[name]=cb}};
- const location={href:'https://example.test/merchant-checkout.html?orderId='+id+'&token='+token+'&proofbridge=1',
-  search:'?orderId='+id+'&token='+token+'&proofbridge=1',pathname:'/merchant-checkout.html'};
- const data={ledger:'PENDING',utr:null,claim:null,qr:null,copied:[],auth:0,polls:0};
+ const route=checkoutMode==='generic'?'/p2p':'/merchant-checkout.html';
+ const location={href:'https://example.test'+route+'?orderId='+id+'&token='+token+'&proofbridge=1',
+  search:'?orderId='+id+'&token='+token+'&proofbridge=1',pathname:route};
+ const data={ledger:'PENDING',utr:null,claim:null,debitConfirmed:false,
+  payerTransactionId:'PAYER-TXN-20261120',qr:null,copied:[],auth:0,polls:0};
  const fetch=async(url,options)=>{
+  if(url.includes('/api/session/'))return {ok:true,json:async()=>({success:true,
+   session:{orderId:id,txnRef:'SRVTEST123',challengeAmount:500,expiresAt:Date.now()+140000,
+    merchantType:'P2P',vpaAddress:selectedPayee,status:'PENDING'},upiLink:selectedUri})};
   if(url.includes('/api/merchant/public/order/'))return {ok:true,json:async()=>({success:true,order:{
    id,upi_uri:selectedUri,amount:500,payment_type:kind,vpa_address:selectedPayee,
    expires_at:Date.now()+140000,status:'PENDING'}})};
@@ -44,9 +49,11 @@ function launch(tampered=false,kind='P2P'){
   if(url.includes('/api/proofbridge/status/')){
    data.polls++;
    return {ok:true,json:async()=>({success:true,evidenceState:data.claim?'UTR_OBSERVED_UNVERIFIED':'AWAITING_EVIDENCE',
-    paymentVerified:false,utrCandidate:data.claim,
-    payerDebitEvidence:data.claim?{utr:data.claim,issuerId:'payer-app-test',claimedPaidAt:Date.now(),
-     evidenceState:'PAYER_DEBIT_CLAIM_UNVERIFIED',debitVerified:false}:null})};
+    payerDebitVerified:data.debitConfirmed,paymentVerified:data.debitConfirmed,utrCandidate:data.claim,
+    payerDebitEvidence:data.claim?{utr:data.claim,payerTransactionId:data.payerTransactionId,
+     issuerId:'payer-app-test',claimedPaidAt:Date.now(),
+     evidenceState:data.debitConfirmed?'PAYER_DEBIT_VERIFIED':'PAYER_DEBIT_CLAIM_UNVERIFIED',
+     debitVerified:data.debitConfirmed}:null})};
   }
   if(url.includes('/api/ledger/'))return {ok:true,json:async()=>({
    success:true,status:data.ledger,utr:data.utr,challengeAmount:500})};
@@ -96,6 +103,27 @@ async function flush(){for(let i=0;i<55;i++)await Promise.resolve()}
  app.data.ledger='SUCCESS';app.data.utr='123456789012';
  app.events.focus();await flush();
  assert.equal(app.stages.find(x=>!x.hidden)?.dataset.stage,'receipt','Real ledger-confirmed state governs final receipt');
+
+ const payer=launch(false,'P2P','generic');await flush();
+ assert.equal(payer.elems.serviceIdentifier.textContent,'Service ID · SRVTEST123');
+ payer.elems.proofbridgeConsent.checked=true;
+ payer.elems.proofbridgeConsent.events.change();await flush();
+ payer.elems.proofbridgeProceed.events.click();await flush();
+ payer.data.claim='999888777666';
+ payer.events.focus();await flush();
+ assert.equal(payer.elems.payerUtrCandidate.textContent,'999888777666');
+ assert.equal(payer.elems.payerTransactionIdCandidate.textContent,'PAYER-TXN-20261120');
+ assert.equal(payer.stages.find(x=>!x.hidden)?.dataset.stage,'qr',
+  'A signed claim alone never becomes a payer receipt');
+ payer.data.debitConfirmed=true;
+ payer.events.focus();await flush();
+ assert.equal(payer.stages.find(x=>!x.hidden)?.dataset.stage,'receipt',
+  'Authenticated payer debit produces a receipt without beneficiary credit');
+ assert.equal(payer.elems.receiptUtr.textContent,'999888777666');
+ assert.equal(payer.elems.receiptPayerTxn.textContent,'PAYER-TXN-20261120');
+ assert.equal(payer.elems.receiptPaymentRef.textContent,'SRVTEST123');
+ assert.equal(payer.elems.receiptVerifiedStatus.textContent,'Debit confirmed');
+ assert.equal(payer.data.ledger,'PENDING','Receipt is not tied to beneficiary credit');
 
  const attack=launch(true);await flush();
  attack.elems.proofbridgeConsent.checked=true;attack.elems.proofbridgeConsent.events.change();await flush();
