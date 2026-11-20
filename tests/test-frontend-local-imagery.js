@@ -23,5 +23,6 @@ assert.equal((dashboard.match(/<button[^>]*class="btn primary small"[^>]*data-sw
 const app=read('public/premium-dashboard.js');
 assert.ok(!app.includes('Owner access requires the verified primary Clerk email'),'No user-facing owner email leak');
 const p2p=read('public/try-checkout.js');
-assert.ok(p2p.includes('UNAUTHORIZED_PAYEE_VPA'),'Unregistered public receiving accounts must be rejected');
+assert.doesNotMatch(p2p,/search\.set\('vpa'|params\.get\('vpa'/,'Customers cannot substitute a receiving account');
+assert.ok(read('server.js').includes('UNAUTHORIZED_PAYEE_VPA'),'Backend must reject unauthorized receiver accounts');
 console.log('LOCAL_IMAGES_AND_UI_PASS: exact local assets mirrored, single CTA and protected UX');
