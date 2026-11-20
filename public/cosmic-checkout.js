@@ -34,14 +34,10 @@
  }
  function copyDebugReport(){
   if(!debug)return;
-  const report='DISHA checkout diagnostic v2
-'+
-   'Checkout session: '+(orderId()?'active':'not-created')+'
-'+
-   'Device: '+device+'
-'+
-   debugHistory.map(x=>x.time+' '+x.event+' '+x.code+' '+x.app).join('
-');
+  const report='DISHA checkout diagnostic v2\n'+
+   'Checkout session: '+(orderId()?'active':'not-created')+'\n'+
+   'Device: '+device+'\n'+
+   debugHistory.map(x=>x.time+' '+x.event+' '+x.code+' '+x.app).join('\n');
   if(navigator.clipboard?.writeText){
    navigator.clipboard.writeText(report).then(()=>debugStatus('Trace copied')).catch(()=>debugStatus('Copy not permitted'));
   }else debugStatus('Clipboard unavailable');
@@ -397,6 +393,7 @@
    qrUri=session.upiUri;
   }
   handleQrExpiry();
+  if(query.has('nativeHostUnavailable'))message('DISHA Android host was not found. Standard UPI launch remains available; this attempt will not return native transaction evidence.','info');
  }
  function onReturn(){
   if(!session||receiptShown||document.visibilityState==='hidden')return;
@@ -650,15 +647,11 @@
   get('saveReceipt').addEventListener('click',()=>{if(receiptShown)window.print()});
   get('shareReceipt').addEventListener('click',async()=>{
    if(!receiptShown)return;
-   const content='DISHA verified payment receipt
-Amount: '+format(session.amount)+
-    '
-'+(session.serviceNumber?'Service ID: '+session.serviceNumber+'
-':'')+
+   const content='DISHA verified payment receipt\nAmount: '+format(session.amount)+
+    '\n'+(session.serviceNumber?'Service ID: '+session.serviceNumber+'\n':'')+
     'Bank UTR / reference: '+get('receiptUtr').textContent+
     (get('receiptPayerTxnRow')&&!get('receiptPayerTxnRow').hidden?
-     '
-Payer transaction ID: '+get('receiptPayerTxn').textContent:'');
+     '\nPayer transaction ID: '+get('receiptPayerTxn').textContent:'');
    try{
     if(navigator.share)await navigator.share({title:'DISHA payment receipt',text:content});
     else if(navigator.clipboard?.writeText){
