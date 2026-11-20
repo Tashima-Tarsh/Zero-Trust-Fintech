@@ -29,4 +29,4 @@ From android/ with JDK 17, Android SDK Platform 35 and Gradle 8.9:
 The APK is produced under upi-host/build/outputs/apk/debug/.
 
 ## Release gates
-The checkout handoff is not yet wired. Real-device return contracts for GPay/PhonePe/Paytm/BHIM are not yet verified. Signing/distribution and verified Android App Links are not configured. The legacy notification-listener library is a separate module and is not a dependency of this host.
+The checkout handoff is not yet wired. Real-device return contracts for GPay/PhonePe/Paytm/BHIM are not yet verified. Signing/distribution and verified Android App Links are not configured. The legacy notification-listener source is excluded from this Android Gradle build and is not packaged in the host APK.
