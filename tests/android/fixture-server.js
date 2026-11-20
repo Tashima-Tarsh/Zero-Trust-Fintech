@@ -121,8 +121,10 @@ http.createServer((req,res)=>{
       req.headers['x-csrf-token']!==token||status!=='PENDING')
      return reply(res,403,{success:false,error:'TEST_CONSENT_BLOCKED'});
    proofbridgeAuthorized=true;
-   const ticket={protocol:'DISHA-PROOF-TICKET-V1',orderId,nonce:proofNonce,
+   const ticket={protocol:'DISHA-PROOF-TICKET-V2',orderId,nonce:proofNonce,
     amountPaise:'49901',payeeVpa:paymentKind==='P2M'?'qa-company@ypbiz':'qa-receiver@oksbi',
+    paymentType:paymentKind,merchantCategory:paymentKind==='P2M'?'5411':'',
+    merchantReference:paymentKind==='P2M'?'PAYAABBCCDDEEFF001122334455':'',
     paymentUriHash:crypto.createHash('sha256').update((paymentKind==='P2M'?merchantUri:uri).toString()).digest('hex'),
     expiresAt:proofExpiry};
    const signature=crypto.createHmac('sha256','test-only-fixture-key-not-used-for-money')
