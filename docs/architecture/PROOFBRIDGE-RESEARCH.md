@@ -10,6 +10,9 @@ A payer and a seller use existing browsers; neither installs DISHA, a PWA, a plu
 ## What is implemented
 
 - Opt-in checkout mode: append \`&proofbridge=1\` to an existing DISHA P2P checkout URL (or \`?proofbridge=1\` if it is the first parameter).
+- **Two-action copy-to-pay:** ticking consent now preauthorizes the server-bound transaction; touching Proceed then copies the receiving UPI ID directly in a user-gesture event. The QR remains hidden until this succeeds. Modern HTTPS browsers use Clipboard API, while compatible legacy WebViews use the synchronous copy fallback. If the browser denies copying, the checkout stays locked.
+- Returning to the browser via focus/pageshow/visibility change immediately polls the ProofBridge evidence endpoint. Issuer-signed UTR claims remain explicitly unverified until a financial source confirms them.
+- Emulator scenario on Android 35/37 uses real screen taps and a *test-only installed UPI receiver*: no customer DISHA install, no live money transfer, no private Android app-data access, and no genuine UTR extraction.
 - QR is hidden and payment app links are disabled **in this research mode** until the user checks the one-time consent box and touches Proceed.
 - \`POST /api/proofbridge/authorize\` validates the session token and CSRF header, checks order status/expiry and the canonical server UPI URI, binds payee/amount to a random nonce, records consent in PostgreSQL, then returns a HMAC-signed **ticket** plus server URI.
 - Frontend requires the server-issued URI to equal the checkout URI byte-for-byte before it shows a QR; mismatches remain blocked.
