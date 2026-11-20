@@ -7,6 +7,7 @@
  */
 const crypto = require('node:crypto');
 const express = require('express');
+const { rupeesToPaise } = require('./money');
 
 const fail = (code, status = 422) => Object.assign(new Error(code), { code, status });
 const sha256 = value => crypto.createHash('sha256').update(value).digest('hex');
@@ -112,7 +113,7 @@ async function initializeSessionEvidenceSchema(pool) {
       decision_state TEXT NOT NULL
     );
     CREATE UNIQUE INDEX IF NOT EXISTS disha_session_evidence_txn_replay
-      ON disha_session_evidence_events(package_name, transaction_ref)
+      ON disha_session_evidence_events(transaction_ref)
       WHERE transaction_ref IS NOT NULL;
     CREATE INDEX IF NOT EXISTS disha_session_evidence_order_time
       ON disha_session_evidence_events(order_id, posted_at DESC);
@@ -144,7 +145,7 @@ function createSessionEvidenceRouter({ getPool, getSession }) {
       const session = await getSession(b.orderId);
       if (!session || !safeEqual(session.sessionId, b.token) || session.status !== 'PENDING' ||
           Date.now() >= Number(session.expiresAt)) throw fail('SESSION_INVALID_OR_EXPIRED', 409);
-      const amountPaise = String(Math.round(Number(session.challengeAmount) * 100));
+      const amountPaise = rupeesToPaise(String(session.challengeAmount));
       const payee = String(session.vpaAddress || '').toLowerCase();
       if (!/^[1-9][0-9]{0,15}$/.test(amountPaise) || !validVpa(payee)) throw fail('SESSION_BINDING_INVALID', 409);
       const now = Date.now(), expiresAt = Math.min(Number(session.expiresAt), now + 180000);
