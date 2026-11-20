@@ -8,7 +8,7 @@ A minimal native Android host with **no NotificationListenerService** and no not
 3. Launches the selected installed UPI app.
 4. Receives the UPI activity result through AndroidX Activity Result API.
 5. Extracts only fields explicitly returned: status, response code, transaction ID, approval reference, merchant transaction reference, and optional amount/payee.
-6. Signs normalized evidence and posts to the existing session-evidence endpoint.
+6. Signs the complete normalized EBIT response and posts it to /api/session-evidence/upi-result.
 7. Returns the browser to checkout.
 
 ## Browser handoff
