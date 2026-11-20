@@ -268,6 +268,16 @@ public final class UpiResultHostActivity extends ComponentActivity {
         return generator.generateKeyPair();
     }
 
+    private static String safeRef(String value) {
+        return value != null && value.matches("^[A-Za-z0-9._:/-]{6,100}$") ? value : null;
+    }
+    private static String safeCode(String value) {
+        return value != null && value.matches("^[A-Za-z0-9_-]{1,16}$") ? value : null;
+    }
+    private static String safeVpa(String value) {
+        return value != null && value.matches("(?i)^[a-z0-9._-]{2,100}@[a-z0-9._-]{2,40}$") ? value : null;
+    }
+
     private static String toPaise(String amount) {
         if (amount == null) return null;
         try {
