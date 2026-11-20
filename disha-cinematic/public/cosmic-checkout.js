@@ -355,6 +355,16 @@
    anchor.href='#';anchor.setAttribute('aria-disabled','true');
    container.replaceChildren();qrUri=null;
    get('upiAppOptions').hidden=!nativeHostEligible;
+   // Put a primary action immediately after the Service ID on Android Chrome.
+   // P2P still dispatches through the installed DISHA host; it never creates a
+   // merchant-intent URI or treats app launch as payment confirmation.
+   const proceed=get('vaultProceed');
+   if(proceed){
+    proceed.hidden=!nativeHostEligible;
+    proceed.href=nativeHostEligible?nativeHostIntentUri('gpay'):'#';
+    proceed.textContent='Proceed with Google Pay';
+    proceed.setAttribute('aria-disabled',nativeHostEligible?'false':'true');
+   }
    for(const link of document.querySelectorAll('[data-upi-app]')){
     link.href=nativeHostEligible?nativeHostIntentUri(link.dataset.upiApp):'#';
     link.setAttribute('aria-disabled',nativeHostEligible?'false':'true');
