@@ -27,6 +27,12 @@ jobs:
       - name: Run lint (syntax check)
         run: npm run lint
 
+      - name: Build frontend deployment mirrors
+        run: npm run build
+
+      - name: Verify checked-in mirrors match canonical frontend
+        run: git diff --exit-code -- dist disha-cinematic
+
       - name: Start checkout server (port 3000)
         run: npm start &
         env:
