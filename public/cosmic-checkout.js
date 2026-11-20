@@ -6,7 +6,9 @@
  const mode=document.body.dataset.checkout==='merchant'?'merchant':'generic';
  const query=new URLSearchParams(location.search);
  const quantumEnabled=query.get('qs')==='1';
- const proofbridgeEnabled=(mode==='generic'||query.get('proofbridge')==='1')&&!/Android/i.test(navigator.userAgent||'');
+ const checkoutUA=navigator.userAgent||'';
+ const nativeChromeCheckout=/Android/i.test(checkoutUA)&&/Chrome\\/\\d+/i.test(checkoutUA)&&!/[;\\s]wv[);\\s]/i.test(checkoutUA);
+ const proofbridgeEnabled=(mode==='generic'||query.get('proofbridge')==='1')&&!nativeChromeCheckout;
  const quantumClient=window.DISHAQuantumSignalClient||null;
  let quantumReady=false;
  const requiredMode=mode==='generic'?'P2P':
@@ -334,9 +336,15 @@
   const anchor=get('qrTapToPay'),container=get('paymentQr');
   // P2P ProofBridge is copy-to-pay, NOT QR-to-pay. Neither consent
   // nor Proceed may render a personal-account QR in this mode.
-  const nativeHostEligible=device==='android'&&!query.has('nativeHostUnavailable');
+  const nativeHostEligible=device==='android'&&/Chrome\\/\\d+/i.test(userAgent)&&!/[;\\s]wv[);\\s]/i.test(userAgent)&&!query.has('nativeHostUnavailable');
   const disclosure=get('nativeEvidenceDisclosure');
   if(disclosure)disclosure.hidden=!nativeHostEligible;
+  if(expired()||['EXPIRED','FAILED','CANCELLED'].includes(session.initialStatus)){
+   anchor.href='#';anchor.hidden=true;anchor.setAttribute('aria-disabled','true');
+   get('upiAppOptions').hidden=true;
+   if(disclosure)disclosure.hidden=true;
+   container.replaceChildren();qrUri=null;handleQrExpiry();return;
+  }
   const p2pCopyOnly=model.isPersonalPayment(session.upiUri)&&(proofbridgeEnabled||nativeHostEligible);
   anchor.hidden=p2pCopyOnly;
   get('qrExpiry').hidden=p2pCopyOnly;
@@ -364,11 +372,6 @@
    return;
   }
   // Payment dispatch is independent of optional Quantum evidence telemetry.
-  if(expired()||['EXPIRED','FAILED','CANCELLED'].includes(session.initialStatus)){
-   anchor.href='#';anchor.setAttribute('aria-disabled','true');
-   get('upiAppOptions').hidden=true;
-   container.replaceChildren();qrUri=null;handleQrExpiry();return;
-  }
   // Check the literal launch target BEFORE Android resolves an anchor's "#"
   // to the current absolute URL. Personal P2P remains scan/copy-only.
   const launchUri=nativeHostEligible?nativeHostIntentUri('gpay'):
