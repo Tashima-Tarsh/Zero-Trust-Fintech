@@ -20,13 +20,21 @@ const id=value=>typeof value==='string'&&/^[A-Za-z0-9_-]{6,150}$/.test(value);
 const tokenOk=value=>typeof value==='string'&&/^[a-f0-9]{24,64}$/i.test(value);
 const vpa=value=>typeof value==='string'&&/^[a-z0-9._-]{2,100}@[a-z0-9._-]{2,40}$/.test(value);
 const proofFields=['protocol','issuerId','orderId','nonce','utr','amountPaise','payeeVpa','paymentType','merchantCategory','merchantReference','outcome','paidAt','ticketHash'];
+const payerProofFields=['protocol','issuerId','orderId','nonce','utr','payerTransactionId','amountPaise','payeeVpa','paymentType','merchantCategory','merchantReference','outcome','paidAt','ticketHash'];
 
 function canonicalCapsule(input){
- if(!input||typeof input!=='object'||Array.isArray(input)||
-    Object.keys(input).length!==proofFields.length||
-    !proofFields.every(k=>Object.hasOwn(input,k)))throw fail('PROOF_FIELDS_INVALID');
- const c=Object.fromEntries(proofFields.map(k=>[k,input[k]]));
- if(c.protocol!=='DISHA-PROOF-CAPSULE-V2'||!/^[A-Za-z0-9._-]{3,64}$/.test(c.issuerId)||
+ if(!input||typeof input!=='object'||Array.isArray(input))throw fail('PROOF_FIELDS_INVALID');
+ const fields=input.protocol==='DISHA-PROOF-CAPSULE-V3'?payerProofFields:proofFields;
+ if(Object.keys(input).length!==fields.length||!fields.every(k=>Object.hasOwn(input,k)))
+   throw fail('PROOF_FIELDS_INVALID');
+ const c=Object.fromEntries(fields.map(k=>[k,input[k]]));
+ if(c.protocol!=='DISHA-PROOF-CAPSULE-V2'&&c.protocol!=='DISHA-PROOF-CAPSULE-V3')
+   throw fail('PROOF_FIELDS_INVALID');
+ if(c.protocol==='DISHA-PROOF-CAPSULE-V3'&&
+    (typeof c.payerTransactionId!=='string'||c.payerTransactionId.length>100||
+     /[\\u0000-\\u001f\\u007f]/.test(c.payerTransactionId)))
+   throw fail('PAYER_TRANSACTION_ID_INVALID');
+ if(!!/^[A-Za-z0-9._-]{3,64}$/.test(c.issuerId)||
     !id(c.orderId)||!/^[a-f0-9]{40}$/i.test(c.nonce)||
     !/^[0-9]{12}$/.test(c.utr)||
     !/^[1-9][0-9]{0,15}$/.test(c.amountPaise)||!vpa(c.payeeVpa)||
@@ -119,6 +127,7 @@ async function initProofBridgeSchema(pool){
   "ALTER TABLE disha_proofbridge_capsules ADD COLUMN IF NOT EXISTS payment_type TEXT;"+
   "ALTER TABLE disha_proofbridge_capsules ADD COLUMN IF NOT EXISTS merchant_category TEXT;"+
   "ALTER TABLE disha_proofbridge_capsules ADD COLUMN IF NOT EXISTS merchant_reference TEXT;"+
+  "ALTER TABLE disha_proofbridge_capsules ADD COLUMN IF NOT EXISTS payer_transaction_id TEXT;"+
   "CREATE INDEX IF NOT EXISTS idx_disha_pb_capsules_order ON disha_proofbridge_capsules(order_id,received_at DESC)"
  );
 }
@@ -192,10 +201,10 @@ function createProofBridgeRouter({getPool,getSession,getUpiUri}){
    if(previous&&(previous.order_id!==capsule.orderId||previous.capsule_hash!==hash))
      throw fail('UTR_REPLAY_BLOCKED',409);
    if(!previous)await c.query(
-    'INSERT INTO disha_proofbridge_capsules (capsule_hash,order_id,issuer_id,utr,amount_paise,payee_vpa,paid_at,received_at,payment_type,merchant_category,merchant_reference) '+
-    'VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)',
+    'INSERT INTO disha_proofbridge_capsules (capsule_hash,order_id,issuer_id,utr,amount_paise,payee_vpa,paid_at,received_at,payment_type,merchant_category,merchant_reference,payer_transaction_id) '+
+    'VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)',
     [hash,capsule.orderId,issuerId,capsule.utr,capsule.amountPaise,capsule.payeeVpa,capsule.paidAt,Date.now(),
-      capsule.paymentType,capsule.merchantCategory,capsule.merchantReference]);
+      capsule.paymentType,capsule.merchantCategory,capsule.merchantReference,capsule.payerTransactionId||'']);
    await c.query('COMMIT');tx=false;
    // NEVER post to sessions, transactions, utr_order_bindings or the ledger.
    return res.set('Cache-Control','no-store').json({
@@ -215,7 +224,7 @@ function createProofBridgeRouter({getPool,getSession,getUpiUri}){
    const a=(await pool.query('SELECT * FROM disha_proofbridge_sessions WHERE order_id=$1',[orderId])).rows[0];
    if(!a||!exact(a.token_hash,digest(token)))throw fail('PROOF_SESSION_MISSING',404);
    const c=(await pool.query(
-     'SELECT utr,issuer_id,paid_at,evidence_state FROM disha_proofbridge_capsules WHERE order_id=$1 ORDER BY received_at DESC LIMIT 1',
+     'SELECT utr,issuer_id,paid_at,evidence_state,payer_transaction_id FROM disha_proofbridge_capsules WHERE order_id=$1 ORDER BY received_at DESC LIMIT 1',
      [orderId])).rows[0];
    return res.set('Cache-Control','no-store').json({
     success:true,orderId,consented:true,deviceIntegrity:'UNKNOWN',
@@ -225,7 +234,8 @@ function createProofBridgeRouter({getPool,getSession,getUpiUri}){
     // Payer-side observation is separate from payee-side credit settlement.
     // A signed SUCCESS_CLAIM is not independent proof that funds were debited.
     payerDebitEvidence:c?{
-      utr:c.utr,issuerId:c.issuer_id,claimedPaidAt:Number(c.paid_at),
+      utr:c.utr,payerTransactionId:c.payer_transaction_id||null,
+      issuerId:c.issuer_id,claimedPaidAt:Number(c.paid_at),
       evidenceState:'PAYER_DEBIT_CLAIM_UNVERIFIED',debitVerified:false
     }:null});
   }catch(e){return error(res,e)}
