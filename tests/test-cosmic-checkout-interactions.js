@@ -3,13 +3,13 @@ const assert=require('node:assert/strict'),vm=require('node:vm'),fs=require('nod
 const source=fs.readFileSync(path.join(__dirname,'../public/cosmic-checkout.js'),'utf8');
 const model=require('../public/cosmic-checkout-model.js');
 const uri='upi://pay?pa=merchant@oksbi&pn=Merchant&am=500.00&cu=INR&tn=Invoice';
-function mount(status='PENDING'){
+function mount(status='PENDING',checkout='merchant'){
  const nodes={},events={},stages=['initial','methods','qr','checking','receipt'].map(stage=>({dataset:{stage},hidden:stage!=='qr'}));
  const node=k=>nodes[k]||(nodes[k]={textContent:'',href:'#',disabled:true,hidden:true,dataset:{},attrs:{},events:{},
   addEventListener(k,v){this.events[k]=v},setAttribute(k,v){this.attrs[k]=v},getAttribute(k){return this.attrs[k]},
   removeAttribute(k){delete this.attrs[k]},replaceChildren(){},classList:{toggle(){}}});
  const data={status,utr:null,qr:null,prompt:0};
- const document={body:{dataset:{checkout:'merchant'}},visibilityState:'visible',getElementById:node,
+ const document={body:{dataset:{checkout}},visibilityState:'visible',getElementById:node,
   querySelectorAll:q=>q==='[data-stage]'?stages:[],addEventListener:(k,v)=>events[k]=v};
  const location={href:'https://checkout.example/merchant-checkout.html?orderId=ORD_TEST_1234&token='+('a'.repeat(48)),
   search:'?orderId=ORD_TEST_1234&token='+('a'.repeat(48))};
@@ -20,6 +20,14 @@ function mount(status='PENDING'){
  const fetch=async url=>{
    if(url.includes('/api/merchant/public/order/'))return {ok:true,json:async()=>({success:true,order:{
     id:'ORD_TEST_1234',upi_uri:uri,amount:500,expires_at:Date.now()+180000,status}})};
+   if(url.includes('/api/session/'))return {ok:true,json:async()=>({success:true,session:{
+    orderId:'ORD_TEST_1234',challengeAmount:500,expiresAt:Date.now()+180000,status:'PENDING',
+    merchantType:'PERSONAL',vpaAddress:'merchant@oksbi',txnRef:'SERVICE_TEST'
+   },upiLink:uri})};
+   if(url.includes('/api/proofbridge/status/'))return {ok:false,status:503,json:async()=>({success:false})};
+   if(url.includes('/api/quantum-signal/status/'))return {ok:true,json:async()=>({
+    success:true,utrCandidate:'123456789012',eventState:'UTR_CANDIDATE_UNVERIFIED'
+   })};
    if(url.includes('/api/ledger/'))return {ok:true,json:async()=>({
     status:data.status,utr:data.utr,challengeAmount:500})};
    throw Error('Unexpected fetch '+url);
@@ -51,7 +59,17 @@ const active=app=>app.stages.find(s=>!s.hidden)?.dataset.stage;
  running.data.status='SUCCESS';running.data.utr='123456789012';
  running.events.focus();await flush();
  assert.equal(active(running),'receipt','Ledger credit updates original browser from any paying device');
- const expired=mount('EXPIRED');await flush();
+ const p2p=mount('PENDING','generic');await flush();
+ assert.equal(p2p.nodes.debitProofCheck.hidden,false,'P2P proof check should be visible');
+ assert.equal(active(p2p),'qr','P2P starts in original checkout');
+ assert.equal(typeof p2p.nodes.debitProofCheckButton.events.click,'function');
+ await p2p.nodes.debitProofCheckButton.events.click();await flush();
+ assert.match(p2p.nodes.debitProofCheckStatus.textContent,/unverified/i,
+   'I Paid must not certify a debit without issuer evidence');
+ assert.match(p2p.nodes.debitProofCheckUtr.textContent,/Reported UTR \\(not verified\\)/,
+   'Returned UTR candidates must remain explicitly unverified');
+ assert.equal(active(p2p),'qr','Unverified debit must not unlock receipt');
+  const expired=mount('EXPIRED');await flush();
  assert.equal(active(expired),'qr');
  assert.equal(expired.nodes.qrTapToPay.href,'#');
  assert.equal(expired.nodes.qrTapToPay.getAttribute('aria-disabled'),'true');

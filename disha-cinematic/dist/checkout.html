@@ -111,6 +111,12 @@
       
       <p id="checkoutPaymentIdentity" class="inline-note" aria-live="polite"></p>
       <p id="paymentTrackingStatus" class="inline-note" role="status" aria-live="polite">Payment status · Checking…</p>
+      <!-- Payer-side issuer proof check. Never relies on the user's I Paid declaration. -->
+      <div id="debitProofCheck" class="fusion-handoff" hidden>
+        <button id="debitProofCheckButton" type="button" class="action-secondary glass-btn">I Paid · Check Debit Proof</button>
+        <p id="debitProofCheckStatus" class="inline-note" role="status" aria-live="polite">After paying, check for signed payer-side evidence. I Paid alone cannot verify a debit.</p>
+        <p id="debitProofCheckUtr" class="inline-note" hidden></p>
+      </div>
       <p id="checkoutNote" class="inline-note"></p>
       <button id="shareCheckout" type="button" class="checkout-share-link glass-btn">Share checkout link with another phone</button>
     </section>
