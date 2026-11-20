@@ -373,7 +373,7 @@
    const r=await fetch(url,{cache:'no-store',credentials:'same-origin'});
    if(!r.ok)return;
    const d=await r.json();
-   if(d.payerDebitEvidence?.utr&&/^\\d{12}$/.test(d.payerDebitEvidence.utr)){
+   if(d.payerDebitEvidence?.utr&&/^\d{12}$/.test(d.payerDebitEvidence.utr)){
     // A signed payer-side claim carries a real-format UTR candidate but
     // cannot prove that the payer's bank actually posted a debit.
     const payer=get('payerDebitEvidence');
