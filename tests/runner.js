@@ -36,6 +36,7 @@ const UNIT_TESTS = [
   'test-service-number-contract.js',
   'test-qr-cross-device.js',
   'test-checkout-diagnostics.js', // opt-in UPI trace security and backend receipt, no financial claims // Android user gesture + desktop QR + generic fallback
+  'test-quantum-fusion-p2p-controls.js', // P2P Android app choices and Proceed cannot be CSS-hidden
   'test-cosmic-checkout-interactions.js', // Stage transitions and ledger receipt authority
   'test-expired-checkout-recovery.js', // no unpaid intent resurrection beyond three minutes
   'test-checkout-one-rupee.js', // direct checkout default and saved-session amount
