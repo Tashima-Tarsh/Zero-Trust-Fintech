@@ -339,6 +339,8 @@
   const nativeHostEligible=device==='android'&&/Chrome\/\d+/i.test(userAgent)&&!/[;\s]wv[);\s]/i.test(userAgent)&&!query.has('nativeHostUnavailable');
   const disclosure=get('nativeEvidenceDisclosure');
   if(disclosure)disclosure.hidden=!nativeHostEligible;
+  const proofbridgeGate=get('proofbridgeGate');
+  if(proofbridgeGate)proofbridgeGate.hidden=!proofbridgeEnabled;
   if(expired()||['EXPIRED','FAILED','CANCELLED'].includes(session.initialStatus)){
    anchor.href='#';anchor.hidden=true;anchor.setAttribute('aria-disabled','true');
    get('upiAppOptions').hidden=true;
