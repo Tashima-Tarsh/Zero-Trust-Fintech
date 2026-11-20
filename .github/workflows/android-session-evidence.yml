@@ -37,4 +37,4 @@ jobs:
           "$SDKMANAGER" --install "platforms;android-35" "build-tools;35.0.0"
       - name: Compile Android evidence library
         working-directory: android
-        run: gradle --no-daemon :session-evidence:assembleDebug
+        run: gradle --no-daemon :session-evidence:assembleDebug :upi-host:assembleDebug
