@@ -38,3 +38,10 @@ jobs:
       - name: Compile Android evidence library
         working-directory: android
         run: gradle --no-daemon :session-evidence:assembleDebug :upi-host:assembleDebug
+
+      - name: Upload debug host APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: disha-upi-host-debug-apk
+          path: android/upi-host/build/outputs/apk/debug/*.apk
+          if-no-files-found: error
