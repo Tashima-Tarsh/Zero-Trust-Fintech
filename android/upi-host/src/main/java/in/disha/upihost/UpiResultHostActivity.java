@@ -41,7 +41,7 @@ public final class UpiResultHostActivity extends ComponentActivity {
 
     private ActivityResultLauncher<Intent> upiLauncher;
     private TextView statusView;
-    private String apiBase, orderId, token, upiUri, upiPackage, returnUrl, nonce, deviceId;
+    private String apiBase, orderId, token, upiUri, upiPackage, returnUrl, nonce, deviceId, paymentType;
     private boolean launched;
 
     @Override protected void onCreate(Bundle state) {
@@ -110,6 +110,7 @@ public final class UpiResultHostActivity extends ComponentActivity {
                 request.put("deviceId", deviceId);
                 request.put("publicKeyPem", publicPem);
                 JSONObject response = post(apiBase + "/api/session-evidence/authorize", request, token);
+                validateServerPaymentBinding(response);
                 nonce = response.getString("nonce");
                 if (!nonce.matches("(?i)^[a-f0-9]{40}$")) throw new IllegalStateException("Invalid session nonce");
                 runOnUiThread(this::launchUpi);
@@ -252,6 +253,31 @@ public final class UpiResultHostActivity extends ComponentActivity {
             .setDigests(android.security.keystore.KeyProperties.DIGEST_SHA256)
             .setUserAuthenticationRequired(false).build());
         return generator.generateKeyPair();
+    }
+
+    private void validateServerPaymentBinding(JSONObject response) throws Exception {
+        String serverAmountPaise = response.getString("amountPaise");
+        String serverPayee = response.getString("payeeVpa");
+        paymentType = response.getString("paymentType");
+        Uri payment = Uri.parse(upiUri);
+        String intentAmountPaise = toPaise(payment.getQueryParameter("am"));
+        String intentPayee = payment.getQueryParameter("pa");
+        if (!serverAmountPaise.equals(intentAmountPaise) ||
+            intentPayee == null || !serverPayee.equalsIgnoreCase(intentPayee)) {
+            throw new SecurityException("UPI intent does not match the server checkout session");
+        }
+        String mc = payment.getQueryParameter("mc");
+        String tr = payment.getQueryParameter("tr");
+        if ("P2P".equals(paymentType)) {
+            if (mc != null || tr != null) throw new SecurityException("P2P intent contains merchant-only fields");
+        } else if ("P2M".equals(paymentType)) {
+            if (mc == null || !mc.matches("^[0-9]{4}$") || "0000".equals(mc) ||
+                tr == null || !tr.matches("^[A-Za-z0-9_-]{1,35}$")) {
+                throw new SecurityException("P2M intent is missing its merchant classification/reference");
+            }
+        } else {
+            throw new SecurityException("Unknown server payment type");
+        }
     }
 
     private static String safeRef(String value) {
