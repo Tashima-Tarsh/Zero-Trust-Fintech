@@ -152,17 +152,27 @@ function createSessionEvidenceRouter({ getPool, getSession }) {
       const c = await pool.connect(); let tx = false;
       try {
         await c.query('BEGIN'); tx = true;
-        await c.query(
-          `INSERT INTO disha_session_evidence_consents
-            (order_id,token_hash,nonce,amount_paise,payee_vpa,payment_type,consented_at,expires_at,revoked_at)
-           VALUES($1,$2,$3,$4,$5,$6,$7,$8,NULL)
-           ON CONFLICT(order_id) DO UPDATE SET token_hash=EXCLUDED.token_hash,nonce=EXCLUDED.nonce,
-             amount_paise=EXCLUDED.amount_paise,payee_vpa=EXCLUDED.payee_vpa,
-             payment_type=EXCLUDED.payment_type,consented_at=EXCLUDED.consented_at,
-             expires_at=EXCLUDED.expires_at,revoked_at=NULL`,
-          [b.orderId, sha256(b.token), nonce, amountPaise, payee,
-            String(session.merchantType || '').toUpperCase().includes('P2M') ||
-            String(session.merchantType || '').toUpperCase() === 'MERCHANT' ? 'P2M' : 'P2P', now, expiresAt]);
+        const paymentType =
+          String(session.merchantType || '').toUpperCase().includes('P2M') ||
+          String(session.merchantType || '').toUpperCase() === 'MERCHANT' ? 'P2M' : 'P2P';
+        const existing = (await c.query(
+          'SELECT * FROM disha_session_evidence_consents WHERE order_id=$1 FOR UPDATE', [b.orderId])).rows[0];
+        let activeNonce = nonce, activeExpiry = expiresAt, activeConsentTime = now;
+        if (existing) {
+          if (existing.revoked_at || Number(existing.expires_at) <= now ||
+              !safeEqual(existing.token_hash, sha256(b.token)) ||
+              existing.amount_paise !== amountPaise || existing.payee_vpa !== payee ||
+              existing.payment_type !== paymentType) throw fail('SESSION_EVIDENCE_BINDING_CONFLICT', 409);
+          activeNonce = existing.nonce;
+          activeExpiry = Number(existing.expires_at);
+          activeConsentTime = Number(existing.consented_at);
+        } else {
+          await c.query(
+            `INSERT INTO disha_session_evidence_consents
+              (order_id,token_hash,nonce,amount_paise,payee_vpa,payment_type,consented_at,expires_at,revoked_at)
+             VALUES($1,$2,$3,$4,$5,$6,$7,$8,NULL)`,
+            [b.orderId, sha256(b.token), nonce, amountPaise, payee, paymentType, now, expiresAt]);
+        }
         await c.query(
           `INSERT INTO disha_session_evidence_devices(order_id,device_id,public_key_pem,enrolled_at)
            VALUES($1,$2,$3,$4)
@@ -172,8 +182,8 @@ function createSessionEvidenceRouter({ getPool, getSession }) {
       } catch (e) { if (tx) await c.query('ROLLBACK').catch(() => {}); throw e; }
       finally { c.release(); }
       return res.status(201).set('Cache-Control','no-store').json({
-        success:true, orderId:b.orderId, nonce, deviceId:b.deviceId,
-        expiresAt, serverTime:now, allowedPackages:[...ALLOWED_PACKAGES]
+        success:true, orderId:b.orderId, nonce:activeNonce, deviceId:b.deviceId,
+        expiresAt:activeExpiry, consentedAt:activeConsentTime, serverTime:now, allowedPackages:[...ALLOWED_PACKAGES]
       });
     } catch (e) { return respondError(res, e); }
   });
@@ -193,7 +203,7 @@ function createSessionEvidenceRouter({ getPool, getSession }) {
         [b.evidence.orderId, b.evidence.deviceId])).rows[0];
       if (!device) throw fail('DEVICE_NOT_ENROLLED', 403);
       const session = await getSession(b.evidence.orderId);
-      if (!session || !safeEqual(session.sessionId, b.token) ||
+      if (!session || session.status !== 'PENDING' || !safeEqual(session.sessionId, b.token) ||
           !safeEqual(sha256(b.token || ''), consent.token_hash)) throw fail('SESSION_TOKEN_INVALID', 401);
       const publicKey = crypto.createPublicKey(device.public_key_pem);
       const eventHash = verifyDeviceEvidence(b.evidence, b.signature, publicKey);
