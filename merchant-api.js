@@ -129,14 +129,14 @@ async function selectMerchantVPA(client, merchantId, amount) {
   return selected;
 }
 const sqlOrders = "SELECT o.id,o.merchant_id,o.amount_paise,o.description,o.external_reference,"+
-  "o.vpa_address,o.created_at,o.expires_at,s.status,s.utr,s.session_id,s.state,t.created_at AS settled_at,"+
+  "o.vpa_address,o.created_at,o.expires_at,s.status,s.utr,s.txn_ref AS service_number,s.session_id,s.state,t.created_at AS settled_at,"+
   "ve.outcome AS vault_outcome,ve.utr_candidate AS vault_utr_candidate,ve.correlation AS vault_correlation "+
   "FROM saas_merchant_orders o JOIN sessions s ON s.session_id=o.session_id "+
   "LEFT JOIN LATERAL (SELECT outcome, utr_candidate, correlation FROM disha_vault_evidence WHERE order_id=o.id ORDER BY created_at DESC LIMIT 1) ve ON TRUE "+
   "LEFT JOIN LATERAL (SELECT created_at FROM transactions WHERE order_id=o.id ORDER BY created_at DESC LIMIT 1) t ON TRUE "+
   "WHERE o.merchant_id=$1 AND o.created_at >= $2 ORDER BY o.created_at DESC LIMIT $3";
 const publicOrder = o => ({
-  id:o.id, amount:Number(o.amount_paise)/100,description:o.description,
+  id:o.id,service_number:o.service_number||null,amount:Number(o.amount_paise)/100,description:o.description,
   external_reference:o.external_reference,vpa_address:o.vpa_address,
   created_at:Number(o.created_at),expires_at:Number(o.expires_at),utr:o.utr,
   status:invoiceStatus(o),settled_at:o.settled_at?Number(o.settled_at):null,

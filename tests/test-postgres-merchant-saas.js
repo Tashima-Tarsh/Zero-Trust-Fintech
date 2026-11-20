@@ -195,7 +195,7 @@ const {buildUpiUri}=require('../utils/upi-intent');
   assert.equal(upgradedPayment.status,201);
   const upgradedParams=new URL(upgradedPayment.data.order.upi_uri_dynamic).searchParams;
   assert.equal(upgradedParams.get('mc'),'5411');
-  assert.match(upgradedParams.get('tr'),/^PAY[A-F0-9]{24}$/);
+  assert.match(upgradedParams.get('tr'),/^SRV[A-F0-9]{24}$/);
   const newToken=new URL(upgradedPayment.data.order.checkout_url,base).searchParams.get('token');
   const reloadedUpgrade=await call('/api/merchant/public/payment/'+encodeURIComponent(upgradedPayment.data.order.id)+
     '?token='+encodeURIComponent(newToken));
@@ -236,7 +236,7 @@ const {buildUpiUri}=require('../utils/upi-intent');
   const p2mParams=new URL(p2m.data.order.upi_uri_dynamic).searchParams;
   assert.equal(p2mParams.get('pa'),merchantVpa);
   assert.equal(p2mParams.get('mc'),'5411');
-  assert.match(p2mParams.get('tr'),/^PAY[A-F0-9]{24}$/,'Merchant payment uses a payment reference, never a public order identifier');
+  assert.match(p2mParams.get('tr'),/^SRV[A-F0-9]{24}$/,'Merchant payment uses a payment reference, never a public order identifier');
   assert.equal(p2mParams.get('tn'),'Company receipt','Purpose is preserved without payment record metadata');
   assert.equal(p2mParams.get('pn'),'Counter Team','P2M uses the saved receiving-account holder, not unrelated business branding');
   const recorded=await pg.query('SELECT payee_name,payee_account_type,payee_mcc FROM saas_merchant_orders WHERE id=$1',
