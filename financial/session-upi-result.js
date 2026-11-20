@@ -77,7 +77,7 @@ async function initializeSessionUpiResultSchema(pool) {
       signal_status TEXT NOT NULL,
       decision_state TEXT NOT NULL
     );
-    CREATE INDEX IF NOT EXISTS disha_session_upi_results_order_time
+    ALTER TABLE disha_session_upi_results ADD COLUMN IF NOT EXISTS utr_candidate TEXT;\n    CREATE UNIQUE INDEX IF NOT EXISTS disha_session_upi_results_utr_unique\n      ON disha_session_upi_results(utr_candidate) WHERE utr_candidate IS NOT NULL;\n    CREATE INDEX IF NOT EXISTS disha_session_upi_results_order_time
       ON disha_session_upi_results(order_id, returned_at DESC);
     CREATE INDEX IF NOT EXISTS disha_session_upi_results_txn_id
       ON disha_session_upi_results(upi_txn_id) WHERE upi_txn_id IS NOT NULL;
