@@ -367,14 +367,28 @@
      typeof data.ticketSignature!=='string'||!/^[a-f0-9]{64}$/i.test(data.ticketSignature)||
      typeof data.ticketHash!=='string'||!/^[a-f0-9]{64}$/i.test(data.ticketHash)||
      typeof data.ticket?.nonce!=='string'||!/^[a-f0-9]{40}$/i.test(data.ticket.nonce)||
+     data.ticket?.protocol!=='DISHA-PROOF-TICKET-V2'||
      data.ticket?.orderId!==session.orderId||
+     !['P2P','P2M'].includes(data.ticket?.paymentType)||
+     data.ticket?.paymentType!==
+      (['MERCHANT','P2M'].includes(String(session.paymentType||'').toUpperCase())?'P2M':'P2P')||
      data.ticket?.amountPaise!==String(Math.round(session.amount*100))||
      data.ticket?.payeeVpa!==(session.payeeVpa||'').toLowerCase()||
      data.ticket?.expiresAt!==data.expiresAt)return false;
   const q=new URLSearchParams(data.upiUri.split('?')[1]||'');
-  return q.get('pa')?.toLowerCase()===data.ticket.payeeVpa &&
-   String(Math.round(Number(q.get('am'))*100))===data.ticket.amountPaise &&
-   q.get('cu')==='INR';
+  if(q.getAll('pa').length!==1||q.getAll('am').length!==1||q.getAll('cu').length!==1||
+     q.get('pa')?.toLowerCase()!==data.ticket.payeeVpa||
+     String(Math.round(Number(q.get('am'))*100))!==data.ticket.amountPaise||
+     q.get('cu')!=='INR')return false;
+  if(data.ticket.paymentType==='P2P')
+   return !q.has('mc')&&!q.has('tr')&&
+    data.ticket.merchantCategory===''&&data.ticket.merchantReference==='';
+  return q.getAll('mc').length===1&&q.getAll('tr').length===1&&
+   data.ticket.merchantCategory===q.get('mc')&&
+   data.ticket.merchantReference===q.get('tr')&&
+   /^[0-9]{4}$/.test(data.ticket.merchantCategory)&&
+   data.ticket.merchantCategory!=='0000'&&
+   /^[A-Za-z0-9]{1,35}$/.test(data.ticket.merchantReference);
  }
  function proofbridgeCopyVpa(value){
   // Invoke directly within the Proceed user gesture; never after an API fetch.
@@ -434,8 +448,14 @@
     if(!consent.checked||expired()||Date.now()>=proofbridgeAuthorized.expiresAt)return;
     proofbridgeReady=true;gate.hidden=true;renderQr();
     const note=get('proofbridgeEvidence');
-    if(note){note.hidden=false;note.textContent='UPI ID copied. Pay the exact amount in your UPI app, then return here. Awaiting genuine transaction evidence.'}
-    message('UPI ID copied. Open your existing UPI app, pay, and return for your receipt.','info');
+    const merchantMode=proofbridgeAuthorized.ticket.paymentType==='P2M';
+    const guidance=merchantMode?
+     'UPI ID copied. For an actual P2M payment, use the verified merchant QR or supported merchant app route. Manual VPA entry can be classified as P2P. Awaiting authentic evidence.':
+     'UPI ID copied. Pay the exact amount in your UPI app, then return here. Awaiting genuine transaction evidence.';
+    if(note){note.hidden=false;note.textContent=guidance}
+    message(merchantMode?
+     'Merchant payee copied. Use the verified merchant QR for P2M; manually sending to a VPA may be P2P.':
+     'UPI ID copied. Open your existing UPI app, pay, and return for your receipt.','info');
     void pollProofbridgeEvidence();
     if(!proofbridgePollTimer)proofbridgePollTimer=setInterval(()=>{void pollProofbridgeEvidence()},5000);
    }).catch(()=>{

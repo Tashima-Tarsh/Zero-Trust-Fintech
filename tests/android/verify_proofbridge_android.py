@@ -84,7 +84,34 @@ def test():
     assert observed["qr"]
     assert fixture_info()["status"]=="PENDING"
     screen("pb-05-browser-return-unverified")
-    print("ANDROID_PROOFBRIDGE_E2E_PASS: consent, copy tap, simulated UPI screen, synthetic claim, browser return, no false credit", flush=True)
+
+    print("PB07: merchant P2M consent uses a separate bank-classified payment session", flush=True)
+    set_kind("P2M")
+    command("proofbridge")
+    p2m_locked=wait_state(
+        lambda s:s.get("proofGateOpen") and s.get("proofProceedDisabled")
+            and not s.get("qr") and "P2M" in s.get("paymentKind",""),
+        "Merchant P2M QR remains locked before consent"
+    )
+    tap_native(p2m_locked["proofConsentTarget"])
+    p2m_prepared=wait_state(
+        lambda s:s.get("proofConsentChecked") and not s.get("proofProceedDisabled")
+            and "Session authorized" in s.get("proofStatus","")
+            and "P2M" in s.get("paymentKind",""),
+        "Merchant classified one-time consent succeeds"
+    )
+    tap_native(p2m_prepared["proofProceedTarget"])
+    p2m_ready=wait_state(
+        lambda s:"UPI ID copied" in s.get("proofEvidence","")
+            and s.get("qr") and not s.get("qrDisabled")
+            and s.get("qrHref","").startswith("upi://pay?")
+            and "P2M" in s.get("paymentKind",""),
+        "Merchant P2M signed authorization preserves native payment URI"
+    )
+    assert fixture_info()["status"]=="PENDING"
+    assert p2m_ready["receiptUtr"]!="123456789012"
+    screen("pb-06-merchant-p2m-copied")
+    print("ANDROID_PROOFBRIDGE_E2E_PASS: P2P + P2M consent/copy, simulated evidence, browser return and no false credit", flush=True)
 
 if __name__=="__main__":
     try:

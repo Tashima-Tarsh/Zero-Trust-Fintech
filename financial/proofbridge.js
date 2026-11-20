@@ -19,17 +19,21 @@ const exact=(a,b)=>{
 const id=value=>typeof value==='string'&&/^[A-Za-z0-9_-]{6,150}$/.test(value);
 const tokenOk=value=>typeof value==='string'&&/^[a-f0-9]{24,64}$/i.test(value);
 const vpa=value=>typeof value==='string'&&/^[a-z0-9._-]{2,100}@[a-z0-9._-]{2,40}$/.test(value);
-const proofFields=['protocol','issuerId','orderId','nonce','utr','amountPaise','payeeVpa','outcome','paidAt','ticketHash'];
+const proofFields=['protocol','issuerId','orderId','nonce','utr','amountPaise','payeeVpa','paymentType','merchantCategory','merchantReference','outcome','paidAt','ticketHash'];
 
 function canonicalCapsule(input){
  if(!input||typeof input!=='object'||Array.isArray(input)||
     Object.keys(input).length!==proofFields.length||
     !proofFields.every(k=>Object.hasOwn(input,k)))throw fail('PROOF_FIELDS_INVALID');
  const c=Object.fromEntries(proofFields.map(k=>[k,input[k]]));
- if(c.protocol!=='DISHA-PROOF-CAPSULE-V1'||!/^[A-Za-z0-9._-]{3,64}$/.test(c.issuerId)||
+ if(c.protocol!=='DISHA-PROOF-CAPSULE-V2'||!/^[A-Za-z0-9._-]{3,64}$/.test(c.issuerId)||
     !id(c.orderId)||!/^[a-f0-9]{40}$/i.test(c.nonce)||
     !/^[0-9]{12}$/.test(c.utr)||
     !/^[1-9][0-9]{0,15}$/.test(c.amountPaise)||!vpa(c.payeeVpa)||
+    !['P2P','P2M'].includes(c.paymentType)||
+    (c.paymentType==='P2P'?(c.merchantCategory!==''||c.merchantReference!==''):
+      (!/^[0-9]{4}$/.test(c.merchantCategory)||c.merchantCategory==='0000'||
+        !/^[A-Za-z0-9]{1,35}$/.test(c.merchantReference)))||
     c.outcome!=='SUCCESS_CLAIM'||!Number.isSafeInteger(c.paidAt)||
     !/^[a-f0-9]{64}$/.test(c.ticketHash))throw fail('PROOF_FIELDS_INVALID');
  return JSON.stringify(c);
@@ -38,6 +42,8 @@ function canonicalCapsule(input){
 function receiptIntegrity(c,session,time=Date.now()){
  if(c.orderId!==session.order_id||c.nonce!==session.nonce||
     c.amountPaise!==session.amount_paise||c.payeeVpa!==session.payee_vpa||
+    c.paymentType!==session.payment_type||c.merchantCategory!==session.merchant_category||
+    c.merchantReference!==session.merchant_reference||
     c.ticketHash!==session.ticket_hash)throw fail('PROOF_ORDER_MISMATCH',409);
  if(c.paidAt<Number(session.consented_at)-30000||
     c.paidAt>Number(session.expires_at)+60000||
@@ -56,9 +62,10 @@ function verifySignedCapsule(capsule,signature,publicKey){
  return digest(bytes);
 }
 function issuedTicket(order,nonce,expiry,secret){
- const ticket={protocol:'DISHA-PROOF-TICKET-V1',orderId:order.orderId,
+ const ticket={protocol:'DISHA-PROOF-TICKET-V2',orderId:order.orderId,
    nonce,amountPaise:order.amountPaise,payeeVpa:order.payeeVpa,
-   paymentUriHash:digest(order.upiUri),expiresAt:expiry};
+   paymentType:order.paymentType,merchantCategory:order.merchantCategory,
+   merchantReference:order.merchantReference,paymentUriHash:digest(order.upiUri),expiresAt:expiry};
  const serialized=JSON.stringify(ticket);
  const signature=crypto.createHmac('sha256',secret).update(serialized).digest('hex');
  return {ticket,signature,ticketHash:digest(serialized+'.'+signature)};
@@ -77,14 +84,21 @@ function inspectPayment(session,upiUri){
     rupeesToPaise(rawAmount)!==rupeesToPaise(String(session.challengeAmount))||
     ['pa','am','cu'].some(k=>q.getAll(k).length!==1))
     throw fail('PAYMENT_PAYLOAD_TAMPERED',409);
- const p2m=String(session.merchantType||'').toUpperCase();
- if(p2m==='PERSONAL'||p2m==='P2P'){
+ const classification=String(session.merchantType||'').toUpperCase();
+ let paymentType,merchantCategory='',merchantReference='';
+ if(classification==='PERSONAL'||classification==='P2P'){
+   paymentType='P2P';
    if(q.has('mc')||q.has('tr'))throw fail('PAYMENT_KIND_MISMATCH',409);
- }else if(p2m==='MERCHANT'||p2m==='P2M'){
-   if(!/^[0-9]{4}$/.test(q.get('mc')||'')||!q.get('tr'))throw fail('PAYMENT_KIND_MISMATCH',409);
+ }else if(classification==='MERCHANT'||classification==='P2M'){
+   paymentType='P2M';
+   merchantCategory=q.get('mc')||'';merchantReference=q.get('tr')||'';
+   if(q.getAll('mc').length!==1||q.getAll('tr').length!==1||
+      !/^[0-9]{4}$/.test(merchantCategory)||merchantCategory==='0000'||
+      !/^[A-Za-z0-9]{1,35}$/.test(merchantReference))
+      throw fail('PAYMENT_KIND_MISMATCH',409);
  }else throw fail('PAYMENT_KIND_MISMATCH',409);
  return {orderId:session.orderId,amountPaise:rupeesToPaise(rawAmount),
-   payeeVpa:payee,upiUri};
+   payeeVpa:payee,upiUri,paymentType,merchantCategory,merchantReference};
 }
 async function initProofBridgeSchema(pool){
  if(!pool)throw fail('POSTGRES_REQUIRED',503);
@@ -93,12 +107,18 @@ async function initProofBridgeSchema(pool){
   "order_id TEXT PRIMARY KEY,token_hash TEXT NOT NULL,nonce TEXT NOT NULL,"+
   "amount_paise TEXT NOT NULL,payee_vpa TEXT NOT NULL,upi_uri_sha256 TEXT NOT NULL,"+
   "ticket_hash TEXT NOT NULL,expires_at BIGINT NOT NULL,consented_at BIGINT NOT NULL);"+
+  "ALTER TABLE disha_proofbridge_sessions ADD COLUMN IF NOT EXISTS payment_type TEXT;"+
+  "ALTER TABLE disha_proofbridge_sessions ADD COLUMN IF NOT EXISTS merchant_category TEXT;"+
+  "ALTER TABLE disha_proofbridge_sessions ADD COLUMN IF NOT EXISTS merchant_reference TEXT;"+
   "CREATE TABLE IF NOT EXISTS disha_proofbridge_capsules ("+
   "capsule_hash TEXT PRIMARY KEY,order_id TEXT NOT NULL REFERENCES disha_proofbridge_sessions(order_id),"+
   "issuer_id TEXT NOT NULL,utr TEXT NOT NULL,amount_paise TEXT NOT NULL,payee_vpa TEXT NOT NULL,"+
   "paid_at BIGINT NOT NULL,received_at BIGINT NOT NULL,"+
   "evidence_state TEXT NOT NULL DEFAULT 'UTR_OBSERVED_UNVERIFIED',"+
   "UNIQUE(issuer_id,utr));"+
+  "ALTER TABLE disha_proofbridge_capsules ADD COLUMN IF NOT EXISTS payment_type TEXT;"+
+  "ALTER TABLE disha_proofbridge_capsules ADD COLUMN IF NOT EXISTS merchant_category TEXT;"+
+  "ALTER TABLE disha_proofbridge_capsules ADD COLUMN IF NOT EXISTS merchant_reference TEXT;"+
   "CREATE INDEX IF NOT EXISTS idx_disha_pb_capsules_order ON disha_proofbridge_capsules(order_id,received_at DESC)"
  );
 }
@@ -126,17 +146,19 @@ function createProofBridgeRouter({getPool,getSession,getUpiUri}){
    const existing=(await c.query('SELECT * FROM disha_proofbridge_sessions WHERE order_id=$1 FOR UPDATE',[b.orderId])).rows[0];
    if(existing&&(!exact(existing.token_hash,digest(b.token))||
      existing.amount_paise!==order.amountPaise||existing.payee_vpa!==order.payeeVpa||
-     existing.upi_uri_sha256!==digest(order.upiUri)))throw fail('PAYMENT_PAYLOAD_TAMPERED',409);
+     existing.upi_uri_sha256!==digest(order.upiUri)||
+     existing.payment_type!==order.paymentType||existing.merchant_category!==order.merchantCategory||
+     existing.merchant_reference!==order.merchantReference))throw fail('PAYMENT_PAYLOAD_TAMPERED',409);
    const nonce=existing?.nonce||crypto.randomBytes(20).toString('hex');
    const expiry=existing?Number(existing.expires_at):expiresAt;
    if(expiry<=now)throw fail('SESSION_EXPIRED',410);
    const issued=issuedTicket(order,nonce,expiry,secret());
    if(existing&&existing.ticket_hash!==issued.ticketHash)throw fail('PROOF_TICKET_CONFLICT',409);
    if(!existing)await c.query(
-    'INSERT INTO disha_proofbridge_sessions(order_id,token_hash,nonce,amount_paise,payee_vpa,upi_uri_sha256,ticket_hash,expires_at,consented_at) '+
-    'VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9)',
+    'INSERT INTO disha_proofbridge_sessions(order_id,token_hash,nonce,amount_paise,payee_vpa,upi_uri_sha256,ticket_hash,expires_at,consented_at,payment_type,merchant_category,merchant_reference) '+
+    'VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)',
     [b.orderId,digest(b.token),nonce,order.amountPaise,order.payeeVpa,
-      digest(order.upiUri),issued.ticketHash,expiry,now]);
+      digest(order.upiUri),issued.ticketHash,expiry,now,order.paymentType,order.merchantCategory,order.merchantReference]);
    await c.query('COMMIT');tx=false;
    return res.status(200).set('Cache-Control','no-store').json({
     success:true,orderId:b.orderId,upiUri:order.upiUri,
@@ -170,9 +192,10 @@ function createProofBridgeRouter({getPool,getSession,getUpiUri}){
    if(previous&&(previous.order_id!==capsule.orderId||previous.capsule_hash!==hash))
      throw fail('UTR_REPLAY_BLOCKED',409);
    if(!previous)await c.query(
-    'INSERT INTO disha_proofbridge_capsules (capsule_hash,order_id,issuer_id,utr,amount_paise,payee_vpa,paid_at,received_at) '+
-    'VALUES($1,$2,$3,$4,$5,$6,$7,$8)',
-    [hash,capsule.orderId,issuerId,capsule.utr,capsule.amountPaise,capsule.payeeVpa,capsule.paidAt,Date.now()]);
+    'INSERT INTO disha_proofbridge_capsules (capsule_hash,order_id,issuer_id,utr,amount_paise,payee_vpa,paid_at,received_at,payment_type,merchant_category,merchant_reference) '+
+    'VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)',
+    [hash,capsule.orderId,issuerId,capsule.utr,capsule.amountPaise,capsule.payeeVpa,capsule.paidAt,Date.now(),
+      capsule.paymentType,capsule.merchantCategory,capsule.merchantReference]);
    await c.query('COMMIT');tx=false;
    // NEVER post to sessions, transactions, utr_order_bindings or the ledger.
    return res.set('Cache-Control','no-store').json({
@@ -196,6 +219,7 @@ function createProofBridgeRouter({getPool,getSession,getUpiUri}){
      [orderId])).rows[0];
    return res.set('Cache-Control','no-store').json({
     success:true,orderId,consented:true,deviceIntegrity:'UNKNOWN',
+    paymentType:a.payment_type||'UNKNOWN',
     evidenceState:c?.evidence_state||'AWAITING_EVIDENCE',paymentVerified:false,
     utrCandidate:c?.utr||null,issuerId:c?.issuer_id||null,claimedPaidAt:c?.paid_at||null});
   }catch(e){return error(res,e)}
