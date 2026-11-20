@@ -4,42 +4,33 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="robots" content="noindex,follow">
-<meta name="referrer" content="strict-origin-when-cross-origin">
+<meta name="referrer" content="no-referrer">
 <meta name="theme-color" content="#08101f">
-<title>Try DISHA Checkout — P2P / P2M</title>
-<meta name="description" content="Prepare an exact-amount DISHA payment request with your configured receiving UPI ID.">
+<title>Quantum Fusion | DISHA 8.2</title>
+<meta name="description" content="Choose a direct payment lane without entering payment details.">
 <link rel="icon" href="/assets/disha-8-2-wordmark-cropped.png">
-<link rel="stylesheet" href="/try-checkout.css?v=ponytail-1">
-<script defer src="/try-checkout.js?v=proofbridge-selector-20261120"></script>
+<link rel="stylesheet" href="/try-checkout.css?v=quantum-fusion-20261120">
+<script defer src="/try-checkout.js?v=quantum-fusion-20261120"></script>
 <script src="/frontend-monitor.js?v=owner-monitor-1" defer></script>
 </head>
 <body>
 <main class="try-shell">
 <header class="try-header">
-<a href="/" aria-label="DISHA 8.2 home"><img src="/assets/disha-8-2-wordmark-cropped.png" alt="DISHA 8.2" width="188" height="52"></a>
+<a href="/" aria-label="DISHA home"><img src="/assets/disha-8-2-wordmark-cropped.png" alt="DISHA 8.2" width="188" height="52"></a>
 <a href="/" class="back-link">Back to DISHA</a>
 </header>
 <section class="choose" aria-labelledby="try-title">
-<p class="eyebrow">DISHA / DIRECT UPI CHECKOUT</p>
-<h1 id="try-title">Prepare your payment.</h1>
-<p class="intro">Select P2P or P2M and enter the amount. P2P continues to Consent → Proceed → Copy UPI ID; P2M uses its registered merchant checkout.</p>
-<form id="tryCheckoutForm" novalidate>
-<fieldset class="mode-field">
-<legend>Payment type</legend>
-<div class="mode-options" role="group" aria-label="Receiving account type">
-<button type="button" class="mode active" data-payment-mode="P2P" aria-pressed="true"><strong>P2P</strong><span>Personal receiving UPI</span></button>
-<button type="button" class="mode" data-payment-mode="P2M" aria-pressed="false"><strong>P2M</strong><span>Registered merchant UPI</span></button>
+<p class="eyebrow">DISHA 8.2 / DIRECT PAYMENT</p>
+<h1 id="try-title">Quantum Fusion</h1>
+<p class="intro">Choose a payment route. No account or amount entry is needed on this screen.</p>
+<div class="mode-options" role="group" aria-label="Choose payment route">
+<button type="button" class="mode" data-payment-mode="P2P"><strong>P2P</strong><span>Personal receiving account</span></button>
+<button type="button" class="mode" data-payment-mode="P2M"><strong>P2M</strong><span>Registered merchant account</span></button>
 </div>
-</fieldset>
-<div class="inputs">
-<label for="tryAmount">Amount in INR<input id="tryAmount" name="amount" type="number" min="0.01" max="100000" step="0.01" inputmode="decimal" value="1.00" required autocomplete="off"></label>
-<label for="tryVpa"><span id="tryVpaLabel">Receiving UPI ID (optional for P2P)</span><input id="tryVpa" name="vpa" type="text" maxlength="256" placeholder="Configured personal UPI ID (automatic)" autocapitalize="none" autocomplete="off" spellcheck="false"></label>
-</div>
-<p id="modeDescription" class="mode-description">P2P uses the configured personal receiving account. The receiving handle must be authorized on DISHA.</p>
-<div id="tryError" class="try-error" role="alert" hidden></div>
-<button type="submit" class="continue">Continue to P2P consent ↗</button>
-</form>
-<p class="fine">P2P will copy only the backend-authorized receiving UPI ID after consent, without a QR or DISHA app installation. Open your existing UPI app to pay. P2M requires an approved merchant account and its bank-issued MCC. A genuine receipt appears only after verified payment evidence is available.</p>
+<p id="modeDescription" class="mode-description">One touch creates a time-limited ₹1 test order using the authorized receiving account.</p>
+<p id="tryStatus" class="mode-description" role="status" aria-live="polite"></p>
+<p id="tryError" class="try-error" role="alert" hidden></p>
+<p class="fine">For P2P, DISHA issues a consent-bound payment request. For P2M, the authorized merchant workspace issues the amount and payment details. A verified receipt is shown only after matching transaction evidence arrives.</p>
 </section>
 </main>
 </body>

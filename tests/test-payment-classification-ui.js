@@ -4,7 +4,8 @@ const root=path.join(__dirname,'..'),read=x=>fs.readFileSync(path.join(root,x),'
 const merchant=read('merchant-api.js'),server=read('server.js'),client=read('public/cosmic-checkout.js'),owner=read('platform-control.js'),ownerUI=read('public/platform-console.js');
 for(const f of ['public/checkout.html','public/merchant-checkout.html']){
  const s=read(f);
- assert.ok(s.includes('id="checkoutTimer"')&&s.includes('id="paymentKind"'),'Checkout must show expiry and P2P/P2M payee');
+ assert.ok(s.includes('id="checkoutTimer"')&&s.includes('id="paymentKind"'),'Checkout must keep expiry and classification hooks');
+ assert.match(read('public/quantum-fusion.css'),/checkout-payment-kind/,'Account classification is preserved internally but hidden from customer UI');
  assert.match(s,/\/cosmic-checkout\.js\?v=[A-Za-z0-9._-]+/,'Checkout JS must be cache-versioned');
  assert.match(s,/\/cosmic-checkout-model\.js\?v=[A-Za-z0-9._-]+/,'Checkout model must be cache-versioned');
 }

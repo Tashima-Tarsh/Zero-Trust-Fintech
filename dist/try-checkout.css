@@ -1,4 +1,4 @@
-/* Single-source compact Try Checkout form. No extra cards or JS UI frameworks. */
+/* One touch chooses an authorized payment route. No payer-input form. */
 :root{color-scheme:dark;font-family:Inter,system-ui,-apple-system,Segoe UI,sans-serif;background:#080b15;color:#f5f5ff}
 *{box-sizing:border-box}html{min-height:100%;background:#080b15}body{margin:0;min-height:100svh;background:radial-gradient(ellipse at 84% 4%,#5b36734f,transparent 44%),linear-gradient(140deg,#080b15,#0e1529)}
 .try-shell{width:min(100%,790px);padding:clamp(15px,3vw,32px);margin:0 auto;min-height:100svh}
@@ -8,18 +8,14 @@
 .eyebrow{font-size:11px;font-weight:800;letter-spacing:.17em;color:#b6bbff;margin:0 0 15px}
 h1{font-size:clamp(30px,5.5vw,46px);letter-spacing:-.06em;line-height:1.14;margin:0 0 12px}
 .intro{font-size:14px;color:#c3cde7;line-height:1.6;margin:0 0 27px}
-.mode-field{margin:0 0 20px;padding:0;border:0}.mode-field legend{font-size:12px;font-weight:800;color:#dbe4ff;margin:0 0 10px}
 .mode-options{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
 .mode{display:flex;flex-direction:column;align-items:flex-start;gap:4px;padding:14px 16px;min-height:72px;text-align:left;border-radius:13px;border:1px solid #8396bd74;background:#101e35ba;color:#ecf3ff;cursor:pointer}
-.mode strong{font-size:21px;line-height:1.1}.mode span{font-size:12px;color:#aabbd5}.mode[aria-pressed="true"]{border-color:#d3a2f8;background:linear-gradient(115deg,#493c81,#223e69);box-shadow:inset 0 1px #fff4}
-.inputs{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.5fr);gap:14px}
-.inputs label{display:flex;flex-direction:column;gap:9px;font-size:12px;font-weight:800;color:#e0e9ff}
-.inputs input{width:100%;height:52px;border:1px solid #8397bb80;border-radius:10px;background:#080f20d6;color:#fff;padding:0 14px;font-size:16px;font-weight:500}
-.inputs input::placeholder{color:#7d90ae}.inputs input:focus{outline:3px solid #9baffb66;outline-offset:1px}
-.mode-description{min-height:37px;margin:14px 0 5px;color:#bbc9e5;font-size:12px;line-height:1.55}
+.mode:hover,.mode:focus-visible{background:linear-gradient(115deg,#493c81,#223e69);border-color:#d3a2f8}
+.mode:active{transform:scale(.99)}
+.mode:disabled{opacity:.65;cursor:wait}
+.mode strong{font-size:21px;line-height:1.1}.mode span{font-size:12px;color:#aabbd5}.mode-description{min-height:37px;margin:14px 0 5px;color:#bbc9e5;font-size:12px;line-height:1.55}
 .try-error{border:1px solid #f6a7a7a1;border-radius:10px;background:#4d1f32bf;padding:12px;margin:13px 0;color:#fff;font-size:13px;line-height:1.5}
-.continue{width:100%;border:0;border-radius:12px;min-height:53px;background:linear-gradient(105deg,#ae80ff,#5879ee);color:#fff;font-size:15px;font-weight:800;display:flex;align-items:center;justify-content:center;gap:12px;cursor:pointer}
-.continue:disabled{opacity:.6;cursor:progress}.continue:focus-visible,.mode:focus-visible,.back-link:focus-visible{outline:3px solid #d3b0ff;outline-offset:3px}
+.mode:focus-visible,.mode:focus-visible,.back-link:focus-visible{outline:3px solid #d3b0ff;outline-offset:3px}
 .fine{font-size:11px;line-height:1.6;color:#a7b6d4;margin:20px 2px 0}
-@media(max-width:540px){.try-header{margin-bottom:24px}.choose{padding:20px 16px}.inputs{grid-template-columns:1fr;gap:12px}.mode{padding:12px 9px}.mode strong{font-size:20px}.mode span{font-size:10px}.mode-description{min-height:0}.intro{margin-bottom:20px}}
+@media(max-width:540px){.try-header{margin-bottom:24px}.choose{padding:20px 16px}.mode{padding:12px 9px}.mode strong{font-size:20px}.mode span{font-size:10px}.mode-description{min-height:0}.intro{margin-bottom:20px}}
 @media(prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}

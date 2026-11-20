@@ -47,6 +47,24 @@ assert.throws(()=>verifySignedCapsule({...capsule,payeeVpa:'attacker@oksbi'},sig
 assert.throws(()=>verifySignedCapsule(capsule,signed,crypto.generateKeyPairSync('ed25519').publicKey),/PROOF_SIGNATURE_INVALID/);
 assert.throws(()=>canonicalCapsule({...capsule,extra:'ignored'}),/PROOF_FIELDS_INVALID/);
 assert.throws(()=>canonicalCapsule({...capsule,utr:'TEST123'}),/PROOF_FIELDS_INVALID/);
+const confirmedDebit={...capsule,protocol:'DISHA-PROOF-CAPSULE-V4',
+ payerTransactionId:'PAYERAPP-REAL-TX-012345',outcome:'DEBIT_CONFIRMED'};
+const debitSignature=crypto.sign(null,Buffer.from(canonicalCapsule(confirmedDebit)),kp.privateKey).toString('base64url');
+assert.equal(verifySignedCapsule(confirmedDebit,debitSignature,kp.publicKey).length,64,
+ 'Payer debit proof must carry a valid issuer signature');
+assert.throws(()=>verifySignedCapsule({...confirmedDebit,utr:'123456789013'},debitSignature,kp.publicKey),
+ /PROOF_SIGNATURE_INVALID/,'UTR must be cryptographically bound');
+assert.throws(()=>verifySignedCapsule({...confirmedDebit,payerTransactionId:'PAYERAPP-CHANGED'},debitSignature,kp.publicKey),
+ /PROOF_SIGNATURE_INVALID/,'Actual payer transaction ID must be cryptographically bound');
+assert.throws(()=>canonicalCapsule({...confirmedDebit,outcome:'SUCCESS_CLAIM'}),/PROOF_OUTCOME_INVALID/,
+ 'A claim cannot be upgraded into confirmed debit by changing status');
+assert.throws(()=>canonicalCapsule({...confirmedDebit,protocol:'DISHA-PROOF-CAPSULE-V3'}),/PROOF_OUTCOME_INVALID/);
+assert.throws(()=>canonicalCapsule({...confirmedDebit,payerTransactionId:'\u0000danger'}),/PAYER_TRANSACTION_ID_INVALID/);
+assert.throws(()=>canonicalCapsule({...confirmedDebit,payerTransactionId:''}),/PAYER_TRANSACTION_ID_INVALID/);
+assert.throws(()=>verifySignedCapsule({...confirmedDebit,orderId:'ORD_DIFFERENT'},debitSignature,kp.publicKey),/PROOF_SIGNATURE_INVALID/);
+const debitClaim={...confirmedDebit,protocol:'DISHA-PROOF-CAPSULE-V3',outcome:'SUCCESS_CLAIM'};
+assert.doesNotThrow(()=>canonicalCapsule(debitClaim),'V3 issuer-signed observation still supported but not confirmed');
+
 
 const bound={
  order_id:session.orderId,nonce,amount_paise:'50000',payee_vpa:'receiver@oksbi',
@@ -88,7 +106,8 @@ assert.throws(()=>receiptIntegrity({...capsule,paidAt:now+160000},bound),/PROOF_
 // The experimental issuer signed a CLAIM, not a real bank credit.
 const source=fs.readFileSync(path.join(__dirname,'../financial/proofbridge.js'),'utf8');
 assert.doesNotMatch(source,/UPDATE sessions SET status='SUCCESS'|INSERT INTO transactions|INSERT INTO ledger_entries|INSERT INTO utr_order_bindings/);
-assert.match(source,/paymentVerified:false/);
+assert.match(source,/paymentVerified:c\?\.evidence_state==='PAYER_DEBIT_VERIFIED'/,'Only the issuer-confirmed payer debit may become verified');
+assert.match(source,/payerDebitVerified:confirmedDebit/,'Confirmed debit is distinct from unverified claim');
 assert.match(source,/UTR_OBSERVED_UNVERIFIED/);
 const html=fs.readFileSync(path.join(__dirname,'../public/checkout.html'),'utf8');
 const checkout=fs.readFileSync(path.join(__dirname,'../public/cosmic-checkout.js'),'utf8');

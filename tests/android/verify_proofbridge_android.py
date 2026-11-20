@@ -51,7 +51,7 @@ def test():
     print("PB03: real Android Proceed touch attempts clipboard copy", flush=True)
     tap_native(prepared["proofProceedTarget"])
     copied=wait_state(
-        lambda s: "UPI ID copied" in s.get("proofEvidence","")
+        lambda s: "Receiving address copied" in s.get("proofEvidence","")
             and not s.get("qr") and s.get("qrHidden") and s.get("qrDisabled")
             and s.get("qrHref")=="#",
         "Proceed copies receiving P2P VPA with no QR or native intent"

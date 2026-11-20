@@ -10,22 +10,24 @@ const get=async(path)=>{
 };
 const test=async()=>{
  const page=await get('/choose-payment?mode=P2P');
- assert.match(page,/id="tryCheckoutForm"/);
- assert.match(page,/id="tryVpaLabel"/);
- assert.match(page,/Continue to P2P consent/);
- assert.match(page,/\/try-checkout\.js\?v=proofbridge-selector-20261120/);
- const js=await get('/try-checkout.js?v=proofbridge-selector-20261120');
+ assert.match(page,/Quantum Fusion/);
+ assert.match(page,/data-payment-mode="P2P"/);
+ assert.match(page,/data-payment-mode="P2M"/);
+ assert.doesNotMatch(page,/<form\b|<input\b|id="tryAmount"|id="tryVpa"/i);
+ assert.match(page,/\/try-checkout\.js\?v=quantum-fusion-20261120/);
+ const js=await get('/try-checkout.js?v=quantum-fusion-20261120');
  assert.match(js,/checkout\.searchParams\.set\('proofbridge','1'\)/);
- assert.match(js,/if\(payee\)search\.set\('vpa',payee\)/);
- assert.match(js,/vpa\.required=merchant/);
- assert.match(js,/if\(params\.get\('qs'\)==='1'\)checkout\.searchParams\.set\('qs','1'\)/,
-  'QS remains opt-in for the P2P checkout');
+ assert.match(js,/location\.assign\('\/login\?mode=P2M'\)/);
+ assert.match(js,/if\(mode==='P2M'\)/);
  const checkout=await get('/p2p?proofbridge=1&amount=1');
  assert.match(checkout,/id="proofbridgeConsent"/);
  assert.match(checkout,/id="proofbridgeProceed"/);
+ assert.match(checkout,/Quantum Fusion/);
+ assert.match(checkout,/id="payerDebitEvidence"/);
+ assert.match(checkout,/id="receiptUtr"/);
  const merchant=await get('/p2m');
  assert.match(merchant,/MERCHANT LANE/);
- console.log('LIVE_PAYMENT_CHOOSER_PROOFBRIDGE_PASS: chooser -> P2P consent/proceed; P2M separate; no money moved');
+ console.log('LIVE_QUANTUM_FUSION_CHOOSER_PASS: no payer fields, P2P consent/Proceed, P2M separate; no money moved');
 };
 (async()=>{
  let last;

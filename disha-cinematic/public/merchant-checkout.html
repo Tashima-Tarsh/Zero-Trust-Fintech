@@ -6,24 +6,25 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no">
 <meta name="color-scheme" content="dark">
 <meta name="theme-color" content="#0a0604">
-<title>DISHA 8.2 — Checkout</title>
+<title>DISHA 8.2 — Quantum Fusion</title>
 <meta name="description" content="Complete a UPI payment with DISHA 8.2.">
 <meta name="referrer" content="no-referrer">
 
 <link rel="preload" href="/assets/disha-8-2-wordmark-cropped.png" as="image">
 <link rel="stylesheet" href="/api/runtime-assets/cosmic-checkout.css?v=qr-first-20261119">
 <link rel="stylesheet" href="/api/runtime-assets/checkout-moonlight.css?v=moonlight1">
+<link rel="stylesheet" href="/quantum-fusion.css?v=20261120">
 <link rel="stylesheet" href="/api/runtime-assets/disha-vault-3d.css?v=vault1">
 <script defer src="/vendor/qrcode.min.js"></script>
 <script defer src="/vendor/simplewebauthn.umd.js"></script>
 <script defer src="/api/runtime-assets/one-touch-vault.js?v=quantum20261119"></script>
 <script defer src="/api/runtime-assets/quantum-signal-client.js?v=quantum20261119"></script>
 <script defer src="/api/runtime-assets/cosmic-checkout-model.js?v=intent-retry-20261119"></script>
-<script defer src="/api/runtime-assets/cosmic-checkout.js?v=upi-direct-20261119"></script>
+<script defer src="/api/runtime-assets/cosmic-checkout.js?v=quantum-fusion-20261120"></script>
 <script defer src="/api/runtime-assets/disha-vault-3d.js?v=vault1"></script>
 <script src="/api/runtime-assets/frontend-monitor.js?v=owner-monitor-1" defer></script>
 </head>
-<body data-qr-primary="true" data-checkout="merchant">
+<body data-qr-primary="true" data-checkout="merchant" data-quantum-fusion="true">
 
 <!-- Mars 3D Background -->
 <canvas id="mars-bg-canvas" class="mars-bg" aria-hidden="true"></canvas>
@@ -38,20 +39,32 @@
     
     <p id="checkoutTimer" class="checkout-timer" role="timer" aria-live="off">Preparing secure session…</p>
     
-    <section data-stage="qr" class="stage stage-qr" aria-label="UPI QR checkout">
-      <p class="eyebrow">ONE QR · TWO WAYS TO PAY</p>
-      <h1>Scan or tap to pay.</h1>
+    <section data-stage="qr" class="stage stage-qr" aria-label="Quantum Fusion payment">
+      <p class="eyebrow">DISHA 8.2 · SECURE PAYMENT</p>
+      <h1>Quantum Fusion</h1>
       <div id="payAmount" class="amount" aria-label="Exact payment amount">—</div>
+      <p id="serviceIdentifier" class="fusion-service" aria-live="polite">Service ID · Preparing…</p>
+      <div id="payerDebitEvidence" class="fusion-evidence" hidden aria-live="polite">
+        <strong>Payer-side transaction reference observed</strong>
+        <p><span>Reported UTR</span> <strong id="payerUtrCandidate">—</strong></p>
+        <p id="payerTransactionIdRow" hidden><span>Reported payer transaction ID</span> <strong id="payerTransactionIdCandidate">—</strong></p>
+        <span id="payerDebitEvidenceStatus">Issuer-signed claim recorded; payer debit is not independently confirmed.</span>
+      </div>
+      <div id="copyHandoff" class="fusion-handoff" hidden aria-live="polite">
+        <strong>Payment details copied</strong>
+        <p id="copiedPayee" class="fusion-payee"></p>
+        <span id="copyHandoffStatus">Open your payment app, paste the receiving address and confirm the amount. Return here to check your receipt.</span>
+      </div>
       <p id="paymentKind" class="checkout-payment-kind" aria-live="polite">Checking receiving account…</p>
       
       <!-- Research-only zero-install consent + copy-to-pay gate -->
       <section id="proofbridgeGate" class="glass-panel" hidden aria-label="ProofBridge payment authorization" style="padding:16px;margin:12px 0">
-        <p class="eyebrow">DISHA PROOFBRIDGE · RESEARCH MODE</p>
+        <p class="eyebrow">QUANTUM FUSION · ONE-TIME CONSENT</p>
         <label style="display:flex;gap:10px;align-items:flex-start;font-size:0.9rem">
           <input id="proofbridgeConsent" type="checkbox" style="width:22px;height:22px;flex-shrink:0">
-          Authorize evidence processing for this payment only. This does not grant access to other apps.
+          Authorize this payment's one-time evidence processing.
         </label>
-        <button id="proofbridgeProceed" type="button" class="action-primary glass-btn" disabled style="margin-top:12px">Copy UPI ID &amp; Proceed</button>
+        <button id="proofbridgeProceed" type="button" class="action-primary glass-btn" disabled style="margin-top:12px">Copy &amp; Proceed</button>
         <p id="proofbridgeStatus" class="inline-note" role="status" aria-live="polite">Payment instructions are locked.</p>
       </section>
       <p id="proofbridgeEvidence" class="inline-note" aria-live="polite" hidden></p>
@@ -88,13 +101,15 @@
     <section data-stage="receipt" class="stage stage-receipt" aria-label="Payment receipt" hidden>
       <p class="eyebrow">PAYMENT RECEIPT</p>
       <div class="receipt-seal glass-seal" aria-hidden="true">✓</div>
-      <h1>Payment confirmed.</h1>
+      <h1 id="receiptHeading">Payment confirmed.</h1>
       <div id="receiptAmount" class="receipt-amount">—</div>
-      <p class="receipt-subline">Recorded payment</p>
+      <p id="receiptSubline" class="receipt-subline">Transaction reference from confirmed payment record</p>
       <div class="receipt-details">
-        <div><span>Service number / UPI transaction reference (TR)</span><strong id="receiptPaymentRef">—</strong></div>
-        <div><span>UPI reference</span><strong id="receiptUtr">—</strong></div>
-        <div><span>Status</span><strong class="receipt-confirmed">Completed</strong></div>
+        <div><span>Service ID</span><strong id="receiptPaymentRef">—</strong></div>
+        <div><span>UTR / Bank reference</span><strong id="receiptUtr">—</strong></div>
+        <div id="receiptPayerTxnRow" hidden><span>Payer transaction ID</span><strong id="receiptPayerTxn">—</strong></div>
+        <div id="receiptTimeRow" hidden><span>Payment time</span><strong id="receiptTime">—</strong></div>
+        <div><span>Status</span><strong id="receiptVerifiedStatus" class="receipt-confirmed">Payment confirmed</strong></div>
       </div>
       <div class="receipt-actions">
         <button id="saveReceipt" type="button" class="action-primary glass-btn">Save / print receipt <span class="action-arrow" aria-hidden="true">↗</span></button>

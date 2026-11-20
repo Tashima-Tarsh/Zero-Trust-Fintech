@@ -78,7 +78,7 @@ assert.match(runner,/intent-logcat-live\.txt/,
   const html=await(await fetch(origin+'/merchant-checkout.html')).text();
   assert.doesNotMatch(html,/btnOneTouch|oneTouchFallback|data-stage="methods"/,'One QR must replace the legacy passkey/app picker');
   assert.doesNotMatch(html,/Touch to Pay/);
-  assert.match(html,/<section data-stage="qr"[^>]*aria-label="UPI QR checkout"/);
+  assert.match(html,/<section data-stage="qr"[^>]*aria-label="Quantum Fusion payment"/);
   assert.match(html,/id="qrTapToPay"/);
   assert.match(html,/id="shareCheckout"/);
   assert.match(html,/cosmic-checkout\.js/);
