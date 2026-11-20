@@ -78,7 +78,9 @@ async function flush(){for(let i=0;i<55;i++)await Promise.resolve()}
  assert.equal(app.data.qr,null,'P2P QR must remain absent after Proceed');
  assert.equal(app.elems.qrTapToPay.hidden,true,'P2P QR container must be hidden');
  assert.equal(app.elems.qrExpiry.hidden,true,'P2P QR expiry text hidden');
- assert.match(app.elems.paymentStageCopy.textContent,/UPI ID copied/);
+ assert.match(app.elems.paymentStageCopy.textContent,/Receiving details copied/);
+ assert.equal(app.elems.copyHandoff.hidden,false,'One touch reveals copied payee below Service ID');
+ assert.equal(app.elems.copiedPayee.textContent,'receiver@oksbi');
  assert.equal(app.elems.proofbridgeGate.hidden,true);
  assert.equal(app.stages.find(x=>!x.hidden)?.dataset.stage,'qr');
  app.data.claim='123456789012';
