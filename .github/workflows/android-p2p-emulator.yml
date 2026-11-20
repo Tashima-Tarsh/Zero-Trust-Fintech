@@ -5,6 +5,7 @@ on:
   push:
     branches:
       - experiment/zero-install-proofbridge
+      - experiment/dtwp-p2p-p2m-witness
   workflow_dispatch:
 
 permissions:
