@@ -6,14 +6,25 @@ const assert=require('node:assert/strict');
 const crypto=require('node:crypto');
 const path=require('node:path');
 const {spawn}=require('node:child_process');
+const net=require('node:net');
 const {Pool}=require('pg');
 
+async function findAvailablePort(){
+  const probe=net.createServer();
+  await new Promise((resolve,reject)=>{
+    probe.once('error',reject);
+    probe.listen(0,'127.0.0.1',resolve);
+  });
+  const port=probe.address().port;
+  await new Promise((resolve,reject)=>probe.close(error=>error?reject(error):resolve()));
+  return port;
+}
 (async()=>{
   const url=process.env.TEST_DATABASE_URL;
   if(!url||!['localhost','127.0.0.1','::1'].includes(new URL(url).hostname))
     throw Error('Vault evidence HTTP tests must use disposable localhost PostgreSQL');
   const pg=new Pool({connectionString:url,max:3});
-  const port=30000+crypto.randomInt(6000),base='http://127.0.0.1:'+port;
+  const port=await findAvailablePort(),base='http://127.0.0.1:'+port;
   const server=spawn(process.execPath,['server.js'],{
     cwd:path.join(__dirname,'..'),
     env:{...process.env,PORT:String(port),DB_BACKEND:'postgres',DATABASE_URL:url,
@@ -121,6 +132,67 @@ const {Pool}=require('pg');
     const evidenceRows=(await pg.query('SELECT count(*)::int n FROM disha_vault_evidence WHERE order_id=$1',
       [one.orderId])).rows[0];
     assert.equal(evidenceRows.n,1,'Replay must not duplicate evidence record');
+    // Native Android UPI activity-result path: signed EBIT fields are stored
+    // against the same checkout session and never mutate payment/ledger state.
+    const upiOrder=await makeOrder();
+    const {publicKey,privateKey}=crypto.generateKeyPairSync('ec',{namedCurve:'prime256v1'});
+    const deviceId='device_'+rand();
+    const publicKeyPem=publicKey.export({type:'spki',format:'pem'});
+    let auth=await fetch(base+'/api/session-evidence/authorize',{
+      method:'POST',headers:{'Content-Type':'application/json','X-CSRF-Token':upiOrder.token},
+      body:JSON.stringify({consent:true,orderId:upiOrder.orderId,token:upiOrder.token,
+        deviceId,publicKeyPem}),signal:AbortSignal.timeout(8000)});
+    const authBody=await auth.json();
+    assert.equal(auth.status,201,JSON.stringify(authBody)+'\\n'+logs.slice(-3000));
+    const sessionRow=(await pg.query('SELECT txn_ref FROM sessions WHERE order_id=$1',[upiOrder.orderId])).rows[0];
+    const txnId=utr(),approvalRef=utr(),returnedAt=Date.now();
+    const ebit={
+      protocol:'DISHA-UPI-RESULT-V1',
+      eventId:'upi_'+rand(),
+      orderId:upiOrder.orderId,
+      nonce:authBody.nonce,
+      deviceId,
+      packageName:'com.google.android.apps.nbu.paisa.user',
+      returnedAt,
+      txnId,
+      approvalRefNo:approvalRef,
+      txnRef:String(sessionRow.txn_ref).replace(/[^A-Za-z0-9]/g,'').slice(0,35),
+      responseCode:'00',
+      amountPaise:'50001',
+      payeeVpa:'qa-receiver@oksbi',
+      status:'SUCCESS'
+    };
+    const canonical=JSON.stringify(ebit);
+    const signature=crypto.sign('sha256',Buffer.from(canonical),privateKey).toString('base64url');
+    const upiBody={evidence:ebit,signature,token:upiOrder.token};
+    const sendUpi=async body=>fetch(base+'/api/session-evidence/upi-result',{
+      method:'POST',headers:{'Content-Type':'application/json','X-CSRF-Token':upiOrder.token},
+      body:JSON.stringify(body),signal:AbortSignal.timeout(8000)});
+    let upiResponse=await sendUpi(upiBody);
+    let upiResult=await upiResponse.json();
+    assert.equal(upiResponse.status,202,JSON.stringify(upiResult));
+    assert.equal(upiResult.decisionState,'UPI_RESPONSE_MATCHED');
+    assert.equal(upiResult.utrCandidate,txnId);
+    assert.equal(upiResult.ebit.approvalRefNo,approvalRef);
+    assert.equal(upiResult.paymentStateChanged,false);
+    upiResponse=await sendUpi(upiBody);
+    assert.equal(upiResponse.status,409,'Native UPI result replay must be rejected');
+    const storedUpi=(await pg.query(
+      'SELECT upi_txn_id,approval_ref_no,merchant_txn_ref,response_code,signal_status,decision_state '+
+      'FROM disha_session_upi_results WHERE order_id=$1',[upiOrder.orderId])).rows[0];
+    assert.equal(storedUpi.upi_txn_id,txnId);
+    assert.equal(storedUpi.approval_ref_no,approvalRef);
+    assert.equal(storedUpi.response_code,'00');
+    assert.equal(storedUpi.signal_status,'SUCCESS');
+    assert.equal(storedUpi.decision_state,'UPI_RESPONSE_MATCHED');
+    const upiSession=(await pg.query('SELECT status,state,utr FROM sessions WHERE order_id=$1',[upiOrder.orderId])).rows[0];
+    assert.equal(upiSession.status,'PENDING');
+    const upiTx=(await pg.query('SELECT count(*)::int n FROM transactions WHERE order_id=$1',[upiOrder.orderId])).rows[0];
+    assert.equal(upiTx.n,0);
+    const upiJournal=(await pg.query('SELECT count(*)::int n FROM disha_core_journals WHERE order_id=$1',[upiOrder.orderId])).rows[0];
+    assert.equal(upiJournal.n,0);
+
+    console.log('VAULT_AND_UPI_EVIDENCE_HTTP_PASS: session authorization, signed Android EBIT/UTR, replay, and zero financial posting; Vault checks also passed.');
     console.log('VAULT_EVIDENCE_HTTP_PASS: authenticated Vault+token, CSRF, replay, '+
       'cross-order UTR collision, amount, payee, no-UTR and zero financial credit.');
   }finally{

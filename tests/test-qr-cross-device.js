@@ -14,7 +14,7 @@ function open(sharedToken){
   querySelectorAll:q=>q==='[data-stage]'?stages:[],addEventListener:(k,fn)=>events[k]=fn};
  const location={href:'https://disha.example/checkout?paymentRef='+order+'&token='+sharedToken,
   search:'?paymentRef='+order+'&token='+sharedToken};
- const navigator={userAgent:'Mozilla/5.0 (Linux; Android 15)',clipboard:{
+ const navigator={userAgent:'Mozilla/5.0 (Linux; Android 15) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/157.0.0.0 Mobile Safari/537.36',clipboard:{
   writeText:async text=>{state.shared=text}}};
  const window={DISHACosmicCheckoutModel:model,DISHAOneTouchVault:{
   getDeviceUserId(){throw Error('Shared checkout should not create a new customer')},
@@ -42,11 +42,13 @@ async function flush(){for(let i=0;i<35;i++)await Promise.resolve()}
  const phone=open(token);await flush();
  assert.equal(phone.stages.find(x=>!x.hidden).dataset.stage,'qr');
  assert.equal(phone.state.qr,null,'Personal Quantum Fusion must never render a QR');
- assert.equal(phone.nodes.proofbridgeGate.hidden,false,'Consent gate stays visible for P2P');
+ assert.equal(phone.nodes.proofbridgeGate.hidden,true,'Native Android host removes the old copy-to-pay consent gate');
  // P2P is copy-to-pay. No native intent or QR is dispatched.
  const qrHref=phone.nodes.qrTapToPay.href;
  assert.equal(qrHref,'#');
  assert.equal(phone.nodes.qrTapToPay.getAttribute('aria-disabled'),'true');
+ assert.equal(phone.nodes.qrTapToPay.hidden,true,'P2P stays QR-free on Android');
+ assert.equal(phone.nodes.upiAppOptions.hidden,false,'P2P exposes one-tap native UPI app choices');
  assert.equal(phone.nodes.qrTapToPay.hidden,true,'QR is hidden throughout personal checkout');
  assert.match(phone.nodes.paymentTrackingStatus.textContent,/Awaiting confirmation/,
    'Original browser shows that confirmation is pending when another phone scans');

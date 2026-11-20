@@ -163,17 +163,26 @@ function createSessionEvidenceRouter({ getPool, getSession }) {
       const amountPaise = rupeesToPaise(String(session.challengeAmount));
       const payee = String(session.vpaAddress || '').toLowerCase();
       if (!/^[1-9][0-9]{0,15}$/.test(amountPaise) || !validVpa(payee)) throw fail('SESSION_BINDING_INVALID', 409);
+      const paymentType =
+        String(session.merchantType || '').toUpperCase().includes('P2M') ||
+        String(session.merchantType || '').toUpperCase() === 'MERCHANT' ? 'P2M' : 'P2P';
+      let merchantReference = '', merchantCategoryCode = '';
+      if (session.upiUri) {
+        const issuedParams = new URL(session.upiUri).searchParams;
+        merchantReference = issuedParams.get('tr') || '';
+        merchantCategoryCode = issuedParams.get('mc') || '';
+      } else if (paymentType === 'P2M') {
+        merchantReference = String(session.txnRef || session.orderId || '').replace(/[^A-Za-z0-9]/g, '').slice(0, 35);
+        merchantCategoryCode = String(session.mcc || '');
+      }
       const now = Date.now(), expiresAt = Math.min(Number(session.expiresAt), now + 180000);
       const nonce = crypto.randomBytes(20).toString('hex');
+      let activeNonce = nonce, activeExpiry = expiresAt, activeConsentTime = now;
       const c = await pool.connect(); let tx = false;
       try {
         await c.query('BEGIN'); tx = true;
-        const paymentType =
-          String(session.merchantType || '').toUpperCase().includes('P2M') ||
-          String(session.merchantType || '').toUpperCase() === 'MERCHANT' ? 'P2M' : 'P2P';
         const existing = (await c.query(
           'SELECT * FROM disha_session_evidence_consents WHERE order_id=$1 FOR UPDATE', [b.orderId])).rows[0];
-        let activeNonce = nonce, activeExpiry = expiresAt, activeConsentTime = now;
         if (existing) {
           if (existing.revoked_at || Number(existing.expires_at) <= now ||
               !safeEqual(existing.token_hash, sha256(b.token)) ||
@@ -207,9 +216,10 @@ function createSessionEvidenceRouter({ getPool, getSession }) {
       finally { c.release(); }
       return res.status(201).set('Cache-Control','no-store').json({
         success:true, orderId:b.orderId, nonce:activeNonce, deviceId:b.deviceId,
+        amountPaise, payeeVpa:payee, paymentType, merchantReference, merchantCategoryCode,
         expiresAt:activeExpiry, consentedAt:activeConsentTime, serverTime:now, allowedPackages:[...ALLOWED_PACKAGES]
       });
-    } catch (e) { return respondError(res, e); }
+    } catch (e) { console.error('[session-evidence] authorize failed:', e && (e.code || e.message) || 'unknown'); return respondError(res, e); }
   });
 
   router.post('/event', async (req, res) => {

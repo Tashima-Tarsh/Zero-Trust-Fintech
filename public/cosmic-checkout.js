@@ -6,7 +6,9 @@
  const mode=document.body.dataset.checkout==='merchant'?'merchant':'generic';
  const query=new URLSearchParams(location.search);
  const quantumEnabled=query.get('qs')==='1';
- const proofbridgeEnabled=mode==='generic'||query.get('proofbridge')==='1';
+ const checkoutUA=navigator.userAgent||'';
+ const nativeChromeCheckout=/Android/i.test(checkoutUA)&&/Chrome\/\d+/i.test(checkoutUA)&&!/[;\s]wv[);\s]/i.test(checkoutUA);
+ const proofbridgeEnabled=(mode==='generic'||query.get('proofbridge')==='1')&&!nativeChromeCheckout;
  const quantumClient=window.DISHAQuantumSignalClient||null;
  let quantumReady=false;
  const requiredMode=mode==='generic'?'P2P':
@@ -306,23 +308,63 @@
   if(forFallback)u.searchParams.set('upi_intent_fallback','1');
   return u.href;
  }
+ function nativeHostIntentUri(app){
+  const packages={
+   gpay:'com.google.android.apps.nbu.paisa.user',
+   phonepe:'com.phonepe.app',
+   paytm:'net.one97.paytm',
+   bhim:'in.org.npci.upiapp'
+  };
+  const upiPackage=packages[app];
+  if(!upiPackage||!session||!session.token||!session.orderId)return '#';
+  const params=new URLSearchParams({
+   apiBase:location.origin,
+   orderId:session.orderId,
+   token:session.token,
+   upiUri:session.upiUri,
+   upiPackage,
+   returnUrl:secureCheckoutUrl(true)
+  });
+  const fallback=new URL(secureCheckoutUrl(true));
+  fallback.searchParams.set('nativeHostUnavailable','1');
+  return 'intent://pay?'+params.toString()+
+   '#Intent;scheme=disha;package=in.disha.upihost;S.browser_fallback_url='+
+   encodeURIComponent(fallback.href)+';end';
+ }
  function renderQr(){
   if(!session)return;
   const anchor=get('qrTapToPay'),container=get('paymentQr');
   // P2P ProofBridge is copy-to-pay, NOT QR-to-pay. Neither consent
   // nor Proceed may render a personal-account QR in this mode.
-  const p2pCopyOnly=proofbridgeEnabled&&model.isPersonalPayment(session.upiUri);
+  const nativeHostEligible=device==='android'&&/Chrome\/\d+/i.test(userAgent)&&!/[;\s]wv[);\s]/i.test(userAgent)&&!query.has('nativeHostUnavailable');
+  const disclosure=get('nativeEvidenceDisclosure');
+  if(disclosure)disclosure.hidden=!nativeHostEligible;
+  const proofbridgeGate=get('proofbridgeGate');
+  if(proofbridgeGate&&!proofbridgeEnabled)proofbridgeGate.hidden=true;
+  if(expired()||['EXPIRED','FAILED','CANCELLED'].includes(session.initialStatus)){
+   anchor.href='#';anchor.hidden=true;anchor.setAttribute('aria-disabled','true');
+   get('upiAppOptions').hidden=true;
+   if(disclosure)disclosure.hidden=true;
+   container.replaceChildren();qrUri=null;handleQrExpiry();return;
+  }
+  const p2pCopyOnly=model.isPersonalPayment(session.upiUri)&&(proofbridgeEnabled||nativeHostEligible);
   anchor.hidden=p2pCopyOnly;
   get('qrExpiry').hidden=p2pCopyOnly;
   get('qrTapToPayHint').hidden=p2pCopyOnly;
   if(p2pCopyOnly){
    anchor.href='#';anchor.setAttribute('aria-disabled','true');
    container.replaceChildren();qrUri=null;
-   get('upiAppOptions').hidden=true;
+   get('upiAppOptions').hidden=!nativeHostEligible;
+   for(const link of document.querySelectorAll('[data-upi-app]')){
+    link.href=nativeHostEligible?nativeHostIntentUri(link.dataset.upiApp):'#';
+    link.setAttribute('aria-disabled',nativeHostEligible?'false':'true');
+   }
    const guide=get('paymentStageCopy');
-   if(guide)guide.textContent=proofbridgeReady?
-    'Receiving details copied. Open your payment app, paste the address, confirm the amount and pay. Return here for your receipt.':
-    'Authorize this session, then touch Proceed once to copy the receiving address.';
+   if(guide)guide.textContent=nativeHostEligible?
+    'Choose your UPI app. DISHA will receive only the transaction fields returned for this payment session.':
+    proofbridgeReady?
+     'Receiving details copied. Open your payment app, paste the address, confirm the amount and pay. Return here for your receipt.':
+     'Authorize this session, then touch Proceed once to copy the receiving address.';
    return;
   }
   if(proofbridgeEnabled&&!proofbridgeReady){
@@ -332,15 +374,10 @@
    return;
   }
   // Payment dispatch is independent of optional Quantum evidence telemetry.
-  if(expired()||['EXPIRED','FAILED','CANCELLED'].includes(session.initialStatus)){
-   anchor.href='#';anchor.setAttribute('aria-disabled','true');
-   get('upiAppOptions').hidden=true;
-   container.replaceChildren();qrUri=null;handleQrExpiry();return;
-  }
   // Check the literal launch target BEFORE Android resolves an anchor's "#"
   // to the current absolute URL. Personal P2P remains scan/copy-only.
-  const launchUri=model.supportsNativeUPI(userAgent)
-   ?model.qrTapLaunchUri(session.upiUri,userAgent,secureCheckoutUrl(true)):'#';
+  const launchUri=nativeHostEligible?nativeHostIntentUri('gpay'):
+   (model.supportsNativeUPI(userAgent)?model.qrTapLaunchUri(session.upiUri,userAgent,secureCheckoutUrl(true)):'#');
   anchor.href=launchUri;
   anchor.setAttribute('aria-disabled',launchUri==='#'?'true':'false');
   if(quantumEnabled){
@@ -348,10 +385,10 @@
    proceed.href=launchUri;
    proceed.setAttribute('aria-disabled',launchUri==='#'?'true':'false');
   }
-  const targeted=model.supportsTargetedAppLaunch(userAgent)&&!model.isPersonalPayment(session.upiUri);
+  const targeted=nativeHostEligible||model.supportsTargetedAppLaunch(userAgent)&&!model.isPersonalPayment(session.upiUri);
   get('upiAppOptions').hidden=!targeted;
   for(const link of document.querySelectorAll('[data-upi-app]')){
-   link.href=targeted?model.appTapLaunchUri(session.upiUri,userAgent,secureCheckoutUrl(true),link.dataset.upiApp):'#';
+   link.href=targeted?(nativeHostEligible?nativeHostIntentUri(link.dataset.upiApp):model.appTapLaunchUri(session.upiUri,userAgent,secureCheckoutUrl(true),link.dataset.upiApp)):'#';
    link.setAttribute('aria-disabled',targeted?'false':'true');
   }
   if(qrUri!==session.upiUri){
@@ -367,6 +404,7 @@
    qrUri=session.upiUri;
   }
   handleQrExpiry();
+  if(query.has('nativeHostUnavailable'))message('DISHA Android host was not found. Standard UPI launch remains available; this attempt will not return native transaction evidence.','info');
  }
  function onReturn(){
   if(!session||receiptShown||document.visibilityState==='hidden')return;

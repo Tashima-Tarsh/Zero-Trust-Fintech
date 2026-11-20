@@ -19,6 +19,7 @@ const {createVaultEvidenceRouter,initializeVaultEvidenceSchema,rememberVaultAuth
 const {initializeQuantumSignal,createQuantumSignalRouter}=require('./financial/quantum-signal');
 const {initProofBridgeSchema,createProofBridgeRouter}=require('./financial/proofbridge');
 const {initializeSessionEvidenceSchema,createSessionEvidenceRouter}=require('./financial/session-evidence');
+const {initializeSessionUpiResultSchema,createSessionUpiResultRouter}=require('./financial/session-upi-result');
 const {createCheckoutDiagnostics}=require('./financial/checkout-diagnostics');
 const {initializeClaimObserver,observeClaim} = require('./financial/untrusted-utr-claims');
 const {
@@ -554,7 +555,34 @@ function broadcastOrderSuccess(orderId, payload) {
 // Vault evidence: verified passkey authorization + observed browser return, never settlement.
 app.use('/api/vault',createVaultEvidenceRouter({getPool:()=>db.pgPool}));
 // Session-bound, multi-device evidence. Device events never mutate checkout or ledger state.
-app.use('/api/session-evidence',verifyLimiter,createSessionEvidenceRouter({getPool:()=>db.pgPool,getSession:id=>db.findSessionByOrderId(id)}));
+async function findSessionForEvidence(orderId){
+  let local=null;
+  try{local=await db.findSessionByOrderId(orderId);}catch(_){local=null;}
+  if(local)return local;
+  if(!db.pgPool)return null;
+  const result=await db.pgPool.query('SELECT * FROM sessions WHERE order_id=$1 LIMIT 1',[orderId]);
+  const row=result.rows[0];
+  if(!row)return null;
+  const upiUri=String(row.upi_uri||'');
+  let params;
+  try{params=new URL(upiUri).searchParams;}catch(_){params=new URLSearchParams();}
+  const rawType=String(row.payment_type||row.merchant_type||'').toUpperCase();
+  const merchantType=rawType.includes('P2M')||rawType==='MERCHANT'||params.has('mc')?'P2M':'P2P';
+  return {
+    orderId:String(row.order_id),
+    sessionId:String(row.session_id),
+    status:String(row.status||'').toUpperCase(),
+    challengeAmount:String(row.challenge_amount),
+    vpaAddress:String(row.vpa_address||'').toLowerCase(),
+    merchantType,
+    txnRef:String(row.txn_ref||''),
+    upiUri,
+    expiresAt:Number(row.expires_at||0)
+  };
+}
+
+app.use('/api/session-evidence/upi-result',verifyLimiter,createSessionUpiResultRouter({getPool:()=>db.pgPool,getSession:findSessionForEvidence}));
+app.use('/api/session-evidence',verifyLimiter,createSessionEvidenceRouter({getPool:()=>db.pgPool,getSession:findSessionForEvidence}));
 // Per-order digital twin. Browser observations are never converted to financial credits.
 app.use('/api/quantum-signal',createQuantumSignalRouter({getPool:()=>db.pgPool}));
 // Experimental only: signed receipt claims never update payment status or ledger.
@@ -2063,6 +2091,7 @@ app.get('/failed', (req, res) => res.sendFile(path.join(__dirname, 'public', 'fa
     await initializeVaultEvidenceSchema(db.pgPool);
     await initializeQuantumSignal(db.pgPool);
     await initializeSessionEvidenceSchema(db.pgPool);
+    await initializeSessionUpiResultSchema(db.pgPool);
     if(process.env.DISHA_PROOFBRIDGE_EXPERIMENT==='1')await initProofBridgeSchema(db.pgPool);
     await initializeClaimObserver(db.pgPool);
   }

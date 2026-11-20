@@ -24,7 +24,7 @@ function mount(status='PENDING'){
     status:data.status,utr:data.utr,challengeAmount:500})};
    throw Error('Unexpected fetch '+url);
  };
- vm.runInNewContext(source,{window,document,location,navigator:{userAgent:'Mozilla/5.0 (Linux; Android 15)'},
+ vm.runInNewContext(source,{window,document,location,navigator:{userAgent:'Mozilla/5.0 (Linux; Android 15) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/157.0.0.0 Mobile Safari/537.36'},
    URL,URLSearchParams,Date,Intl,console,fetch,setInterval:()=>1,clearInterval(){},
    sessionStorage:{getItem:()=>null,setItem(){}}});
  return {nodes,events,stages,data};
@@ -34,10 +34,12 @@ const active=app=>app.stages.find(s=>!s.hidden)?.dataset.stage;
 (async()=>{
  const running=mount();await flush();
  assert.equal(active(running),'qr');
- assert.equal(running.data.qr,uri);
- // Personal UPI remains a scannable QR but never a restricted native intent.
+ assert.equal(running.data.qr,null);
+ // Personal P2P is QR-free; the Android native host is exposed through app choices.
  const qrHref=running.nodes.qrTapToPay.href;
  assert.equal(qrHref,'#');
+ assert.equal(running.nodes.qrTapToPay.hidden,true);
+ assert.equal(running.nodes.upiAppOptions.hidden,false);
  assert.equal(running.nodes.qrTapToPay.getAttribute('aria-disabled'),'true');
  assert.equal(running.data.prompt,0);
  running.events.focus();await flush();

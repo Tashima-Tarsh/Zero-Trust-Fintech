@@ -13,7 +13,7 @@ function start(userAgent){
  const appNodes=['gpay','phonepe','paytm','bhim'].map(app=>Object.assign(node('app-'+app),{dataset:{upiApp:app}}));
  const document={body:{dataset:{checkout:'merchant'}},visibilityState:'visible',getElementById:node,
   querySelectorAll:q=>q==='[data-stage]'?stages:q==='[data-upi-app]'?appNodes:[],addEventListener:(k,fn)=>events[k]=fn};
- const location={href:'https://checkout.example/merchant-checkout.html?orderId='+order+'&token='+token,
+ const location={origin:'https://checkout.example',href:'https://checkout.example/merchant-checkout.html?orderId='+order+'&token='+token,
   search:'?orderId='+order+'&token='+token};
  const navigator={userAgent,clipboard:{writeText:async x=>{state.shared=x}}};
  const window={DISHACosmicCheckoutModel:model,DISHAOneTouchVault:{
@@ -38,16 +38,23 @@ async function flush(){for(let i=0;i<35;i++)await Promise.resolve()}
  assert.equal(mobile.state.qr,uri);
  assert.equal(mobile.nodes.upiAppOptions.hidden,false,'Chrome Android provides explicit UPI app routing');
  for(const link of mobile.appNodes){
-  assert.match(link.href,new RegExp('package='),
-   'Selected app must be explicitly targeted instead of opening the last-used Slice app');
+  assert.match(link.href,/package=in\.disha\.upihost;/,
+   'Selected app must be routed through the installed DISHA result host');
+  const params=new URLSearchParams(link.href.split('?')[1].split('#')[0]);
+  assert.equal(params.get('upiPackage'),({
+   gpay:'com.google.android.apps.nbu.paisa.user',phonepe:'com.phonepe.app',
+   paytm:'net.one97.paytm',bhim:'in.org.npci.upiapp'
+  })[link.dataset.upiApp]);
   assert.equal(link.getAttribute('aria-disabled'),'false');
  }
- assert.match(mobile.appNodes[0].href,/package=com\.google\.android\.apps\.nbu\.paisa\.user;/);
+ assert.match(mobile.appNodes[0].href,/package=in\.disha\.upihost;/);
  const mobileTap=mobile.nodes.qrTapToPay.href;
  assert.match(mobileTap,/^intent:\/\/pay\?/,'Chrome uses Android Intent URI');
  assert.equal(mobile.state.qr,uri,'Scannable QR must retain raw UPI intent');
- assert.equal(new URLSearchParams(mobileTap.split('?')[1].split('#')[0]).get('pa'),'merchant@ypbiz');
- assert.match(mobileTap,/#Intent;scheme=upi;action=android.intent.action.VIEW;/);
+ const mainParams=new URLSearchParams(mobileTap.split('?')[1].split('#')[0]);
+ assert.equal(mainParams.get('upiPackage'),'com.google.android.apps.nbu.paisa.user');
+ assert.equal(new URL(mainParams.get('upiUri')).searchParams.get('pa'),'merchant@ypbiz');
+ assert.match(mobileTap,/#Intent;scheme=disha;package=in\.disha\.upihost;/);
  assert.ok(decodeURIComponent(mobileTap.match(/S\.browser_fallback_url=([^;]+)/)[1]).includes(
   'paymentRef='+order),'Fallback recovers the original payment');
  assert.equal(mobile.nodes.qrTapToPay.getAttribute('aria-disabled'),'false');
