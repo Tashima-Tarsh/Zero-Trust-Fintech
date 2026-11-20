@@ -354,21 +354,29 @@
   if(p2pCopyOnly){
    anchor.href='#';anchor.setAttribute('aria-disabled','true');
    container.replaceChildren();qrUri=null;
-   // Personal P2P is copy-to-pay. Do not launch external UPI apps or
-   // require the DISHA Android host APK; the customer chooses their app manually.
-   get('upiAppOptions').hidden=true;
-   const proceed=get('vaultProceed');
-   if(proceed){
-    proceed.hidden=false;
-    proceed.href='#';
-    proceed.textContent='Copy UPI ID';
-    proceed.setAttribute('aria-disabled','false');
+   if(nativeHostEligible){
+    // Android Chrome P2P is copy-to-pay. Never launch a UPI app or require
+    // the DISHA host APK; the customer chooses their UPI app manually.
+    get('upiAppOptions').hidden=true;
+    const proceed=get('vaultProceed');
+    if(proceed){
+     proceed.hidden=false;proceed.href='#';
+     proceed.textContent='Copy UPI ID';
+     proceed.setAttribute('aria-disabled','false');
+    }
+    if(disclosure)disclosure.hidden=true;
+    const guide=get('paymentStageCopy');
+    if(guide)guide.textContent='Copy the receiving UPI ID, open any UPI app, paste it and enter the exact amount. No app launch or DISHA installation is required.';
+   }else{
+    // Keep the existing consent-authorized ProofBridge flow for non-native
+    // browsers; do not bypass its server authorization.
+    get('upiAppOptions').hidden=true;
+    const proceed=get('vaultProceed');if(proceed)proceed.hidden=true;
+    const guide=get('paymentStageCopy');
+    if(guide)guide.textContent=proofbridgeReady?
+     'Receiving details copied. Open your payment app, paste the address, confirm the amount and pay. Return here for your receipt.':
+     'Authorize this session, then touch Proceed once to copy the receiving address.';
    }
-   if(disclosure)disclosure.hidden=true;
-   const guide=get('paymentStageCopy');
-   if(guide)guide.textContent=proofbridgeReady?
-    'Receiving UPI ID copied. Open your UPI app, paste it, enter the exact amount and pay. Return here for your receipt.':
-    'Copy the receiving UPI ID, open any UPI app, paste it and enter the exact amount. No app launch or DISHA installation is required.';
    return;
   }
   if(proofbridgeEnabled&&!proofbridgeReady){
