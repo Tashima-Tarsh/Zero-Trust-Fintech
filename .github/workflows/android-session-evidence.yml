@@ -37,7 +37,7 @@ jobs:
           "$SDKMANAGER" --install "platforms;android-35" "build-tools;35.0.0"
       - name: Compile Android evidence library
         working-directory: android
-        run: gradle --no-daemon :session-evidence:assembleDebug :upi-host:assembleDebug :upi-host:testDebugUnitTest
+        run: gradle --no-daemon :upi-host:assembleDebug :upi-host:testDebugUnitTest
 
       - name: Upload debug host APK
         uses: actions/upload-artifact@v4
