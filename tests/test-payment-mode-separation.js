@@ -19,7 +19,8 @@ for(const html of [home,selector]){
 assert.match(home,/<div class="header-checkout" role="group"/,'Both checkout options belong in the header');
 assert.doesNotMatch(home,/class="payment-lanes"|class="lane-options"/,'No full-height homepage payment lane section');
 assert.match(selector,/class="choose"/);
-assert.match(selector,/id="tryCheckoutForm"/);
+assert.match(selector,/id="tryStatus"/);
+assert.doesNotMatch(selector,/<form\b|<input\b/i,'No customer entry form in payment chooser');
 assert.ok(read("public/try-checkout.js").includes("fetch(\u0027/api/session/new?"));
 assert.doesNotMatch(selector,/min-height:255px|margin-top:70px/,'Checkout mode chooser must stay compact');
 assert.match(p2mPage,/\/login\?mode=P2M/);
