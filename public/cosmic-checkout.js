@@ -192,6 +192,32 @@
   const payee=session.payeeVpa||p.get('pa')||'';
   label.textContent=kind+' · '+name+(payee?' · '+payee:'');
  }
+ // Issuer-confirmed payer debit evidence produces its own receipt, without
+ // consulting the receiving account's settlement state.
+ function createPayerDebitReceipt(proof){
+  const debit=proof?.payerDebitEvidence;
+  if(receiptShown||!proof?.payerDebitVerified||!debit?.debitVerified||
+     debit.evidenceState!=='PAYER_DEBIT_VERIFIED'||
+     !/^\d{12}$/.test(debit.utr||'')||
+     !/^[A-Za-z0-9][A-Za-z0-9._:\/\-]{5,99}$/.test(debit.payerTransactionId||''))return;
+  receiptShown=true;
+  get('receiptAmount').textContent=format(session.amount);
+  get('receiptPaymentRef').textContent=session.serviceNumber||'—';
+  get('receiptUtr').textContent=debit.utr;
+  get('receiptPayerTxnRow').hidden=false;
+  get('receiptPayerTxn').textContent=debit.payerTransactionId;
+  get('receiptHeading').textContent='Payer debit confirmed.';
+  get('receiptSubline').textContent='Payer-side transaction evidence';
+  get('receiptVerifiedStatus').textContent='Debit confirmed';
+  if(Number.isSafeInteger(debit.claimedPaidAt)&&debit.claimedPaidAt>0){
+   get('receiptTimeRow').hidden=false;
+   get('receiptTime').textContent=new Date(debit.claimedPaidAt).toLocaleString('en-IN');
+  }
+  showStage('receipt');
+  if(ledgerTicker)clearInterval(ledgerTicker);
+  if(proofbridgePollTimer)clearInterval(proofbridgePollTimer);
+  if(window.DISHAVault3D)window.DISHAVault3D.destroy();
+ }
  function createReceipt(record){
   if(!model.isSettled(record)||receiptShown)return;
   receiptShown=true;
@@ -217,15 +243,15 @@
    const r=await fetch(urlWithToken('/api/ledger/'),{cache:'no-store',credentials:'same-origin'});
    if(r.ok){
     const result=await r.json();
-    if(model.isSettled(result)){createReceipt(result);return}
+    if(mode!=='generic'&&model.isSettled(result)){createReceipt(result);return}
     const tracker=get('paymentTrackingStatus');
     if(tracker){
      const state=String(result.status||'PENDING').toUpperCase();
      tracker.textContent=state==='PENDING'
       ?'Payment status · Awaiting confirmation'
-      :state==='EXPIRED'?'Payment status · Window expired, checking recorded credit'
+      :state==='EXPIRED'?'Payment status · Session expired'
       :state==='FAILED'||state==='CANCELLED'?'Payment status · Not completed'
-      :'Payment status · Checking recorded credit';
+      :'Payment status · Checking authenticated evidence';
     }
 }
    if(expired()){
@@ -373,6 +399,9 @@
    const r=await fetch(url,{cache:'no-store',credentials:'same-origin'});
    if(!r.ok)return;
    const d=await r.json();
+   if(mode==='generic'&&d.payerDebitVerified&&d.payerDebitEvidence?.debitVerified){
+    createPayerDebitReceipt(d);return;
+   }
    if(d.payerDebitEvidence?.utr&&/^\d{12}$/.test(d.payerDebitEvidence.utr)){
     // A signed payer-side claim carries a real-format UTR candidate but
     // cannot prove that the payer's bank actually posted a debit.
@@ -380,6 +409,12 @@
     if(payer){
      payer.hidden=false;
      get('payerUtrCandidate').textContent=d.payerDebitEvidence.utr;
+     const reportedId=d.payerDebitEvidence.payerTransactionId;
+     const extra=get('payerTransactionIdRow');
+     if(extra){
+      extra.hidden=!/^[A-Za-z0-9][A-Za-z0-9._:\/\-]{5,99}$/.test(reportedId||'');
+      if(!extra.hidden)get('payerTransactionIdCandidate').textContent=reportedId;
+     }
      get('payerDebitEvidenceStatus').textContent=
       'Payer debit claim recorded from '+d.payerDebitEvidence.issuerId+
       '. Actual debit is not independently verified; no payment receipt issued.';
