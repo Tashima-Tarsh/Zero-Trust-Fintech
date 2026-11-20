@@ -367,14 +367,28 @@
      typeof data.ticketSignature!=='string'||!/^[a-f0-9]{64}$/i.test(data.ticketSignature)||
      typeof data.ticketHash!=='string'||!/^[a-f0-9]{64}$/i.test(data.ticketHash)||
      typeof data.ticket?.nonce!=='string'||!/^[a-f0-9]{40}$/i.test(data.ticket.nonce)||
+     data.ticket?.protocol!=='DISHA-PROOF-TICKET-V2'||
      data.ticket?.orderId!==session.orderId||
+     !['P2P','P2M'].includes(data.ticket?.paymentType)||
+     data.ticket?.paymentType!==
+      (['MERCHANT','P2M'].includes(String(session.paymentType||'').toUpperCase())?'P2M':'P2P')||
      data.ticket?.amountPaise!==String(Math.round(session.amount*100))||
      data.ticket?.payeeVpa!==(session.payeeVpa||'').toLowerCase()||
      data.ticket?.expiresAt!==data.expiresAt)return false;
   const q=new URLSearchParams(data.upiUri.split('?')[1]||'');
-  return q.get('pa')?.toLowerCase()===data.ticket.payeeVpa &&
-   String(Math.round(Number(q.get('am'))*100))===data.ticket.amountPaise &&
-   q.get('cu')==='INR';
+  if(q.getAll('pa').length!==1||q.getAll('am').length!==1||q.getAll('cu').length!==1||
+     q.get('pa')?.toLowerCase()!==data.ticket.payeeVpa||
+     String(Math.round(Number(q.get('am'))*100))!==data.ticket.amountPaise||
+     q.get('cu')!=='INR')return false;
+  if(data.ticket.paymentType==='P2P')
+   return !q.has('mc')&&!q.has('tr')&&
+    data.ticket.merchantCategory===''&&data.ticket.merchantReference==='';
+  return q.getAll('mc').length===1&&q.getAll('tr').length===1&&
+   data.ticket.merchantCategory===q.get('mc')&&
+   data.ticket.merchantReference===q.get('tr')&&
+   /^[0-9]{4}$/.test(data.ticket.merchantCategory)&&
+   data.ticket.merchantCategory!=='0000'&&
+   /^[A-Za-z0-9]{1,35}$/.test(data.ticket.merchantReference);
  }
  function proofbridgeCopyVpa(value){
   // Invoke directly within the Proceed user gesture; never after an API fetch.
