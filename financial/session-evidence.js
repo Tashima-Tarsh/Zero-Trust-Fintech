@@ -76,6 +76,20 @@ function evaluateEvidence(e, session, now = Date.now()) {
   return { state: 'SIGNAL_MATCHED', accepted: true };
 }
 
+function aggregateSessionDecision(rows) {
+  const states = rows.map(r => r.decision_state);
+  const refs = new Set(rows.map(r => r.transaction_ref).filter(Boolean));
+  const devices = new Set(rows.map(r => r.device_id).filter(Boolean));
+  const fraudStates = new Set(['CROSS_SESSION','SESSION_TIME_INVALID','AMOUNT_MISMATCH',
+    'PAYEE_MISMATCH','TRANSACTION_REFERENCE_REPLAY','CROSS_DEVICE_SIGNAL_CONFLICT']);
+  if (states.some(s => fraudStates.has(s))) return 'FRAUD_REJECT';
+  if (refs.size > 1) return 'MULTIPLE_REFERENCE_CONFLICT';
+  if (states.includes('SIGNAL_MATCHED') && devices.size > 1 && refs.size === 1) return 'MULTI_DEVICE_CORROBORATED';
+  if (states.includes('SIGNAL_MATCHED')) return 'SIGNAL_MATCHED';
+  if (states.includes('PAYMENT_FAILED_SIGNAL')) return 'PAYMENT_FAILED_SIGNAL';
+  return 'INCOMPLETE_SIGNAL';
+}
+
 async function initializeSessionEvidenceSchema(pool) {
   if (!pool) throw fail('POSTGRES_REQUIRED', 503);
   await pool.query(`
@@ -112,7 +126,8 @@ async function initializeSessionEvidenceSchema(pool) {
       signal_status TEXT NOT NULL,
       decision_state TEXT NOT NULL
     );
-    CREATE UNIQUE INDEX IF NOT EXISTS disha_session_evidence_txn_replay
+    DROP INDEX IF EXISTS disha_session_evidence_txn_replay;
+    CREATE INDEX IF NOT EXISTS disha_session_evidence_txn_lookup
       ON disha_session_evidence_events(transaction_ref)
       WHERE transaction_ref IS NOT NULL;
     CREATE INDEX IF NOT EXISTS disha_session_evidence_order_time
@@ -216,8 +231,18 @@ function createSessionEvidenceRouter({ getPool, getSession }) {
           !safeEqual(sha256(b.token || ''), consent.token_hash)) throw fail('SESSION_TOKEN_INVALID', 401);
       const publicKey = crypto.createPublicKey(device.public_key_pem);
       const eventHash = verifyDeviceEvidence(b.evidence, b.signature, publicKey);
-      const decision = evaluateEvidence(b.evidence, consent);
-      if (!decision.accepted) throw fail(decision.state, 409);
+      let decision = evaluateEvidence(b.evidence, consent);
+      if (decision.accepted && b.evidence.transactionRef) {
+        const previousRef = (await c.query(
+          'SELECT order_id,amount_paise,payee_vpa FROM disha_session_evidence_events WHERE transaction_ref=$1 LIMIT 1 FOR UPDATE',
+          [b.evidence.transactionRef])).rows[0];
+        if (previousRef && previousRef.order_id !== b.evidence.orderId) {
+          decision = { state: 'TRANSACTION_REFERENCE_REPLAY', accepted: false };
+        } else if (previousRef && (previousRef.amount_paise !== b.evidence.amountPaise ||
+                   String(previousRef.payee_vpa || '').toLowerCase() !== String(b.evidence.payeeVpa || '').toLowerCase())) {
+          decision = { state: 'CROSS_DEVICE_SIGNAL_CONFLICT', accepted: false };
+        }
+      }
       const eventCount = Number((await c.query(
         'SELECT COUNT(*)::int AS count FROM disha_session_evidence_events WHERE order_id=$1',
         [b.evidence.orderId])).rows[0].count);
@@ -238,12 +263,18 @@ function createSessionEvidenceRouter({ getPool, getSession }) {
           COUNT(DISTINCT device_id)::int AS device_count,
           COUNT(DISTINCT transaction_ref) FILTER (WHERE transaction_ref IS NOT NULL)::int AS reference_count
          FROM disha_session_evidence_events WHERE order_id=$1`, [b.evidence.orderId])).rows[0];
+      const rows = (await c.query(
+        'SELECT device_id,transaction_ref,decision_state FROM disha_session_evidence_events WHERE order_id=$1',
+        [b.evidence.orderId])).rows;
+      const unifiedDecision = aggregateSessionDecision(rows);
       await c.query('COMMIT'); tx = false;
-      return res.status(202).set('Cache-Control','no-store').json({
-        success:true,accepted:true,decisionState:decision.state,
+      const payload = {
+        success:decision.accepted,accepted:decision.accepted,decisionState:decision.state,
+        fraudDecision:unifiedDecision,
         sessionEvidence:{eventCount:aggregate.event_count,matchedSignalCount:aggregate.matched_count,
           participatingDeviceCount:aggregate.device_count,referenceCount:aggregate.reference_count}
-      });
+      };
+      return res.status(decision.accepted ? 202 : 409).set('Cache-Control','no-store').json(payload);
     } catch (e) {
       if (tx) await c.query('ROLLBACK').catch(() => {});
       if (e.code === '23505') return respondError(res, fail('EVIDENCE_REPLAY_BLOCKED', 409));
@@ -291,4 +322,4 @@ function createSessionEvidenceRouter({ getPool, getSession }) {
 }
 
 module.exports = { ALLOWED_PACKAGES, canonicalEvidence, verifyDeviceEvidence,
-  evaluateEvidence, initializeSessionEvidenceSchema, createSessionEvidenceRouter };
+  evaluateEvidence, aggregateSessionDecision, initializeSessionEvidenceSchema, createSessionEvidenceRouter };
