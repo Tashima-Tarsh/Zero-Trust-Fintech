@@ -32,7 +32,7 @@ import java.util.concurrent.Executors;
 
 public final class UpiResultHostActivity extends ComponentActivity {
     private static final String PREFS = "disha_upi_host";
-    private static final String KEY_ALIAS = "disha_upi_host_p256";
+    private static final String KEY_ALIAS_PREFIX = "disha_upi_session_";
     private static final ExecutorService IO = Executors.newSingleThreadExecutor();
     private static final String[] ALLOWED_UPI_PACKAGES = {
         "com.google.android.apps.nbu.paisa.user", "com.phonepe.app",
@@ -146,7 +146,7 @@ public final class UpiResultHostActivity extends ComponentActivity {
             return;
         }
 
-        final String reference = approvalRef != null ? approvalRef : txnId;
+        final String reference = txnId != null ? txnId : approvalRef;
         final String finalStatus = status;
         final String finalAmountPaise = amountPaise;
         final String finalPayee = payee;
@@ -239,12 +239,12 @@ public final class UpiResultHostActivity extends ComponentActivity {
     private KeyPair keyPair() throws Exception {
         KeyStore store = KeyStore.getInstance("AndroidKeyStore");
         store.load(null);
-        if (store.containsAlias(KEY_ALIAS)) {
-            java.security.PrivateKey privateKey = (java.security.PrivateKey) store.getKey(KEY_ALIAS, null);
+        if (store.containsAlias(alias)) {
+            java.security.PrivateKey privateKey = (java.security.PrivateKey) store.getKey(alias, null);
             return new KeyPair(store.getCertificate(KEY_ALIAS).getPublicKey(), privateKey);
         }
         KeyPairGenerator generator = KeyPairGenerator.getInstance("EC", "AndroidKeyStore");
-        generator.initialize(new android.security.keystore.KeyGenParameterSpec.Builder(KEY_ALIAS,
+        generator.initialize(new android.security.keystore.KeyGenParameterSpec.Builder(alias,
             android.security.keystore.KeyProperties.PURPOSE_SIGN)
             .setAlgorithmParameterSpec(new ECGenParameterSpec("secp256r1"))
             .setDigests(android.security.keystore.KeyProperties.DIGEST_SHA256)
