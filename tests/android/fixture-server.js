@@ -1,9 +1,11 @@
 'use strict';
 if(process.env.DISHA_ANDROID_FIXTURE_ONLY!=='1')throw Error('Android fixture is test-only');
-const http=require('node:http'),fs=require('node:fs'),path=require('node:path');
+const http=require('node:http'),fs=require('node:fs'),path=require('node:path'),crypto=require('node:crypto');
 const root=path.join(__dirname,'..','..','public'),port=8765;
 const orderId='PAY_ANDROID_CI_1001',token='b'.repeat(48),expiresAt=Date.now()+12*60*1000;
 let status='PENDING',paymentKind='P2P',vaultRegistered=false,vaultPrompts=0;
+let proofbridgeAuthorized=false,proofbridgeClaim=null;
+const proofNonce='a'.repeat(40),proofExpiry=Date.now()+10*60*1000;
 const CI_REGISTER_SESSION='a1'.repeat(16);
 const CI_AUTH_SESSION='b2'.repeat(16);
 const evidenceEvents=new Map();
@@ -20,7 +22,7 @@ for(const [key,val] of Object.entries({
 }))merchantUri.searchParams.set(key,val);
 http.createServer((req,res)=>{
  const url=new URL(req.url,'http://10.0.2.2:'+port);
- if(url.pathname==='/health')return reply(res,200,{ok:true,status,vaultRegistered,vaultPrompts,evidenceCount:evidenceEvents.size});
+ if(url.pathname==='/health')return reply(res,200,{ok:true,status,vaultRegistered,vaultPrompts,evidenceCount:evidenceEvents.size,proofbridgeAuthorized,proofbridgeClaimed:Boolean(proofbridgeClaim)});
  if(url.pathname==='/merchant-checkout.html')return reply(res,200,fs.readFileSync(path.join(root,'merchant-checkout.html')),'text/html');
  const allowedAssets=new Map([
   ['/cosmic-checkout.css','text/css'],
@@ -110,6 +112,42 @@ http.createServer((req,res)=>{
    return;
  }
 
+ // Deliberately isolated fixture: NEVER bank success, payment routing, or private app access.
+ if(url.pathname==='/api/proofbridge/authorize'&&req.method==='POST'){
+  let body='';req.on('data',chunk=>{body+=chunk;if(body.length>4000)req.destroy()});
+  req.on('end',()=>{
+   let b={};try{b=JSON.parse(body)}catch(_){}
+   if(b.orderId!==orderId||b.token!==token||b.consent!==true||
+      req.headers['x-csrf-token']!==token||status!=='PENDING')
+     return reply(res,403,{success:false,error:'TEST_CONSENT_BLOCKED'});
+   proofbridgeAuthorized=true;
+   const ticket={protocol:'DISHA-PROOF-TICKET-V1',orderId,nonce:proofNonce,
+    amountPaise:'49901',payeeVpa:paymentKind==='P2M'?'qa-company@ypbiz':'qa-receiver@oksbi',
+    paymentUriHash:crypto.createHash('sha256').update((paymentKind==='P2M'?merchantUri:uri).toString()).digest('hex'),
+    expiresAt:proofExpiry};
+   const signature=crypto.createHmac('sha256','test-only-fixture-key-not-used-for-money')
+    .update(JSON.stringify(ticket)).digest('hex');
+   return reply(res,200,{success:true,orderId,
+    upiUri:(paymentKind==='P2M'?merchantUri:uri).toString(),
+    ticket,ticketSignature:signature,
+    ticketHash:crypto.createHash('sha256').update(JSON.stringify(ticket)+'.'+signature).digest('hex'),
+    expiresAt:proofExpiry,deviceIntegrity:'UNKNOWN',paymentState:'PENDING_VERIFICATION'});
+  });return;
+ }
+ if(url.pathname==='/api/proofbridge/status/'+orderId){
+  if(url.searchParams.get('token')!==token||!proofbridgeAuthorized)
+   return reply(res,403,{success:false,error:'TEST_NOT_AUTHORIZED'});
+  return reply(res,200,{success:true,orderId,consented:true,deviceIntegrity:'UNKNOWN',
+   evidenceState:proofbridgeClaim?'UTR_OBSERVED_UNVERIFIED':'AWAITING_EVIDENCE',
+   paymentVerified:false,utrCandidate:proofbridgeClaim,issuerId:proofbridgeClaim?'test-issuer':null});
+ }
+ if(url.pathname==='/__test/proofbridge/claim'&&req.method==='POST'&&
+    req.headers['x-ci-fixture-key']==='CI_ANDROID_ONLY'){
+  if(!proofbridgeAuthorized||status!=='PENDING')
+   return reply(res,409,{success:false,error:'TEST_AUTH_REQUIRED'});
+  proofbridgeClaim='123456789012'; // SYNTHETIC ONLY, cannot settle funds.
+  return reply(res,200,{ok:true,evidenceState:'UTR_OBSERVED_UNVERIFIED',bankVerified:false});
+ }
  if(url.pathname==='/api/ledger/'+orderId){
   if(url.searchParams.get('token')!==token)return reply(res,401,{success:false,error:'SESSION_TOKEN_REQUIRED'});
   return reply(res,200,{success:true,orderId,challengeAmount:499.01,
@@ -130,7 +168,7 @@ http.createServer((req,res)=>{
     req.headers['x-ci-fixture-key']==='CI_ANDROID_ONLY'){
   const next=url.searchParams.get('value');
   if(!['P2P','P2M'].includes(next))return reply(res,400,{error:'invalid kind'});
-  paymentKind=next;return reply(res,200,{ok:true,kind:paymentKind});
+  paymentKind=next;proofbridgeAuthorized=false;proofbridgeClaim=null;return reply(res,200,{ok:true,kind:paymentKind});
  }
  if(url.pathname==='/__test/state'&&req.method==='POST'&&req.headers['x-ci-fixture-key']==='CI_ANDROID_ONLY'){
   const value=url.searchParams.get('value');
