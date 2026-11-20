@@ -34,10 +34,14 @@
  }
  function copyDebugReport(){
   if(!debug)return;
-  const report='DISHA checkout diagnostic v2\n'+
-   'Checkout session: '+(orderId()?'active':'not-created')+'\n'+
-   'Device: '+device+'\n'+
-   debugHistory.map(x=>x.time+' '+x.event+' '+x.code+' '+x.app).join('\n');
+  const report='DISHA checkout diagnostic v2
+'+
+   'Checkout session: '+(orderId()?'active':'not-created')+'
+'+
+   'Device: '+device+'
+'+
+   debugHistory.map(x=>x.time+' '+x.event+' '+x.code+' '+x.app).join('
+');
   if(navigator.clipboard?.writeText){
    navigator.clipboard.writeText(report).then(()=>debugStatus('Trace copied')).catch(()=>debugStatus('Copy not permitted'));
   }else debugStatus('Clipboard unavailable');
@@ -334,7 +338,8 @@
   const anchor=get('qrTapToPay'),container=get('paymentQr');
   // P2P ProofBridge is copy-to-pay, NOT QR-to-pay. Neither consent
   // nor Proceed may render a personal-account QR in this mode.
-  const nativeHostEligible=device==='android'&&!query.has('nativeHostUnavailable');\n  const p2pCopyOnly=proofbridgeEnabled&&model.isPersonalPayment(session.upiUri)&&!nativeHostEligible;
+  const nativeHostEligible=device==='android'&&!query.has('nativeHostUnavailable');
+  const p2pCopyOnly=proofbridgeEnabled&&model.isPersonalPayment(session.upiUri)&&!nativeHostEligible;
   anchor.hidden=p2pCopyOnly;
   get('qrExpiry').hidden=p2pCopyOnly;
   get('qrTapToPayHint').hidden=p2pCopyOnly;
@@ -362,8 +367,8 @@
   }
   // Check the literal launch target BEFORE Android resolves an anchor's "#"
   // to the current absolute URL. Personal P2P remains scan/copy-only.
-  const launchUri=model.supportsNativeUPI(userAgent)
-   ?model.qrTapLaunchUri(session.upiUri,userAgent,secureCheckoutUrl(true)):'#';
+  const launchUri=nativeHostEligible?nativeHostIntentUri('gpay'):
+   (model.supportsNativeUPI(userAgent)?model.qrTapLaunchUri(session.upiUri,userAgent,secureCheckoutUrl(true)):'#');
   anchor.href=launchUri;
   anchor.setAttribute('aria-disabled',launchUri==='#'?'true':'false');
   if(quantumEnabled){
@@ -643,11 +648,15 @@
   get('saveReceipt').addEventListener('click',()=>{if(receiptShown)window.print()});
   get('shareReceipt').addEventListener('click',async()=>{
    if(!receiptShown)return;
-   const content='DISHA verified payment receipt\nAmount: '+format(session.amount)+
-    '\n'+(session.serviceNumber?'Service ID: '+session.serviceNumber+'\n':'')+
+   const content='DISHA verified payment receipt
+Amount: '+format(session.amount)+
+    '
+'+(session.serviceNumber?'Service ID: '+session.serviceNumber+'
+':'')+
     'Bank UTR / reference: '+get('receiptUtr').textContent+
     (get('receiptPayerTxnRow')&&!get('receiptPayerTxnRow').hidden?
-     '\nPayer transaction ID: '+get('receiptPayerTxn').textContent:'');
+     '
+Payer transaction ID: '+get('receiptPayerTxn').textContent:'');
    try{
     if(navigator.share)await navigator.share({title:'DISHA payment receipt',text:content});
     else if(navigator.clipboard?.writeText){
