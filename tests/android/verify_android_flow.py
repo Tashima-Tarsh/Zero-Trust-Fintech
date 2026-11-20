@@ -97,6 +97,10 @@ def simulate_receiver_outcome(outcome):
         "-p","ai.disha.testupi","--es","outcome",outcome,timeout=15)
 
 def reopen_test_receiver():
+    # A fresh deliberate tap after a canceled/returned app must outlive the
+    # checkout's six-second duplicate-launch guard. The previous CI attempt
+    # clicked too soon and incorrectly expected a new native receiver.
+    time.sleep(6.5)
     current=states()[-1]
     assert current["stage"]=="qr" and current["qr"] and not current["qrDisabled"]
     baseline=len(log())
