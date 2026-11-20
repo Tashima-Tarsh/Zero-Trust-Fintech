@@ -375,7 +375,7 @@
  }
  function proofbridgeCopyVpa(value){
   // Invoke directly within the Proceed user gesture; never after an API fetch.
-  if(!value||!navigator.clipboard?.writeText){
+  if(!value||window.isSecureContext===false||!navigator.clipboard?.writeText){
    // Older WebViews may expose only the synchronous, gesture-bound copy API.
    if(!document.execCommand||!document.createElement)return Promise.reject(Error('COPY_UNAVAILABLE'));
    const el=document.createElement('textarea');
