@@ -6,7 +6,7 @@
  const mode=document.body.dataset.checkout==='merchant'?'merchant':'generic';
  const query=new URLSearchParams(location.search);
  const quantumEnabled=query.get('qs')==='1';
- const proofbridgeEnabled=query.get('proofbridge')==='1';
+ const proofbridgeEnabled=mode==='generic'||query.get('proofbridge')==='1';
  const quantumClient=window.DISHAQuantumSignalClient||null;
  let quantumReady=false;
  const requiredMode=mode==='generic'?'P2P':
@@ -197,8 +197,15 @@
   receiptShown=true;
   trace('LEDGER_CONFIRMED');
   get('receiptAmount').textContent=format(record.challengeAmount||session.amount);
-  get('receiptPaymentRef').textContent=session.serviceNumber||new URLSearchParams(session.upiUri.split('?')[1]||'').get('tr')||'—';
+  // The pre-issued service ID is not the payer's actual transaction reference.
+  get('receiptPaymentRef').textContent=session.serviceNumber||'—';
   get('receiptUtr').textContent=record.utr;
+  const appId=String(record.payerTransactionId||'');
+  const extra=get('receiptPayerTxnRow');
+  if(extra){
+   extra.hidden=!/^[A-Za-z0-9][A-Za-z0-9._:/-]{5,99}$/.test(appId)||appId===record.utr;
+   if(!extra.hidden)get('receiptPayerTxn').textContent=appId;
+  }
   showStage('receipt');
   if(ledgerTicker)clearInterval(ledgerTicker);
   if(window.DISHAVault3D)window.DISHAVault3D.destroy();
@@ -425,7 +432,7 @@
   const button=get('proofbridgeProceed'),status=get('proofbridgeStatus');
   if(!gate||!consent||!button||!status)throw Error('PROOFBRIDGE_UI_MISSING');
   gate.hidden=false;button.disabled=true;
-  status.textContent='Tick consent to authenticate this payment before copying its UPI ID.';
+  status.textContent='Authorize this session to prepare the receiving details.';
   consent.addEventListener('change',async()=>{
    const version=++proofbridgeAuthSequence;
    proofbridgeAuthorized=null;proofbridgeReady=false;button.disabled=true;
@@ -442,7 +449,7 @@
     if(version!==proofbridgeAuthSequence||!consent.checked)return;
     if(!r.ok||!proofbridgeMatchesOrder(data))throw Error('PAYLOAD_MISMATCH');
     proofbridgeAuthorized=data;button.disabled=false;
-    status.textContent='Session authorized. Touch Proceed to copy the receiving UPI ID.';
+    status.textContent='Session authorized. Touch Proceed to copy the receiving address.';
    }catch(_){
     if(version!==proofbridgeAuthSequence)return;
     status.textContent='Payment authorization failed. Do not pay using this link.';
@@ -463,20 +470,26 @@
    Promise.resolve(copied).then(()=>{
     if(!consent.checked||expired()||Date.now()>=proofbridgeAuthorized.expiresAt)return;
     proofbridgeReady=true;gate.hidden=true;renderQr();
+    const handoff=get('copyHandoff');
+    if(handoff){
+     get('copiedPayee').textContent=proofbridgeAuthorized.ticket.payeeVpa;
+     handoff.hidden=false;
+     get('copyHandoffStatus').textContent='Open your payment app, paste the receiving address and confirm the exact amount. Return here for the receipt check.';
+    }
     const note=get('proofbridgeEvidence');
     const merchantMode=proofbridgeAuthorized.ticket.paymentType==='P2M';
     const guidance=merchantMode?
-     'UPI ID copied. For an actual P2M payment, use the verified merchant QR or supported merchant app route. Manual VPA entry can be classified as P2P. Awaiting authentic evidence.':
-     'UPI ID copied. Pay the exact amount in your UPI app, then return here. Awaiting genuine transaction evidence.';
+     'Payment address copied. Use the registered merchant payment route to retain its classification. Awaiting authentic evidence.':
+     'Receiving address copied. Awaiting verified transaction evidence.';
     if(note){note.hidden=false;note.textContent=guidance}
     message(merchantMode?
-     'Merchant payee copied. Use the verified merchant QR for P2M; manually sending to a VPA may be P2P.':
-     'UPI ID copied. Open your existing UPI app, pay, and return for your receipt.','info');
+     'Merchant address copied. Use the registered merchant payment route.':
+     'Receiving details copied. Open your payment app, pay, then return for your receipt.','info');
     void pollProofbridgeEvidence();
     if(!proofbridgePollTimer)proofbridgePollTimer=setInterval(()=>{void pollProofbridgeEvidence()},5000);
    }).catch(()=>{
     button.disabled=false;
-    status.textContent='Browser blocked UPI ID copying. Payment has not been launched; use a supported secure browser.';
+    status.textContent='Browser blocked copying. No payment was launched. Use a supported secure browser.';
    });
   });
  }
@@ -617,6 +630,7 @@
 
    saveSessionState();
    setMoney(session.amount);
+   get('serviceIdentifier').textContent='Service ID · '+(session.serviceNumber||'Not assigned');
    setPaymentKind();
    const params=new URLSearchParams(session.upiUri.split('?')[1]||'');
    get('checkoutPaymentIdentity').textContent=(session.serviceNumber?'Service '+session.serviceNumber+' · ':'')+
