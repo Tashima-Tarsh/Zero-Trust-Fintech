@@ -6,25 +6,36 @@
  const amount=document.getElementById('tryAmount'),vpa=document.getElementById('tryVpa');
  const error=document.getElementById('tryError'),status=document.getElementById('modeDescription');
  const button=form.querySelector('[type="submit"]'),modes=[...form.querySelectorAll('[data-payment-mode]')];
+ const vpaLabel=document.getElementById('tryVpaLabel');
  let mode='P2P';
  function selectMode(next){
   mode=next==='P2M'?'P2M':'P2P';
   modes.forEach(el=>{const active=el.dataset.paymentMode===mode;el.setAttribute('aria-pressed',String(active));el.classList.toggle('active',active)});
-  status.textContent=mode==='P2M'
+  const merchant=mode==='P2M';
+  status.textContent=merchant
    ?'P2M requires an active bank-registered merchant UPI account and its real MCC. Sign in to issue the service payment.'
-   :'P2P uses your configured personal receiving UPI account. Unknown payees cannot be substituted.';
+   :'P2P uses the configured personal receiving UPI account. Continue to one-time Consent and Proceed; no QR is shown.';
+  // The public P2P receiver is already verified server-side. Never require
+  // customers to retype or invent a receiving ID. P2M must remain explicit.
+  vpa.required=merchant;
+  vpa.placeholder=merchant?'registered-merchant@bank':'Configured personal UPI ID (automatic)';
+  if(vpaLabel)vpaLabel.textContent=merchant?'Merchant receiving UPI ID':'Receiving UPI ID (optional for P2P)';
+  if(!button.disabled)button.textContent=merchant?'Continue to merchant sign-in ↗':'Continue to P2P consent ↗';
   error.hidden=true;
  }
  modes.forEach(el=>el.addEventListener('click',()=>selectMode(el.dataset.paymentMode)));
  selectMode(params.get('mode'));
- function fail(message){error.hidden=false;error.textContent=message;button.disabled=false;button.textContent='Continue to UPI ↗'}
+ function fail(message){
+  error.hidden=false;error.textContent=message;button.disabled=false;
+  button.textContent=mode==='P2M'?'Continue to merchant sign-in ↗':'Continue to P2P consent ↗';
+ }
  form.addEventListener('submit',async event=>{
   event.preventDefault();error.hidden=true;
   const raw=String(amount.value||'').trim(),payee=String(vpa.value||'').trim();
   if(!/^\d+(?:\.\d{1,2})?$/.test(raw)||!(Number(raw)>=0.01&&Number(raw)<=100000)){
    fail('Enter an amount between ₹0.01 and ₹1,00,000, with up to two decimal places.');return;
   }
-  if(!/^[a-zA-Z0-9.\-_]{2,256}@[a-zA-Z][a-zA-Z0-9]{1,63}$/.test(payee)){
+  if((mode==='P2M'||payee)&&!/^[a-zA-Z0-9.\-_]{2,256}@[a-zA-Z][a-zA-Z0-9]{1,63}$/.test(payee)){
    fail('Enter a valid receiving UPI ID, for example youraccount@bank.');return;
   }
   const value=Number(raw).toFixed(2);
@@ -35,7 +46,10 @@
    location.assign('/login?mode=P2M');return;
   }
   try{
-   const search=new URLSearchParams({amount:value,vpa:payee,description:'Direct UPI payment'});
+   // If no VPA is supplied, Railway chooses the configured owner P2P
+   // receiver. A supplied VPA remains subject to the backend allowlist.
+   const search=new URLSearchParams({amount:value,description:'Direct UPI payment'});
+   if(payee)search.set('vpa',payee);
    const response=await fetch('/api/session/new?'+search.toString(),{credentials:'same-origin',cache:'no-store'});
    const result=await response.json().catch(()=>({}));
    if(!response.ok){
@@ -48,7 +62,10 @@
       !/^[a-f0-9]{24,64}$/i.test(result.sessionId||''))throw Error('Payment session was incomplete. Please try again.');
    const checkout=new URL('/p2p',location.origin);
    checkout.searchParams.set('orderId',result.orderId);checkout.searchParams.set('token',result.sessionId);
-   checkout.searchParams.set('qs','1');
+   // This page previously dropped proofbridge=1 and launched the retired QR
+   // path. Always enter the consent-gated copy-to-pay P2P checkout.
+   checkout.searchParams.set('proofbridge','1');
+   if(params.get('qs')==='1')checkout.searchParams.set('qs','1');
    location.assign(checkout.pathname+checkout.search);
   }catch(e){fail(e.message||'Payment request unavailable. Please try again.')}
  });
