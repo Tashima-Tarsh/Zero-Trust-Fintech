@@ -35,21 +35,21 @@
  }
 // Android Chrome supports intent:// with a direct user gesture. The
  // bank-scannable UPI QR remains unchanged and Android WebViews still get upi://pay.
+ // Personal UPI intent is disallowed. Keep it for scannable QR/share-pay only.
+ function isPersonalPayment(uri){
+   const valid=qrPayload(uri);
+   const p=new URLSearchParams(valid.slice(valid.indexOf('?')+1));
+   return !p.has('mc');
+ }
  function qrTapLaunchUri(uri,userAgent,checkoutFallbackHref){
    const valid=qrPayload(uri),ua=String(userAgent||'');
-   // Use targeted intent for ALL Android browsers (except WebView), same as appTapLaunchUri
+   if(isPersonalPayment(valid))return '#';
    if(!supportsTargetedAppLaunch(ua))return valid;
    const params=valid.slice(valid.indexOf('?')+1);
    const fallback=checkoutFallbackUrl(checkoutFallbackHref);
-   // Build intent with fallback chain: GPay → PhonePe → Paytm → BHIM → generic
-   const packages={gpay:'com.google.android.apps.nbu.paisa.user',
-    phonepe:'com.phonepe.app',paytm:'net.one97.paytm',bhim:'in.org.npci.upiapp'};
-   const chain=['gpay','phonepe','paytm','bhim'];
-   const fallbackChain=chain.map(a=>packages[a]).join(';');
    return 'intent://pay?'+params+
-    '#Intent;scheme=upi;action=android.intent.action.VIEW;'+
-    (fallback?'S.browser_fallback_url='+encodeURIComponent(fallback)+';':'')+
-    'S.browser_fallback_package='+encodeURIComponent(fallbackChain)+';end';
+     '#Intent;scheme=upi;action=android.intent.action.VIEW;'+
+     (fallback?'S.browser_fallback_url='+encodeURIComponent(fallback)+';':'')+'end';
  }
 // Package-targeted intent with fallback chain: GPay → PhonePe → Paytm → BHIM → generic.
 // Prevents Android's last-used UPI app (e.g., Slice) from hijacking the payment.
@@ -61,21 +61,18 @@
   return isAndroid && !isWebView;
  }
  function appTapLaunchUri(uri,userAgent,checkoutFallbackHref,app){
-  const valid=qrPayload(uri);
-  const packages={gpay:'com.google.android.apps.nbu.paisa.user',
-   phonepe:'com.phonepe.app',paytm:'net.one97.paytm',bhim:'in.org.npci.upiapp'};
-  const pkg=packages[app];
-  if(!pkg)throw Error('Unsupported UPI app');
-  if(!supportsTargetedAppLaunch(userAgent))return valid;
-  // Build intent with fallback chain
-  const chain=['gpay','phonepe','paytm','bhim'];
-  const fallbackChain=chain.map(a=>packages[a]).join(';');
-  const params=valid.slice(valid.indexOf('?')+1);
-  const fallback=checkoutFallbackUrl(checkoutFallbackHref);
-  return 'intent://pay?'+params+
-   '#Intent;scheme=upi;action=android.intent.action.VIEW;package='+pkg+';'+
-   (fallback?'S.browser_fallback_url='+encodeURIComponent(fallback)+';':'')+
-   'S.browser_fallback_package='+encodeURIComponent(fallbackChain)+';end';
+   const valid=qrPayload(uri);
+   const packages={gpay:'com.google.android.apps.nbu.paisa.user',
+    phonepe:'com.phonepe.app',paytm:'net.one97.paytm',bhim:'in.org.npci.upiapp'};
+   const pkg=packages[app];
+   if(!pkg)throw Error('Unsupported UPI app');
+   if(isPersonalPayment(valid))return '#';
+   if(!supportsTargetedAppLaunch(userAgent))return valid;
+   const params=valid.slice(valid.indexOf('?')+1);
+   const fallback=checkoutFallbackUrl(checkoutFallbackHref);
+   return 'intent://pay?'+params+
+    '#Intent;scheme=upi;action=android.intent.action.VIEW;package='+pkg+';'+
+    (fallback?'S.browser_fallback_url='+encodeURIComponent(fallback)+';':'')+'end';
  }
  function isSettled(record){
   return Boolean(record&&record.status==='SUCCESS'&&typeof record.utr==='string'&&/^[0-9]{12}$/.test(record.utr));
@@ -95,7 +92,7 @@
   if(!Number.isFinite(n)||n<=0)throw Error('Invalid payment amount');
   return new Intl.NumberFormat('en-IN',{style:'currency',currency:'INR',maximumFractionDigits:2,minimumFractionDigits:2}).format(n);
  }
- const api=Object.freeze({qrPayload,qrTapLaunchUri,appTapLaunchUri,supportsTargetedAppLaunch,checkoutFallbackUrl,supportsNativeUPI,isSettled,formatINR,userFacingError});
+ const api=Object.freeze({qrPayload,isPersonalPayment,qrTapLaunchUri,appTapLaunchUri,supportsTargetedAppLaunch,checkoutFallbackUrl,supportsNativeUPI,isSettled,formatINR,userFacingError});
  if(typeof module!=='undefined'&&module.exports)module.exports=api;
  root.DISHACosmicCheckoutModel=api;
 })(typeof window!=='undefined'?window:globalThis);

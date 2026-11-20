@@ -11,7 +11,7 @@
   mode=next==='P2M'?'P2M':'P2P';
   modes.forEach(el=>{const active=el.dataset.paymentMode===mode;el.setAttribute('aria-pressed',String(active));el.classList.toggle('active',active)});
   status.textContent=mode==='P2M'
-   ?'P2M requires an active bank-registered merchant UPI account and its real MCC. Sign in to issue the order.'
+   ?'P2M requires an active bank-registered merchant UPI account and its real MCC. Sign in to issue the service payment.'
    :'P2P uses your configured personal receiving UPI account. Unknown payees cannot be substituted.';
   error.hidden=true;
  }

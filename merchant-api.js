@@ -129,14 +129,14 @@ async function selectMerchantVPA(client, merchantId, amount) {
   return selected;
 }
 const sqlOrders = "SELECT o.id,o.merchant_id,o.amount_paise,o.description,o.external_reference,"+
-  "o.vpa_address,o.created_at,o.expires_at,s.status,s.utr,s.session_id,s.state,t.created_at AS settled_at,"+
+  "o.vpa_address,o.created_at,o.expires_at,s.status,s.utr,s.txn_ref AS service_number,s.session_id,s.state,t.created_at AS settled_at,"+
   "ve.outcome AS vault_outcome,ve.utr_candidate AS vault_utr_candidate,ve.correlation AS vault_correlation "+
   "FROM saas_merchant_orders o JOIN sessions s ON s.session_id=o.session_id "+
   "LEFT JOIN LATERAL (SELECT outcome, utr_candidate, correlation FROM disha_vault_evidence WHERE order_id=o.id ORDER BY created_at DESC LIMIT 1) ve ON TRUE "+
   "LEFT JOIN LATERAL (SELECT created_at FROM transactions WHERE order_id=o.id ORDER BY created_at DESC LIMIT 1) t ON TRUE "+
   "WHERE o.merchant_id=$1 AND o.created_at >= $2 ORDER BY o.created_at DESC LIMIT $3";
 const publicOrder = o => ({
-  id:o.id, amount:Number(o.amount_paise)/100,description:o.description,
+  id:o.id,service_number:o.service_number||null,amount:Number(o.amount_paise)/100,description:o.description,
   external_reference:o.external_reference,vpa_address:o.vpa_address,
   created_at:Number(o.created_at),expires_at:Number(o.expires_at),utr:o.utr,
   status:invoiceStatus(o),settled_at:o.settled_at?Number(o.settled_at):null,
@@ -242,12 +242,12 @@ function createMerchantApi({db,getAuth,buildUpiUri,platformControl}) {
       payee={...payee,...prior.rows[0]};
     }
     // Retain previously issued merchant payment links without changing their UPI tr.
-    const paymentReference=/^PAY[A-F0-9]{24}$/i.test(String(o.txn_ref||''))
+    const paymentReference=/^[A-Za-z0-9]{1,35}$/.test(String(o.txn_ref||''))
       ?o.txn_ref:o.id.replace(/[^A-Za-z0-9]/g,'').slice(0,35);
     const uri=upi(payee,payee.holder_name||o.business_name,
       amount,o.description||'Payment',paymentReference);
     res.set('Cache-Control','no-store').json({success:true,order:{
-      id:o.id,amount,business_name:o.business_name,vpa_address:o.vpa_address,
+      id:o.id,service_number:paymentReference,amount,business_name:o.business_name,vpa_address:o.vpa_address,
       payee_name:payee.holder_name||o.business_name,
       payment_type:String(payee.account_type).toUpperCase()==='MERCHANT'?'P2M':'P2P',
       description:o.description,status:invoiceStatus(o),expires_at:Number(o.expires_at),
@@ -455,7 +455,7 @@ function createMerchantApi({db,getAuth,buildUpiUri,platformControl}) {
     const externalReference=val(req.body.paymentReference??req.body.orderId,100);
     const c=await db.pgPool.connect();
     const orderId=id('PAY_'),sessionId=crypto.randomBytes(24).toString('hex');
-    const paymentReference='PAY'+crypto.randomBytes(12).toString('hex').toUpperCase();
+    const paymentReference='SRV'+crypto.randomBytes(12).toString('hex').toUpperCase();
     const createdAt=now(),expiresAt=createdAt+180000;
     let receiving,checkoutUri,accountType;
     try{
@@ -499,7 +499,7 @@ function createMerchantApi({db,getAuth,buildUpiUri,platformControl}) {
     }catch(e){await c.query('ROLLBACK');throw e;}finally{c.release();}
     const uri=checkoutUri;
     res.status(201).json({success:true,order:{
-      id:orderId,amount,description,vpa_address:receiving.vpa_address,
+      id:orderId,service_number:paymentReference,amount,description,vpa_address:receiving.vpa_address,
       status:'PENDING',expires_at:expiresAt,
       payment_type:accountType==='MERCHANT'?'P2M':'P2P',
       upi_uri_dynamic:uri,checkout_url:link(orderId,sessionId,req.merchant.is_internal_test===true,accountType)

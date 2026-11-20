@@ -2,7 +2,7 @@
 const assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path'),vm=require('node:vm');
 const source=fs.readFileSync(path.join(__dirname,'../public/cosmic-checkout.js'),'utf8');
 const model=require('../public/cosmic-checkout-model.js');
-const uri='upi://pay?pa=receiver@oksbi&pn=Receiver&am=1.00&cu=INR';
+const uri='upi://pay?pa=merchant@ypbiz&pn=Merchant&am=1.00&cu=INR&mc=5411&tr=SRVINTENTTEST';
 const order='ORD_INTENT_TEST_11',token='a'.repeat(48);
 function start(userAgent){
  const nodes={},events={},stages=['initial','methods','qr','checking','receipt'].map(stage=>({dataset:{stage},hidden:stage!=='qr'}));
@@ -22,7 +22,7 @@ function start(userAgent){
  window.QRCode.CorrectLevel={M:1};
  const fetch=async url=>{
   if(url.startsWith('/api/merchant/public/order/'))return {ok:true,json:async()=>({success:true,order:{
-   id:order,upi_uri:uri,amount:1,expires_at:Date.now()+180000,status:'PENDING',payment_type:'P2P',vpa_address:'receiver@oksbi'}})};
+   id:order,upi_uri:uri,amount:1,expires_at:Date.now()+180000,status:'PENDING',payment_type:'P2M',vpa_address:'merchant@ypbiz'}})};
   if(url.startsWith('/api/ledger/'))return {ok:true,json:async()=>({status:state.ledger,utr:state.utr,challengeAmount:1})};
   throw Error('Unexpected fetch '+url);
  };
@@ -46,14 +46,14 @@ async function flush(){for(let i=0;i<35;i++)await Promise.resolve()}
  const mobileTap=mobile.nodes.qrTapToPay.href;
  assert.match(mobileTap,/^intent:\/\/pay\?/,'Chrome uses Android Intent URI');
  assert.equal(mobile.state.qr,uri,'Scannable QR must retain raw UPI intent');
- assert.equal(new URLSearchParams(mobileTap.split('?')[1].split('#')[0]).get('pa'),'receiver@oksbi');
+ assert.equal(new URLSearchParams(mobileTap.split('?')[1].split('#')[0]).get('pa'),'merchant@ypbiz');
  assert.match(mobileTap,/#Intent;scheme=upi;action=android.intent.action.VIEW;/);
  assert.ok(decodeURIComponent(mobileTap.match(/S\.browser_fallback_url=([^;]+)/)[1]).includes(
   'paymentRef='+order),'Fallback recovers the original payment');
  assert.equal(mobile.nodes.qrTapToPay.getAttribute('aria-disabled'),'false');
  assert.ok(mobile.nodes.payAmount.textContent.includes('1.00'));
  assert.match(mobile.nodes.paymentTrackingStatus.textContent,/Awaiting confirmation/);
- assert.ok(mobile.nodes.paymentKind.textContent.includes('P2P'));
+ assert.ok(mobile.nodes.paymentKind.textContent.includes('P2M'));
  let prevented=false;
  mobile.nodes.qrTapToPay.events.click({preventDefault(){prevented=true}});
  assert.equal(prevented,false,'Chrome Intent tap must preserve native user gesture');

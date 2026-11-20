@@ -3,7 +3,7 @@
  * upi-intent.js — P2P and P2M UPI intent URI builders for a self-hosted,
  * non-custodial checkout. Replaces buildNPCIIntentUri() in npci-intent.js.
  *
- * P2P: personal VPA. Params: pa, pn, am, cu, tn. Never sends mc/tr.
+ * P2P: QR/share-pay personal VPA. Params: pa, pn, am, cu, tn. No restricted intent mode.
  * P2M: merchant VPA issued by the shop's own bank. Needs the shop's real
  *      4-digit mc (copy it from the bank's merchant QR) and a tr.
  *
@@ -96,11 +96,10 @@ function buildUpiUri(o) {
 
   if (kind === 'P2P') {
     if (o.mc || o.tr || o.url || o.sign || o.tid || o.mid || o.msid || o.mtid || o.mam) {
-      throw new Error('P2P must not carry mc/tr/url/sign/tid/mid/msid/mtid/mam: put the order id in tn instead');
+      throw new Error('P2P cannot carry merchant-only fields; use a service description in tn');
     }
-    // P2P defaults per NPCI spec
-    parts.push('mode=04');        // 04 = Intent (push payment)
-    parts.push('orgid=000000');   // merchant-created intent
+    // NPCI OC76A disallows P2P Intent. This payload is only for QR/share-pay,
+    // without pretending to be an acquiring bank or intent mode 04/05.
   } else {
     // P2M validation
     if (!MC_RE.test(String(o.mc || ''))) {
@@ -113,8 +112,11 @@ function buildUpiUri(o) {
     parts.push('mc=' + o.mc);
 
     // NPCI mode/orgid for P2M
-    const mode = o.mode || '05';  // 05 = Secure Intent (P2M preferred by top PSPs)
+    // Only a PSP-signed URI may be labelled secure intent mode 05.
+    const mode = o.mode || (o.sign ? '05' : '04');
     if (!MODE_RE.test(mode)) throw new Error('Invalid mode: must be 2-digit NPCI code');
+    if (mode === '05' && !o.sign) throw new Error('Secure Intent mode 05 requires a PSP-provided signature');
+    if (mode === '04' && o.sign) throw new Error('Signed intent requires secure mode 05');
     parts.push('mode=' + mode);
 
     const orgid = o.orgid || '000000';
@@ -262,7 +264,7 @@ function appTapLaunchUri(upiUri, userAgent, checkoutFallbackHref, app) {
   return 'intent://pay?' + q +
     '#Intent;scheme=upi;action=android.intent.action.VIEW;package=' + pkg + ';' +
     (fallbackUrl ? 'S.browser_fallback_url=' + encodeURIComponent(fallbackUrl) + ';' : '') +
-    'S.browser_fallback_package=' + encodeURIComponent(fallbackChain) + ';end';
+    'end';
 }
 
 /**
@@ -303,7 +305,7 @@ function qrTapLaunchUri(upiUri, userAgent, checkoutFallbackHref) {
   return 'intent://pay?' + q +
     '#Intent;scheme=upi;action=android.intent.action.VIEW;' +
     (fallbackUrl ? 'S.browser_fallback_url=' + encodeURIComponent(fallbackUrl) + ';' : '') +
-    'S.browser_fallback_package=' + encodeURIComponent(fallbackChain) + ';end';
+    'end';
 }
 
 /**

@@ -11,15 +11,15 @@ const plain = value => String(value||'').trim();
 const p2mOnly=()=>/(?:^|[?&])mode=P2M(?:&|$)/i.test(String(location.search||''));
 const views = {
  overview:['Overview','Your business activity, financial evidence and operational priorities'],
- intelligence:['Payment Intelligence','Order-bound UTR and evidence correlation'],
+ intelligence:['Payment Intelligence','Service-bound UTR and evidence correlation'],
  payments:['Transactions','Track every payment request and recorded outcome'],
  create:['Create payment','Generate a customer-specific UPI link and QR'],
  vpas:['UPI Accounts & Routing','Manage the UPI addresses that receive your payments'],
  routing:['Routing & accounts','Inspect the primary and active receiving accounts'],
- vault:['Vault & Evidence','Device observations and order-bound evidence'],
+ vault:['Vault & Evidence','Device observations and service-bound evidence'],
  ledger:['Reconciliation & Ledger','Qualified financial records and report status'],
  integrations:['Integrations & Automation','Developer connections and configuration'],
- risk:['Security review','Actual order-state indicators for this workspace'],
+ risk:['Security review','Actual service-state indicators for this workspace'],
  access:['IP directory','Maintain the server IP addresses registered for your business'],
  reports:['Reports & exports','Download recorded merchant payment activity'],
  notifications:['Notifications','Operational events from this workspace'],
@@ -232,7 +232,8 @@ async function setupMerchant(event){
 }
 function orderTable(rows,compact=false){
  if(!rows.length)return '<tr><td colspan="'+(compact?5:7)+'" class="empty">No real payment records in this view.</td></tr>';
- return rows.map(o=>'<tr><td><strong>'+esc(o.description||'Payment')+'</strong></td><td>'+esc(date(o.created_at))+
+ return rows.map(o=>'<tr><td><strong>'+esc(o.description||'Service')+'</strong>'+
+  (o.service_number?'<small> · '+esc(o.service_number)+'</small>':'')+'</td><td>'+esc(date(o.created_at))+
   '</td><td>'+money(o.amount)+'</td><td>'+esc(o.vpa_address)+'</td>'+
   (compact?'':'<td>'+esc(o.utr||'—')+'</td>')+
   '<td><span class="state '+esc(String(o.status).toLowerCase())+'">'+esc(o.status)+'</span></td>'+
@@ -314,7 +315,7 @@ async function loadIntelligence(){
   const items=await merchantEvidence();
   $('#intelligence-table').innerHTML=evidenceTable(items,'intelligence');
   const questionable=items.filter(o=>o.vault_outcome&&String(o.vault_outcome).toUpperCase()!=='VERIFIED'||o.status==='EXPIRED'||o.status==='FAILED');
-  $('#intelligence-exceptions').innerHTML=questionable.length?evidenceTable(questionable,'intelligence'):'<div class="empty">No recorded exceptions in the loaded order register. This is not a platform-wide fraud guarantee.</div>';
+  $('#intelligence-exceptions').innerHTML=questionable.length?evidenceTable(questionable,'intelligence'):'<div class="empty">No recorded exceptions in the loaded service register. This is not a platform-wide fraud guarantee.</div>';
  }catch(e){$('#intelligence-table').textContent='Unable to retrieve merchant intelligence: '+e.message}
 }
 
@@ -347,7 +348,7 @@ function showOrder(id){
  const detail=$('#txDetails');detail.style.display='block';
  detail.innerHTML='<div class="module-head"><h2>Payment details</h2><button type="button" class="btn tiny" id="closeDetail">Close ×</button></div>'+
   '<div class="order-details">'+[
-   ['Amount',money(o.amount)],['Status',esc(o.status)],['Receiving UPI',esc(o.vpa_address)],
+   ['Service number',esc(o.service_number||'—')],['Amount',money(o.amount)],['Status',esc(o.status)],['Receiving UPI',esc(o.vpa_address)],
    ['UTR',esc(o.utr||'Not recorded')],['Created',esc(date(o.created_at))],
    ['Your reference',esc(o.external_reference||'—')]
   ].map(pair=>'<div>'+pair[0]+'<strong>'+pair[1]+'</strong></div>').join('')+'</div>';
@@ -478,7 +479,7 @@ function showCreatedOrder(o){
  const box=$('#createResult');box.className='';
  box.innerHTML='<div class="qr-result"><div class="qr-shell"><div id="createdQr"></div></div>'+
   '<div class="qr-copy"><div class="overline">REQUEST CREATED</div><div class="pay-amount">'+money(o.amount)+'</div>'+
-  '<p>Payment request ready</p><p>Receiving '+esc(o.vpa_address)+'</p>'+
+  '<p>Service '+esc(o.service_number||'—')+'</p><p>Receiving '+esc(o.vpa_address)+'</p>'+
   '<div class="form-actions">'+
   '<button type="button" class="btn tiny" data-copy="'+esc(link)+'">Copy payment link</button>'+
   '<button type="button" class="btn tiny ghost" data-copy="'+esc(o.upi_uri_dynamic)+'">Copy UPI URI</button>'+
@@ -515,7 +516,7 @@ async function loadRisk(){
  try{
   const d=await api('/api/merchant/risk'),r=d.risk||{};
   $('#riskResult').style.display='block';
-  $('#riskResult').innerHTML='<h2>Current order controls</h2><div class="risk-facts">'+
+  $('#riskResult').innerHTML='<h2>Current service controls</h2><div class="risk-facts">'+
     '<div><b>'+num(r.open)+'</b><small>Open payment requests</small></div>'+
     '<div><b>'+num(r.expired)+'</b><small>Expired requests</small></div>'+
     '<div><b>'+num(r.completed)+'</b><small>Completed records</small></div></div>';
