@@ -47,6 +47,24 @@ assert.throws(()=>verifySignedCapsule({...capsule,payeeVpa:'attacker@oksbi'},sig
 assert.throws(()=>verifySignedCapsule(capsule,signed,crypto.generateKeyPairSync('ed25519').publicKey),/PROOF_SIGNATURE_INVALID/);
 assert.throws(()=>canonicalCapsule({...capsule,extra:'ignored'}),/PROOF_FIELDS_INVALID/);
 assert.throws(()=>canonicalCapsule({...capsule,utr:'TEST123'}),/PROOF_FIELDS_INVALID/);
+const confirmedDebit={...capsule,protocol:'DISHA-PROOF-CAPSULE-V4',
+ payerTransactionId:'PAYERAPP-REAL-TX-012345',outcome:'DEBIT_CONFIRMED'};
+const debitSignature=crypto.sign(null,Buffer.from(canonicalCapsule(confirmedDebit)),kp.privateKey).toString('base64url');
+assert.equal(verifySignedCapsule(confirmedDebit,debitSignature,kp.publicKey).length,64,
+ 'Payer debit proof must carry a valid issuer signature');
+assert.throws(()=>verifySignedCapsule({...confirmedDebit,utr:'123456789013'},debitSignature,kp.publicKey),
+ /PROOF_SIGNATURE_INVALID/,'UTR must be cryptographically bound');
+assert.throws(()=>verifySignedCapsule({...confirmedDebit,payerTransactionId:'PAYERAPP-CHANGED'},debitSignature,kp.publicKey),
+ /PROOF_SIGNATURE_INVALID/,'Actual payer transaction ID must be cryptographically bound');
+assert.throws(()=>canonicalCapsule({...confirmedDebit,outcome:'SUCCESS_CLAIM'}),/PROOF_OUTCOME_INVALID/,
+ 'A claim cannot be upgraded into confirmed debit by changing status');
+assert.throws(()=>canonicalCapsule({...confirmedDebit,protocol:'DISHA-PROOF-CAPSULE-V3'}),/PROOF_OUTCOME_INVALID/);
+assert.throws(()=>canonicalCapsule({...confirmedDebit,payerTransactionId:'\u0000danger'}),/PAYER_TRANSACTION_ID_INVALID/);
+assert.throws(()=>canonicalCapsule({...confirmedDebit,payerTransactionId:''}),/PAYER_TRANSACTION_ID_INVALID/);
+assert.throws(()=>verifySignedCapsule({...confirmedDebit,orderId:'ORD_DIFFERENT'},debitSignature,kp.publicKey),/PROOF_SIGNATURE_INVALID/);
+const debitClaim={...confirmedDebit,protocol:'DISHA-PROOF-CAPSULE-V3',outcome:'SUCCESS_CLAIM'};
+assert.doesNotThrow(()=>canonicalCapsule(debitClaim),'V3 issuer-signed observation still supported but not confirmed');
+
 
 const bound={
  order_id:session.orderId,nonce,amount_paise:'50000',payee_vpa:'receiver@oksbi',
