@@ -147,7 +147,7 @@ function createSessionUpiResultRouter({ getPool, getSession }) {
       } else if (evidence.status === 'SUCCESS' &&
           (evidence.txnId || evidence.approvalRefNo) &&
           evidence.amountPaise !== null && evidence.payeeVpa !== null) {
-        decisionState = 'UPI_RESULT_MATCHED';
+        decisionState = 'UPI_RESPONSE_MATCHED';
       }
 
       const references = [evidence.txnId, evidence.approvalRefNo].filter(Boolean);
