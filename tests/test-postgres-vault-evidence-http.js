@@ -6,14 +6,25 @@ const assert=require('node:assert/strict');
 const crypto=require('node:crypto');
 const path=require('node:path');
 const {spawn}=require('node:child_process');
+const net=require('node:net');
 const {Pool}=require('pg');
 
+async function findAvailablePort(){
+  const probe=net.createServer();
+  await new Promise((resolve,reject)=>{
+    probe.once('error',reject);
+    probe.listen(0,'127.0.0.1',resolve);
+  });
+  const port=probe.address().port;
+  await new Promise((resolve,reject)=>probe.close(error=>error?reject(error):resolve()));
+  return port;
+}
 (async()=>{
   const url=process.env.TEST_DATABASE_URL;
   if(!url||!['localhost','127.0.0.1','::1'].includes(new URL(url).hostname))
     throw Error('Vault evidence HTTP tests must use disposable localhost PostgreSQL');
   const pg=new Pool({connectionString:url,max:3});
-  const port=30000+crypto.randomInt(6000),base='http://127.0.0.1:'+port;
+  const port=await findAvailablePort(),base='http://127.0.0.1:'+port;
   const server=spawn(process.execPath,['server.js'],{
     cwd:path.join(__dirname,'..'),
     env:{...process.env,PORT:String(port),DB_BACKEND:'postgres',DATABASE_URL:url,
