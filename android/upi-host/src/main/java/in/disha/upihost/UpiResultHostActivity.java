@@ -136,52 +136,54 @@ public final class UpiResultHostActivity extends ComponentActivity {
 
     private void onUpiResult(ActivityResult result) {
         Map<String,String> fields = UpiResponseParser.parse(result.getData());
-        String txnId = UpiResponseParser.first(fields, "txnid", "txid", "utr", "rrn");
-        String approvalRef = UpiResponseParser.first(fields, "approvalrefno");
-        String responseCode = UpiResponseParser.first(fields, "responsecode", "rescode");
+        String txnId = safeRef(UpiResponseParser.first(fields, "txnid", "txid", "utr", "rrn"));
+        String approvalRef = safeRef(UpiResponseParser.first(fields, "approvalrefno"));
+        String txnRef = safeRef(UpiResponseParser.first(fields, "txnref", "tr"));
+        String responseCode = safeCode(UpiResponseParser.first(fields, "responsecode", "rescode"));
         String status = UpiResponseParser.status(fields);
         String amountPaise = toPaise(UpiResponseParser.first(fields, "am", "amount"));
-        String payee = UpiResponseParser.first(fields, "tovpa", "pa");
+        String payee = safeVpa(UpiResponseParser.first(fields, "tovpa", "pa"));
 
-        if (txnId == null && approvalRef == null && responseCode == null && "UNKNOWN".equals(status)) {
+        if (txnId == null && approvalRef == null && txnRef == null &&
+            responseCode == null && "UNKNOWN".equals(status)) {
             show("UPI app returned without a structured transaction response. DISHA has not invented or submitted a UTR.");
             returnToCheckout("missing");
             return;
         }
 
-        final String reference = txnId != null ? txnId : approvalRef;
-        final String finalStatus = status;
-        final String finalAmountPaise = amountPaise;
-        final String finalPayee = payee;
         IO.execute(() -> {
             try {
                 JSONObject evidence = new JSONObject();
-                evidence.put("protocol", "DISHA-SESSION-EVIDENCE-V1");
+                evidence.put("protocol", "DISHA-UPI-RESULT-V1");
                 evidence.put("eventId", UUID.randomUUID().toString().replace("-", "_"));
                 evidence.put("orderId", orderId);
                 evidence.put("nonce", nonce);
                 evidence.put("deviceId", deviceId);
                 evidence.put("packageName", upiPackage);
-                evidence.put("postedAt", System.currentTimeMillis());
-                evidence.put("amountPaise", finalAmountPaise == null ? JSONObject.NULL : finalAmountPaise);
-                evidence.put("payeeVpa", finalPayee == null ? JSONObject.NULL : finalPayee);
-                evidence.put("transactionRef", reference == null ? JSONObject.NULL : reference);
-                evidence.put("status", finalStatus);
+                evidence.put("returnedAt", System.currentTimeMillis());
+                evidence.put("txnId", txnId == null ? JSONObject.NULL : txnId);
+                evidence.put("approvalRefNo", approvalRef == null ? JSONObject.NULL : approvalRef);
+                evidence.put("txnRef", txnRef == null ? JSONObject.NULL : txnRef);
+                evidence.put("responseCode", responseCode == null ? JSONObject.NULL : responseCode);
+                evidence.put("amountPaise", amountPaise == null ? JSONObject.NULL : amountPaise);
+                evidence.put("payeeVpa", payee == null ? JSONObject.NULL : payee);
+                evidence.put("status", status);
 
                 Signature signer = Signature.getInstance("SHA256withECDSA");
                 signer.initSign(keyPair().getPrivate());
-                signer.update(canonicalEvidence(evidence).getBytes(StandardCharsets.UTF_8));
+                signer.update(canonicalUpiResult(evidence).getBytes(StandardCharsets.UTF_8));
                 String signed = Base64.encodeToString(signer.sign(),
                     Base64.URL_SAFE | Base64.NO_WRAP | Base64.NO_PADDING);
                 JSONObject body = new JSONObject();
                 body.put("evidence", evidence);
                 body.put("signature", signed);
                 body.put("token", token);
-                JSONObject server = post(apiBase + "/api/session-evidence/event", body, token);
+                JSONObject server = post(apiBase + "/api/session-evidence/upi-result", body, token);
                 runOnUiThread(() -> {
-                    show("UPI response received. Reference: " +
-                        (reference == null ? "not returned" : reference) +
-                        ". DISHA decision: " + server.optString("decisionState", "received") + ".");
+                    String utr = server.optString("utrCandidate", "");
+                    show("UPI response received. UTR/reference: " +
+                        (utr.isEmpty() ? "not returned" : utr) +
+                        ". DISHA evidence: " + server.optString("decisionState", "stored") + ".");
                     returnToCheckout("received");
                 });
             } catch (Exception error) {
@@ -193,18 +195,21 @@ public final class UpiResultHostActivity extends ComponentActivity {
         });
     }
 
-    private String canonicalEvidence(JSONObject e) throws Exception {
+    private String canonicalUpiResult(JSONObject e) throws Exception {
         return "{"
-            + "\\"protocol\\":\\"DISHA-SESSION-EVIDENCE-V1\\""
+            + "\\"protocol\\":\\"DISHA-UPI-RESULT-V1\\""
             + ",\\"eventId\\":" + JSONObject.quote(e.getString("eventId"))
             + ",\\"orderId\\":" + JSONObject.quote(e.getString("orderId"))
             + ",\\"nonce\\":" + JSONObject.quote(e.getString("nonce"))
             + ",\\"deviceId\\":" + JSONObject.quote(e.getString("deviceId"))
             + ",\\"packageName\\":" + JSONObject.quote(e.getString("packageName"))
-            + ",\\"postedAt\\":" + e.getLong("postedAt")
+            + ",\\"returnedAt\\":" + e.getLong("returnedAt")
+            + ",\\"txnId\\":" + nullable(e, "txnId")
+            + ",\\"approvalRefNo\\":" + nullable(e, "approvalRefNo")
+            + ",\\"txnRef\\":" + nullable(e, "txnRef")
+            + ",\\"responseCode\\":" + nullable(e, "responseCode")
             + ",\\"amountPaise\\":" + nullable(e, "amountPaise")
             + ",\\"payeeVpa\\":" + nullable(e, "payeeVpa")
-            + ",\\"transactionRef\\":" + nullable(e, "transactionRef")
             + ",\\"status\\":" + JSONObject.quote(e.getString("status")) + "}";
     }
 
