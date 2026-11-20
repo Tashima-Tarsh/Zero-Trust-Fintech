@@ -41,12 +41,13 @@ async function flush(){for(let i=0;i<35;i++)await Promise.resolve()}
 (async()=>{
  const phone=open(token);await flush();
  assert.equal(phone.stages.find(x=>!x.hidden).dataset.stage,'qr');
- assert.equal(phone.state.qr,upi);
- // P2P is QR/share-pay; restricted native intents remain disabled.
+ assert.equal(phone.state.qr,null,'Personal Quantum Fusion must never render a QR');
+ assert.equal(phone.nodes.proofbridgeGate.hidden,false,'Consent gate stays visible for P2P');
+ // P2P is copy-to-pay. No native intent or QR is dispatched.
  const qrHref=phone.nodes.qrTapToPay.href;
  assert.equal(qrHref,'#');
  assert.equal(phone.nodes.qrTapToPay.getAttribute('aria-disabled'),'true');
- assert.match(phone.nodes.qrTapToPayHint.textContent,/Personal UPI/);
+ assert.equal(phone.nodes.qrTapToPay.hidden,true,'QR is hidden throughout personal checkout');
  assert.match(phone.nodes.paymentTrackingStatus.textContent,/Awaiting confirmation/,
    'Original browser shows that confirmation is pending when another phone scans');
  assert.ok(phone.state.links.includes('/api/session/'+order+'?token='+token));
@@ -54,10 +55,11 @@ async function flush(){for(let i=0;i<35;i++)await Promise.resolve()}
  await phone.nodes.shareCheckout.events.click();
  assert.equal(new URL(phone.state.shared).searchParams.get('paymentRef'),order);
  phone.state.ledger='SUCCESS';phone.events.focus();await flush();
- assert.equal(phone.stages.find(x=>!x.hidden).dataset.stage,'receipt');
+ assert.equal(phone.stages.find(x=>!x.hidden).dataset.stage,'qr',
+  'Receiving ledger status is not the payer-side receipt trigger');
  const blocked=open('c'.repeat(48));await flush();
  assert.equal(blocked.nodes.qrTapToPay.href,'#');
  assert.equal(blocked.state.qr,null);
  assert.match(blocked.nodes.checkoutStatus.textContent,/Error/);
- console.log('QR_CROSS_DEVICE_PASS: shared generic order stays identical; invalid bearer fails closed');
+ console.log('QUANTUM_FUSION_CROSS_DEVICE_PASS: personal QR absent, session bearer preserved, no receipt on payee credit alone');
 })().catch(err=>{console.error(err);process.exitCode=1});
