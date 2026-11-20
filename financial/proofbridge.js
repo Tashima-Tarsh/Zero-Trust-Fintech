@@ -221,7 +221,13 @@ function createProofBridgeRouter({getPool,getSession,getUpiUri}){
     success:true,orderId,consented:true,deviceIntegrity:'UNKNOWN',
     paymentType:a.payment_type||'UNKNOWN',
     evidenceState:c?.evidence_state||'AWAITING_EVIDENCE',paymentVerified:false,
-    utrCandidate:c?.utr||null,issuerId:c?.issuer_id||null,claimedPaidAt:c?.paid_at||null});
+    utrCandidate:c?.utr||null,issuerId:c?.issuer_id||null,claimedPaidAt:c?.paid_at||null,
+    // Payer-side observation is separate from payee-side credit settlement.
+    // A signed SUCCESS_CLAIM is not independent proof that funds were debited.
+    payerDebitEvidence:c?{
+      utr:c.utr,issuerId:c.issuer_id,claimedPaidAt:Number(c.paid_at),
+      evidenceState:'PAYER_DEBIT_CLAIM_UNVERIFIED',debitVerified:false
+    }:null});
   }catch(e){return error(res,e)}
  });
  return router;
