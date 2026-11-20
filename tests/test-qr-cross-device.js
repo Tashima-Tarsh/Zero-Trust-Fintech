@@ -14,7 +14,7 @@ function open(sharedToken){
   querySelectorAll:q=>q==='[data-stage]'?stages:[],addEventListener:(k,fn)=>events[k]=fn};
  const location={href:'https://disha.example/checkout?paymentRef='+order+'&token='+sharedToken,
   search:'?paymentRef='+order+'&token='+sharedToken};
- const navigator={userAgent:'Mozilla/5.0 (Linux; Android 15)',clipboard:{
+ const navigator={userAgent:'Mozilla/5.0 (Linux; Android 15) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/157.0.0.0 Mobile Safari/537.36',clipboard:{
   writeText:async text=>{state.shared=text}}};
  const window={DISHACosmicCheckoutModel:model,DISHAOneTouchVault:{
   getDeviceUserId(){throw Error('Shared checkout should not create a new customer')},
