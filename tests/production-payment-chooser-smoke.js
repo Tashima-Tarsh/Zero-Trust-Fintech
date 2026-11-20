@@ -13,12 +13,12 @@ const test=async()=>{
  assert.match(page,/Quantum Fusion/);
  assert.match(page,/data-payment-mode="P2P"/);
  assert.match(page,/data-payment-mode="P2M"/);
- assert.doesNotMatch(page,/<form\\b|<input\\b|id="tryAmount"|id="tryVpa"/i);
- assert.match(page,/\/try-checkout\\.js\\?v=quantum-fusion-20261120/);
+ assert.doesNotMatch(page,/<form\b|<input\b|id="tryAmount"|id="tryVpa"/i);
+ assert.match(page,/\/try-checkout\.js\?v=quantum-fusion-20261120/);
  const js=await get('/try-checkout.js?v=quantum-fusion-20261120');
- assert.match(js,/checkout\\.searchParams\\.set\\('proofbridge','1'\\)/);
- assert.match(js,/location\\.assign\\('\/login\\?mode=P2M'\\)/);
- assert.match(js,/if\\(mode==='P2M'\\)/);
+ assert.match(js,/checkout\.searchParams\.set\('proofbridge','1'\)/);
+ assert.match(js,/location\.assign\('\/login\?mode=P2M'\)/);
+ assert.match(js,/if\(mode==='P2M'\)/);
  const checkout=await get('/p2p?proofbridge=1&amount=1');
  assert.match(checkout,/id="proofbridgeConsent"/);
  assert.match(checkout,/id="proofbridgeProceed"/);
