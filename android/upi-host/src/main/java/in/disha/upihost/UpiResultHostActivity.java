@@ -94,10 +94,11 @@ public final class UpiResultHostActivity extends ComponentActivity {
         IO.execute(() -> {
             try {
                 KeyPair pair = keyPair();
-                deviceId = getSharedPreferences(PREFS, MODE_PRIVATE).getString("deviceId", null);
+                String deviceKey = "deviceId_" + orderId;
+                deviceId = getSharedPreferences(PREFS, MODE_PRIVATE).getString(deviceKey, null);
                 if (deviceId == null) {
                     deviceId = UUID.randomUUID().toString().replace("-", "_");
-                    getSharedPreferences(PREFS, MODE_PRIVATE).edit().putString("deviceId", deviceId).apply();
+                    getSharedPreferences(PREFS, MODE_PRIVATE).edit().putString(deviceKey, deviceId).apply();
                 }
                 String publicPem = "-----BEGIN PUBLIC KEY-----\\n" +
                     Base64.encodeToString(pair.getPublic().getEncoded(), Base64.NO_WRAP) +
@@ -236,12 +237,20 @@ public final class UpiResultHostActivity extends ComponentActivity {
         return response;
     }
 
+    private String keyAlias() throws Exception {
+        byte[] digest = java.security.MessageDigest.getInstance("SHA-256")
+            .digest(orderId.getBytes(StandardCharsets.UTF_8));
+        return KEY_ALIAS_PREFIX + Base64.encodeToString(digest,
+            Base64.URL_SAFE | Base64.NO_WRAP | Base64.NO_PADDING);
+    }
+
     private KeyPair keyPair() throws Exception {
+        String alias = keyAlias();
         KeyStore store = KeyStore.getInstance("AndroidKeyStore");
         store.load(null);
         if (store.containsAlias(alias)) {
             java.security.PrivateKey privateKey = (java.security.PrivateKey) store.getKey(alias, null);
-            return new KeyPair(store.getCertificate(KEY_ALIAS).getPublicKey(), privateKey);
+            return new KeyPair(store.getCertificate(alias).getPublicKey(), privateKey);
         }
         KeyPairGenerator generator = KeyPairGenerator.getInstance("EC", "AndroidKeyStore");
         generator.initialize(new android.security.keystore.KeyGenParameterSpec.Builder(alias,
@@ -282,6 +291,11 @@ public final class UpiResultHostActivity extends ComponentActivity {
     }
     private void returnToCheckout(String result) {
         try {
+            KeyStore store = KeyStore.getInstance("AndroidKeyStore");
+            store.load(null);
+            String alias = keyAlias();
+            if (store.containsAlias(alias)) store.deleteEntry(alias);
+            getSharedPreferences(PREFS, MODE_PRIVATE).edit().remove("deviceId_" + orderId).apply();
             Uri target = Uri.parse(returnUrl).buildUpon().appendQueryParameter("dishaNative", result).build();
             startActivity(new Intent(Intent.ACTION_VIEW, target));
             finish();
