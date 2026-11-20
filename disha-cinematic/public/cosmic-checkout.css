@@ -428,3 +428,20 @@ body[data-qr-primary="true"] .qr-scan-line{display:none}
 .upi-app-options a:focus-visible{outline:3px solid #a8dfff;outline-offset:2px}
 .upi-app-options a[aria-disabled="true"]{opacity:.5;pointer-events:none}
 
+
+/* Android Chrome checkout interaction fix: keep controls reachable below the Service ID.
+   The panel remains viewport-fitted; only the payment stage scrolls when its content
+   exceeds the available height. Preserve native vertical touch scrolling and tap targets. */
+@media screen and (max-width: 900px), screen and (max-height: 760px){
+  .stage-qr{
+    min-height:0!important;
+    overflow-x:hidden!important;
+    overflow-y:auto!important;
+    overscroll-behavior-y:contain;
+    -webkit-overflow-scrolling:touch;
+    touch-action:pan-y;
+    flex:1 1 auto;
+    padding-bottom:max(18px, env(safe-area-inset-bottom));
+  }
+  .stage-qr > *{pointer-events:auto}
+}
