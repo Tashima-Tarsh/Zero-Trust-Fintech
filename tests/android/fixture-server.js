@@ -34,6 +34,7 @@ http.createServer((req,res)=>{
   ['/disha-vault-3d.css','text/css'],
   ['/one-touch-vault.js','application/javascript'],
   ['/quantum-signal-client.js','application/javascript'],
+  ['/android-checkout-handshake.js','application/javascript'],
   ['/assets/disha-vault-sculpture.svg','image/svg+xml'],
   ['/assets/disha-8-2-wordmark-cropped.png','image/png'],
   ['/assets/upi-googlepay.svg','image/svg+xml'],

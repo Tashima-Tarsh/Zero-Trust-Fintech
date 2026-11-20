@@ -445,3 +445,13 @@ body[data-qr-primary="true"] .qr-scan-line{display:none}
   }
   .stage-qr > *{pointer-events:auto}
 }
+
+/* Opt-in Android/browser research probe; never part of payment verification. */
+#dishaHandshakeLab[hidden]{display:none!important}
+.disha-handshake-lab{margin:14px 0;padding:16px;text-align:left}
+.disha-handshake-lab strong{display:block;margin:6px 0}
+.disha-handshake-consent{display:flex;gap:10px;align-items:flex-start;margin:12px 0;font-size:.88rem;line-height:1.4}
+.disha-handshake-consent input{width:20px;height:20px;flex-shrink:0}
+.disha-handshake-actions{display:flex;flex-wrap:wrap;gap:8px;margin:12px 0}
+.disha-handshake-actions button{min-height:42px;flex:1 1 150px}
+.disha-handshake-lab textarea{display:block;box-sizing:border-box;width:100%;padding:10px;border:1px solid #79665c;border-radius:8px;background:#120d0b;color:#fff;font:inherit;resize:vertical}

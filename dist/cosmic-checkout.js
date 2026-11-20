@@ -734,6 +734,8 @@
     }
    }
    trace('ORDER_READY');
+   // Optional checkout-local WebAuthn + WebOTP transport probe; never settlement proof.
+   window.DISHAAndroidCheckoutHandshake?.attach?.({orderId:session.orderId,expiresAt:session.expiresAt});
 
 
    saveSessionState();
