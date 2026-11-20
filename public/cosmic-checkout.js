@@ -337,18 +337,24 @@
   const nativeHostEligible=device==='android'&&!query.has('nativeHostUnavailable');
   const disclosure=get('nativeEvidenceDisclosure');
   if(disclosure)disclosure.hidden=!nativeHostEligible;
-  const p2pCopyOnly=proofbridgeEnabled&&model.isPersonalPayment(session.upiUri)&&!nativeHostEligible;
+  const p2pCopyOnly=model.isPersonalPayment(session.upiUri)&&(proofbridgeEnabled||nativeHostEligible);
   anchor.hidden=p2pCopyOnly;
   get('qrExpiry').hidden=p2pCopyOnly;
   get('qrTapToPayHint').hidden=p2pCopyOnly;
   if(p2pCopyOnly){
    anchor.href='#';anchor.setAttribute('aria-disabled','true');
    container.replaceChildren();qrUri=null;
-   get('upiAppOptions').hidden=true;
+   get('upiAppOptions').hidden=!nativeHostEligible;
+   for(const link of document.querySelectorAll('[data-upi-app]')){
+    link.href=nativeHostEligible?nativeHostIntentUri(link.dataset.upiApp):'#';
+    link.setAttribute('aria-disabled',nativeHostEligible?'false':'true');
+   }
    const guide=get('paymentStageCopy');
-   if(guide)guide.textContent=proofbridgeReady?
-    'Receiving details copied. Open your payment app, paste the address, confirm the amount and pay. Return here for your receipt.':
-    'Authorize this session, then touch Proceed once to copy the receiving address.';
+   if(guide)guide.textContent=nativeHostEligible?
+    'Choose your UPI app. DISHA will receive only the transaction fields returned for this payment session.':
+    proofbridgeReady?
+     'Receiving details copied. Open your payment app, paste the address, confirm the amount and pay. Return here for your receipt.':
+     'Authorize this session, then touch Proceed once to copy the receiving address.';
    return;
   }
   if(proofbridgeEnabled&&!proofbridgeReady){
