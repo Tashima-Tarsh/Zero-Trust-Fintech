@@ -10,7 +10,7 @@
 <meta name="description" content="Prepare an exact-amount DISHA payment request with your configured receiving UPI ID.">
 <link rel="icon" href="/assets/disha-8-2-wordmark-cropped.png">
 <link rel="stylesheet" href="/try-checkout.css?v=ponytail-1">
-<script defer src="/try-checkout.js?v=ponytail-1"></script>
+<script defer src="/try-checkout.js?v=proofbridge-selector-20261120"></script>
 <script src="/frontend-monitor.js?v=owner-monitor-1" defer></script>
 </head>
 <body>
@@ -22,7 +22,7 @@
 <section class="choose" aria-labelledby="try-title">
 <p class="eyebrow">DISHA / DIRECT UPI CHECKOUT</p>
 <h1 id="try-title">Prepare your payment.</h1>
-<p class="intro">Choose the receiving account type, enter your details and continue to the actual UPI checkout.</p>
+<p class="intro">Select P2P or P2M and enter the amount. P2P continues to Consent → Proceed → Copy UPI ID; P2M uses its registered merchant checkout.</p>
 <form id="tryCheckoutForm" novalidate>
 <fieldset class="mode-field">
 <legend>Payment type</legend>
@@ -33,13 +33,13 @@
 </fieldset>
 <div class="inputs">
 <label for="tryAmount">Amount in INR<input id="tryAmount" name="amount" type="number" min="0.01" max="100000" step="0.01" inputmode="decimal" value="1.00" required autocomplete="off"></label>
-<label for="tryVpa">Receiving UPI ID<input id="tryVpa" name="vpa" type="text" maxlength="256" placeholder="youraccount@bank" required autocapitalize="none" autocomplete="off" spellcheck="false"></label>
+<label for="tryVpa"><span id="tryVpaLabel">Receiving UPI ID (optional for P2P)</span><input id="tryVpa" name="vpa" type="text" maxlength="256" placeholder="Configured personal UPI ID (automatic)" autocapitalize="none" autocomplete="off" spellcheck="false"></label>
 </div>
 <p id="modeDescription" class="mode-description">P2P uses the configured personal receiving account. The receiving handle must be authorized on DISHA.</p>
 <div id="tryError" class="try-error" role="alert" hidden></div>
-<button type="submit" class="continue">Continue to UPI <span aria-hidden="true">↗</span></button>
+<button type="submit" class="continue">Continue to P2P consent ↗</button>
 </form>
-<p class="fine">The next page issues one time-limited payment request. DISHA never asks for your UPI PIN. P2M access requires an approved merchant account and bank-issued MCC.</p>
+<p class="fine">P2P will copy only the backend-authorized receiving UPI ID after consent, without a QR or DISHA app installation. Open your existing UPI app to pay. P2M requires an approved merchant account and its bank-issued MCC. A genuine receipt appears only after verified payment evidence is available.</p>
 </section>
 </main>
 </body>
