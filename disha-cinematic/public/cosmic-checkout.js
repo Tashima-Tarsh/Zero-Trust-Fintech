@@ -6,6 +6,7 @@
  const mode=document.body.dataset.checkout==='merchant'?'merchant':'generic';
  const query=new URLSearchParams(location.search);
  const quantumEnabled=query.get('qs')==='1';
+ const proofbridgeEnabled=query.get('proofbridge')==='1';
  const quantumClient=window.DISHAQuantumSignalClient||null;
  let quantumReady=false;
  const requiredMode=mode==='generic'?'P2P':
@@ -13,6 +14,7 @@
  const resumeKey='disha82:upi-payment-resume:v2';
  const stages=[...document.querySelectorAll('[data-stage]')];
  let session=null,polling=false,receiptShown=false;
+ let proofbridgeReady=false,proofbridgePolling=false;
  let qrUri=null,lastStage='qr',expiryTicker=null,ledgerTicker=null;
  let expiryLogged=false;
  // Browser-only diagnostics for direct QR taps. Not evidence of a bank payment.
@@ -273,6 +275,12 @@
  function renderQr(){
   if(!session)return;
   const anchor=get('qrTapToPay'),container=get('paymentQr');
+  if(proofbridgeEnabled&&!proofbridgeReady){
+   anchor.href='#';anchor.setAttribute('aria-disabled','true');
+   container.replaceChildren();qrUri=null;
+   get('upiAppOptions').hidden=true;
+   return;
+  }
   // Payment dispatch is independent of optional Quantum evidence telemetry.
   if(expired()||['EXPIRED','FAILED','CANCELLED'].includes(session.initialStatus)){
    anchor.href='#';anchor.setAttribute('aria-disabled','true');
@@ -328,6 +336,53 @@
    qrTapStartedAt=0;qrAppBackgrounded=false;
   }
   void pollLedger();
+ }
+ async function pollProofbridgeEvidence(){
+  if(!proofbridgeReady||proofbridgePolling||receiptShown||!session)return;
+  proofbridgePolling=true;
+  try{
+   const url='/api/proofbridge/status/'+encodeURIComponent(session.orderId)+'?token='+encodeURIComponent(session.token);
+   const r=await fetch(url,{cache:'no-store',credentials:'same-origin'});
+   if(!r.ok)return;
+   const d=await r.json();
+   if(d.utrCandidate){
+    const note=get('proofbridgeEvidence');
+    note.hidden=false;
+    note.textContent='Issuer-signed UTR claim: '+d.utrCandidate+' · NOT bank-verified. Awaiting financial confirmation.';
+   }
+  }catch(_){/* Evidence transport is optional and never changes financial state. */}
+  finally{proofbridgePolling=false}
+ }
+ function configureProofbridge(){
+  if(!proofbridgeEnabled)return;
+  const gate=get('proofbridgeGate'),consent=get('proofbridgeConsent');
+  const button=get('proofbridgeProceed'),status=get('proofbridgeStatus');
+  if(!gate||!consent||!button||!status)throw Error('PROOFBRIDGE_UI_MISSING');
+  gate.hidden=false;
+  button.addEventListener('click',async()=>{
+   if(!consent.checked){status.textContent='Tick the one-payment consent first.';return}
+   if(!session||expired()||receiptShown){status.textContent='This payment session is no longer active.';return}
+   button.disabled=true;
+   try{
+    const r=await fetch('/api/proofbridge/authorize',{method:'POST',cache:'no-store',
+     credentials:'same-origin',headers:{'Content-Type':'application/json','X-CSRF-Token':session.token},
+     body:JSON.stringify({orderId:session.orderId,token:session.token,consent:true})});
+    const data=await r.json().catch(()=>({}));
+    if(!r.ok||!data.success)throw Error('PROOFBRIDGE_AUTHORIZATION_FAILED');
+    // Fail closed if the original checkout and server-issued UPI URI disagree.
+    if(model.qrPayload(data.upiUri)!==session.upiUri||data.orderId!==session.orderId||
+       data.ticket?.amountPaise===undefined||data.ticket?.payeeVpa===undefined||
+       !Number.isSafeInteger(data.expiresAt)||data.expiresAt<=Date.now())
+      throw Error('PAYMENT_PAYLOAD_TAMPERED');
+    proofbridgeReady=true;gate.hidden=true;renderQr();
+    message('Payment instructions authorized. UTR proof is still awaiting an issuer.','info');
+    void pollProofbridgeEvidence();
+    setInterval(()=>{void pollProofbridgeEvidence()},5000);
+   }catch(_){
+    status.textContent='Authorization failed. Payment instructions remain blocked.';
+    locked('Cannot release this payment. Request a fresh authenticated checkout.');
+   }finally{button.disabled=false}
+  });
  }
  function setEventHandlers(){
 
@@ -439,6 +494,7 @@
   setEventHandlers();showStage('qr');
   try{
    session=await getSession();
+   configureProofbridge();
 
 
    trace('QR_OPEN');
