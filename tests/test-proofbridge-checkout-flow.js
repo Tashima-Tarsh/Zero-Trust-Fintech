@@ -44,7 +44,9 @@ function launch(tampered=false,kind='P2P'){
   if(url.includes('/api/proofbridge/status/')){
    data.polls++;
    return {ok:true,json:async()=>({success:true,evidenceState:data.claim?'UTR_OBSERVED_UNVERIFIED':'AWAITING_EVIDENCE',
-    paymentVerified:false,utrCandidate:data.claim})};
+    paymentVerified:false,utrCandidate:data.claim,
+    payerDebitEvidence:data.claim?{utr:data.claim,issuerId:'payer-app-test',claimedPaidAt:Date.now(),
+     evidenceState:'PAYER_DEBIT_CLAIM_UNVERIFIED',debitVerified:false}:null})};
   }
   if(url.includes('/api/ledger/'))return {ok:true,json:async()=>({
    success:true,status:data.ledger,utr:data.utr,challengeAmount:500})};
@@ -86,7 +88,10 @@ async function flush(){for(let i=0;i<55;i++)await Promise.resolve()}
  app.data.claim='123456789012';
  app.events.focus();await flush();
  assert.match(app.elems.proofbridgeEvidence.textContent,/123456789012/);
- assert.match(app.elems.proofbridgeEvidence.textContent,/NOT bank-verified/);
+ assert.match(app.elems.proofbridgeEvidence.textContent,/NOT independently debit-verified/);
+ assert.equal(app.elems.payerDebitEvidence.hidden,false,'Payer reference is separately recorded');
+ assert.equal(app.elems.payerUtrCandidate.textContent,'123456789012');
+ assert.match(app.elems.payerDebitEvidenceStatus.textContent,/not independently verified/i);
  assert.equal(app.stages.find(x=>!x.hidden)?.dataset.stage,'qr','Claim never triggers financial receipt');
  app.data.ledger='SUCCESS';app.data.utr='123456789012';
  app.events.focus();await flush();
