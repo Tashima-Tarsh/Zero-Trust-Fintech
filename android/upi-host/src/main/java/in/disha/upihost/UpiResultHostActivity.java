@@ -259,6 +259,7 @@ public final class UpiResultHostActivity extends ComponentActivity {
         String serverAmountPaise = response.getString("amountPaise");
         String serverPayee = response.getString("payeeVpa");
         String serverMerchantReference = response.optString("merchantReference", "");
+        String serverMerchantCategory = response.optString("merchantCategoryCode", "");
         paymentType = response.getString("paymentType");
         Uri payment = Uri.parse(upiUri);
         String intentAmountPaise = toPaise(payment.getQueryParameter("am"));
@@ -273,6 +274,7 @@ public final class UpiResultHostActivity extends ComponentActivity {
             if (mc != null || tr != null) throw new SecurityException("P2P intent contains merchant-only fields");
         } else if ("P2M".equals(paymentType)) {
             if (mc == null || !mc.matches("^[0-9]{4}$") || "0000".equals(mc) ||
+                !mc.equals(serverMerchantCategory) ||
                 tr == null || !tr.matches("^[A-Za-z0-9_-]{1,35}$") ||
                 !tr.equals(serverMerchantReference)) {
                 throw new SecurityException("P2M intent is missing its merchant classification/reference");
