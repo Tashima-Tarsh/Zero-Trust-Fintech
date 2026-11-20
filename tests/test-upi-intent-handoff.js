@@ -13,7 +13,7 @@ function start(userAgent){
  const appNodes=['gpay','phonepe','paytm','bhim'].map(app=>Object.assign(node('app-'+app),{dataset:{upiApp:app}}));
  const document={body:{dataset:{checkout:'merchant'}},visibilityState:'visible',getElementById:node,
   querySelectorAll:q=>q==='[data-stage]'?stages:q==='[data-upi-app]'?appNodes:[],addEventListener:(k,fn)=>events[k]=fn};
- const location={href:'https://checkout.example/merchant-checkout.html?orderId='+order+'&token='+token,
+ const location={origin:'https://checkout.example',href:'https://checkout.example/merchant-checkout.html?orderId='+order+'&token='+token,
   search:'?orderId='+order+'&token='+token};
  const navigator={userAgent,clipboard:{writeText:async x=>{state.shared=x}}};
  const window={DISHACosmicCheckoutModel:model,DISHAOneTouchVault:{
