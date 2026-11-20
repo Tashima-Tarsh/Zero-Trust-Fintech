@@ -174,11 +174,19 @@ function createSessionEvidenceRouter({ getPool, getSession }) {
              VALUES($1,$2,$3,$4,$5,$6,$7,$8,NULL)`,
             [b.orderId, sha256(b.token), nonce, amountPaise, payee, paymentType, now, expiresAt]);
         }
-        await c.query(
+        const enrolled = (await c.query(
+          'SELECT public_key_pem FROM disha_session_evidence_devices WHERE order_id=$1 AND device_id=$2',
+          [b.orderId, b.deviceId])).rows[0];
+        if (enrolled && enrolled.public_key_pem !== b.publicKeyPem) {
+          throw fail('DEVICE_KEY_REPLACEMENT_BLOCKED', 409);
+        }
+        const deviceCount = Number((await c.query(
+          'SELECT COUNT(*)::int AS count FROM disha_session_evidence_devices WHERE order_id=$1',
+          [b.orderId])).rows[0].count);
+        if (!enrolled && deviceCount >= 3) throw fail('DEVICE_PAIR_LIMIT_REACHED', 409);
+        if (!enrolled) await c.query(
           `INSERT INTO disha_session_evidence_devices(order_id,device_id,public_key_pem,enrolled_at)
-           VALUES($1,$2,$3,$4)
-           ON CONFLICT(order_id,device_id) DO UPDATE SET public_key_pem=EXCLUDED.public_key_pem,enrolled_at=EXCLUDED.enrolled_at`,
-          [b.orderId, b.deviceId, b.publicKeyPem, now]);
+           VALUES($1,$2,$3,$4)`, [b.orderId, b.deviceId, b.publicKeyPem, now]);
         await c.query('COMMIT'); tx = false;
       } catch (e) { if (tx) await c.query('ROLLBACK').catch(() => {}); throw e; }
       finally { c.release(); }
@@ -210,6 +218,10 @@ function createSessionEvidenceRouter({ getPool, getSession }) {
       const eventHash = verifyDeviceEvidence(b.evidence, b.signature, publicKey);
       const decision = evaluateEvidence(b.evidence, consent);
       if (!decision.accepted) throw fail(decision.state, 409);
+      const eventCount = Number((await c.query(
+        'SELECT COUNT(*)::int AS count FROM disha_session_evidence_events WHERE order_id=$1',
+        [b.evidence.orderId])).rows[0].count);
+      if (eventCount >= 40) throw fail('SESSION_EVENT_LIMIT_REACHED', 429);
       await c.query(
         `INSERT INTO disha_session_evidence_events
           (event_hash,event_id,order_id,device_id,package_name,posted_at,received_at,
