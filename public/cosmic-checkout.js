@@ -574,11 +574,11 @@
   get('saveReceipt').addEventListener('click',()=>{if(receiptShown)window.print()});
   get('shareReceipt').addEventListener('click',async()=>{
    if(!receiptShown)return;
-   const content='DISHA verified payment receipt\\nAmount: '+format(session.amount)+
-    '\\n'+(session.serviceNumber?'Service ID: '+session.serviceNumber+'\\n':'')+
+   const content='DISHA verified payment receipt\nAmount: '+format(session.amount)+
+    '\n'+(session.serviceNumber?'Service ID: '+session.serviceNumber+'\n':'')+
     'Bank UTR / reference: '+get('receiptUtr').textContent+
     (get('receiptPayerTxnRow')&&!get('receiptPayerTxnRow').hidden?
-     '\\nPayer transaction ID: '+get('receiptPayerTxn').textContent:'');
+     '\nPayer transaction ID: '+get('receiptPayerTxn').textContent:'');
    try{
     if(navigator.share)await navigator.share({title:'DISHA payment receipt',text:content});
     else if(navigator.clipboard?.writeText){
