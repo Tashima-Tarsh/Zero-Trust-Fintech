@@ -12,7 +12,7 @@ A minimal native Android host with **no NotificationListenerService** and no not
 7. Returns the browser to checkout.
 
 ## Browser handoff
-The Android checkout now constructs an Android intent handoff from the server-issued active session. If the host is absent, Chrome returns to checkout and the existing direct UPI fallback remains available. The native host app must be installed once on the payer device. The handoff contract is:
+The Android Chrome checkout now constructs an Android intent handoff from the server-issued active session. Generic Android WebViews are deliberately excluded because their intent handoff behaviour is not equivalent. If the host is absent, Chrome returns to checkout and the existing direct UPI fallback remains available. The native host app must be installed once on the payer device. The handoff contract is:
 
     disha://pay?apiBase=<encoded-origin>&orderId=<order>&token=<session-token>&upiUri=<encoded-upi-uri>&upiPackage=<package>&returnUrl=<encoded-checkout-url>
 
@@ -29,4 +29,4 @@ From android/ with JDK 17, Android SDK Platform 35 and Gradle 8.9:
 The APK is produced under upi-host/build/outputs/apk/debug/.
 
 ## Release gates
-The checkout handoff is wired in the Android browser path. Real-device return contracts for GPay/PhonePe/Paytm/BHIM are not yet verified. Signing/distribution and verified Android App Links are not configured. The legacy notification-listener source is excluded from this Android Gradle build and is not packaged in the host APK.
+The checkout handoff is wired for Android Chrome. Personal P2P remains QR-free and exposes the app choices through the native host. Real-device return contracts for GPay/PhonePe/Paytm/BHIM are not yet verified. Signing/distribution and verified Android App Links are not configured. The legacy notification-listener source is excluded from this Android Gradle build and is not packaged in the host APK.
