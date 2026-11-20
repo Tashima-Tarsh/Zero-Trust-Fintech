@@ -163,14 +163,14 @@ function createSessionEvidenceRouter({ getPool, getSession }) {
       const amountPaise = rupeesToPaise(String(session.challengeAmount));
       const payee = String(session.vpaAddress || '').toLowerCase();
       if (!/^[1-9][0-9]{0,15}$/.test(amountPaise) || !validVpa(payee)) throw fail('SESSION_BINDING_INVALID', 409);
+      const paymentType =
+        String(session.merchantType || '').toUpperCase().includes('P2M') ||
+        String(session.merchantType || '').toUpperCase() === 'MERCHANT' ? 'P2M' : 'P2P';
       const now = Date.now(), expiresAt = Math.min(Number(session.expiresAt), now + 180000);
       const nonce = crypto.randomBytes(20).toString('hex');
       const c = await pool.connect(); let tx = false;
       try {
         await c.query('BEGIN'); tx = true;
-        const paymentType =
-          String(session.merchantType || '').toUpperCase().includes('P2M') ||
-          String(session.merchantType || '').toUpperCase() === 'MERCHANT' ? 'P2M' : 'P2P';
         const existing = (await c.query(
           'SELECT * FROM disha_session_evidence_consents WHERE order_id=$1 FOR UPDATE', [b.orderId])).rows[0];
         let activeNonce = nonce, activeExpiry = expiresAt, activeConsentTime = now;
@@ -207,6 +207,7 @@ function createSessionEvidenceRouter({ getPool, getSession }) {
       finally { c.release(); }
       return res.status(201).set('Cache-Control','no-store').json({
         success:true, orderId:b.orderId, nonce:activeNonce, deviceId:b.deviceId,
+        amountPaise, payeeVpa:payee, paymentType,
         expiresAt:activeExpiry, consentedAt:activeConsentTime, serverTime:now, allowedPackages:[...ALLOWED_PACKAGES]
       });
     } catch (e) { return respondError(res, e); }
