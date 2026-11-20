@@ -33,6 +33,7 @@ const UNIT_TESTS = [
   'test-upi-intent-platform-contract.js', // authentic P2P/P2M URI fields, strict MCC and payee isolation
   'test-npci-intent.js',  // NPCI URI builder / parser / timestamp
   'test-upi-intent-handoff.js',
+  'test-service-number-contract.js',
   'test-qr-cross-device.js',
   'test-checkout-diagnostics.js', // opt-in UPI trace security and backend receipt, no financial claims // Android user gesture + desktop QR + generic fallback
   'test-cosmic-checkout-interactions.js', // Stage transitions and ledger receipt authority

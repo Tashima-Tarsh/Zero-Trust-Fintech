@@ -105,6 +105,7 @@
    const o=raw.order;
    if(!o?.id||!o.upi_uri||!Number(o.amount))throw Error('Payment link is incomplete');
    return {orderId:o.id,token:query.get('token'),upiUri:model.qrPayload(o.upi_uri),
+     serviceNumber:o.service_number||'',
      amount:Number(o.amount),expiresAt:Number(o.expires_at),initialStatus:o.status,
      paymentType:o.payment_type,payeeVpa:o.vpa_address};
   }
@@ -112,11 +113,12 @@
    const o=raw.session;
    if(!o.orderId||!raw.upiLink||!Number(o.challengeAmount))throw Error('Payment link is incomplete');
    return {orderId:o.orderId,token:query.get('token'),upiUri:model.qrPayload(raw.upiLink),
+    serviceNumber:o.txnRef||o.txn_ref||'',
     amount:Number(o.challengeAmount),expiresAt:Number(o.expiresAt),initialStatus:o.status,
     paymentType:o.merchantType,payeeVpa:o.vpaAddress};
   }
   return {orderId:raw.orderId,token:raw.sessionId,
-   upiUri:model.qrPayload(raw.upiLink),amount:Number(raw.challengeAmount),
+   upiUri:model.qrPayload(raw.upiLink),serviceNumber:raw.serviceNumber||raw.txnRef||'',amount:Number(raw.challengeAmount),
    expiresAt:Number(raw.expiresAt),initialStatus:'PENDING',
    paymentType:raw.paymentType,payeeVpa:raw.vpaAddress};
  }
@@ -192,7 +194,7 @@
   receiptShown=true;
   trace('LEDGER_CONFIRMED');
   get('receiptAmount').textContent=format(record.challengeAmount||session.amount);
-  get('receiptPaymentRef').textContent=new URLSearchParams(session.upiUri.split('?')[1]||'').get('tr')||'—';
+  get('receiptPaymentRef').textContent=session.serviceNumber||new URLSearchParams(session.upiUri.split('?')[1]||'').get('tr')||'—';
   get('receiptUtr').textContent=record.utr;
   showStage('receipt');
   if(ledgerTicker)clearInterval(ledgerTicker);
@@ -312,7 +314,7 @@
    void quantumClient.returned(session).then(result=>{
     if(!result)return;
     const state=result.eventState||'';
-    if(state==='CONFLICTING_EVIDENCE')message('Returned payment details conflict with your order.','error');
+    if(state==='CONFLICTING_EVIDENCE')message('Returned payment details conflict with this service.','error');
     else if(state==='UTR_CANDIDATE_UNVERIFIED')
      message('UPI reference observed in app return. Evidence stored; verification pending.','info');
     else message('Android/browser return recorded. Awaiting transaction evidence.','info');
@@ -464,7 +466,8 @@
    setMoney(session.amount);
    setPaymentKind();
    const params=new URLSearchParams(session.upiUri.split('?')[1]||'');
-   get('checkoutPaymentIdentity').textContent='UPI intent · '+(session.payeeVpa||params.get('pa')||'');
+   get('checkoutPaymentIdentity').textContent=(session.serviceNumber?'Service '+session.serviceNumber+' · ':'')+
+    'UPI · '+(session.payeeVpa||params.get('pa')||'');
    get('paymentTrackingStatus').textContent='Payment status · Awaiting confirmation';
    get('checkoutNote').textContent=params.get('tn')||'Service';
    get('qrTapToPayHint').textContent=model.isPersonalPayment(session.upiUri)

@@ -616,7 +616,7 @@ async function generateSession(baseAmount = 100, description = '', customVpa = n
   const expiresAt = now + (180 * 1000); // 3 minutes TTL
   const qrRefreshAt = now + (15 * 1000); // 15 seconds dynamic refresh
   const orderId = 'PAY_' + crypto.randomBytes(5).toString('hex').toUpperCase();
-  const txnRef = 'PAY' + now + crypto.randomBytes(3).toString('hex').toUpperCase();
+  const txnRef = 'SRV' + crypto.randomBytes(12).toString('hex').toUpperCase();
 const challengeAmount = Number(baseAmount);
   // TASK 9: Select optimal VPA to prevent bans or primary VPA
   let vpaAddress = (customVpa && String(customVpa).trim()) ? String(customVpa).trim() : null;
@@ -791,6 +791,7 @@ app.get('/api/session/new', checkoutLimiter, async (req, res) => {
       baseAmount: session.baseAmount,
       challengeAmount: session.challengeAmount,
       txnRef: session.txnRef,
+      serviceNumber: session.txnRef,
       vpaAddress: session.vpaAddress,
       merchantName: session.payeeName||MERCHANT_NAME,
       paymentType:String(session.merchantType).toUpperCase()==='MERCHANT'?'P2M':'P2P',
