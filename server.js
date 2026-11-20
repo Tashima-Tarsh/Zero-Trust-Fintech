@@ -17,6 +17,7 @@ const { createPlatformControl } = require('./platform-control');
 const {createReconciliationRouter,initializeReconciliationSchema,reconcileCredit,reconcileCreditInternal,reconcileCreditWithUtrClaim} = require('./financial/reconciliation-webhook');
 const {createVaultEvidenceRouter,initializeVaultEvidenceSchema,rememberVaultAuthorization} = require('./financial/vault-evidence');
 const {initializeQuantumSignal,createQuantumSignalRouter}=require('./financial/quantum-signal');
+const {initProofBridgeSchema,createProofBridgeRouter}=require('./financial/proofbridge');
 const {createCheckoutDiagnostics}=require('./financial/checkout-diagnostics');
 const {initializeClaimObserver,observeClaim} = require('./financial/untrusted-utr-claims');
 const {
@@ -553,6 +554,10 @@ function broadcastOrderSuccess(orderId, payload) {
 app.use('/api/vault',createVaultEvidenceRouter({getPool:()=>db.pgPool}));
 // Per-order digital twin. Browser observations are never converted to financial credits.
 app.use('/api/quantum-signal',createQuantumSignalRouter({getPool:()=>db.pgPool}));
+// Experimental only: signed receipt claims never update payment status or ledger.
+if(process.env.DISHA_PROOFBRIDGE_EXPERIMENT==='1')app.use('/api/proofbridge',
+  createProofBridgeRouter({getPool:()=>db.pgPool,getSession:id=>db.findSessionByOrderId(id),
+    getUpiUri:session=>generateUPILink(session)}));
 // Authenticated internal account-credit boundary; disabled without explicit connector config.
 // It never accepts customer-origin callbacks as bank-confirmed funds.
 app.use('/api/reconciliation',createReconciliationRouter({
@@ -2054,6 +2059,7 @@ app.get('/failed', (req, res) => res.sendFile(path.join(__dirname, 'public', 'fa
   if(db.pgPool) {
     await initializeVaultEvidenceSchema(db.pgPool);
     await initializeQuantumSignal(db.pgPool);
+    if(process.env.DISHA_PROOFBRIDGE_EXPERIMENT==='1')await initProofBridgeSchema(db.pgPool);
     await initializeClaimObserver(db.pgPool);
   }
   if(process.env.RECONCILIATION_WEBHOOK_SECRET && process.env.RECONCILIATION_SOURCE_ID){

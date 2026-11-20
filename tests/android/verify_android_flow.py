@@ -97,6 +97,11 @@ def simulate_receiver_outcome(outcome):
         "-p","ai.disha.testupi","--es","outcome",outcome,timeout=15)
 
 def reopen_test_receiver():
+    # Checkout intentionally refuses duplicate Android launches for six seconds.
+    # A physical test tap must respect that production anti-double-launch guard;
+    # do not weaken the checkout code to make a rapid retry appear successful.
+    print("ANDROID_RETRY_WAIT: honoring 6000ms native launch cooldown",flush=True)
+    time.sleep(6.5)
     current=states()[-1]
     assert current["stage"]=="qr" and current["qr"] and not current["qrDisabled"]
     baseline=len(log())
@@ -152,102 +157,86 @@ def tap_and_await_native_dispatch():
     raise AssertionError("Android touchscreen tap did not reach WebView after 2 physical touches\\n"+log()[-3500:])
 
 def test():
-    print("A01: checkout displays amount, receiving VPA and scannable QR",flush=True)
-    # Remote POSIX shell needs quotes around &token in the checkout URL.
+    print("A01: P2P browser displays correct QR while direct intent remains blocked",flush=True)
     adb("shell","am start -n ai.disha.testupi/.TestBrowserActivity --es url "+
         shlex.quote(CHECKOUT),timeout=15)
-    page=wait_state(lambda s:s["stage"]=="qr" and "499.01" in s["amount"]
+    personal=wait_state(lambda s:s["stage"]=="qr" and "499.01" in s["amount"]
         and s["qr"] and s["readyState"]=="complete"
-        and s["qrTarget"] is not None
-        and s["qrTarget"]["visible"] and not s["qrDisabled"],
-        "Order-bound QR is ready without app selection or a passkey")
+        and s["qrDisabled"] and s["qrHref"]=="#"
+        and "P2P" in s["paymentKind"],
+        "Personal-account P2P is scannable/copyable but not an app intent")
     assert fixture_state()=="PENDING"
-    assert page["qrHref"].startswith("upi://pay?"),(
-        "Android WebView must retain upi://pay; Chrome-only intent:// is not intercepted")
-    screen("01-qr-checkout")
+    assert personal["receiptUtr"]!="123456789012"
+    screen("01-p2p-qr-scan-only")
 
-    print("A02: physical QR tap launches generic Android UPI intent",flush=True)
-    # Require a real Android touch reaching the WebView, including under load.
-    tap_and_await_native_dispatch()
-    await_log("RECEIVED pa=qa-receiver@oksbi")
-    await_log("am=499.01")
-    await_log("cu=INR")
-    await_log("mc=null")
-    await_log("QA_OUTCOME_RECEIVER_READY")
-    screen("02-native-qr-tap-intent")
-
-    print("A03: simulated PSP rejection before PIN cannot fail or settle the ledger",flush=True)
-    simulate_receiver_outcome("PRE_PIN_FAILURE")
-    await_log("QA_RECEIVER_PRE_PIN_FAILURE_NO_MONEY")
-    await_log("ANDROID_ACTIVITY_RESULT classification=CANCELLED appReported=FAILURE")
-    wait_state(lambda s:s["stage"]=="qr" and s["qr"] and s["receiptUtr"]!="123456789012",
-        "Early app-side rejection retains original checkout without a receipt")
-    assert fixture_state()=="PENDING"
-    assert fixture_info()["evidenceCount"]==0
-    screen("03-pre-pin-rejection-pending")
-
-    print("A04: forged application-reported success cannot generate a financial receipt",flush=True)
-    reopen_test_receiver()
-    simulate_receiver_outcome("APP_REPORTED_SUCCESS")
-    await_log("QA_RECEIVER_APP_CLAIM_ONLY_NO_MONEY")
-    await_log("ANDROID_ACTIVITY_RESULT classification=APP_REPORTED_OK appReported=SUCCESS")
-    wait_state(lambda s:s["stage"]=="qr" and s["qr"] and s["receiptUtr"]!="123456789012",
-        "Only the application returned success; server ledger remains pending")
-    assert fixture_state()=="PENDING"
-    assert fixture_info()["evidenceCount"]==0
-    screen("04-untrusted-app-success-pending")
-
-    print("A05: UPI cancellation keeps original QR and order pending",flush=True)
-    reopen_test_receiver()
-    before_back=len(log())
-    adb("shell","input","keyevent","KEYCODE_BACK")
-    await_new_log("ANDROID_ACTIVITY_RESULT classification=CANCELLED",before_back,timeout=25)
-    await_log("bankVerified=false")
-    wait_state(lambda s:s["stage"]=="qr" and s["qr"] and s["receiptUtr"]!="123456789012",
-        "A cancelled transfer cannot create a receipt")
-    assert fixture_state()=="PENDING"
-    state=fixture_info()
-    assert state["vaultPrompts"]==0,"QR tap must not cause an extra passkey prompt"
-    assert state["evidenceCount"]==0,"Browser return alone is not settlement"
-    screen("05-return-pending")
-
-    print("A06: other-phone ledger credit appears on original browser",flush=True)
+    print("A02: ledger-only completed credit produces a receipt even across devices",flush=True)
     set_state("COMPLETED")
     receipt=wait_state(lambda s:s["stage"]=="receipt" and s["receiptUtr"]=="123456789012",
-        "Existing checkout sees completed server-ledger status")
+        "Only the server ledger's completed state generates a receipt")
     assert receipt["stage"]=="receipt"
-    screen("06-cross-device-receipt")
+    screen("02-cross-device-ledger-receipt")
 
-    print("A07: expired order never exposes scannable QR or app handoff",flush=True)
+    print("A03: expired P2P checkout cannot expose QR or native handoff",flush=True)
     set_state("EXPIRED")
     command("refresh")
-    wait_state(lambda s:s["stage"]=="qr" and s["qrDisabled"]
-        and not s["qr"] and "expired" in s["status"].lower(),
-        "Expired checkout disables QR and native UPI tap")
-    screen("07-expired-qr-blocked")
-    print("A08: merchant-classified QR must retain real MCC and independent payment reference",flush=True)
+    wait_state(lambda s:s["stage"]=="qr" and s["qrDisabled"] and not s["qr"]
+        and "expired" in s["status"].lower(),
+        "Expiry prevents an unsafe payment QR")
+    screen("03-expired-qr-blocked")
+
+    print("A04: only bank-classified P2M app intent can launch the test receiver",flush=True)
     set_state("PENDING")
     set_kind("P2M")
-    # Reuse the foreground WebView: on API 37, force-stop/relaunch during the
-    # second journey caused test-host and Play Services ANRs before a tap landed.
     command("refresh")
     merchant=wait_state(lambda s:s["stage"]=="qr" and "499.01" in s["amount"]
         and s["qr"] and not s["qrDisabled"] and "P2M" in s["paymentKind"]
         and s["readyState"]=="complete",
         "P2M QR rendered with bank-classified merchant receiver")
-    screen("08-merchant-qr")
-    tap_native(states()[-1]["qrTarget"])
+    assert merchant["qrHref"].startswith("upi://pay?")
+    screen("04-merchant-qr")
+
+    print("A05: physical Android QR tap launches test-only merchant UPI receiver",flush=True)
+    tap_and_await_native_dispatch()
     await_log("RECEIVED pa=qa-company@ypbiz")
     await_log("mc=5411 tr=PAYAABBCCDDEEFF001122334455")
     await_log("tn=Service payment")
-    screen("09-merchant-upi-handoff")
-    before_merchant_back=len(log())
-    adb("shell","input","keyevent","KEYCODE_BACK")
-    await_new_log("ANDROID_ACTIVITY_RESULT classification=CANCELLED",before_merchant_back)
-    wait_state(lambda s:s["stage"]=="qr" and s["qr"] and not s["qrDisabled"],
-        "Merchant cancellation remains pending with QR available")
+    await_log("QA_OUTCOME_RECEIVER_READY")
+    screen("05-native-p2m-handoff")
+
+    print("A06: simulated pre-PIN refusal cannot generate a financial receipt",flush=True)
+    simulate_receiver_outcome("PRE_PIN_FAILURE")
+    await_log("QA_RECEIVER_PRE_PIN_FAILURE_NO_MONEY")
+    await_log("ANDROID_ACTIVITY_RESULT classification=CANCELLED appReported=FAILURE")
+    wait_state(lambda s:s["stage"]=="qr" and s["qr"]
+        and s["receiptUtr"]!="123456789012",
+        "Pre-PIN rejection stays pending without a receipt")
     assert fixture_state()=="PENDING"
-    print("ANDROID_COSMIC_P2P_E2E_PASS: P2P/P2M tap, pre-PIN rejection, untrusted app success, cancel, ledger receipt and expiry",flush=True)
+    assert fixture_info()["evidenceCount"]==0
+    screen("06-pre-pin-refused")
+
+    print("A07: fake UPI app success cannot fabricate settlement or UTR",flush=True)
+    reopen_test_receiver()
+    simulate_receiver_outcome("APP_REPORTED_SUCCESS")
+    await_log("QA_RECEIVER_APP_CLAIM_ONLY_NO_MONEY")
+    await_log("ANDROID_ACTIVITY_RESULT classification=APP_REPORTED_OK appReported=SUCCESS")
+    wait_state(lambda s:s["stage"]=="qr" and s["qr"]
+        and s["receiptUtr"]!="123456789012",
+        "UPI app-side success remains unverified")
+    assert fixture_state()=="PENDING"
+    screen("07-unverified-app-success")
+
+    print("A08: cancellation leaves original merchant checkout pending",flush=True)
+    reopen_test_receiver()
+    marker=len(log())
+    adb("shell","input","keyevent","KEYCODE_BACK")
+    await_new_log("ANDROID_ACTIVITY_RESULT classification=CANCELLED",marker,timeout=25)
+    wait_state(lambda s:s["stage"]=="qr" and s["qr"] and not s["qrDisabled"],
+        "Merchant cancellation retains QR without false receipt")
+    assert fixture_state()=="PENDING"
+    assert fixture_info()["vaultPrompts"]==0
+    assert fixture_info()["evidenceCount"]==0
+    screen("08-return-pending")
+    print("ANDROID_COSMIC_P2P_E2E_PASS: P2P scan-only, P2M native tap, failure/success claims, ledger receipt, expiry",flush=True)
 
 if __name__=="__main__":
     try:test()

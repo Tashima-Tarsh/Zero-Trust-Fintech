@@ -134,6 +134,10 @@ public final class TestBrowserActivity extends Activity {
         else if ("open".equals(command)) {
             Log.i(TAG,"TAP_QR_TO_OPEN_UPI");
             webView.evaluateJavascript("(function(){var b=document.getElementById('qrTapToPay');if(b)b.click()})()",null);
+        } else if ("proofbridge".equals(command)) {
+            Log.i(TAG,"OPEN_PROOFBRIDGE_ANDROID_FIXTURE");
+            webView.loadUrl("http://10.0.2.2:8765/merchant-checkout.html?paymentRef=PAY_ANDROID_CI_1001&token="
+                + "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb" + "&proofbridge=1");
         } else if ("refresh".equals(command)) {
             Log.i(TAG,"RELOAD_CHECKOUT");
             webView.reload();
@@ -151,11 +155,18 @@ public final class TestBrowserActivity extends Activity {
             "var b=null;" +
             "var app=null;" +
             "var qrTap=document.getElementById('qrTapToPay');" +
+            "var proofGate=document.getElementById('proofbridgeGate');" +
+            "var proofConsent=document.getElementById('proofbridgeConsent');" +
+            "var proofProceed=document.getElementById('proofbridgeProceed');" +
             "var active=Array.from(document.querySelectorAll('[data-stage]')).find(function(e){return !e.hidden});" +
             "return JSON.stringify({amount:v('payAmount'),stage:active?active.dataset.stage:'none'," +
               "status:v('checkoutStatus'),paymentKind:v('paymentKind'),checking:v('checkingHelp'),receiptUtr:v('receiptUtr')," +
               "disabled:b?b.disabled:true,qr:!!document.querySelector('#paymentQr img, #paymentQr canvas')," +
-              "readyState:document.readyState,qrHref:qrTap?qrTap.getAttribute('href'):'',qrTarget:target(qrTap),qrDisabled:!qrTap||qrTap.getAttribute('aria-disabled')==='true',touchTarget:target(b),appTarget:target(app)});" +
+              "readyState:document.readyState,qrHref:qrTap?qrTap.getAttribute('href'):'',qrTarget:target(qrTap),qrDisabled:!qrTap||qrTap.getAttribute('aria-disabled')==='true'," +
+              "proofGateOpen:!!proofGate&&!proofGate.hidden,proofConsentChecked:!!proofConsent&&proofConsent.checked," +
+              "proofStatus:v('proofbridgeStatus'),proofEvidence:v('proofbridgeEvidence')," +
+              "proofConsentTarget:target(proofConsent),proofProceedTarget:target(proofProceed)," +
+              "proofProceedDisabled:!proofProceed||proofProceed.disabled,touchTarget:target(b),appTarget:target(app)});" +
             "})()";
         webView.evaluateJavascript(js, data -> Log.i(TAG, "CHECKOUT_DOM "+data));
     }

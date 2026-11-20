@@ -1,8 +1,10 @@
 name: Android P2P UPI emulator E2E (no real transfer)
 
 on:
-  # Real-device / Android Studio testing is the default.
-  # The heavyweight GitHub Android emulator matrix runs only by explicit request.
+  # Explicit experimental push only: run both Android emulator images for ProofBridge.
+  push:
+    branches:
+      - experiment/zero-install-proofbridge
   workflow_dispatch:
 
 permissions:

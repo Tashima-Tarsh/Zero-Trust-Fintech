@@ -6,6 +6,7 @@
  const mode=document.body.dataset.checkout==='merchant'?'merchant':'generic';
  const query=new URLSearchParams(location.search);
  const quantumEnabled=query.get('qs')==='1';
+ const proofbridgeEnabled=query.get('proofbridge')==='1';
  const quantumClient=window.DISHAQuantumSignalClient||null;
  let quantumReady=false;
  const requiredMode=mode==='generic'?'P2P':
@@ -13,6 +14,8 @@
  const resumeKey='disha82:upi-payment-resume:v2';
  const stages=[...document.querySelectorAll('[data-stage]')];
  let session=null,polling=false,receiptShown=false;
+ let proofbridgeReady=false,proofbridgePolling=false,proofbridgeAuthorized=null;
+ let proofbridgeAuthSequence=0,proofbridgePollTimer=null;
  let qrUri=null,lastStage='qr',expiryTicker=null,ledgerTicker=null;
  let expiryLogged=false;
  // Browser-only diagnostics for direct QR taps. Not evidence of a bank payment.
@@ -273,19 +276,28 @@
  function renderQr(){
   if(!session)return;
   const anchor=get('qrTapToPay'),container=get('paymentQr');
+  if(proofbridgeEnabled&&!proofbridgeReady){
+   anchor.href='#';anchor.setAttribute('aria-disabled','true');
+   container.replaceChildren();qrUri=null;
+   get('upiAppOptions').hidden=true;
+   return;
+  }
   // Payment dispatch is independent of optional Quantum evidence telemetry.
   if(expired()||['EXPIRED','FAILED','CANCELLED'].includes(session.initialStatus)){
    anchor.href='#';anchor.setAttribute('aria-disabled','true');
    get('upiAppOptions').hidden=true;
    container.replaceChildren();qrUri=null;handleQrExpiry();return;
   }
-  anchor.href=model.supportsNativeUPI(userAgent)
+  // Check the literal launch target BEFORE Android resolves an anchor's "#"
+  // to the current absolute URL. Personal P2P remains scan/copy-only.
+  const launchUri=model.supportsNativeUPI(userAgent)
    ?model.qrTapLaunchUri(session.upiUri,userAgent,secureCheckoutUrl(true)):'#';
-  anchor.setAttribute('aria-disabled',anchor.href==='#'?'true':'false');
+  anchor.href=launchUri;
+  anchor.setAttribute('aria-disabled',launchUri==='#'?'true':'false');
   if(quantumEnabled){
    const proceed=get('vaultProceed');
-   proceed.href=anchor.href;
-   proceed.setAttribute('aria-disabled',anchor.href==='#'?'true':'false');
+   proceed.href=launchUri;
+   proceed.setAttribute('aria-disabled',launchUri==='#'?'true':'false');
   }
   const targeted=model.supportsTargetedAppLaunch(userAgent)&&!model.isPersonalPayment(session.upiUri);
   get('upiAppOptions').hidden=!targeted;
@@ -328,6 +340,109 @@
    qrTapStartedAt=0;qrAppBackgrounded=false;
   }
   void pollLedger();
+  if(proofbridgeEnabled&&proofbridgeReady)void pollProofbridgeEvidence();
+ }
+ async function pollProofbridgeEvidence(){
+  if(!proofbridgeReady||proofbridgePolling||receiptShown||!session)return;
+  proofbridgePolling=true;
+  try{
+   const url='/api/proofbridge/status/'+encodeURIComponent(session.orderId)+'?token='+encodeURIComponent(session.token);
+   const r=await fetch(url,{cache:'no-store',credentials:'same-origin'});
+   if(!r.ok)return;
+   const d=await r.json();
+   if(d.utrCandidate){
+    const note=get('proofbridgeEvidence');
+    note.hidden=false;
+    note.textContent='Issuer-signed UTR claim: '+d.utrCandidate+' · NOT bank-verified. Awaiting financial confirmation.';
+   }
+  }catch(_){/* Evidence transport is optional and never changes financial state. */}
+  finally{proofbridgePolling=false}
+ }
+ function proofbridgeMatchesOrder(data){
+  if(!data||data.success!==true||!session||
+     model.qrPayload(data.upiUri)!==session.upiUri||
+     data.orderId!==session.orderId||
+     !Number.isSafeInteger(data.expiresAt)||data.expiresAt<=Date.now()||
+     data.expiresAt>Number(session.expiresAt)||
+     typeof data.ticketSignature!=='string'||!/^[a-f0-9]{64}$/i.test(data.ticketSignature)||
+     typeof data.ticketHash!=='string'||!/^[a-f0-9]{64}$/i.test(data.ticketHash)||
+     typeof data.ticket?.nonce!=='string'||!/^[a-f0-9]{40}$/i.test(data.ticket.nonce)||
+     data.ticket?.orderId!==session.orderId||
+     data.ticket?.amountPaise!==String(Math.round(session.amount*100))||
+     data.ticket?.payeeVpa!==(session.payeeVpa||'').toLowerCase()||
+     data.ticket?.expiresAt!==data.expiresAt)return false;
+  const q=new URLSearchParams(data.upiUri.split('?')[1]||'');
+  return q.get('pa')?.toLowerCase()===data.ticket.payeeVpa &&
+   String(Math.round(Number(q.get('am'))*100))===data.ticket.amountPaise &&
+   q.get('cu')==='INR';
+ }
+ function proofbridgeCopyVpa(value){
+  // Invoke directly within the Proceed user gesture; never after an API fetch.
+  if(!value||window.isSecureContext===false||!navigator.clipboard?.writeText){
+   // Older WebViews may expose only the synchronous, gesture-bound copy API.
+   if(!document.execCommand||!document.createElement)return Promise.reject(Error('COPY_UNAVAILABLE'));
+   const el=document.createElement('textarea');
+   el.value=value;el.setAttribute('readonly','');el.style.position='fixed';
+   el.style.opacity='0';document.body.appendChild(el);el.select();
+   let ok=false;try{ok=document.execCommand('copy')}finally{document.body.removeChild(el)}
+   return ok?Promise.resolve():Promise.reject(Error('COPY_DENIED'));
+  }
+  return navigator.clipboard.writeText(value);
+ }
+ function configureProofbridge(){
+  if(!proofbridgeEnabled)return;
+  const gate=get('proofbridgeGate'),consent=get('proofbridgeConsent');
+  const button=get('proofbridgeProceed'),status=get('proofbridgeStatus');
+  if(!gate||!consent||!button||!status)throw Error('PROOFBRIDGE_UI_MISSING');
+  gate.hidden=false;button.disabled=true;
+  status.textContent='Tick consent to authenticate this payment before copying its UPI ID.';
+  consent.addEventListener('change',async()=>{
+   const version=++proofbridgeAuthSequence;
+   proofbridgeAuthorized=null;proofbridgeReady=false;button.disabled=true;
+   if(!consent.checked){
+    status.textContent='Consent unchecked. Proceed is locked.';renderQr();return;
+   }
+   if(!session||expired()||receiptShown){status.textContent='Payment session expired.';renderQr();return}
+   status.textContent='Authenticating one-time payment consent…';
+   try{
+    const r=await fetch('/api/proofbridge/authorize',{method:'POST',cache:'no-store',
+     credentials:'same-origin',headers:{'Content-Type':'application/json','X-CSRF-Token':session.token},
+     body:JSON.stringify({orderId:session.orderId,token:session.token,consent:true})});
+    const data=await r.json().catch(()=>({}));
+    if(version!==proofbridgeAuthSequence||!consent.checked)return;
+    if(!r.ok||!proofbridgeMatchesOrder(data))throw Error('PAYLOAD_MISMATCH');
+    proofbridgeAuthorized=data;button.disabled=false;
+    status.textContent='Session authorized. Touch Proceed to copy the receiving UPI ID.';
+   }catch(_){
+    if(version!==proofbridgeAuthSequence)return;
+    status.textContent='Payment authorization failed. Do not pay using this link.';
+    locked('Payment security check failed.');
+   }
+  });
+  button.addEventListener('click',()=>{
+   if(!consent.checked||!proofbridgeAuthorized||proofbridgeReady||
+      !session||expired()||receiptShown||Date.now()>=proofbridgeAuthorized.expiresAt){
+    status.textContent='Payment not authorized. Request a fresh checkout.';return;
+   }
+   // Before copying check the exact server-authorized bytes again.
+   if(!proofbridgeMatchesOrder(proofbridgeAuthorized)){
+    button.disabled=true;status.textContent='Payment payload mismatch. Transaction blocked.';return;
+   }
+   button.disabled=true;
+   const copied=proofbridgeCopyVpa(proofbridgeAuthorized.ticket.payeeVpa);
+   Promise.resolve(copied).then(()=>{
+    if(!consent.checked||expired()||Date.now()>=proofbridgeAuthorized.expiresAt)return;
+    proofbridgeReady=true;gate.hidden=true;renderQr();
+    const note=get('proofbridgeEvidence');
+    if(note){note.hidden=false;note.textContent='UPI ID copied. Pay the exact amount in your UPI app, then return here. Awaiting genuine transaction evidence.'}
+    message('UPI ID copied. Open your existing UPI app, pay, and return for your receipt.','info');
+    void pollProofbridgeEvidence();
+    if(!proofbridgePollTimer)proofbridgePollTimer=setInterval(()=>{void pollProofbridgeEvidence()},5000);
+   }).catch(()=>{
+    button.disabled=false;
+    status.textContent='Browser blocked UPI ID copying. Payment has not been launched; use a supported secure browser.';
+   });
+  });
  }
  function setEventHandlers(){
 
@@ -337,7 +452,7 @@
    if(!session||receiptShown||expired()||
       !model.supportsNativeUPI(userAgent)||
       ['EXPIRED','FAILED','CANCELLED'].includes(session.initialStatus)||
-      get('vaultProceed').href==='#'){
+      get('vaultProceed').getAttribute('aria-disabled')==='true'){
     event.preventDefault();
     message(session&&model.isPersonalPayment(session.upiUri)?
       'Personal UPI intent is restricted. Scan or import the QR inside your UPI app.':
@@ -354,7 +469,7 @@
   get('qrTapToPay').addEventListener('click',event=>{
    if(!session||receiptShown||expired()||
       ['EXPIRED','FAILED','CANCELLED'].includes(session.initialStatus)||!model.supportsNativeUPI(userAgent)||
-      get('qrTapToPay').href==='#') {
+      get('qrTapToPay').getAttribute('aria-disabled')==='true') {
     event.preventDefault();
     message(expired()?'Payment window expired. Request a fresh link.':
      'Scan or import the personal-account QR inside your UPI app. P2P Intent is restricted.','info');
@@ -439,6 +554,7 @@
   setEventHandlers();showStage('qr');
   try{
    session=await getSession();
+   configureProofbridge();
 
 
    trace('QR_OPEN');

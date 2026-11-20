@@ -42,6 +42,17 @@
       <div id="payAmount" class="amount" aria-label="Exact payment amount">—</div>
       <p id="paymentKind" class="checkout-payment-kind" aria-live="polite">Checking receiving account…</p>
       
+      <!-- ProofBridge is an opt-in experimental web-only authorization gate. -->
+      <section id="proofbridgeGate" class="glass-panel" hidden aria-label="ProofBridge payment authorization" style="padding:16px;margin:12px 0">
+        <p class="eyebrow">DISHA PROOFBRIDGE · RESEARCH MODE</p>
+        <label style="display:flex;gap:10px;align-items:flex-start;font-size:0.9rem">
+          <input id="proofbridgeConsent" type="checkbox" style="width:22px;height:22px;flex-shrink:0">
+          Authorize evidence processing for this payment only. This does not grant Android app-data access.
+        </label>
+        <button id="proofbridgeProceed" type="button" class="action-primary glass-btn" disabled style="margin-top:12px">Copy UPI ID &amp; Proceed</button>
+        <p id="proofbridgeStatus" class="inline-note" role="status" aria-live="polite">Payment QR is locked until authorization.</p>
+      </section>
+      <p id="proofbridgeEvidence" class="inline-note" aria-live="polite" hidden></p>
       <!-- Glass Proceed button -->
       <a id="vaultProceed" role="button" href="#" aria-disabled="true" class="action-primary glass-btn" hidden>Proceed to UPI</a>
       <p id="vaultStatus" class="inline-note" aria-live="polite"></p>
