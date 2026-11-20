@@ -3,12 +3,13 @@ const assert=require('node:assert/strict'),vm=require('node:vm'),fs=require('nod
 const source=fs.readFileSync(path.join(__dirname,'../public/cosmic-checkout.js'),'utf8');
 const model=require('../public/cosmic-checkout-model.js');
 const uri='upi://pay?pa=merchant@oksbi&pn=Merchant&am=500.00&cu=INR&tn=Invoice';
-function mount(status='PENDING',checkout='merchant'){
+function mount(status='PENDING',checkout='merchant',overrides={}){
  const nodes={},events={},stages=['initial','methods','qr','checking','receipt'].map(stage=>({dataset:{stage},hidden:stage!=='qr'}));
  const node=k=>nodes[k]||(nodes[k]={textContent:'',href:'#',disabled:true,hidden:true,dataset:{},attrs:{},events:{},
   addEventListener(k,v){this.events[k]=v},setAttribute(k,v){this.attrs[k]=v},getAttribute(k){return this.attrs[k]},
   removeAttribute(k){delete this.attrs[k]},replaceChildren(){},classList:{toggle(){}}});
- const data={status,utr:null,qr:null,prompt:0};
+ const data={status,utr:null,qr:null,prompt:0,proof:null,
+  signal:{success:true,utrCandidate:'123456789012',eventState:'UTR_CANDIDATE_UNVERIFIED'},...overrides};
  const document={body:{dataset:{checkout}},visibilityState:'visible',getElementById:node,
   querySelectorAll:q=>q==='[data-stage]'?stages:[],addEventListener:(k,v)=>events[k]=v};
  const location={href:'https://checkout.example/merchant-checkout.html?orderId=ORD_TEST_1234&token='+('a'.repeat(48)),
@@ -24,10 +25,10 @@ function mount(status='PENDING',checkout='merchant'){
     orderId:'ORD_TEST_1234',challengeAmount:500,expiresAt:Date.now()+180000,status:'PENDING',
     merchantType:'PERSONAL',vpaAddress:'merchant@oksbi',txnRef:'SERVICE_TEST'
    },upiLink:uri})};
-   if(url.includes('/api/proofbridge/status/'))return {ok:false,status:503,json:async()=>({success:false})};
-   if(url.includes('/api/quantum-signal/status/'))return {ok:true,json:async()=>({
-    success:true,utrCandidate:'123456789012',eventState:'UTR_CANDIDATE_UNVERIFIED'
-   })};
+   if(url.includes('/api/proofbridge/status/'))return {ok:Boolean(data.proof),
+    status:data.proof?200:503,json:async()=>data.proof||{success:false}};
+   if(url.includes('/api/quantum-signal/status/'))return {ok:Boolean(data.signal),
+    status:data.signal?200:503,json:async()=>data.signal||{success:false}};
    if(url.includes('/api/ledger/'))return {ok:true,json:async()=>({
     status:data.status,utr:data.utr,challengeAmount:500})};
    throw Error('Unexpected fetch '+url);
@@ -69,6 +70,27 @@ const active=app=>app.stages.find(s=>!s.hidden)?.dataset.stage;
  assert.match(p2p.nodes.debitProofCheckUtr.textContent,/Reported UTR \(not verified\)/,
    'Returned UTR candidates must remain explicitly unverified');
  assert.equal(active(p2p),'qr','Unverified debit must not unlock receipt');
+ const unavailable=mount('PENDING','generic',{signal:null});await flush();
+ await unavailable.nodes.debitProofCheckButton.events.click();await flush();
+ assert.match(unavailable.nodes.debitProofCheckStatus.textContent,/service unavailable/i);
+ assert.equal(active(unavailable),'qr','Unavailable service is not payment failure or receipt');
+ const validIssuer={success:true,orderId:'ORD_TEST_1234',paymentVerified:true,
+  payerDebitVerified:true,payerDebitEvidence:{debitVerified:true,
+   evidenceState:'PAYER_DEBIT_VERIFIED',utr:'123456789012',
+   payerTransactionId:'PAYERTXN12345',issuerId:'Issuer-Test',
+   claimedPaidAt:Date.now()}};
+ const otherRequest=mount('PENDING','generic',{proof:{...validIssuer,orderId:'OTHER_ORDER_99'}});
+ await flush();await otherRequest.nodes.debitProofCheckButton.events.click();await flush();
+ assert.equal(active(otherRequest),'qr','Evidence for a different service request is rejected');
+ const incomplete=mount('PENDING','generic',{proof:{...validIssuer,
+  payerDebitEvidence:{...validIssuer.payerDebitEvidence,payerTransactionId:null}}});
+ await flush();await incomplete.nodes.debitProofCheckButton.events.click();await flush();
+ assert.equal(active(incomplete),'qr','Signed evidence lacking a payer transaction ID cannot issue receipt');
+ const authenticated=mount('PENDING','generic',{proof:validIssuer});await flush();
+ await authenticated.nodes.debitProofCheckButton.events.click();await flush();
+ assert.equal(active(authenticated),'receipt','Configured issuer debit evidence may render receipt');
+ assert.equal(authenticated.nodes.receiptUtr.textContent,'123456789012');
+ assert.equal(authenticated.nodes.receiptPayerTxn.textContent,'PAYERTXN12345');
   const expired=mount('EXPIRED');await flush();
  assert.equal(active(expired),'qr');
  assert.equal(expired.nodes.qrTapToPay.href,'#');

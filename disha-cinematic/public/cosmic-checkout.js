@@ -618,9 +618,11 @@
     const debit=issuer?.payerDebitEvidence;
     // Only the configured issuer's signed payer-debit record can produce
     // the existing payer receipt. A reported UTR or browser return cannot.
-    if(issuer?.payerDebitVerified===true&&debit?.debitVerified===true&&
+    if(issuer?.orderId===session.orderId&&issuer?.paymentVerified===true&&
+       issuer?.payerDebitVerified===true&&debit?.debitVerified===true&&
        debit.evidenceState==='PAYER_DEBIT_VERIFIED'&&
        /^\d{12}$/.test(debit.utr||'')&&
+       /^[A-Za-z0-9][A-Za-z0-9._:\/-]{5,99}$/.test(debit.payerTransactionId||'')&&
        /^[A-Za-z0-9._-]{3,64}$/.test(debit.issuerId||'')){
      status.textContent='Issuer-signed payer-side debit evidence found.';
      createPayerDebitReceipt(issuer);
@@ -631,7 +633,9 @@
      reported.textContent='Reported UTR (not verified): '+candidate;
      reported.hidden=false;
     }
-    status.textContent='No authenticated debit confirmation found. Service remains unverified.';
+    status.textContent=!issuer&&!signal
+     ?'Debit evidence service unavailable. Payment may have completed; check your UPI app before paying again.'
+     :'No authenticated debit confirmation found. Payment may still be processing; service remains unverified.';
    }finally{busy=false;button.disabled=false}
   });
  }
