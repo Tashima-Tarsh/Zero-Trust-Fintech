@@ -15,7 +15,12 @@ const session={
 };
 const uri='upi://pay?pa=receiver@oksbi&pn=Receiver&am=500.00&cu=INR&tn=Test';
 assert.equal(inspectPayment(session,uri).amountPaise,'50000');
-const ticket=issuedTicket(inspectPayment(session,uri),nonce,now+90000,secret);
+const personal=inspectPayment(session,uri);
+assert.equal(personal.paymentType,'P2P');
+assert.equal(personal.merchantCategory,'');
+assert.equal(personal.merchantReference,'');
+const ticket=issuedTicket(personal,nonce,now+90000,secret);
+assert.equal(ticket.ticket.paymentType,'P2P');
 assert.equal(ticket.ticket.paymentUriHash.length,64);
 assert.equal(issuedTicket(inspectPayment(session,uri),nonce,now+90000,secret).signature,ticket.signature);
 assert.notEqual(issuedTicket(inspectPayment(session,uri),nonce,now+90000,'q'.repeat(64)).signature,ticket.signature);
@@ -28,9 +33,9 @@ assert.throws(()=>inspectPayment({...session,expiresAt:now-1},uri),/ORDER_INACTI
 
 const kp=crypto.generateKeyPairSync('ed25519');
 const capsule={
- protocol:'DISHA-PROOF-CAPSULE-V1',issuerId:'experimental-test-issuer',
+ protocol:'DISHA-PROOF-CAPSULE-V2',issuerId:'experimental-test-issuer',
  orderId:session.orderId,nonce,utr:'123456789012',
- amountPaise:'50000',payeeVpa:'receiver@oksbi',outcome:'SUCCESS_CLAIM',
+ amountPaise:'50000',payeeVpa:'receiver@oksbi',paymentType:'P2P',merchantCategory:'',merchantReference:'',outcome:'SUCCESS_CLAIM',
  paidAt:now,ticketHash:ticket.ticketHash
 };
 const bytes=Buffer.from(canonicalCapsule(capsule));
@@ -45,9 +50,37 @@ assert.throws(()=>canonicalCapsule({...capsule,utr:'TEST123'}),/PROOF_FIELDS_INV
 
 const bound={
  order_id:session.orderId,nonce,amount_paise:'50000',payee_vpa:'receiver@oksbi',
- ticket_hash:ticket.ticketHash,consented_at:now-1000,expires_at:now+90000
+ ticket_hash:ticket.ticketHash,consented_at:now-1000,expires_at:now+90000,
+ payment_type:'P2P',merchant_category:'',merchant_reference:''
 };
 assert.equal(receiptIntegrity(capsule,bound),true);
+assert.throws(()=>canonicalCapsule({...capsule,paymentType:'P2M'}),/PROOF_FIELDS_INVALID/);
+assert.throws(()=>receiptIntegrity({...capsule,paymentType:'P2M',merchantCategory:'5411',merchantReference:'INV500'},bound),/PROOF_ORDER_MISMATCH/);
+const merchantUri='upi://pay?pa=business@ypbiz&pn=Business&am=500.00&cu=INR&mc=5411&tr=INV500';
+const merchantSession={...session,merchantType:'P2M',vpaAddress:'business@ypbiz'};
+const merchant=inspectPayment(merchantSession,merchantUri);
+assert.equal(merchant.paymentType,'P2M');
+assert.equal(merchant.merchantCategory,'5411');
+assert.equal(merchant.merchantReference,'INV500');
+const merchantTicket=issuedTicket(merchant,nonce,now+90000,secret);
+assert.equal(merchantTicket.ticket.paymentType,'P2M');
+assert.equal(merchantTicket.ticket.merchantCategory,'5411');
+assert.equal(merchantTicket.ticket.merchantReference,'INV500');
+assert.notEqual(merchantTicket.ticketHash,ticket.ticketHash);
+assert.throws(()=>inspectPayment(merchantSession,merchantUri+'&mc=5411'),/PAYMENT_KIND_MISMATCH/);
+assert.throws(()=>inspectPayment(merchantSession,merchantUri+'&tr=INV500'),/PAYMENT_KIND_MISMATCH/);
+assert.throws(()=>inspectPayment(merchantSession,merchantUri.replace('mc=5411','mc=0000')),/PAYMENT_KIND_MISMATCH/);
+const merchantProof={...capsule,payeeVpa:merchant.payeeVpa,paymentType:'P2M',
+ merchantCategory:merchant.merchantCategory,merchantReference:merchant.merchantReference,
+ ticketHash:merchantTicket.ticketHash};
+const merchantBound={...bound,payee_vpa:merchant.payeeVpa,payment_type:'P2M',
+ merchant_category:'5411',merchant_reference:'INV500',ticket_hash:merchantTicket.ticketHash};
+assert.equal(receiptIntegrity(merchantProof,merchantBound),true);
+assert.throws(()=>receiptIntegrity({...merchantProof,merchantReference:'INV501'},merchantBound),/PROOF_ORDER_MISMATCH/);
+assert.throws(()=>receiptIntegrity({...merchantProof,merchantCategory:'9999'},merchantBound),/PROOF_ORDER_MISMATCH/);
+const merchantSignature=crypto.sign(null,Buffer.from(canonicalCapsule(merchantProof)),kp.privateKey).toString('base64url');
+assert.equal(verifySignedCapsule(merchantProof,merchantSignature,kp.publicKey).length,64);
+assert.throws(()=>verifySignedCapsule({...merchantProof,merchantCategory:'9999'},merchantSignature,kp.publicKey),/PROOF_SIGNATURE_INVALID/);
 assert.throws(()=>receiptIntegrity({...capsule,nonce:'c'.repeat(40)},bound),/PROOF_ORDER_MISMATCH/);
 assert.throws(()=>receiptIntegrity({...capsule,paidAt:now-40000},bound),/PROOF_TIME_INVALID/);
 assert.throws(()=>receiptIntegrity({...capsule,paidAt:now+160000},bound),/PROOF_TIME_INVALID/);
