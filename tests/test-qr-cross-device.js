@@ -42,15 +42,11 @@ async function flush(){for(let i=0;i<35;i++)await Promise.resolve()}
  const phone=open(token);await flush();
  assert.equal(phone.stages.find(x=>!x.hidden).dataset.stage,'qr');
  assert.equal(phone.state.qr,upi);
- // qrTapLaunchUri now returns targeted intent with fallback chain for ALL Android browsers
+ // P2P is QR/share-pay; restricted native intents remain disabled.
  const qrHref=phone.nodes.qrTapToPay.href;
- assert.match(qrHref,/^intent:\/\/pay\?/,'QR tap link should be targeted Android intent');
- // Should have fallback chain with all 4 apps (order doesn't matter, URL-encoded)
-assert.ok(qrHref.includes('com.google.android.apps.nbu.paisa.user'),'Should include GPay package');
-assert.ok(qrHref.includes('com.phonepe.app'),'Should include PhonePe package');
-assert.ok(qrHref.includes('net.one97.paytm'),'Should include Paytm package');
-assert.ok(qrHref.includes('in.org.npci.upiapp'),'Should include BHIM package');
- assert.ok(qrHref.includes('upi_intent_fallback'),'Should have fallback URL with upi_intent_fallback');
+ assert.equal(qrHref,'#');
+ assert.equal(phone.nodes.qrTapToPay.getAttribute('aria-disabled'),'true');
+ assert.match(phone.nodes.qrTapToPayHint.textContent,/Personal UPI/);
  assert.match(phone.nodes.paymentTrackingStatus.textContent,/Awaiting confirmation/,
    'Original browser shows that confirmation is pending when another phone scans');
  assert.ok(phone.state.links.includes('/api/session/'+order+'?token='+token));

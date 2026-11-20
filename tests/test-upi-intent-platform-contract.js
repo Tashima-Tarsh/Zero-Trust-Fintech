@@ -23,12 +23,12 @@ for(const page of ['public/checkout.html','public/merchant-checkout.html']){
 assert.ok(!Object.keys(pkg.dependencies||{}).some(x=>/razorpay/i.test(x)),'No Razorpay SDK dependency');
 assert.equal(model.supportsNativeUPI('Mozilla/5.0 (Linux; Android 15) Chrome'),true);
 assert.equal(model.supportsNativeUPI('Mozilla/5.0 (Windows NT 10.0)'),false);
-const original='upi://pay?pa=person@oksbi&pn=Person&am=1.00&cu=INR';
+const original='upi://pay?pa=merchant@ypbiz&pn=Merchant&am=1.00&cu=INR&mc=5411&tr=SRVTEST123';
 const chromeUa='Mozilla/5.0 (Linux; Android 15) AppleWebKit/537.36 Chrome/157.0 Mobile Safari/537.36';
 const webViewUa='Mozilla/5.0 (Linux; Android 15; wv) Version/4.0 Chrome/157.0 Mobile Safari/537.36';
 const fallback='https://checkout.example/checkout?paymentRef=PAY_123456&token='+('b'.repeat(48));
 const chromeIntent=model.qrTapLaunchUri(original,chromeUa,fallback);
-assert.match(chromeIntent,/^intent:\/\/pay\?pa=person@oksbi/);
+assert.match(chromeIntent,/^intent:\/\/pay\?pa=merchant@ypbiz/);
 assert.match(chromeIntent,/#Intent;scheme=upi;action=android.intent.action.VIEW;/);
 const fallbackCode=chromeIntent.match(/S\.browser_fallback_url=([^;]+)/)?.[1];
 assert.ok(fallbackCode,'Missing same-payment browser fallback');
@@ -114,6 +114,10 @@ assert.match(androidE2e,/ANDROID_ACTIVITY_RESULT classification=APP_REPORTED_OK 
 assert.match(androidE2e,/assert fixture_info\(\)\["evidenceCount"\]==0/);
 
 const personal=new URL(buildUpiUri({kind:'P2P',pa:'person@oksbi',pn:'Person',am:1,tn:'Medical'}));
+assert.equal(personal.searchParams.get('mode'),null,'P2P QR must not claim restricted intent mode');
+assert.equal(model.qrTapLaunchUri(personal.toString(),chromeUa,fallback),'#','P2P Intent must not launch');
+assert.equal(model.appTapLaunchUri(personal.toString(),chromeUa,fallback,'gpay'),'#','P2P app button must not bypass restriction');
+assert.ok(!chromeIntent.includes('S.browser_fallback_package'),'Remove nonstandard multi-package fallback');
 assert.equal(personal.searchParams.get('mc'),null);
 assert.equal(personal.searchParams.get('tr'),null);
 const merchant=new URL(buildUpiUri({kind:'P2M',pa:'clinic@ypbiz',pn:'Clinic',am:1,mc:'8099',

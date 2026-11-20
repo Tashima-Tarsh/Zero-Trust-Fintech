@@ -271,14 +271,7 @@
  function renderQr(){
   if(!session)return;
   const anchor=get('qrTapToPay'),container=get('paymentQr');
-  if(quantumEnabled&&!quantumReady){
-   anchor.href='#';anchor.setAttribute('aria-disabled','true');
-   const proceed=get('vaultProceed');proceed.href='#';proceed.setAttribute('aria-disabled','true');
-   get('upiAppOptions').hidden=true;
-   container.replaceChildren();qrUri=null;
-   get('qrExpiry').textContent='Preparing the protected payment session.';
-   return;
-  }
+  // Payment dispatch is independent of optional Quantum evidence telemetry.
   if(expired()||['EXPIRED','FAILED','CANCELLED'].includes(session.initialStatus)){
    anchor.href='#';anchor.setAttribute('aria-disabled','true');
    get('upiAppOptions').hidden=true;
@@ -286,13 +279,13 @@
   }
   anchor.href=model.supportsNativeUPI(userAgent)
    ?model.qrTapLaunchUri(session.upiUri,userAgent,secureCheckoutUrl(true)):'#';
-  anchor.setAttribute('aria-disabled','false');
+  anchor.setAttribute('aria-disabled',anchor.href==='#'?'true':'false');
   if(quantumEnabled){
    const proceed=get('vaultProceed');
    proceed.href=anchor.href;
-   proceed.setAttribute('aria-disabled',model.supportsNativeUPI(userAgent)?'false':'true');
+   proceed.setAttribute('aria-disabled',anchor.href==='#'?'true':'false');
   }
-  const targeted=model.supportsTargetedAppLaunch(userAgent);
+  const targeted=model.supportsTargetedAppLaunch(userAgent)&&!model.isPersonalPayment(session.upiUri);
   get('upiAppOptions').hidden=!targeted;
   for(const link of document.querySelectorAll('[data-upi-app]')){
    link.href=targeted?model.appTapLaunchUri(session.upiUri,userAgent,secureCheckoutUrl(true),link.dataset.upiApp):'#';
@@ -339,26 +332,30 @@
   // Native browser anchor navigation preserves Android's direct user gesture.
   // Signal twin and ACK are established before this click.
   get('vaultProceed').addEventListener('click',event=>{
-   if(!quantumEnabled||!quantumReady||!session||receiptShown||expired()||
+   if(!session||receiptShown||expired()||
       !model.supportsNativeUPI(userAgent)||
-      ['EXPIRED','FAILED','CANCELLED'].includes(session.initialStatus)){
+      ['EXPIRED','FAILED','CANCELLED'].includes(session.initialStatus)||
+      get('vaultProceed').href==='#'){
     event.preventDefault();
-    message(expired()?'Payment window expired. Request a fresh link.':
-     'Preparing payment. Retry Proceed when the secure channel is ready.','info');
+    message(session&&model.isPersonalPayment(session.upiUri)?
+      'Personal UPI intent is restricted. Scan or import the QR inside your UPI app.':
+      'Payment unavailable or expired. Request a fresh link.','info');
     return;
    }
-   try{quantumClient.handoff(session,'generic')}
-   catch(_){event.preventDefault();message('Trust channel unavailable. Retry Proceed.','error');return}
+   if(quantumEnabled&&quantumReady&&quantumClient){
+    try{quantumClient.handoff(session,'generic')}catch(_){trace('SIGNAL_UNAVAILABLE')}
+   }
    qrTapStartedAt=Date.now();qrAppBackgrounded=false;
    trace('APP_DISPATCH','APP_GENERIC','generic');
    // Allow the browser to navigate via this user-tapped link.
   });
   get('qrTapToPay').addEventListener('click',event=>{
    if(!session||receiptShown||expired()||
-      ['EXPIRED','FAILED','CANCELLED'].includes(session.initialStatus)||!model.supportsNativeUPI(userAgent)){
+      ['EXPIRED','FAILED','CANCELLED'].includes(session.initialStatus)||!model.supportsNativeUPI(userAgent)||
+      get('qrTapToPay').href==='#') {
     event.preventDefault();
     message(expired()?'Payment window expired. Request a fresh link.':
-     'Scan this QR with any UPI app (GPay, PhonePe, Paytm, BHIM, etc.).','info');
+     'Scan or import the personal-account QR inside your UPI app. P2P Intent is restricted.','info');
     return;
    }
 
@@ -373,8 +370,7 @@
    lastNativeLaunchAt=now;
    qrTapStartedAt=now;qrAppBackgrounded=false;
    if(quantumEnabled&&quantumClient){
-    try{quantumClient.handoff(session,'generic')}
-    catch(_){event.preventDefault();message('Authorize Vault before paying.','error');return}
+    if(quantumReady){try{quantumClient.handoff(session,'generic')}catch(_){trace('SIGNAL_UNAVAILABLE')}}
    }
 
 
@@ -390,9 +386,8 @@
      return;
     }
     qrTapStartedAt=Date.now();qrAppBackgrounded=false;
-    if(quantumEnabled&&quantumClient){
-     try{quantumClient.handoff(session,link.dataset.upiApp)}
-     catch(_){event.preventDefault();message('Authorize Vault before paying.','error');return}
+    if(quantumEnabled&&quantumReady&&quantumClient){
+     try{quantumClient.handoff(session,link.dataset.upiApp)}catch(_){trace('SIGNAL_UNAVAILABLE')}
     }
     trace('APP_DISPATCH','APP_TARGETED',link.dataset.upiApp);
    });
@@ -450,15 +445,17 @@
    const normalized=declared==='PERSONAL'?'P2P':declared==='MERCHANT'?'P2M':declared;
    if(requiredMode&&normalized!==requiredMode)throw Error('PAYMENT_MODE_MISMATCH');
    if(quantumEnabled){
-    if(!quantumClient)throw Error('Quantum Signal client unavailable');
-    const proceed=get('vaultProceed');
-    proceed.hidden=!model.supportsNativeUPI(userAgent);
-    proceed.href='#';proceed.setAttribute('aria-disabled','true');
-    get('vaultStatus').textContent='Preparing DISHA two-way trust signal…';
-    quantumReady=Boolean(quantumClient.restore(session));
-    if(!quantumReady)await quantumClient.prepare(session);
-    quantumReady=true;
-    get('vaultStatus').textContent='Protected signal channel ready · one Proceed tap opens UPI.';
+    try {
+     if(!quantumClient)throw Error('Quantum Signal client unavailable');
+     quantumReady=Boolean(quantumClient.restore(session));
+     if(!quantumReady)await quantumClient.prepare(session);
+     quantumReady=true;
+     get('vaultStatus').textContent='Device trust signal ready. Proceed to UPI.';
+    } catch(_) {
+     quantumReady=false;
+     get('vaultStatus').textContent='Optional trust signal unavailable. UPI payment remains available.';
+     trace('SIGNAL_UNAVAILABLE');
+    }
    }
    trace('ORDER_READY');
 
@@ -470,9 +467,11 @@
    get('checkoutPaymentIdentity').textContent='UPI intent · '+(session.payeeVpa||params.get('pa')||'');
    get('paymentTrackingStatus').textContent='Payment status · Awaiting confirmation';
    get('checkoutNote').textContent=params.get('tn')||'Service';
-   get('qrTapToPayHint').textContent=model.supportsNativeUPI(userAgent)
-    ?'Tap the QR to open your UPI app (GPay/PhonePe/Paytm/BHIM), or scan from another phone.'
-    :'Scan this QR using your UPI app on another phone.';
+   get('qrTapToPayHint').textContent=model.isPersonalPayment(session.upiUri)
+    ?'Personal UPI: scan or import this QR in your UPI app. One-tap P2P intent is restricted.'
+    :model.supportsNativeUPI(userAgent)
+    ?'Tap to open your chosen UPI app, or scan the QR on another device.'
+    :'Scan this QR with a UPI app on another phone.';
    showStage('qr');tickSessionTimer();
 
 

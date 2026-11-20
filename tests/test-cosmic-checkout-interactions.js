@@ -35,15 +35,10 @@ const active=app=>app.stages.find(s=>!s.hidden)?.dataset.stage;
  const running=mount();await flush();
  assert.equal(active(running),'qr');
  assert.equal(running.data.qr,uri);
- // qrTapLaunchUri now returns targeted intent with fallback chain for ALL Android browsers
+ // Personal UPI remains a scannable QR but never a restricted native intent.
  const qrHref=running.nodes.qrTapToPay.href;
- assert.match(qrHref,/^intent:\/\/pay\?/,'QR tap link should be targeted Android intent');
- // Should have fallback chain with all 4 apps (order doesn't matter, URL-encoded)
-assert.ok(qrHref.includes('com.google.android.apps.nbu.paisa.user'),'Should include GPay package');
-assert.ok(qrHref.includes('com.phonepe.app'),'Should include PhonePe package');
-assert.ok(qrHref.includes('net.one97.paytm'),'Should include Paytm package');
-assert.ok(qrHref.includes('in.org.npci.upiapp'),'Should include BHIM package');
- assert.ok(qrHref.includes('upi_intent_fallback'),'Should have fallback URL with upi_intent_fallback');
+ assert.equal(qrHref,'#');
+ assert.equal(running.nodes.qrTapToPay.getAttribute('aria-disabled'),'true');
  assert.equal(running.data.prompt,0);
  running.events.focus();await flush();
  assert.equal(active(running),'qr','Browser focus or scan alone is not a payment');
