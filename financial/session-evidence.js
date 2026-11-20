@@ -207,7 +207,7 @@ function createSessionEvidenceRouter({ getPool, getSession }) {
       finally { c.release(); }
       return res.status(201).set('Cache-Control','no-store').json({
         success:true, orderId:b.orderId, nonce:activeNonce, deviceId:b.deviceId,
-        amountPaise, payeeVpa:payee, paymentType,
+        amountPaise, payeeVpa:payee, paymentType, merchantReference:String(session.txnRef || ''),
         expiresAt:activeExpiry, consentedAt:activeConsentTime, serverTime:now, allowedPackages:[...ALLOWED_PACKAGES]
       });
     } catch (e) { return respondError(res, e); }
