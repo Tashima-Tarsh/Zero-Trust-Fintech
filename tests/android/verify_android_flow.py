@@ -97,6 +97,11 @@ def simulate_receiver_outcome(outcome):
         "-p","ai.disha.testupi","--es","outcome",outcome,timeout=15)
 
 def reopen_test_receiver():
+    # Checkout intentionally refuses duplicate Android launches for six seconds.
+    # A physical test tap must respect that production anti-double-launch guard;
+    # do not weaken the checkout code to make a rapid retry appear successful.
+    print("ANDROID_RETRY_WAIT: honoring 6000ms native launch cooldown",flush=True)
+    time.sleep(6.5)
     current=states()[-1]
     assert current["stage"]=="qr" and current["qr"] and not current["qrDisabled"]
     baseline=len(log())
