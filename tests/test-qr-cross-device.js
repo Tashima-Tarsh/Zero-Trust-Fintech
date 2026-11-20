@@ -48,7 +48,10 @@ async function flush(){for(let i=0;i<35;i++)await Promise.resolve()}
  assert.equal(qrHref,'#');
  assert.equal(phone.nodes.qrTapToPay.getAttribute('aria-disabled'),'true');
  assert.equal(phone.nodes.qrTapToPay.hidden,true,'P2P stays QR-free on Android');
- assert.equal(phone.nodes.upiAppOptions.hidden,false,'P2P exposes one-tap native UPI app choices');
+ assert.equal(phone.nodes.upiAppOptions.hidden,true,'P2P must not launch external UPI apps');
+ assert.equal(phone.nodes.vaultProceed.hidden,false,'Android Chrome P2P exposes Copy UPI ID');
+ assert.equal(phone.nodes.vaultProceed.textContent,'Copy UPI ID');
+ assert.equal(phone.nodes.vaultProceed.href,'#','P2P must not dispatch an Android intent');
  assert.equal(phone.nodes.qrTapToPay.hidden,true,'QR is hidden throughout personal checkout');
  assert.match(phone.nodes.paymentTrackingStatus.textContent,/Awaiting confirmation/,
    'Original browser shows that confirmation is pending when another phone scans');
