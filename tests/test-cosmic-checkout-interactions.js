@@ -66,7 +66,7 @@ const active=app=>app.stages.find(s=>!s.hidden)?.dataset.stage;
  await p2p.nodes.debitProofCheckButton.events.click();await flush();
  assert.match(p2p.nodes.debitProofCheckStatus.textContent,/unverified/i,
    'I Paid must not certify a debit without issuer evidence');
- assert.match(p2p.nodes.debitProofCheckUtr.textContent,/Reported UTR \\(not verified\\)/,
+ assert.match(p2p.nodes.debitProofCheckUtr.textContent,/Reported UTR \(not verified\)/,
    'Returned UTR candidates must remain explicitly unverified');
  assert.equal(active(p2p),'qr','Unverified debit must not unlock receipt');
   const expired=mount('EXPIRED');await flush();

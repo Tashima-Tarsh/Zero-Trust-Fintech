@@ -620,14 +620,14 @@
     // the existing payer receipt. A reported UTR or browser return cannot.
     if(issuer?.payerDebitVerified===true&&debit?.debitVerified===true&&
        debit.evidenceState==='PAYER_DEBIT_VERIFIED'&&
-       /^\\d{12}$/.test(debit.utr||'')&&
+       /^\d{12}$/.test(debit.utr||'')&&
        /^[A-Za-z0-9._-]{3,64}$/.test(debit.issuerId||'')){
      status.textContent='Issuer-signed payer-side debit evidence found.';
      createPayerDebitReceipt(issuer);
      return;
     }
     const candidate=issuer?.utrCandidate||signal?.utrCandidate;
-    if(/^\\d{12}$/.test(candidate||'')){
+    if(/^\d{12}$/.test(candidate||'')){
      reported.textContent='Reported UTR (not verified): '+candidate;
      reported.hidden=false;
     }
