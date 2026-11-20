@@ -38,7 +38,7 @@ assert.equal(ALLOWED_PACKAGES.has(evidence.packageName), true);
 assert.equal(verifyDeviceEvidence(evidence, signature, crypto.createPublicKey(publicKey)).length, 64);
 assert.equal(evaluateEvidence(evidence, session, 160000).state, 'SIGNAL_MATCHED');
 
-assert.throws(() => verifyDeviceEvidence(evidence, signature.slice(0, -2) + 'AA', crypto.createPublicKey(publicKey)),
+assert.throws(() => verifyDeviceEvidence(evidence, (signature.startsWith('AAAA') ? 'BBBB' : 'AAAA') + signature.slice(4), crypto.createPublicKey(publicKey)),
   /DEVICE_SIGNATURE_INVALID/);
 assert.throws(() => canonicalEvidence({ ...evidence, packageName: 'com.example.fake' }), /EVIDENCE_FIELDS_INVALID/);
 assert.throws(() => canonicalEvidence({ ...evidence, extra: 'unexpected' }), /EVIDENCE_FIELDS_INVALID/);
