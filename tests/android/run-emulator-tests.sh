@@ -45,5 +45,7 @@ fi
 # Bound the instrumented browser journey: a dropped WebView/credential prompt
 # must fail with artifacts instead of leaving a runner hanging indefinitely.
 timeout --signal=TERM --kill-after=10s 210s python3 -u tests/android/verify_android_flow.py
+# Run the new ProofBridge journey on the same emulator, using only synthetic test evidence.
+timeout --signal=TERM --kill-after=10s 175s python3 -u tests/android/verify_proofbridge_android.py
 cp test-results/android/intent-logcat-live.txt test-results/android/intent-logcat.txt
 echo 'ANDROID_P2P_INTENT_TESTS_PASS (no financial transfer performed)'
