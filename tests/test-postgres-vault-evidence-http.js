@@ -143,7 +143,7 @@ async function findAvailablePort(){
       body:JSON.stringify({consent:true,orderId:upiOrder.orderId,token:upiOrder.token,
         deviceId,publicKeyPem}),signal:AbortSignal.timeout(8000)});
     const authBody=await auth.json();
-    assert.equal(auth.status,200,JSON.stringify(authBody));
+    assert.equal(auth.status,201,JSON.stringify(authBody)+'\\n'+logs.slice(-3000));
     const sessionRow=(await pg.query('SELECT txn_ref FROM sessions WHERE order_id=$1',[upiOrder.orderId])).rows[0];
     const txnId=utr(),approvalRef=utr(),returnedAt=Date.now();
     const ebit={
