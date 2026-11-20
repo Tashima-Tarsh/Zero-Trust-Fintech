@@ -126,9 +126,11 @@ public final class UpiResultHostActivity extends ComponentActivity {
             show("Opening your selected UPI app. Complete the payment there.");
             upiLauncher.launch(intent);
         } catch (ActivityNotFoundException error) {
-            show("The selected UPI app is not installed. Return to DISHA and choose another app.");
+            show("The selected UPI app is not installed. Returning to checkout.");
+            returnToCheckout("app-not-installed");
         } catch (Exception error) {
-            show("The UPI app could not be opened. Return to DISHA.");
+            show("The UPI app could not be opened. Returning to checkout.");
+            returnToCheckout("launch-failed");
         }
     }
 
