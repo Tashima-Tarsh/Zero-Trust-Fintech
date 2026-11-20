@@ -295,8 +295,8 @@
    get('upiAppOptions').hidden=true;
    const guide=get('paymentStageCopy');
    if(guide)guide.textContent=proofbridgeReady?
-    'UPI ID copied. Open your existing UPI app, paste the receiving ID, check the amount and pay. Return here for transaction evidence.':
-    'Tick consent and touch Proceed. DISHA will copy the authorized receiving UPI ID. No QR or payment intent is required.';
+    'Receiving details copied. Open your payment app, paste the address, confirm the amount and pay. Return here for your receipt.':
+    'Authorize this session, then touch Proceed once to copy the receiving address.';
    return;
   }
   if(proofbridgeEnabled&&!proofbridgeReady){
@@ -373,10 +373,23 @@
    const r=await fetch(url,{cache:'no-store',credentials:'same-origin'});
    if(!r.ok)return;
    const d=await r.json();
-   if(d.utrCandidate){
+   if(d.payerDebitEvidence?.utr&&/^\\d{12}$/.test(d.payerDebitEvidence.utr)){
+    // A signed payer-side claim carries a real-format UTR candidate but
+    // cannot prove that the payer's bank actually posted a debit.
+    const payer=get('payerDebitEvidence');
+    if(payer){
+     payer.hidden=false;
+     get('payerUtrCandidate').textContent=d.payerDebitEvidence.utr;
+     get('payerDebitEvidenceStatus').textContent=
+      'Payer debit claim recorded from '+d.payerDebitEvidence.issuerId+
+      '. Actual debit is not independently verified; no payment receipt issued.';
+    }
     const note=get('proofbridgeEvidence');
-    note.hidden=false;
-    note.textContent='Issuer-signed UTR claim: '+d.utrCandidate+' · NOT bank-verified. Awaiting financial confirmation.';
+    if(note){
+     note.hidden=mode==='generic';
+     note.textContent='Payer-side UTR claim: '+d.payerDebitEvidence.utr+
+      ' · NOT independently debit-verified. Awaiting authenticated evidence.';
+    }
    }
   }catch(_){/* Evidence transport is optional and never changes financial state. */}
   finally{proofbridgePolling=false}
@@ -481,10 +494,8 @@
     const guidance=merchantMode?
      'Payment address copied. Use the registered merchant payment route to retain its classification. Awaiting authentic evidence.':
      'Receiving address copied. Awaiting verified transaction evidence.';
-    if(note){note.hidden=false;note.textContent=guidance}
-    message(merchantMode?
-     'Merchant address copied. Use the registered merchant payment route.':
-     'Receiving details copied. Open your payment app, pay, then return for your receipt.','info');
+    if(note){note.hidden=mode==='generic';note.textContent=guidance}
+    if(merchantMode)message('Merchant address copied. Use the registered merchant payment route.','info');
     void pollProofbridgeEvidence();
     if(!proofbridgePollTimer)proofbridgePollTimer=setInterval(()=>{void pollProofbridgeEvidence()},5000);
    }).catch(()=>{
