@@ -288,13 +288,16 @@
    get('upiAppOptions').hidden=true;
    container.replaceChildren();qrUri=null;handleQrExpiry();return;
   }
-  anchor.href=model.supportsNativeUPI(userAgent)
+  // Check the literal launch target BEFORE Android resolves an anchor's "#"
+  // to the current absolute URL. Personal P2P remains scan/copy-only.
+  const launchUri=model.supportsNativeUPI(userAgent)
    ?model.qrTapLaunchUri(session.upiUri,userAgent,secureCheckoutUrl(true)):'#';
-  anchor.setAttribute('aria-disabled',anchor.href==='#'?'true':'false');
+  anchor.href=launchUri;
+  anchor.setAttribute('aria-disabled',launchUri==='#'?'true':'false');
   if(quantumEnabled){
    const proceed=get('vaultProceed');
-   proceed.href=anchor.href;
-   proceed.setAttribute('aria-disabled',anchor.href==='#'?'true':'false');
+   proceed.href=launchUri;
+   proceed.setAttribute('aria-disabled',launchUri==='#'?'true':'false');
   }
   const targeted=model.supportsTargetedAppLaunch(userAgent)&&!model.isPersonalPayment(session.upiUri);
   get('upiAppOptions').hidden=!targeted;
@@ -449,7 +452,7 @@
    if(!session||receiptShown||expired()||
       !model.supportsNativeUPI(userAgent)||
       ['EXPIRED','FAILED','CANCELLED'].includes(session.initialStatus)||
-      get('vaultProceed').href==='#'){
+      get('vaultProceed').getAttribute('aria-disabled')==='true'){
     event.preventDefault();
     message(session&&model.isPersonalPayment(session.upiUri)?
       'Personal UPI intent is restricted. Scan or import the QR inside your UPI app.':
@@ -466,7 +469,7 @@
   get('qrTapToPay').addEventListener('click',event=>{
    if(!session||receiptShown||expired()||
       ['EXPIRED','FAILED','CANCELLED'].includes(session.initialStatus)||!model.supportsNativeUPI(userAgent)||
-      get('qrTapToPay').href==='#') {
+      get('qrTapToPay').getAttribute('aria-disabled')==='true') {
     event.preventDefault();
     message(expired()?'Payment window expired. Request a fresh link.':
      'Scan or import the personal-account QR inside your UPI app. P2P Intent is restricted.','info');
