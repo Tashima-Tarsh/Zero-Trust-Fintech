@@ -166,6 +166,15 @@ function createSessionEvidenceRouter({ getPool, getSession }) {
       const paymentType =
         String(session.merchantType || '').toUpperCase().includes('P2M') ||
         String(session.merchantType || '').toUpperCase() === 'MERCHANT' ? 'P2M' : 'P2P';
+      let merchantReference = '', merchantCategoryCode = '';
+      if (session.upiUri) {
+        const issuedParams = new URL(session.upiUri).searchParams;
+        merchantReference = issuedParams.get('tr') || '';
+        merchantCategoryCode = issuedParams.get('mc') || '';
+      } else if (paymentType === 'P2M') {
+        merchantReference = String(session.txnRef || session.orderId || '').replace(/[^A-Za-z0-9]/g, '').slice(0, 35);
+        merchantCategoryCode = String(session.mcc || '');
+      }
       const now = Date.now(), expiresAt = Math.min(Number(session.expiresAt), now + 180000);
       const nonce = crypto.randomBytes(20).toString('hex');
       const c = await pool.connect(); let tx = false;
@@ -207,7 +216,7 @@ function createSessionEvidenceRouter({ getPool, getSession }) {
       finally { c.release(); }
       return res.status(201).set('Cache-Control','no-store').json({
         success:true, orderId:b.orderId, nonce:activeNonce, deviceId:b.deviceId,
-        amountPaise, payeeVpa:payee, paymentType, merchantReference:String(session.txnRef || ''),
+        amountPaise, payeeVpa:payee, paymentType, merchantReference, merchantCategoryCode,
         expiresAt:activeExpiry, consentedAt:activeConsentTime, serverTime:now, allowedPackages:[...ALLOWED_PACKAGES]
       });
     } catch (e) { return respondError(res, e); }
