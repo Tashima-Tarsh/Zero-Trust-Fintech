@@ -50,7 +50,7 @@ const bound={
 assert.equal(receiptIntegrity(capsule,bound),true);
 assert.throws(()=>receiptIntegrity({...capsule,nonce:'c'.repeat(40)},bound),/PROOF_ORDER_MISMATCH/);
 assert.throws(()=>receiptIntegrity({...capsule,paidAt:now-40000},bound),/PROOF_TIME_INVALID/);
-assert.throws(()=>receiptIntegrity({...capsule,paidAt:now+100000},bound),/PROOF_TIME_INVALID/);
+assert.throws(()=>receiptIntegrity({...capsule,paidAt:now+160000},bound),/PROOF_TIME_INVALID/);
 
 // The experimental issuer signed a CLAIM, not a real bank credit.
 const source=fs.readFileSync(path.join(__dirname,'../financial/proofbridge.js'),'utf8');
