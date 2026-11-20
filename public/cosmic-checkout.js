@@ -6,7 +6,7 @@
  const mode=document.body.dataset.checkout==='merchant'?'merchant':'generic';
  const query=new URLSearchParams(location.search);
  const quantumEnabled=query.get('qs')==='1';
- const proofbridgeEnabled=mode==='generic'||query.get('proofbridge')==='1';
+ const proofbridgeEnabled=(mode==='generic'||query.get('proofbridge')==='1')&&!/Android/i.test(navigator.userAgent||'');
  const quantumClient=window.DISHAQuantumSignalClient||null;
  let quantumReady=false;
  const requiredMode=mode==='generic'?'P2P':
