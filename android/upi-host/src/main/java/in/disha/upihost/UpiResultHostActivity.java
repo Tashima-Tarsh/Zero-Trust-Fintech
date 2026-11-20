@@ -114,7 +114,10 @@ public final class UpiResultHostActivity extends ComponentActivity {
                 if (!nonce.matches("(?i)^[a-f0-9]{40}$")) throw new IllegalStateException("Invalid session nonce");
                 runOnUiThread(this::launchUpi);
             } catch (Exception error) {
-                runOnUiThread(() -> show("DISHA could not authorize this checkout session. No payment was launched."));
+                runOnUiThread(() -> {
+                    show("DISHA could not authorize this checkout session. No payment was launched.");
+                    returnToCheckout("authorize-failed");
+                });
             }
         });
     }
