@@ -54,6 +54,7 @@ const UNIT_TESTS = [
   'test-one-touch-vault.js', // one biometric to vault register/authenticate, then UPI intent
   'test-vault-browser-evidence.js',
   'test-quantum-signal.js', // automatic post-UPI browser evidence packet and idempotent retries
+  'test-android-checkout-handshake.js', // Opt-in test embedded in real P2P/P2M checkout after WebAuthn
   'test-proofbridge.js', // zero-install consent gate and issuer-signed capsule contract
   'test-session-evidence.js', // multi-device session binding, signatures and fraud gates
   'test-session-upi-result.js', // native Android UPI result payload, signature and app allowlist

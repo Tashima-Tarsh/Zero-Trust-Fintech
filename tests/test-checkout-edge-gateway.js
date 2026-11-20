@@ -12,7 +12,7 @@ const worker=fs.readFileSync(path.join(root,'_worker.js'),'utf8');
 const routes=JSON.parse(fs.readFileSync(path.join(root,'_routes.json'),'utf8'));
 const checkout=fs.readFileSync(path.join(root,'checkout.html'),'utf8');
 
-const checkoutAssets=['checkout.html','merchant-checkout.html','cosmic-checkout.css','cosmic-checkout.js','cosmic-checkout-model.js','one-touch-vault.js','assets/upi-googlepay.svg','assets/upi-phonepe.svg','assets/upi-paytm.svg'];
+const checkoutAssets=['checkout.html','merchant-checkout.html','cosmic-checkout.css','cosmic-checkout.js','cosmic-checkout-model.js','one-touch-vault.js','android-checkout-handshake.js','assets/upi-googlepay.svg','assets/upi-phonepe.svg','assets/upi-paytm.svg'];
 for(const name of checkoutAssets){
  const canonical=fs.readFileSync(path.join(root,name));
  for(const dir of ['dist','disha-cinematic/public','disha-cinematic/dist']){
@@ -39,7 +39,7 @@ vm.runInContext(worker.replace('export default','globalThis.edge ='),context,{fi
  context.fetch=async()=>{upstream++;return new Response('Bad Gateway',{status:502})};
  const env={ASSETS:{fetch:async request=>{assets++;const u=new URL(request.url);
   assert.ok(['/checkout.html','/merchant-checkout.html','/cosmic-checkout.js','/cosmic-checkout-model.js',
-   '/cosmic-checkout.css','/checkout-moonlight.css'].includes(u.pathname),'Allowed Pages asset '+u.pathname);
+   '/cosmic-checkout.css','/checkout-moonlight.css','/android-checkout-handshake.js'].includes(u.pathname),'Allowed Pages asset '+u.pathname);
   const body=u.pathname.endsWith('.js')?'// DISHA static checkout JS':checkout;
   return new Response(body,{status:200,headers:{'content-type':u.pathname.endsWith('.js')?'text/javascript':'text/html'}});
  }}};
@@ -54,13 +54,14 @@ vm.runInContext(worker.replace('export default','globalThis.edge ='),context,{fi
   '/api/runtime-assets/cosmic-checkout.js?v=ci',
   '/api/runtime-assets/cosmic-checkout-model.js',
   '/api/runtime-assets/cosmic-checkout.css',
-  '/api/runtime-assets/checkout-moonlight.css'
+  '/api/runtime-assets/checkout-moonlight.css',
+  '/api/runtime-assets/android-checkout-handshake.js'
  ]){
   const result=await context.edge.fetch(new Request('https://disha8-2.thenitishkr.in'+url),env);
   assert.equal(result.status,200,'Static checkout asset failed '+url);
  }
  assert.equal(upstream,0,'Checkout HTML, CSS, and JS must work without Railway');
- assert.equal(assets,10);
+ assert.equal(assets,11);
  const api=await context.edge.fetch(new Request('https://disha8-2.thenitishkr.in/api/merchant/public/order/example'),env);
  assert.equal(api.status,502,'Dynamic merchant payment order depends on Railway backend');
  assert.equal(upstream,1);

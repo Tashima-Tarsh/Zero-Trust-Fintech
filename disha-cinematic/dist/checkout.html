@@ -19,6 +19,7 @@
 <script defer src="/api/runtime-assets/one-touch-vault.js?v=quantum20261119"></script>
 <script defer src="/api/runtime-assets/quantum-signal-client.js?v=quantum20261119"></script>
 <script defer src="/api/runtime-assets/cosmic-checkout-model.js?v=intent-retry-20261119"></script>
+<script defer src="/api/runtime-assets/android-checkout-handshake.js?v=checkout-20261121"></script>
 <script defer src="/api/runtime-assets/cosmic-checkout.js?v=quantum-fusion-20261120"></script>
 <script src="/api/runtime-assets/frontend-monitor.js?v=owner-monitor-1" defer></script>
 </head>
@@ -69,6 +70,23 @@
       <!-- Glass Proceed button -->
       <a id="vaultProceed" role="button" href="#" aria-disabled="true" class="action-primary glass-btn" hidden>Proceed to UPI</a>
       <p id="vaultStatus" class="inline-note" aria-live="polite"></p>
+      <!-- Optional lab inside the real checkout; never a bank/payment verification path. -->
+      <section id="dishaHandshakeLab" class="glass-panel disha-handshake-lab" hidden aria-label="Android browser handshake research test">
+        <p class="eyebrow">ANDROID HANDSHAKE · EXPERIMENT</p>
+        <strong>Verify device authorization and browser SMS transport</strong>
+        <p class="inline-note">Optional test inside this checkout. Uses your device fingerprint/PIN and a test SMS from another phone. It cannot read normal bank SMS or verify a payment.</p>
+        <p id="dishaHandshakeCapability" class="inline-note" aria-live="polite">Checking capabilities…</p>
+        <label class="disha-handshake-consent"><input id="dishaHandshakeConsent" type="checkbox"> I consent to one 120-second browser/SMS test for this checkout.</label>
+        <div class="disha-handshake-actions">
+          <button id="dishaHandshakeStart" type="button" class="glass-btn" disabled>Start fingerprint/PIN + SMS test</button>
+          <button id="dishaHandshakeStop" type="button" class="glass-btn" disabled>Stop</button>
+          <button id="dishaHandshakeCopy" type="button" class="glass-btn" disabled>Copy test SMS</button>
+        </div>
+        <label for="dishaHandshakeMessage" class="inline-note">Test SMS to send to this phone from another phone:</label>
+        <textarea id="dishaHandshakeMessage" readonly rows="3" spellcheck="false" aria-label="Test-only SMS body"></textarea>
+        <p id="dishaHandshakeResult" class="inline-note" role="status" aria-live="polite">WAITING_FOR_CHECKOUT_SESSION — BANK_DEBIT_UNVERIFIED</p>
+      </section>
+
       
       <p id="paymentStageCopy" class="stage-copy">Tap the QR on this phone, or scan it with a UPI app on another phone.</p>
       

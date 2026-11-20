@@ -9,7 +9,8 @@ export default {
     const checkoutFiles = new Set([
       "cosmic-checkout.js", "cosmic-checkout-model.js",
       "cosmic-checkout.css", "checkout-moonlight.css",
-      "one-touch-vault.js", "quantum-signal-client.js"
+      "one-touch-vault.js", "quantum-signal-client.js",
+      "android-checkout-handshake.js"
     ]);
     let localCheckout = null;
     if (url.pathname === "/api/runtime/checkout" || url.pathname === "/api/runtime/merchant-checkout") {
