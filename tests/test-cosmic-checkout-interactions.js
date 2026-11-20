@@ -24,7 +24,7 @@ function mount(status='PENDING'){
     status:data.status,utr:data.utr,challengeAmount:500})};
    throw Error('Unexpected fetch '+url);
  };
- vm.runInNewContext(source,{window,document,location,navigator:{userAgent:'Mozilla/5.0 (Linux; Android 15)'},
+ vm.runInNewContext(source,{window,document,location,navigator:{userAgent:'Mozilla/5.0 (Linux; Android 15) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/157.0.0.0 Mobile Safari/537.36'},
    URL,URLSearchParams,Date,Intl,console,fetch,setInterval:()=>1,clearInterval(){},
    sessionStorage:{getItem:()=>null,setItem(){}}});
  return {nodes,events,stages,data};
