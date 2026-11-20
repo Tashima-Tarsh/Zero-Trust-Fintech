@@ -24,15 +24,21 @@ function copyDirRecursive(src, dest) {
   }
 }
 
+// Each output directory is an exact generated mirror; remove retired files on rebuild.
+function syncMirror(dest) {
+  fs.rmSync(dest, { recursive: true, force: true });
+  copyDirRecursive(publicDir, dest);
+}
+
 console.log('⚡ [Build] Preparing Cloudflare Pages static & edge bundles...');
 
 // 1. Ensure dist directory exists and copy public/* into dist/
-copyDirRecursive(publicDir, distDir);
+syncMirror(distDir);
 console.log('✅ [Build] Copied public/ -> dist/');
 
 // 2. Ensure disha-cinematic directory exists and populate for legacy Pages configs
-copyDirRecursive(publicDir, cinematicPublicDir);
-copyDirRecursive(publicDir, cinematicDistDir);
+syncMirror(cinematicPublicDir);
+syncMirror(cinematicDistDir);
 console.log('✅ [Build] Populated disha-cinematic/public and disha-cinematic/dist');
 
 console.log('🎉 [Build] Cloudflare Pages build complete!');
