@@ -19,7 +19,7 @@ The web checkout must construct this link from the server-issued active session:
 Allowed app package IDs: GPay, PhonePe, Paytm and BHIM. The checkout must disclose that returned transaction fields are sent to DISHA for this payment session. The token must be short-lived, never a Clerk secret or long-lived credential.
 
 ## Response boundary
-Android's activity-result API returns data only when the called UPI app implements the UPI response contract. Generic ACTION_VIEW does not guarantee a result. Missing data is reported as missing; no UTR is invented and no payment is marked successful. ApprovalRefNo is preferred as the UTR/reference candidate; txnId is used only if it is absent. txnRef is the merchant request reference, not a payer UTR. Amount/payee are forwarded only when actually returned.
+Android's activity-result API returns data only when the called UPI app implements the UPI response contract. Generic ACTION_VIEW does not guarantee a result. Missing data is reported as missing; no UTR is invented and no payment is marked successful. txnId is preferred as the transaction-reference candidate; ApprovalRefNo is used only if txnId is absent. Preserve this distinction during real-app validation. txnRef is the merchant request reference, not a payer UTR. Amount/payee are forwarded only when actually returned.
 
 ## Build
 From android/ with JDK 17, Android SDK Platform 35 and Gradle 8.9:
