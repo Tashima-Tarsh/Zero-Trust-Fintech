@@ -7,7 +7,10 @@ for(const p of ['public/checkout.html','public/merchant-checkout.html']){
   assert.match(html,/\/checkout-moonlight\.css\?v=moonlight1/);
   assert.match(html,/id="mars-bg-canvas"/,'Mars 3D background canvas must exist');
   assert.match(html,/class="qr-tap-link/,'QR itself must be the payment launch surface');
-  assert.match(html,/Scan or tap to pay/);
+  assert.match(html,/Quantum Fusion/);
+  assert.match(html,/id="serviceIdentifier"/);
+  assert.match(html,/id="copyHandoff"/);
+  assert.match(html,/quantum-fusion\.css\?v=20261120/);
   for(const id of ['payAmount','paymentQr','qrTapToPay','checkoutStatus',
    'paymentTrackingStatus','saveReceipt','shareReceipt','shareCheckout'])
     assert.ok(html.includes('id="'+id+'"'),'Checkout payment hook missing '+id);
