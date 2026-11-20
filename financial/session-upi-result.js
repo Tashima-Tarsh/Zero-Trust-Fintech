@@ -150,10 +150,6 @@ function createSessionUpiResultRouter({ getPool, getSession }) {
         decisionState = 'UPI_RESULT_MATCHED';
       }
 
-      if (['AMOUNT_MISMATCH','PAYEE_MISMATCH'].includes(decisionState)) {
-        throw fail(decisionState, 409);
-      }
-
       const references = [evidence.txnId, evidence.approvalRefNo].filter(Boolean);
       for (const reference of references) {
         const prior = (await client.query(
@@ -185,8 +181,9 @@ function createSessionUpiResultRouter({ getPool, getSession }) {
         'UPDATE disha_session_evidence_devices SET last_seen_at=$3 WHERE order_id=$1 AND device_id=$2',
         [evidence.orderId,evidence.deviceId,now]);
       await client.query('COMMIT'); transaction = false;
+      const accepted = !['AMOUNT_MISMATCH','PAYEE_MISMATCH'].includes(decisionState);
       return res.status(202).set('Cache-Control','no-store').json({
-        success:true, accepted:true, decisionState,
+        success:accepted, accepted, decisionState,
         ebit:{
           status:evidence.status,responseCode:evidence.responseCode,
           txnId:evidence.txnId,approvalRefNo:evidence.approvalRefNo,
