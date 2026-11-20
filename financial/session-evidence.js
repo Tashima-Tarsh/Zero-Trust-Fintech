@@ -312,10 +312,14 @@ function createSessionEvidenceRouter({ getPool, getSession }) {
           COUNT(DISTINCT e.device_id)::int AS device_count
          FROM disha_session_evidence_consents c LEFT JOIN disha_session_evidence_events e ON e.order_id=c.order_id
          WHERE c.order_id=$1 GROUP BY c.order_id`, [req.params.orderId])).rows[0];
-      if (!row) return res.json({success:true,state:'NOT_AUTHORIZED',eventCount:0,matchedSignalCount:0,deviceCount:0});
+      if (!row) return res.json({success:true,state:'NOT_AUTHORIZED',fraudDecision:'NO_EVIDENCE',eventCount:0,matchedSignalCount:0,deviceCount:0});
+      const events = (await pool.query(
+        'SELECT device_id,transaction_ref,decision_state FROM disha_session_evidence_events WHERE order_id=$1',
+        [req.params.orderId])).rows;
+      const fraudDecision = aggregateSessionDecision(events);
       return res.set('Cache-Control','no-store').json({
         success:true,state:row.revoked_at?'REVOKED':Date.now()>=Number(row.expires_at)?'EXPIRED':'ACTIVE',
-        expiresAt:Number(row.expires_at),consentedAt:Number(row.consented_at),
+        fraudDecision,expiresAt:Number(row.expires_at),consentedAt:Number(row.consented_at),
         eventCount:row.event_count,matchedSignalCount:row.matched_count,deviceCount:row.device_count
       });
     } catch (e) { return respondError(res,e); }
