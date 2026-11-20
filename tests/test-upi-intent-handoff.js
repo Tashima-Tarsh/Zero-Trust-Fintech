@@ -46,7 +46,7 @@ async function flush(){for(let i=0;i<35;i++)await Promise.resolve()}
  const mobileTap=mobile.nodes.qrTapToPay.href;
  assert.match(mobileTap,/^intent:\/\/pay\?/,'Chrome uses Android Intent URI');
  assert.equal(mobile.state.qr,uri,'Scannable QR must retain raw UPI intent');
- assert.equal(new URLSearchParams(mobileTap.split('?')[1].split('#')[0]).get('pa'),'receiver@oksbi');
+ assert.equal(new URLSearchParams(mobileTap.split('?')[1].split('#')[0]).get('pa'),'merchant@ypbiz');
  assert.match(mobileTap,/#Intent;scheme=upi;action=android.intent.action.VIEW;/);
  assert.ok(decodeURIComponent(mobileTap.match(/S\.browser_fallback_url=([^;]+)/)[1]).includes(
   'paymentRef='+order),'Fallback recovers the original payment');
