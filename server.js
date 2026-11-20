@@ -556,7 +556,8 @@ function broadcastOrderSuccess(orderId, payload) {
 app.use('/api/vault',createVaultEvidenceRouter({getPool:()=>db.pgPool}));
 // Session-bound, multi-device evidence. Device events never mutate checkout or ledger state.
 async function findSessionForEvidence(orderId){
-  const local=await db.findSessionByOrderId(orderId);
+  let local=null;
+  try{local=await db.findSessionByOrderId(orderId);}catch(_){local=null;}
   if(local)return local;
   if(!db.pgPool)return null;
   const result=await db.pgPool.query('SELECT * FROM sessions WHERE order_id=$1 LIMIT 1',[orderId]);
