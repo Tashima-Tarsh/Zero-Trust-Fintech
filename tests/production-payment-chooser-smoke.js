@@ -18,8 +18,8 @@ const test=async()=>{
  assert.match(js,/checkout\.searchParams\.set\('proofbridge','1'\)/);
  assert.match(js,/if\(payee\)search\.set\('vpa',payee\)/);
  assert.match(js,/vpa\.required=merchant/);
- assert.doesNotMatch(js,/checkout\.searchParams\.set\('qs','1'\)/,
-  'QS must not be applied universally to P2P');
+ assert.match(js,/if\(params\.get\('qs'\)==='1'\)checkout\.searchParams\.set\('qs','1'\)/,
+  'QS remains opt-in for the P2P checkout');
  const checkout=await get('/p2p?proofbridge=1&amount=1');
  assert.match(checkout,/id="proofbridgeConsent"/);
  assert.match(checkout,/id="proofbridgeProceed"/);
