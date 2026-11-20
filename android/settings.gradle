@@ -1,17 +1,9 @@
-pluginManagement {
-    repositories {
-        google()
-        mavenCentral()
-        gradlePluginPortal()
-    }
-}
+pluginManagement { repositories { google(); mavenCentral(); gradlePluginPortal() } }
 dependencyResolutionManagement {
     repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
-    repositories {
-        google()
-        mavenCentral()
-    }
+    repositories { google(); mavenCentral() }
 }
-rootProject.name = "disha-session-evidence"
-include(":session-evidence")
+rootProject.name = "disha-android"
+include(":session-evidence", ":upi-host")
 project(":session-evidence").projectDir = file("session-evidence")
+project(":upi-host").projectDir = file("upi-host")
