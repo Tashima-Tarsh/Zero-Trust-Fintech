@@ -52,8 +52,8 @@ def test():
     tap_native(prepared["proofProceedTarget"])
     copied=wait_state(
         lambda s: "UPI ID copied" in s.get("proofEvidence","")
-            and s.get("qr") and not s.get("qrDisabled"),
-        "Proceed gesture copies payee and unlocks payment QR"
+            and s.get("qr") and s.get("qrDisabled") and s.get("qrHref")=="#",
+        "Proceed copies payee and reveals the P2P scan-only QR without enabling restricted native intent"
     )
     assert copied["stage"]=="qr"
     assert fixture_info()["status"]=="PENDING"
