@@ -72,6 +72,25 @@ public final class SessionEvidenceNotificationListener extends NotificationListe
         });
     }
 
+    public static void revokeSession(Context context) {
+        android.content.SharedPreferences p = getPrefs(context);
+        String apiBase = p.getString("apiBase", "");
+        String orderId = p.getString("orderId", "");
+        String token = p.getString("token", "");
+        IO.execute(() -> {
+            try {
+                JSONObject body = new JSONObject();
+                body.put("orderId", orderId);
+                body.put("token", token);
+                post(apiBase + "/api/session-evidence/revoke", body.toString(), token);
+            } catch (Exception ignored) {
+                // Local collection is disabled even if network revocation is unavailable.
+            } finally {
+                getPrefs(context).edit().clear().apply();
+            }
+        });
+    }
+
     public static void stopSession(Context context) {
         getPrefs(context).edit().clear().apply();
     }
