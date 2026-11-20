@@ -63,7 +63,7 @@ function launch(tampered=false,kind='P2P',checkoutMode='merchant'){
   DISHAOneTouchVault:{getPendingOrderId:()=>null,requestEvidence:()=>null},
   QRCode:function(_,opts){data.qr=opts.text},addEventListener(k,v){events[k]=v}};
  window.QRCode.CorrectLevel={M:1};
- const navigator={userAgent:'Mozilla/5.0 (Linux; Android 16)',clipboard:{
+ const navigator={userAgent:'Mozilla/5.0 (Windows NT 10.0; Win64; x64)',clipboard:{
   async writeText(v){data.copied.push(v)}}};
  vm.runInNewContext(script,{window,document:doc,location,navigator,URL,URLSearchParams,
   Date,Intl,console,fetch,setInterval:()=>7,clearInterval(){},sessionStorage:{getItem:()=>null,setItem(){}},
