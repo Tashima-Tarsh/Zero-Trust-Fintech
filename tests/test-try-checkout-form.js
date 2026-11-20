@@ -17,6 +17,7 @@ assert.ok(home.includes('href="/choose-payment?mode=P2P"'));
 assert.ok(home.includes('href="/choose-payment?mode=P2M"'));
 assert.match(html,/id="tryVpaLabel"/,'Explicit P2P receiver field must reflect optional server default');
 assert.match(html,/Continue to P2P consent/,'Describe the next step, not a failing P2P intent');
+assert.match(html,/try-checkout\.js\?v=proofbridge-selector-20261120/,'P2P chooser must load fresh JS, not cached ponytail-1');
 
 const vm=require('node:vm');
 function runChooser(search='?mode=P2P',payee=''){
