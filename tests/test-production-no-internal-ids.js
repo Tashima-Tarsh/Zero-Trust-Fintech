@@ -6,7 +6,7 @@ for(const pattern of [/<strong>'\+esc\(o\.id\)/,/<p>'\+esc\(o\.id\)/,/<h2>Paymen
 for(const pattern of [/<td>'\+esc\(t\.id\)/,/<td>'\+esc\(j\.journal_id\)/,/<td>'\+esc\(v\.order_id\)/,/<td>'\+esc\(e\.order_id\)/])assert.doesNotMatch(owner,pattern,'Owner SaaS must not expose database IDs');
 assert.match(merchant,/data-order-id/,'Preserve internal identifiers for protected row actions');
 assert.match(owner,/dataset\.tenant/,'Preserve internal identifiers for tenant action requests');
-assert.match(checkout,/get\('receiptPaymentRef'\)\.textContent=new URLSearchParams/,'Receipt should show transaction TR where available');
+assert.match(checkout,/get\('receiptPaymentRef'\)\.textContent=session\.serviceNumber\|\|new URLSearchParams/,'Receipt should show transaction TR where available');
 assert.doesNotMatch(checkout,/Payment reference: '\+session\.orderId/,'Do not share internal order ID as payment reference');
-for(const name of ['checkout.html','merchant-checkout.html'])assert.match(read(name),/UPI transaction reference \(TR\)/,'Receipt must label real TR');
+for(const name of ['checkout.html','merchant-checkout.html'])assert.match(read(name),/Service number \/ UPI transaction reference \(TR\)/,'Receipt must label real TR');
 console.log('NO_RAW_ID_UI_PASS: SaaS and receipt avoid displaying internal DB identifiers');

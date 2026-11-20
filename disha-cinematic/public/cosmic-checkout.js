@@ -410,8 +410,9 @@
   get('saveReceipt').addEventListener('click',()=>{if(receiptShown)window.print()});
   get('shareReceipt').addEventListener('click',async()=>{
    if(!receiptShown)return;
-   const content='DISHA payment receipt\nAmount: '+format(session.amount)+
-    '\n'+(new URLSearchParams(session.upiUri.split('?')[1]||'').get('tr')?'TR: '+new URLSearchParams(session.upiUri.split('?')[1]||'').get('tr')+'\n':'')+'UPI reference: '+get('receiptUtr').textContent;
+   const content='DISHA service payment receipt\nAmount: '+format(session.amount)+
+    '\n'+(session.serviceNumber?'Service number: '+session.serviceNumber+'\n':'')+
+    'UPI reference: '+get('receiptUtr').textContent;
    try{
     if(navigator.share)await navigator.share({title:'DISHA payment receipt',text:content});
     else if(navigator.clipboard?.writeText){
