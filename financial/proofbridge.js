@@ -32,9 +32,9 @@ function canonicalCapsule(input){
    throw fail('PROOF_FIELDS_INVALID');
  if(c.protocol==='DISHA-PROOF-CAPSULE-V3'&&
     (typeof c.payerTransactionId!=='string'||c.payerTransactionId.length>100||
-     /[\\u0000-\\u001f\\u007f]/.test(c.payerTransactionId)))
+     /[\u0000-\u001f\u007f]/.test(c.payerTransactionId)))
    throw fail('PAYER_TRANSACTION_ID_INVALID');
- if(!!/^[A-Za-z0-9._-]{3,64}$/.test(c.issuerId)||
+ if(!/^[A-Za-z0-9._-]{3,64}$/.test(c.issuerId)||
     !id(c.orderId)||!/^[a-f0-9]{40}$/i.test(c.nonce)||
     !/^[0-9]{12}$/.test(c.utr)||
     !/^[1-9][0-9]{0,15}$/.test(c.amountPaise)||!vpa(c.payeeVpa)||
