@@ -1,4 +1,4 @@
-name: Android Session Evidence
+name: Android UPI Result Host
 
 on:
   pull_request:
@@ -15,7 +15,7 @@ permissions:
   contents: read
 
 jobs:
-  build-session-evidence:
+  build-upi-host:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -35,7 +35,7 @@ jobs:
           test -n "$SDKMANAGER"
           yes | "$SDKMANAGER" --licenses
           "$SDKMANAGER" --install "platforms;android-35" "build-tools;35.0.0"
-      - name: Compile Android evidence library
+      - name: Build Android UPI result host and tests
         working-directory: android
         run: gradle --no-daemon :upi-host:assembleDebug :upi-host:testDebugUnitTest
 
