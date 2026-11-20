@@ -339,6 +339,8 @@
   // P2P ProofBridge is copy-to-pay, NOT QR-to-pay. Neither consent
   // nor Proceed may render a personal-account QR in this mode.
   const nativeHostEligible=device==='android'&&!query.has('nativeHostUnavailable');
+  const disclosure=get('nativeEvidenceDisclosure');
+  if(disclosure)disclosure.hidden=!nativeHostEligible;
   const p2pCopyOnly=proofbridgeEnabled&&model.isPersonalPayment(session.upiUri)&&!nativeHostEligible;
   anchor.hidden=p2pCopyOnly;
   get('qrExpiry').hidden=p2pCopyOnly;
