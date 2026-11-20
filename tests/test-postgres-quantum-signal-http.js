@@ -1,12 +1,22 @@
 'use strict';
 const assert=require('node:assert/strict'),crypto=require('node:crypto'),path=require('node:path');
-const {spawn}=require('node:child_process'),{Pool}=require('pg');
+const {spawn}=require('node:child_process'),{Pool}=require('pg'),net=require('node:net');
+async function findAvailablePort() {
+ const probe=net.createServer();
+ await new Promise((resolve,reject)=>{
+  probe.once('error',reject);
+  probe.listen(0,'127.0.0.1',resolve);
+ });
+ const port=probe.address().port;
+ await new Promise((resolve,reject)=>probe.close(error=>error?reject(error):resolve()));
+ return port;
+}
 (async()=>{
  const url=process.env.TEST_DATABASE_URL;
  if(!url||!['127.0.0.1','localhost','::1'].includes(new URL(url).hostname))
   throw Error('Quantum Signal HTTP test requires disposable localhost PostgreSQL');
  const pg=new Pool({connectionString:url,max:4});
- const port=30000+crypto.randomInt(20000),base='http://127.0.0.1:'+port;
+ const port=await findAvailablePort(),base='http://127.0.0.1:'+port;
  const child=spawn(process.execPath,['server.js'],{cwd:path.join(__dirname,'..'),
   env:{...process.env,PORT:String(port),DB_BACKEND:'postgres',DATABASE_URL:url,
    MERCHANT_UPI_ID:'qa-receiver@oksbi',NODE_ENV:'test',APP_URL:base,WEBAUTHN_RP_ORIGIN:base},
