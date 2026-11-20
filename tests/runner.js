@@ -54,6 +54,7 @@ const UNIT_TESTS = [
   'test-vault-browser-evidence.js',
   'test-quantum-signal.js', // automatic post-UPI browser evidence packet and idempotent retries
   'test-proofbridge.js', // zero-install consent gate and issuer-signed capsule contract
+  'test-session-evidence.js', // multi-device session binding, signatures and fraud gates
   'test-proofbridge-checkout-flow.js', // consent preflight + native gesture copy + return proof
   'test-high-concurrency-limiter.js', // no O(total IPs) hot-path cleanup before 100K load tests
   'test-utr-hypothesis.js', // UTR anti-fraud and no-false-credit regression
