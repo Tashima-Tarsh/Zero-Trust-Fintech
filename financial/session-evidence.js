@@ -234,12 +234,14 @@ function createSessionEvidenceRouter({ getPool, getSession }) {
       let decision = evaluateEvidence(b.evidence, consent);
       if (decision.accepted && b.evidence.transactionRef) {
         const previousRef = (await c.query(
-          'SELECT order_id,amount_paise,payee_vpa FROM disha_session_evidence_events WHERE transaction_ref=$1 LIMIT 1 FOR UPDATE',
+          'SELECT order_id,amount_paise,payee_vpa FROM disha_session_evidence_events WHERE transaction_ref=$1 ORDER BY received_at ASC LIMIT 1 FOR UPDATE',
           [b.evidence.transactionRef])).rows[0];
         if (previousRef && previousRef.order_id !== b.evidence.orderId) {
           decision = { state: 'TRANSACTION_REFERENCE_REPLAY', accepted: false };
-        } else if (previousRef && (previousRef.amount_paise !== b.evidence.amountPaise ||
-                   String(previousRef.payee_vpa || '').toLowerCase() !== String(b.evidence.payeeVpa || '').toLowerCase())) {
+        } else if (previousRef &&
+                   ((previousRef.amount_paise && b.evidence.amountPaise && previousRef.amount_paise !== b.evidence.amountPaise) ||
+                    (previousRef.payee_vpa && b.evidence.payeeVpa &&
+                     previousRef.payee_vpa.toLowerCase() !== b.evidence.payeeVpa.toLowerCase()))) {
           decision = { state: 'CROSS_DEVICE_SIGNAL_CONFLICT', accepted: false };
         }
       }
