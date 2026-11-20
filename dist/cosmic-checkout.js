@@ -340,7 +340,7 @@
   const disclosure=get('nativeEvidenceDisclosure');
   if(disclosure)disclosure.hidden=!nativeHostEligible;
   const proofbridgeGate=get('proofbridgeGate');
-  if(proofbridgeGate)proofbridgeGate.hidden=!proofbridgeEnabled;
+  if(proofbridgeGate&&!proofbridgeEnabled)proofbridgeGate.hidden=true;
   if(expired()||['EXPIRED','FAILED','CANCELLED'].includes(session.initialStatus)){
    anchor.href='#';anchor.hidden=true;anchor.setAttribute('aria-disabled','true');
    get('upiAppOptions').hidden=true;
