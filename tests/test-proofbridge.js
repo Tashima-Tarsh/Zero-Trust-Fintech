@@ -1,0 +1,66 @@
+'use strict';
+const assert=require('node:assert/strict');
+const crypto=require('node:crypto');
+const fs=require('node:fs');
+const path=require('node:path');
+const {
+ canonicalCapsule,verifySignedCapsule,issuedTicket,inspectPayment,receiptIntegrity
+}=require('../financial/proofbridge');
+
+const now=Date.now(),nonce='a'.repeat(40),secret='p'.repeat(64);
+const session={
+ orderId:'ORD_PROOFBRIDGE_1234',sessionId:'b'.repeat(48),status:'PENDING',
+ createdAt:now-1000,expiresAt:now+180000,challengeAmount:500,
+ merchantType:'PERSONAL',vpaAddress:'receiver@oksbi'
+};
+const uri='upi://pay?pa=receiver@oksbi&pn=Receiver&am=500.00&cu=INR&tn=Test';
+assert.equal(inspectPayment(session,uri).amountPaise,'50000');
+const ticket=issuedTicket(inspectPayment(session,uri),nonce,now+90000,secret);
+assert.equal(ticket.ticket.paymentUriHash.length,64);
+assert.equal(issuedTicket(inspectPayment(session,uri),nonce,now+90000,secret).signature,ticket.signature);
+assert.notEqual(issuedTicket(inspectPayment(session,uri),nonce,now+90000,'q'.repeat(64)).signature,ticket.signature);
+assert.throws(()=>inspectPayment(session,uri.replace('receiver@oksbi','attacker@oksbi')),/PAYMENT_PAYLOAD_TAMPERED/);
+assert.throws(()=>inspectPayment(session,uri.replace('500.00','501.00')),/PAYMENT_PAYLOAD_TAMPERED/);
+assert.throws(()=>inspectPayment(session,uri+'&pa=attacker@oksbi'),/PAYMENT_PAYLOAD_TAMPERED/);
+assert.throws(()=>inspectPayment(session,uri+'&mc=1234&tr=ABC123'),/PAYMENT_KIND_MISMATCH/);
+assert.throws(()=>inspectPayment({...session,status:'SUCCESS'},uri),/ORDER_INACTIVE/);
+assert.throws(()=>inspectPayment({...session,expiresAt:now-1},uri),/ORDER_INACTIVE/);
+
+const kp=crypto.generateKeyPairSync('ed25519');
+const capsule={
+ protocol:'DISHA-PROOF-CAPSULE-V1',issuerId:'experimental-test-issuer',
+ orderId:session.orderId,nonce,utr:'123456789012',
+ amountPaise:'50000',payeeVpa:'receiver@oksbi',outcome:'SUCCESS_CLAIM',
+ paidAt:now,ticketHash:ticket.ticketHash
+};
+const bytes=Buffer.from(canonicalCapsule(capsule));
+const signed=crypto.sign(null,bytes,kp.privateKey).toString('base64url');
+assert.equal(verifySignedCapsule(capsule,signed,kp.publicKey).length,64);
+assert.throws(()=>verifySignedCapsule({...capsule,utr:'123456789013'},signed,kp.publicKey),/PROOF_SIGNATURE_INVALID/);
+assert.throws(()=>verifySignedCapsule({...capsule,amountPaise:'100'},signed,kp.publicKey),/PROOF_SIGNATURE_INVALID/);
+assert.throws(()=>verifySignedCapsule({...capsule,payeeVpa:'attacker@oksbi'},signed,kp.publicKey),/PROOF_SIGNATURE_INVALID/);
+assert.throws(()=>verifySignedCapsule(capsule,signed,crypto.generateKeyPairSync('ed25519').publicKey),/PROOF_SIGNATURE_INVALID/);
+assert.throws(()=>canonicalCapsule({...capsule,extra:'ignored'}),/PROOF_FIELDS_INVALID/);
+assert.throws(()=>canonicalCapsule({...capsule,utr:'TEST123'}),/PROOF_FIELDS_INVALID/);
+
+const bound={
+ order_id:session.orderId,nonce,amount_paise:'50000',payee_vpa:'receiver@oksbi',
+ ticket_hash:ticket.ticketHash,consented_at:now-1000,expires_at:now+90000
+};
+assert.equal(receiptIntegrity(capsule,bound),true);
+assert.throws(()=>receiptIntegrity({...capsule,nonce:'c'.repeat(40)},bound),/PROOF_ORDER_MISMATCH/);
+assert.throws(()=>receiptIntegrity({...capsule,paidAt:now-40000},bound),/PROOF_TIME_INVALID/);
+assert.throws(()=>receiptIntegrity({...capsule,paidAt:now+100000},bound),/PROOF_TIME_INVALID/);
+
+// The experimental issuer signed a CLAIM, not a real bank credit.
+const source=fs.readFileSync(path.join(__dirname,'../financial/proofbridge.js'),'utf8');
+assert.doesNotMatch(source,/UPDATE sessions SET status='SUCCESS'|INSERT INTO transactions|INSERT INTO ledger_entries|INSERT INTO utr_order_bindings/);
+assert.match(source,/paymentVerified:false/);
+assert.match(source,/UTR_OBSERVED_UNVERIFIED/);
+const html=fs.readFileSync(path.join(__dirname,'../public/checkout.html'),'utf8');
+const checkout=fs.readFileSync(path.join(__dirname,'../public/cosmic-checkout.js'),'utf8');
+assert.match(html,/id="proofbridgeConsent"/);
+assert.match(html,/id="proofbridgeProceed"/);
+assert.match(checkout,/proofbridgeEnabled&&!proofbridgeReady/);
+assert.match(checkout,/data\.upiUri\)!==session\.upiUri/);
+console.log('PROOFBRIDGE_PASS: ticket binding, tampered URI, issuer signature, replay prerequisites, zero-install QR consent gate, no ledger promotion');
