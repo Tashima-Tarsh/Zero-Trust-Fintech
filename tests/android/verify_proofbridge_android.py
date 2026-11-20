@@ -52,10 +52,12 @@ def test():
     tap_native(prepared["proofProceedTarget"])
     copied=wait_state(
         lambda s: "UPI ID copied" in s.get("proofEvidence","")
-            and s.get("qr") and s.get("qrDisabled") and s.get("qrHref")=="#",
-        "Proceed copies payee and reveals the P2P scan-only QR without enabling restricted native intent"
+            and not s.get("qr") and s.get("qrHidden") and s.get("qrDisabled")
+            and s.get("qrHref")=="#",
+        "Proceed copies receiving P2P VPA with no QR or native intent"
     )
     assert copied["stage"]=="qr"
+    assert copied["qrHidden"] is True
     assert fixture_info()["status"]=="PENDING"
     screen("pb-03-copied")
 
@@ -81,7 +83,7 @@ def test():
         "Browser return shows signed claim, not a verified bank receipt",
         timeout=70
     )
-    assert observed["qr"]
+    assert not observed["qr"] and observed["qrHidden"]
     assert fixture_info()["status"]=="PENDING"
     screen("pb-05-browser-return-unverified")
 
