@@ -34,13 +34,13 @@ const active=app=>app.stages.find(s=>!s.hidden)?.dataset.stage;
 (async()=>{
  const running=mount();await flush();
  assert.equal(active(running),'qr');
- assert.equal(running.data.qr,uri);
+ assert.equal(running.data.qr,null);
  // Personal P2P is QR-free; the Android native host is exposed through app choices.
  const qrHref=running.nodes.qrTapToPay.href;
- assert.match(qrHref,/^intent:\/\/pay\?/);
- assert.equal(running.nodes.qrTapToPay.hidden,false);
+ assert.equal(qrHref,'#');
+ assert.equal(running.nodes.qrTapToPay.hidden,true);
  assert.equal(running.nodes.upiAppOptions.hidden,false);
- assert.equal(running.nodes.qrTapToPay.getAttribute('aria-disabled'),'false');
+ assert.equal(running.nodes.qrTapToPay.getAttribute('aria-disabled'),'true');
  assert.equal(running.data.prompt,0);
  running.events.focus();await flush();
  assert.equal(active(running),'qr','Browser focus or scan alone is not a payment');
