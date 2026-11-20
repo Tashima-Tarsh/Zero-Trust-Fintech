@@ -177,12 +177,12 @@ function createSessionEvidenceRouter({ getPool, getSession }) {
       }
       const now = Date.now(), expiresAt = Math.min(Number(session.expiresAt), now + 180000);
       const nonce = crypto.randomBytes(20).toString('hex');
+      let activeNonce = nonce, activeExpiry = expiresAt, activeConsentTime = now;
       const c = await pool.connect(); let tx = false;
       try {
         await c.query('BEGIN'); tx = true;
         const existing = (await c.query(
           'SELECT * FROM disha_session_evidence_consents WHERE order_id=$1 FOR UPDATE', [b.orderId])).rows[0];
-        let activeNonce = nonce, activeExpiry = expiresAt, activeConsentTime = now;
         if (existing) {
           if (existing.revoked_at || Number(existing.expires_at) <= now ||
               !safeEqual(existing.token_hash, sha256(b.token)) ||
