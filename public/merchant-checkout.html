@@ -44,6 +44,11 @@
       <h1>Quantum Fusion</h1>
       <div id="payAmount" class="amount" aria-label="Exact payment amount">—</div>
       <p id="serviceIdentifier" class="fusion-service" aria-live="polite">Service ID · Preparing…</p>
+      <div id="payerDebitEvidence" class="fusion-evidence" hidden aria-live="polite">
+        <strong>Payer-side transaction reference observed</strong>
+        <p><span>Reported UTR</span> <strong id="payerUtrCandidate">—</strong></p>
+        <span id="payerDebitEvidenceStatus">Issuer-signed claim recorded; payer debit is not independently confirmed.</span>
+      </div>
       <div id="copyHandoff" class="fusion-handoff" hidden aria-live="polite">
         <strong>Payment details copied</strong>
         <p id="copiedPayee" class="fusion-payee"></p>
@@ -97,12 +102,12 @@
       <div class="receipt-seal glass-seal" aria-hidden="true">✓</div>
       <h1>Payment confirmed.</h1>
       <div id="receiptAmount" class="receipt-amount">—</div>
-      <p class="receipt-subline">Confirmed against recorded credit</p>
+      <p class="receipt-subline">Transaction reference from confirmed payment record</p>
       <div class="receipt-details">
         <div><span>Service ID</span><strong id="receiptPaymentRef">—</strong></div>
         <div><span>UTR / Bank reference</span><strong id="receiptUtr">—</strong></div>
         <div id="receiptPayerTxnRow" hidden><span>Payer transaction ID (verified source)</span><strong id="receiptPayerTxn">—</strong></div>
-        <div><span>Status</span><strong class="receipt-confirmed">Verified credit</strong></div>
+        <div><span>Status</span><strong class="receipt-confirmed">Payment confirmed</strong></div>
       </div>
       <div class="receipt-actions">
         <button id="saveReceipt" type="button" class="action-primary glass-btn">Save / print receipt <span class="action-arrow" aria-hidden="true">↗</span></button>
