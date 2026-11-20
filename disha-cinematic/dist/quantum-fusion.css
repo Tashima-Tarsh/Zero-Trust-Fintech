@@ -43,11 +43,11 @@ body[data-checkout="generic"] #checkoutNote,
 body[data-checkout="generic"] #qrTapToPay,
 body[data-checkout="generic"] #qrExpiry,
 body[data-checkout="generic"] #qrTapToPayHint,
-body[data-checkout="generic"] #upiAppOptions,
-body[data-checkout="generic"] #vaultProceed,
 body[data-checkout="generic"] #vaultStatus,
-body[data-checkout="generic"] #paymentStageCopy,
 body[data-checkout="generic"] #shareCheckout{display:none!important}
+/* P2P keeps QR hidden, but its native Android host actions must remain visible. */
+body[data-checkout="generic"] #upiAppOptions[hidden],
+body[data-checkout="generic"] #vaultProceed[hidden]{display:none!important}
 body[data-checkout="generic"] .checkout-shell{
  height:100dvh;max-height:100dvh;min-height:0;
  padding:clamp(6px,1.4dvh,14px) 12px!important;
@@ -62,7 +62,9 @@ body[data-checkout="generic"] .checkout-brand .logo{
 }
 body[data-checkout="generic"] .stage{
  flex:1 1 auto;min-height:0!important;max-height:none!important;
- overflow:hidden!important;padding:clamp(5px,1.2dvh,12px) clamp(12px,4vw,24px)!important;
+ overflow-x:hidden!important;overflow-y:auto!important;
+ overscroll-behavior-y:contain;-webkit-overflow-scrolling:touch;touch-action:pan-y;
+ padding:clamp(5px,1.2dvh,12px) clamp(12px,4vw,24px)!important;
 }
 body[data-checkout="generic"] .stage-qr{display:flex;flex-direction:column;align-items:center}
 body[data-checkout="generic"] #payAmount{
