@@ -13,7 +13,8 @@ for(const page of ['checkout.html','merchant-checkout.html']){
   assert.ok(html.includes(marker),'Missing canonical payment control: '+marker);
  assert.match(html,/data-stage="qr"/);
  assert.match(html,/data-stage="receipt"/);
- assert.match(html,/\/vendor\/qrcode\.min\.js/);
+ if(page==='merchant-checkout.html')assert.match(html,/\/vendor\/qrcode\.min\.js/);
+ else assert.doesNotMatch(html,/\/vendor\/qrcode\.min\.js/,'Personal copy-only checkout must not preload QR renderer');
  assert.match(html,/\/cosmic-checkout\.js/);
  assert.match(html,/\/cosmic-checkout\.css/);
  assert.match(html,/src="\/assets\/disha-8-2-wordmark-cropped\.png"/);
@@ -46,4 +47,4 @@ assert.match(script,/get\('vaultProceed'\)\.addEventListener\('click',event=>/);
 assert.doesNotMatch(script,/userName=Device user/);
 assert.doesNotMatch(script,/finalizePayment\(|\/api\/settlement\/confirm/,
  'Browser may not invent settlement');
-console.log('COSMIC_CHECKOUT_PASS: QR-first, native gesture, two-device ledger receipt, no stale payment wizard');
+console.log('COSMIC_CHECKOUT_PASS: Quantum Fusion copy-only personal route, merchant QR and confirmed-ledger receipt remain isolated');
