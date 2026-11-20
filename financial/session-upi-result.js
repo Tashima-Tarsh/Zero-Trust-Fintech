@@ -70,6 +70,7 @@ async function initializeSessionUpiResultSchema(pool) {
       returned_at BIGINT NOT NULL,
       upi_txn_id TEXT,
       approval_ref_no TEXT,
+      utr_candidate TEXT,
       merchant_txn_ref TEXT,
       response_code TEXT,
       amount_paise TEXT,
@@ -77,7 +78,10 @@ async function initializeSessionUpiResultSchema(pool) {
       signal_status TEXT NOT NULL,
       decision_state TEXT NOT NULL
     );
-    ALTER TABLE disha_session_upi_results ADD COLUMN IF NOT EXISTS utr_candidate TEXT;\n    CREATE UNIQUE INDEX IF NOT EXISTS disha_session_upi_results_utr_unique\n      ON disha_session_upi_results(utr_candidate) WHERE utr_candidate IS NOT NULL;\n    CREATE INDEX IF NOT EXISTS disha_session_upi_results_order_time
+    ALTER TABLE disha_session_upi_results ADD COLUMN IF NOT EXISTS utr_candidate TEXT;
+    CREATE UNIQUE INDEX IF NOT EXISTS disha_session_upi_results_utr_unique
+      ON disha_session_upi_results(utr_candidate) WHERE utr_candidate IS NOT NULL;
+    CREATE INDEX IF NOT EXISTS disha_session_upi_results_order_time
       ON disha_session_upi_results(order_id, returned_at DESC);
     CREATE INDEX IF NOT EXISTS disha_session_upi_results_txn_id
       ON disha_session_upi_results(upi_txn_id) WHERE upi_txn_id IS NOT NULL;
@@ -150,7 +154,7 @@ function createSessionUpiResultRouter({ getPool, getSession }) {
       for (const reference of references) {
         const prior = (await client.query(
           `SELECT order_id FROM disha_session_upi_results
-           WHERE upi_txn_id=$1 OR approval_ref_no=$1
+           WHERE utr_candidate=$1 OR upi_txn_id=$1 OR approval_ref_no=$1
            LIMIT 1 FOR UPDATE`, [reference])).rows[0];
         const legacy = prior ? null : (await client.query(
           `SELECT order_id FROM disha_session_evidence_events
@@ -168,11 +172,11 @@ function createSessionUpiResultRouter({ getPool, getSession }) {
       await client.query(
         `INSERT INTO disha_session_upi_results
           (event_hash,event_id,order_id,device_id,package_name,returned_at,upi_txn_id,
-           approval_ref_no,merchant_txn_ref,response_code,amount_paise,payee_vpa,signal_status,decision_state)
-         VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)`,
+           approval_ref_no,utr_candidate,merchant_txn_ref,response_code,amount_paise,payee_vpa,signal_status,decision_state)
+         VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15)`,
         [eventHash,evidence.eventId,evidence.orderId,evidence.deviceId,evidence.packageName,
-          evidence.returnedAt,evidence.txnId,evidence.approvalRefNo,evidence.txnRef,
-          evidence.responseCode,evidence.amountPaise,evidence.payeeVpa,evidence.status,decisionState]);
+          evidence.returnedAt,evidence.txnId,evidence.approvalRefNo,evidence.txnId || evidence.approvalRefNo,
+          evidence.txnRef,evidence.responseCode,evidence.amountPaise,evidence.payeeVpa,evidence.status,decisionState]);
       await client.query(
         'UPDATE disha_session_evidence_devices SET last_seen_at=$3 WHERE order_id=$1 AND device_id=$2',
         [evidence.orderId,evidence.deviceId,now]);
