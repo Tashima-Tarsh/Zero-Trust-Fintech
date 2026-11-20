@@ -276,6 +276,22 @@
  function renderQr(){
   if(!session)return;
   const anchor=get('qrTapToPay'),container=get('paymentQr');
+  // P2P ProofBridge is copy-to-pay, NOT QR-to-pay. Neither consent
+  // nor Proceed may render a personal-account QR in this mode.
+  const p2pCopyOnly=proofbridgeEnabled&&model.isPersonalPayment(session.upiUri);
+  anchor.hidden=p2pCopyOnly;
+  get('qrExpiry').hidden=p2pCopyOnly;
+  get('qrTapToPayHint').hidden=p2pCopyOnly;
+  if(p2pCopyOnly){
+   anchor.href='#';anchor.setAttribute('aria-disabled','true');
+   container.replaceChildren();qrUri=null;
+   get('upiAppOptions').hidden=true;
+   const guide=get('paymentStageCopy');
+   if(guide)guide.textContent=proofbridgeReady?
+    'UPI ID copied. Open your existing UPI app, paste the receiving ID, check the amount and pay. Return here for transaction evidence.':
+    'Tick consent and touch Proceed. DISHA will copy the authorized receiving UPI ID. No QR or payment intent is required.';
+   return;
+  }
   if(proofbridgeEnabled&&!proofbridgeReady){
    anchor.href='#';anchor.setAttribute('aria-disabled','true');
    container.replaceChildren();qrUri=null;
