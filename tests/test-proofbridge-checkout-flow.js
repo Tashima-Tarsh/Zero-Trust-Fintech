@@ -67,6 +67,7 @@ async function flush(){for(let i=0;i<55;i++)await Promise.resolve()}
  assert.equal(app.elems.proofbridgeGate.hidden,false);
  assert.equal(app.elems.proofbridgeProceed.disabled,true);
  assert.equal(app.data.qr,null,'No QR without explicit consent');
+ assert.equal(app.elems.qrTapToPay.hidden,true,'P2P QR hidden before consent');
  app.elems.proofbridgeConsent.checked=true;
  app.elems.proofbridgeConsent.events.change();await flush();
  assert.equal(app.data.auth,1,'Consent invokes server-bound authorization');
@@ -74,7 +75,10 @@ async function flush(){for(let i=0;i<55;i++)await Promise.resolve()}
  assert.equal(app.data.qr,null,'Authorization alone does not reveal QR');
  app.elems.proofbridgeProceed.events.click();await flush();
  assert.deepEqual(app.data.copied,['receiver@oksbi'],'One Proceed tap copies exactly authorized payee');
- assert.equal(app.data.qr,upi);
+ assert.equal(app.data.qr,null,'P2P QR must remain absent after Proceed');
+ assert.equal(app.elems.qrTapToPay.hidden,true,'P2P QR container must be hidden');
+ assert.equal(app.elems.qrExpiry.hidden,true,'P2P QR expiry text hidden');
+ assert.match(app.elems.paymentStageCopy.textContent,/UPI ID copied/);
  assert.equal(app.elems.proofbridgeGate.hidden,true);
  assert.equal(app.stages.find(x=>!x.hidden)?.dataset.stage,'qr');
  app.data.claim='123456789012';
@@ -99,6 +103,7 @@ async function flush(){for(let i=0;i<55;i++)await Promise.resolve()}
  merchant.elems.proofbridgeProceed.events.click();await flush();
  assert.deepEqual(merchant.data.copied,['business@ypbiz'],'Merchant payee copied without altering MCC');
  assert.equal(merchant.data.qr,merchant.selectedUri,'Merchant QR preserves MCC and transaction reference');
+ assert.equal(merchant.elems.qrTapToPay.hidden,false,'P2M QR must stay visible');
  assert.equal(merchant.stages.find(x=>!x.hidden)?.dataset.stage,'qr');
  const conflict=launch(true,'P2M');await flush();
  conflict.elems.proofbridgeConsent.checked=true;

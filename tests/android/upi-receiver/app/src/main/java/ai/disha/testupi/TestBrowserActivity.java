@@ -162,7 +162,7 @@ public final class TestBrowserActivity extends Activity {
             "return JSON.stringify({amount:v('payAmount'),stage:active?active.dataset.stage:'none'," +
               "status:v('checkoutStatus'),paymentKind:v('paymentKind'),checking:v('checkingHelp'),receiptUtr:v('receiptUtr')," +
               "disabled:b?b.disabled:true,qr:!!document.querySelector('#paymentQr img, #paymentQr canvas')," +
-              "readyState:document.readyState,qrHref:qrTap?qrTap.getAttribute('href'):'',qrTarget:target(qrTap),qrDisabled:!qrTap||qrTap.getAttribute('aria-disabled')==='true'," +
+              "readyState:document.readyState,qrHref:qrTap?qrTap.getAttribute('href'):'',qrTarget:target(qrTap),qrHidden:!qrTap||qrTap.hidden,qrDisabled:!qrTap||qrTap.getAttribute('aria-disabled')==='true'," +
               "proofGateOpen:!!proofGate&&!proofGate.hidden,proofConsentChecked:!!proofConsent&&proofConsent.checked," +
               "proofStatus:v('proofbridgeStatus'),proofEvidence:v('proofbridgeEvidence')," +
               "proofConsentTarget:target(proofConsent),proofProceedTarget:target(proofProceed)," +
