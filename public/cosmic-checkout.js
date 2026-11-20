@@ -7,7 +7,7 @@
  const query=new URLSearchParams(location.search);
  const quantumEnabled=query.get('qs')==='1';
  const checkoutUA=navigator.userAgent||'';
- const nativeChromeCheckout=/Android/i.test(checkoutUA)&&/Chrome\\/\\d+/i.test(checkoutUA)&&!/[;\\s]wv[);\\s]/i.test(checkoutUA);
+ const nativeChromeCheckout=/Android/i.test(checkoutUA)&&/Chrome\/\d+/i.test(checkoutUA)&&!/[;\s]wv[);\s]/i.test(checkoutUA);
  const proofbridgeEnabled=(mode==='generic'||query.get('proofbridge')==='1')&&!nativeChromeCheckout;
  const quantumClient=window.DISHAQuantumSignalClient||null;
  let quantumReady=false;
@@ -336,7 +336,7 @@
   const anchor=get('qrTapToPay'),container=get('paymentQr');
   // P2P ProofBridge is copy-to-pay, NOT QR-to-pay. Neither consent
   // nor Proceed may render a personal-account QR in this mode.
-  const nativeHostEligible=device==='android'&&/Chrome\\/\\d+/i.test(userAgent)&&!/[;\\s]wv[);\\s]/i.test(userAgent)&&!query.has('nativeHostUnavailable');
+  const nativeHostEligible=device==='android'&&/Chrome\/\d+/i.test(userAgent)&&!/[;\s]wv[);\s]/i.test(userAgent)&&!query.has('nativeHostUnavailable');
   const disclosure=get('nativeEvidenceDisclosure');
   if(disclosure)disclosure.hidden=!nativeHostEligible;
   if(expired()||['EXPIRED','FAILED','CANCELLED'].includes(session.initialStatus)){
