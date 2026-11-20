@@ -195,27 +195,10 @@ public final class UpiResultHostActivity extends ComponentActivity {
         });
     }
 
-    private String canonicalUpiResult(JSONObject e) throws Exception {
-        return "{"
-            + "\\"protocol\\":\\"DISHA-UPI-RESULT-V1\\""
-            + ",\\"eventId\\":" + JSONObject.quote(e.getString("eventId"))
-            + ",\\"orderId\\":" + JSONObject.quote(e.getString("orderId"))
-            + ",\\"nonce\\":" + JSONObject.quote(e.getString("nonce"))
-            + ",\\"deviceId\\":" + JSONObject.quote(e.getString("deviceId"))
-            + ",\\"packageName\\":" + JSONObject.quote(e.getString("packageName"))
-            + ",\\"returnedAt\\":" + e.getLong("returnedAt")
-            + ",\\"txnId\\":" + nullable(e, "txnId")
-            + ",\\"approvalRefNo\\":" + nullable(e, "approvalRefNo")
-            + ",\\"txnRef\\":" + nullable(e, "txnRef")
-            + ",\\"responseCode\\":" + nullable(e, "responseCode")
-            + ",\\"amountPaise\\":" + nullable(e, "amountPaise")
-            + ",\\"payeeVpa\\":" + nullable(e, "payeeVpa")
-            + ",\\"status\\":" + JSONObject.quote(e.getString("status")) + "}";
-    }
-
-    private String nullable(JSONObject object, String key) throws Exception {
-        Object value = object.get(key);
-        return value == JSONObject.NULL ? "null" : JSONObject.quote(String.valueOf(value));
+    private String canonicalUpiResult(JSONObject e) {
+        // Evidence keys are inserted in the exact server canonical order.
+        // Android JSONObject emits compact JSON and preserves insertion order.
+        return e.toString();
     }
 
     private JSONObject post(String endpoint, JSONObject body, String csrf) throws Exception {
