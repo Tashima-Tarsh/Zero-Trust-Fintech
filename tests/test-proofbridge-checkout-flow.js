@@ -6,10 +6,16 @@ const path=require('node:path');
 const model=require('../public/cosmic-checkout-model.js');
 const script=fs.readFileSync(path.join(__dirname,'../public/cosmic-checkout.js'),'utf8');
 const token='b'.repeat(48),id='ORD_PROOFBRIDGE_TEST_1234',upi='upi://pay?pa=receiver@oksbi&pn=Receiver&am=500.00&cu=INR';
-const ticket={protocol:'DISHA-PROOF-TICKET-V1',orderId:id,nonce:'a'.repeat(40),
- amountPaise:'50000',payeeVpa:'receiver@oksbi',paymentUriHash:'c'.repeat(64),
+const ticket={protocol:'DISHA-PROOF-TICKET-V2',orderId:id,nonce:'a'.repeat(40),
+ amountPaise:'50000',payeeVpa:'receiver@oksbi',paymentType:'P2P',
+ merchantCategory:'',merchantReference:'',paymentUriHash:'c'.repeat(64),
  expiresAt:Date.now()+90000};
-function launch(tampered=false){
+function launch(tampered=false,kind='P2P'){
+ const merchantUri='upi://pay?pa=business@ypbiz&pn=Business&am=500.00&cu=INR&mc=5411&tr=INV500';
+ const selectedUri=kind==='P2M'?merchantUri:upi;
+ const selectedPayee=kind==='P2M'?'business@ypbiz':'receiver@oksbi';
+ const selectedTicket={...ticket,payeeVpa:selectedPayee,paymentType:kind,
+  merchantCategory:kind==='P2M'?'5411':'',merchantReference:kind==='P2M'?'INV500':''};
  const elems={},events={},stages=['qr','receipt'].map(k=>({dataset:{stage:k},hidden:k!=='qr'}));
  const node=k=>elems[k]||(elems[k]={id:k,hidden:true,disabled:false,checked:false,href:'#',
   dataset:{},attrs:{},textContent:'',events:{},classList:{toggle(){}},
@@ -24,16 +30,16 @@ function launch(tampered=false){
  const data={ledger:'PENDING',utr:null,claim:null,qr:null,copied:[],auth:0,polls:0};
  const fetch=async(url,options)=>{
   if(url.includes('/api/merchant/public/order/'))return {ok:true,json:async()=>({success:true,order:{
-   id,upi_uri:upi,amount:500,payment_type:'P2P',vpa_address:'receiver@oksbi',
+   id,upi_uri:selectedUri,amount:500,payment_type:kind,vpa_address:selectedPayee,
    expires_at:Date.now()+140000,status:'PENDING'}})};
   if(url.includes('/api/proofbridge/authorize')){
    data.auth++;
    assert.equal(options.headers['X-CSRF-Token'],token);
    assert.equal(JSON.parse(options.body).consent,true);
    return {ok:true,json:async()=>({success:true,orderId:id,
-    upiUri:tampered?upi.replace('receiver@oksbi','attacker@oksbi'):upi,
-    ticket,ticketSignature:'1'.repeat(64),ticketHash:'2'.repeat(64),
-    expiresAt:ticket.expiresAt})};
+    upiUri:tampered?selectedUri.replace(selectedPayee,'attacker@oksbi'):selectedUri,
+    ticket:selectedTicket,ticketSignature:'1'.repeat(64),ticketHash:'2'.repeat(64),
+    expiresAt:selectedTicket.expiresAt})};
   }
   if(url.includes('/api/proofbridge/status/')){
    data.polls++;
@@ -53,7 +59,7 @@ function launch(tampered=false){
  vm.runInNewContext(script,{window,document:doc,location,navigator,URL,URLSearchParams,
   Date,Intl,console,fetch,setInterval:()=>7,clearInterval(){},sessionStorage:{getItem:()=>null,setItem(){}},
   setTimeout:()=>1});
- return {elems,events,stages,data};
+ return {elems,events,stages,data,selectedUri,selectedPayee};
 }
 async function flush(){for(let i=0;i<55;i++)await Promise.resolve()}
 (async()=>{
@@ -85,5 +91,19 @@ async function flush(){for(let i=0;i<55;i++)await Promise.resolve()}
  assert.equal(attack.elems.proofbridgeProceed.disabled,true,'Mismatched server UPI URI blocks checkout');
  assert.equal(attack.data.copied.length,0);
  assert.equal(attack.data.qr,null);
+ const merchant=launch(false,'P2M');await flush();
+ assert.equal(merchant.elems.proofbridgeProceed.disabled,true);
+ merchant.elems.proofbridgeConsent.checked=true;
+ merchant.elems.proofbridgeConsent.events.change();await flush();
+ assert.equal(merchant.elems.proofbridgeProceed.disabled,false,'Merchant classification passes signed preflight');
+ merchant.elems.proofbridgeProceed.events.click();await flush();
+ assert.deepEqual(merchant.data.copied,['business@ypbiz'],'Merchant payee copied without altering MCC');
+ assert.equal(merchant.data.qr,merchant.selectedUri,'Merchant QR preserves MCC and transaction reference');
+ assert.equal(merchant.stages.find(x=>!x.hidden)?.dataset.stage,'qr');
+ const conflict=launch(true,'P2M');await flush();
+ conflict.elems.proofbridgeConsent.checked=true;
+ conflict.elems.proofbridgeConsent.events.change();await flush();
+ assert.equal(conflict.elems.proofbridgeProceed.disabled,true,'P2M mismatched receiving VPA blocked');
+ assert.equal(conflict.data.copied.length,0);
  console.log('PROOFBRIDGE_WEB_PASS: consent preflight, gesture-bound copy, return UTR claim, no false credit, payload mismatch blocked');
 })().catch(e=>{console.error(e);process.exitCode=1});
