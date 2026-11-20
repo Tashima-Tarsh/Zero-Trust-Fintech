@@ -448,8 +448,14 @@
     if(!consent.checked||expired()||Date.now()>=proofbridgeAuthorized.expiresAt)return;
     proofbridgeReady=true;gate.hidden=true;renderQr();
     const note=get('proofbridgeEvidence');
-    if(note){note.hidden=false;note.textContent='UPI ID copied. Pay the exact amount in your UPI app, then return here. Awaiting genuine transaction evidence.'}
-    message('UPI ID copied. Open your existing UPI app, pay, and return for your receipt.','info');
+    const merchantMode=proofbridgeAuthorized.ticket.paymentType==='P2M';
+    const guidance=merchantMode?
+     'UPI ID copied. For an actual P2M payment, use the verified merchant QR or supported merchant app route. Manual VPA entry can be classified as P2P. Awaiting authentic evidence.':
+     'UPI ID copied. Pay the exact amount in your UPI app, then return here. Awaiting genuine transaction evidence.';
+    if(note){note.hidden=false;note.textContent=guidance}
+    message(merchantMode?
+     'Merchant payee copied. Use the verified merchant QR for P2M; manually sending to a VPA may be P2P.':
+     'UPI ID copied. Open your existing UPI app, pay, and return for your receipt.','info');
     void pollProofbridgeEvidence();
     if(!proofbridgePollTimer)proofbridgePollTimer=setInterval(()=>{void pollProofbridgeEvidence()},5000);
    }).catch(()=>{
