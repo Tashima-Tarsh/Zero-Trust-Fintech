@@ -12,6 +12,7 @@ import androidx.activity.result.ActivityResult;
 import androidx.activity.result.ActivityResultLauncher;
 import androidx.activity.result.contract.ActivityResultContracts;
 import org.json.JSONObject;
+import org.json.JSONArray;
 import java.io.BufferedReader;
 import java.io.InputStream;
 import java.io.InputStreamReader;
@@ -110,6 +111,7 @@ public final class UpiResultHostActivity extends ComponentActivity {
                 request.put("deviceId", deviceId);
                 request.put("publicKeyPem", publicPem);
                 JSONObject response = post(apiBase + "/api/session-evidence/authorize", request, token);
+                validateServerAllowedPackage(response);
                 validateServerPaymentBinding(response);
                 nonce = response.getString("nonce");
                 if (!nonce.matches("(?i)^[a-f0-9]{40}$")) throw new IllegalStateException("Invalid session nonce");
@@ -253,6 +255,15 @@ public final class UpiResultHostActivity extends ComponentActivity {
             .setDigests(android.security.keystore.KeyProperties.DIGEST_SHA256)
             .setUserAuthenticationRequired(false).build());
         return generator.generateKeyPair();
+    }
+
+    private void validateServerAllowedPackage(JSONObject response) throws Exception {
+        JSONArray allowed = response.getJSONArray("allowedPackages");
+        boolean found = false;
+        for (int i = 0; i < allowed.length(); i++) {
+            if (upiPackage.equals(allowed.getString(i))) { found = true; break; }
+        }
+        if (!found) throw new SecurityException("Selected UPI app is not allowed for this session");
     }
 
     private void validateServerPaymentBinding(JSONObject response) throws Exception {
