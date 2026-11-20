@@ -354,27 +354,21 @@
   if(p2pCopyOnly){
    anchor.href='#';anchor.setAttribute('aria-disabled','true');
    container.replaceChildren();qrUri=null;
-   get('upiAppOptions').hidden=!nativeHostEligible;
-   // Put a primary action immediately after the Service ID on Android Chrome.
-   // P2P still dispatches through the installed DISHA host; it never creates a
-   // merchant-intent URI or treats app launch as payment confirmation.
+   // Personal P2P is copy-to-pay. Do not launch external UPI apps or
+   // require the DISHA Android host APK; the customer chooses their app manually.
+   get('upiAppOptions').hidden=true;
    const proceed=get('vaultProceed');
    if(proceed){
-    proceed.hidden=!nativeHostEligible;
-    proceed.href=nativeHostEligible?nativeHostIntentUri('gpay'):'#';
-    proceed.textContent='Proceed with Google Pay';
-    proceed.setAttribute('aria-disabled',nativeHostEligible?'false':'true');
+    proceed.hidden=false;
+    proceed.href='#';
+    proceed.textContent='Copy UPI ID';
+    proceed.setAttribute('aria-disabled','false');
    }
-   for(const link of document.querySelectorAll('[data-upi-app]')){
-    link.href=nativeHostEligible?nativeHostIntentUri(link.dataset.upiApp):'#';
-    link.setAttribute('aria-disabled',nativeHostEligible?'false':'true');
-   }
+   if(disclosure)disclosure.hidden=true;
    const guide=get('paymentStageCopy');
-   if(guide)guide.textContent=nativeHostEligible?
-    'Choose your UPI app. DISHA will receive only the transaction fields returned for this payment session.':
-    proofbridgeReady?
-     'Receiving details copied. Open your payment app, paste the address, confirm the amount and pay. Return here for your receipt.':
-     'Authorize this session, then touch Proceed once to copy the receiving address.';
+   if(guide)guide.textContent=proofbridgeReady?
+    'Receiving UPI ID copied. Open your UPI app, paste it, enter the exact amount and pay. Return here for your receipt.':
+    'Copy the receiving UPI ID, open any UPI app, paste it and enter the exact amount. No app launch or DISHA installation is required.';
    return;
   }
   if(proofbridgeEnabled&&!proofbridgeReady){
@@ -589,25 +583,35 @@
  }
  function setEventHandlers(){
 
-  // Native browser anchor navigation preserves Android's direct user gesture.
-  // Signal twin and ACK are established before this click.
+  // P2P action copies the receiving VPA only. Never dispatch an app intent.
   get('vaultProceed').addEventListener('click',event=>{
+   event.preventDefault();
    if(!session||receiptShown||expired()||
-      !model.supportsNativeUPI(userAgent)||
       ['EXPIRED','FAILED','CANCELLED'].includes(session.initialStatus)||
       get('vaultProceed').getAttribute('aria-disabled')==='true'){
-    event.preventDefault();
-    message(session&&model.isPersonalPayment(session.upiUri)?
-      'Personal UPI intent is restricted. Scan or import the QR inside your UPI app.':
-      'Payment unavailable or expired. Request a fresh link.','info');
-    return;
+    message('Payment unavailable or expired. Request a fresh link.','info');return;
    }
-   if(quantumEnabled&&quantumReady&&quantumClient){
-    try{quantumClient.handoff(session,'generic')}catch(_){trace('SIGNAL_UNAVAILABLE')}
+   if(!model.isPersonalPayment(session.upiUri)){
+    message('Use the registered merchant payment route for this payment.','info');return;
    }
-   qrTapStartedAt=Date.now();qrAppBackgrounded=false;
-   trace('APP_DISPATCH','APP_GENERIC','generic');
-   // Allow the browser to navigate via this user-tapped link.
+   const payee=session.payeeVpa||new URLSearchParams(session.upiUri.split('?')[1]||'').get('pa');
+   if(!payee){message('Receiving UPI ID is unavailable. Request a fresh link.','error');return;}
+   get('vaultProceed').setAttribute('aria-disabled','true');
+   proofbridgeCopyVpa(payee).then(()=>{
+    get('vaultProceed').setAttribute('aria-disabled','false');
+    const handoff=get('copyHandoff');
+    if(handoff){
+     get('copiedPayee').textContent=payee;
+     handoff.hidden=false;
+     get('copyHandoffStatus').textContent='UPI ID copied. Open Google Pay, PhonePe, Paytm or BHIM yourself, paste the ID, enter the exact amount and pay. Return here for the receipt check.';
+    }
+    const guide=get('paymentStageCopy');
+    if(guide)guide.textContent='UPI ID copied. Open your preferred UPI app and paste the receiving address.';
+    message('UPI ID copied. Open your UPI app and paste it.','success');
+   }).catch(()=>{
+    get('vaultProceed').setAttribute('aria-disabled','false');
+    message('Could not copy the UPI ID. Allow clipboard access or try Chrome again. No UPI app was launched.','error');
+   });
   });
   get('qrTapToPay').addEventListener('click',event=>{
    if(!session||receiptShown||expired()||
