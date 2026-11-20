@@ -81,6 +81,10 @@ async function initializeSessionUpiResultSchema(pool) {
     ALTER TABLE disha_session_upi_results ADD COLUMN IF NOT EXISTS utr_candidate TEXT;
     CREATE UNIQUE INDEX IF NOT EXISTS disha_session_upi_results_utr_unique
       ON disha_session_upi_results(utr_candidate) WHERE utr_candidate IS NOT NULL;
+    CREATE UNIQUE INDEX IF NOT EXISTS disha_session_upi_results_txn_unique
+      ON disha_session_upi_results(upi_txn_id) WHERE upi_txn_id IS NOT NULL;
+    CREATE UNIQUE INDEX IF NOT EXISTS disha_session_upi_results_approval_unique
+      ON disha_session_upi_results(approval_ref_no) WHERE approval_ref_no IS NOT NULL;
     CREATE INDEX IF NOT EXISTS disha_session_upi_results_order_time
       ON disha_session_upi_results(order_id, returned_at DESC);
     CREATE INDEX IF NOT EXISTS disha_session_upi_results_txn_id
