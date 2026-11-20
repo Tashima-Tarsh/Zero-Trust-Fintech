@@ -2,7 +2,7 @@
 const assert = require('node:assert/strict');
 const crypto = require('node:crypto');
 const {
-  ALLOWED_PACKAGES, canonicalEvidence, verifyDeviceEvidence, evaluateEvidence
+  ALLOWED_PACKAGES, canonicalEvidence, verifyDeviceEvidence, evaluateEvidence, aggregateSessionDecision
 } = require('../financial/session-evidence');
 
 const { publicKey, privateKey } = crypto.generateKeyPairSync('ec', {
@@ -49,4 +49,16 @@ assert.equal(evaluateEvidence({ ...evidence, postedAt: 300000 }, session, 310000
 assert.equal(evaluateEvidence({ ...evidence, transactionRef: null }, session, 160000).state, 'INCOMPLETE_SIGNAL');
 assert.equal(evaluateEvidence({ ...evidence, status: 'FAILED' }, session, 160000).state, 'PAYMENT_FAILED_SIGNAL');
 
-console.log('PASS: session evidence signature, allowlist, binding, clock, amount, payee and incomplete-signal tests');
+assert.equal(aggregateSessionDecision([
+  { device_id: 'DEVICE_A', transaction_ref: 'UPI123456789', decision_state: 'SIGNAL_MATCHED' },
+  { device_id: 'DEVICE_B', transaction_ref: 'UPI123456789', decision_state: 'INCOMPLETE_SIGNAL' }
+]), 'MULTI_DEVICE_CORROBORATED');
+assert.equal(aggregateSessionDecision([
+  { device_id: 'DEVICE_A', transaction_ref: 'UPI123456789', decision_state: 'SIGNAL_MATCHED' },
+  { device_id: 'DEVICE_B', transaction_ref: 'UPI987654321', decision_state: 'SIGNAL_MATCHED' }
+]), 'MULTIPLE_REFERENCE_CONFLICT');
+assert.equal(aggregateSessionDecision([
+  { device_id: 'DEVICE_A', transaction_ref: null, decision_state: 'AMOUNT_MISMATCH' }
+]), 'FRAUD_REJECT');
+
+console.log('PASS: session evidence signature, allowlist, binding, clock, amount, payee, replay and unified fraud decision tests');
