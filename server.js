@@ -19,6 +19,7 @@ const {createVaultEvidenceRouter,initializeVaultEvidenceSchema,rememberVaultAuth
 const {initializeQuantumSignal,createQuantumSignalRouter}=require('./financial/quantum-signal');
 const {initProofBridgeSchema,createProofBridgeRouter}=require('./financial/proofbridge');
 const {initializeSessionEvidenceSchema,createSessionEvidenceRouter}=require('./financial/session-evidence');
+const {initializeSessionUpiResultSchema,createSessionUpiResultRouter}=require('./financial/session-upi-result');
 const {createCheckoutDiagnostics}=require('./financial/checkout-diagnostics');
 const {initializeClaimObserver,observeClaim} = require('./financial/untrusted-utr-claims');
 const {
@@ -555,6 +556,7 @@ function broadcastOrderSuccess(orderId, payload) {
 app.use('/api/vault',createVaultEvidenceRouter({getPool:()=>db.pgPool}));
 // Session-bound, multi-device evidence. Device events never mutate checkout or ledger state.
 app.use('/api/session-evidence',verifyLimiter,createSessionEvidenceRouter({getPool:()=>db.pgPool,getSession:id=>db.findSessionByOrderId(id)}));
+app.use('/api/session-evidence/upi-result',verifyLimiter,createSessionUpiResultRouter({getPool:()=>db.pgPool,getSession:id=>db.findSessionByOrderId(id)}));
 // Per-order digital twin. Browser observations are never converted to financial credits.
 app.use('/api/quantum-signal',createQuantumSignalRouter({getPool:()=>db.pgPool}));
 // Experimental only: signed receipt claims never update payment status or ledger.
@@ -2063,6 +2065,7 @@ app.get('/failed', (req, res) => res.sendFile(path.join(__dirname, 'public', 'fa
     await initializeVaultEvidenceSchema(db.pgPool);
     await initializeQuantumSignal(db.pgPool);
     await initializeSessionEvidenceSchema(db.pgPool);
+    await initializeSessionUpiResultSchema(db.pgPool);
     if(process.env.DISHA_PROOFBRIDGE_EXPERIMENT==='1')await initProofBridgeSchema(db.pgPool);
     await initializeClaimObserver(db.pgPool);
   }
