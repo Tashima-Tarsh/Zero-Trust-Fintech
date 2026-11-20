@@ -151,10 +151,13 @@ function createSessionUpiResultRouter({ getPool, getSession }) {
         const prior = (await client.query(
           `SELECT order_id FROM disha_session_upi_results
            WHERE upi_txn_id=$1 OR approval_ref_no=$1
-           UNION ALL
-           SELECT order_id FROM disha_session_evidence_events WHERE transaction_ref=$1
            LIMIT 1 FOR UPDATE`, [reference])).rows[0];
-        if (prior && prior.order_id !== evidence.orderId) throw fail('TRANSACTION_REFERENCE_REPLAY', 409);
+        const legacy = prior ? null : (await client.query(
+          `SELECT order_id FROM disha_session_evidence_events
+           WHERE transaction_ref=$1 LIMIT 1`, [reference])).rows[0];
+        const duplicate = prior || legacy;
+        if (duplicate) throw fail(
+          duplicate.order_id === evidence.orderId ? 'UPI_RESULT_DUPLICATE' : 'TRANSACTION_REFERENCE_REPLAY', 409);
       }
 
       const count = Number((await client.query(
