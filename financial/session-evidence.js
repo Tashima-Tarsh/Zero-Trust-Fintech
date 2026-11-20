@@ -219,7 +219,7 @@ function createSessionEvidenceRouter({ getPool, getSession }) {
         amountPaise, payeeVpa:payee, paymentType, merchantReference, merchantCategoryCode,
         expiresAt:activeExpiry, consentedAt:activeConsentTime, serverTime:now, allowedPackages:[...ALLOWED_PACKAGES]
       });
-    } catch (e) { return respondError(res, e); }
+    } catch (e) { console.error('[session-evidence] authorize failed:', e && (e.code || e.message) || 'unknown'); return respondError(res, e); }
   });
 
   router.post('/event', async (req, res) => {
