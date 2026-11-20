@@ -16,7 +16,7 @@ final class UpiResponseParser {
         Bundle extras = intent.getExtras();
         if (extras != null) for (String key : extras.keySet()) {
             Object value = extras.get(key);
-            if (value instanceof String) values.put(key.toLowerCase(Locale.ROOT), (String)value);
+            if (value instanceof CharSequence || value instanceof Number) values.put(key.toLowerCase(Locale.ROOT), String.valueOf(value));
         }
         String response = first(values, "response", "upi_response", "result");
         if (response != null) parseQuery(response, values);
