@@ -28,6 +28,7 @@
 /* The personal payment has exactly one consent gate and one handoff.
    Old QR, app picker, and identity notes remain DOM hooks for the merchant
    lane and legacy tests; they are never visible in the personal lane. */
+[data-quantum-fusion="true"] .checkout-payment-kind,
 body[data-checkout="generic"] .checkout-payment-kind,
 body[data-checkout="generic"] #checkoutPaymentIdentity,
 body[data-checkout="generic"] #checkoutNote,
