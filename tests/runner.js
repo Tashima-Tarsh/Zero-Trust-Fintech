@@ -65,7 +65,8 @@ const UNIT_TESTS = [
   'test-proofbridge.js', // zero-install consent gate and issuer-signed capsule contract
   'test-session-evidence.js',
   'test-udeb-evidence-contract.js',
-  'test-udeb-browser-handoff.js', // Auto-poll read-only consent-scoped Android evidence; fail-closed receipt // Claude iteration 1: signed observation, fraud/nonce/replay (never settlement) // multi-device session binding, signatures and fraud gates
+  'test-udeb-browser-handoff.js',
+  'test-udeb-observer-trust.js', // Reject unauthenticated device keys before device-observed receipt // Auto-poll read-only consent-scoped Android evidence; fail-closed receipt // Claude iteration 1: signed observation, fraud/nonce/replay (never settlement) // multi-device session binding, signatures and fraud gates
   'test-session-upi-result.js', // native Android UPI result payload, signature and app allowlist
   'test-android-upi-host-contract.js', // no special permissions, activity result, checkout handoff and server EBIT route
   'test-proofbridge-checkout-flow.js', // consent preflight + native gesture copy + return proof
