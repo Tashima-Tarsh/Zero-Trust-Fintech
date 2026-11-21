@@ -3,6 +3,7 @@ package ai.disha.credentialfixture
 import android.app.Application
 import android.graphics.Bitmap
 import android.util.Log
+import java.security.MessageDigest
 import androidx.credentials.registry.provider.RegistryManager
 import androidx.credentials.registry.digitalcredentials.openid4vp.OpenId4VpRegistry
 import androidx.credentials.registry.digitalcredentials.sdjwt.SdJwtEntry
@@ -66,12 +67,23 @@ class DishaCredentialApplication : Application() {
                     entryDisplayPropertySet = setOf(display),
                     id = "disha-fixture-synthetic-v1"
                 )
-                registryManager.registerCredentials(
-                    OpenId4VpRegistry(
-                        credentialEntries = listOf(entry),
-                        id = "disha-fixture-registry-v1"
-                    )
+                val registry = OpenId4VpRegistry(
+                    credentialEntries = listOf(entry),
+                    id = "disha-fixture-registry-v1"
                 )
+                // Diagnostic fingerprints identify the exact synthetic registry and matcher
+                // used in a device run. They do not establish matcher eligibility or success.
+                fun digest(bytes: ByteArray): String =
+                    MessageDigest.getInstance("SHA-256").digest(bytes)
+                        .joinToString("") { "%02x".format(it) }
+                Log.i(
+                    "DISHA_CREDENTIAL_FIXTURE",
+                    "REGISTRY_DIAGNOSTICS credentialBytes=${registry.credentials.size}" +
+                        " credentialSha256=${digest(registry.credentials)}" +
+                        " matcherBytes=${registry.matcher.size}" +
+                        " matcherSha256=${digest(registry.matcher)}"
+                )
+                registryManager.registerCredentials(registry)
                 Log.i("DISHA_CREDENTIAL_FIXTURE", "APPLICATION_SCOPED_REGISTRATION_SUCCESS")
             } catch (error: Exception) {
                 Log.e("DISHA_CREDENTIAL_FIXTURE", "APPLICATION_SCOPED_REGISTRATION_FAILED", error)
