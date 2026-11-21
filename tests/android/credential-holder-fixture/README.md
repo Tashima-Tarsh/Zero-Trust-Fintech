@@ -41,3 +41,26 @@ Kotlin source implementation; requires GitHub Android compile CI and physical An
 - This does not establish production readiness or customer-phone SMS access. The Google Play Identity Credential registration service must become available to the test app/device, or a separately supported Android platform credential-provider path must be used. Keep the e2e job failing until it reaches `Android handoff received`; never relax its assertion to merely detect `DigitalCredential`.
 
 Android 36 Google Play emulator result: CI job `136763710126`, commit `38815eaf3a59bc1ee261f4088935c59098526355`. Chrome/provider handoff was **not** demonstrated.
+
+## Local Android Studio / Windows diagnostics
+
+To reproduce the issue without touching production payments, launch an **Android 36 Google Play Store** AVD in Android Studio (do not attempt to log in with accounts you cannot use). From Windows PowerShell in the repository root:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File tests/android/credential-holder-fixture/doctor.ps1
+```
+
+This read-only preflight saves `local-diagnostics/<timestamp>/` containing ADB connectivity, SDK/GMS build, the fixture's installed manifest information, emulator list, filtered Logcat, and a Gradle `--no-daemon` debug build. If ADB cannot initialize the interrupt socket or Gradle cannot connect to its daemon, restart **only** local tooling:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File tests/android/credential-holder-fixture/doctor.ps1 -RepairLocalTools
+```
+
+`-RepairLocalTools` performs `adb kill-server`/`start-server` and `gradle --stop`, then uses `--no-daemon` for the build. Neither command changes device accounts, Google Play Services, or production payment records. The script never needs Google account credentials. Logs may contain system identifiers; review before sharing.
+
+### CI matrix result (commit `9d22d7f`)
+
+- Android **35** Google Play image: `GMS_AVAILABILITY=2` (Play Services needs update); registration ends in `RegisterCredentialsConfigurationException` — not an eligible comparison for digital holder flow.
+- Android **36** Google Play image: `GMS_AVAILABILITY=0`, registry provider metadata present, but `RegisterCredentialsUnknownException: 17` from the GMS Identity Credentials registration client. This is *not* evidence that Android does not have Credential Manager or that DISHA signing failed.
+- Google's `IdentityCredentialClient.registerCredentials` API documents status 17 for disallowed operations; a Google-side eligibility/API enablement restriction is a **hypothesis**, not an established root cause. See https://developers.google.com/android/reference/com/google/android/gms/identitycredentials/IdentityCredentialClient and https://developers.google.com/android/reference/com/google/android/gms/common/api/CommonStatusCodes .
+- Do not mark the Chrome holder flow green until the emulator actually logs `Android handoff received`. An Android Studio Gradle sync passing is not the browser callback.
