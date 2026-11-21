@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>DISHA - isolated PaymentResponse evidence lab</title>
+<style>body{font:16px system-ui;max-width:660px;margin:2rem auto;padding:0 1rem;line-height:1.5}label{display:block;margin:1rem 0}input{display:block;width:100%;box-sizing:border-box;padding:.7rem}button{padding:.8rem;margin:.4rem .2rem .4rem 0}pre{white-space:pre-wrap;overflow-wrap:anywhere;background:#eee;color:#111;padding:1rem}small{display:block}button:disabled{opacity:.5}</style>
+<h1>DISHA - PaymentResponse research only</h1>
+<p>This page is NOT checkout, not bank debit verification and not an RRN reader. It does not call DISHA APIs or store a response. Payment apps only respond if the configured merchant and payment method are supported.</p>
+<p><strong>Probe only</strong> checks capability without launching a transaction. <strong>Launch payment test</strong> can request a REAL payment and should be used only in an authorized test with the payer's explicit approval.</p>
+<label>Merchant/payee VPA<input id="vpa" autocomplete="off" placeholder="merchant@bank"></label>
+<label>Merchant name<input id="name" autocomplete="off" placeholder="Registered test merchant"></label>
+<label>Verified merchant category code (MCC)<input id="mcc" inputmode="numeric" maxlength="4" placeholder="4-digit MCC"></label>
+<label>Amount in INR<input id="amount" value="1.00" inputmode="decimal"></label>
+<label>Unique merchant request reference<input id="ref" autocomplete="off" placeholder="TESTORDER001"></label>
+<button id="probe">1. Probe browser support (no payment)</button>
+<button id="launch" disabled>2. Launch payment test (may transfer real money)</button>
+<small>The second button is enabled only after canMakePayment returns true. It is never triggered automatically.</small>
+<h2>Local sanitized observations</h2><pre id="out" role="status" aria-live="polite">Not run</pre>
+<script src="./paymentresponse-lab.js"></script>
+<script>
+(()=>{'use strict';
+ const get=id=>document.getElementById(id),lib=window.DISHAPaymentResponseLab;
+ let request=null,params=null;
+ const report=o=>get('out').textContent=JSON.stringify(o,null,2);
+ function read(){
+  return {payeeVpa:get('vpa').value.trim(),payeeName:get('name').value.trim(),mcc:get('mcc').value.trim(),amount:get('amount').value.trim(),transactionRef:get('ref').value.trim(),orderUrl:location.origin+location.pathname};
+ }
+ get('probe').addEventListener('click',async()=>{
+  get('launch').disabled=true;request=null;
+  try{
+   if(!window.isSecureContext||!window.PaymentRequest){report({result:'PAYMENT_REQUEST_NOT_AVAILABLE',secureContext:window.isSecureContext});return;}
+   params=read();const data=lib.requestData(params);request=new PaymentRequest(data.methods,data.details);
+   const capable=await request.canMakePayment();
+   report({result:capable?'SUPPORTED_PAYMENT_METHOD_FOUND':'NO_SUPPORTED_PAYMENT_METHOD',paymentMethod:lib.METHOD,realPaymentStarted:false});
+   get('launch').disabled=!capable;
+  }catch(e){report({result:'PROBE_FAILED',errorName:e.name||'Error'});}
+ });
+ get('launch').addEventListener('click',async()=>{
+  if(!request||!params)return;
+  get('launch').disabled=true;
+  try{
+   // Only an explicit click launches Chrome PaymentRequest. No payment action without user approval.
+   const response=await request.show();
+   const observation=lib.inspectResponse(response,params);
+   report(observation);
+   // We never report payment completion. Chromium requires complete() to close the sheet.
+   try{await response.complete('unknown');}catch(_){}
+  }catch(e){report({result:'PAYMENT_REQUEST_CANCELLED_OR_FAILED',errorName:e.name||'Error',bankRrnProven:false});}
+  finally{request=null;}
+ });
+})();
+</script></html>
