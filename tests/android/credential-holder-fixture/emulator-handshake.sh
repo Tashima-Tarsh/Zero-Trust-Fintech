@@ -56,8 +56,15 @@ sleep 12
 adb logcat -d -s DISHA_CREDENTIAL_FIXTURE:I > "$out/provider-logcat.txt"
 adb shell uiautomator dump /sdcard/disha-ui.xml >/dev/null 2>&1 || true
 adb pull /sdcard/disha-ui.xml "$out/browser-after.xml" >/dev/null || true
-if ! grep -q 'Android handoff received' "$out/provider-logcat.txt"; then
-  echo "Chrome did not deliver a GET_CREDENTIAL request to fixture on this image."
+if ! grep -q 'GET_CREDENTIAL_CALLBACK_PARSED' "$out/provider-logcat.txt"; then
+  if grep -q 'GET_CREDENTIAL_CALLBACK_REJECTED' "$out/provider-logcat.txt"; then
+    echo "Holder activity ran but Android provider request was rejected; inspect exception class."
+  elif grep -q 'HOLDER_ACTIVITY_CREATED' "$out/provider-logcat.txt"; then
+    echo "Holder activity started but no parsed GET_CREDENTIAL callback was observed."
+  else
+    echo "No DISHA holder activity invocation observed; inspect Chrome request and OS provider selection."
+  fi
+  echo "CHROME_ANDROID_CREDENTIAL_HANDSHAKE_NOT_VERIFIED"
   exit 1
 fi
 echo "CHROME_ANDROID_CREDENTIAL_HANDSHAKE_PASS (synthetic no-payment evidence only)"
