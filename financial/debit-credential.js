@@ -7,6 +7,7 @@
 const crypto=require('node:crypto');
 const express=require('express');
 const {rupeesToPaise}=require('./money');
+const {createEvidenceAcknowledgement}=require('./debit-evidence-receipt');
 const fail=(status,code)=>Object.assign(new Error(code),{status,code});
 const sha=value=>crypto.createHash('sha256').update(value).digest('hex');
 const validId=value=>typeof value==='string'&&/^[A-Za-z0-9_-]{6,150}$/.test(value);
@@ -207,6 +208,34 @@ function createDebitCredentialRouter({getPool,getSession}){
     issuerId:row?.issuer_id||null,utrCandidate:row?.utr||null,
     signedClaimReceivedAt:row?Number(row.received_at):null,
     paymentVerified:false,debitVerified:false,paymentStateChanged:false});
+  }catch(e){return err(res,e)}
+ });
+ // DISHA-signed acknowledgement of a trusted issuer's submitted claim.
+ // The server deliberately attests to evidence RECEIPT, not bank settlement.
+ router.get('/evidence-receipt/:serviceRequestId',async(req,res)=>{
+  res.set('Cache-Control','no-store');
+  const pool=getPool();if(!pool)return err(res,fail(503,'POSTGRES_REQUIRED'));
+  try{
+   const serviceRequestId=req.params.serviceRequestId,token=req.query.token;
+   if(!validId(serviceRequestId)||!validToken(token))
+    throw fail(401,'SESSION_TOKEN_REQUIRED');
+   const session=await getSession(serviceRequestId);
+   if(!session||!same(session.sessionId,token))
+    throw fail(401,'SESSION_TOKEN_REQUIRED');
+   if(!['PERSONAL','P2P'].includes(String(session.merchantType||'').toUpperCase()))
+    throw fail(409,'P2P_REQUIRED');
+   const row=(await pool.query(
+    'SELECT utr,issuer_id,receipt_hash,received_at FROM disha_debit_credential_claims '+
+    'WHERE service_request_id=$1',[serviceRequestId])).rows[0];
+   if(!row)throw fail(404,'DEBIT_ISSUER_CLAIM_MISSING');
+   const signingKey=process.env.DISHA_EVIDENCE_RECEIPT_PRIVATE_KEY_BASE64;
+   if(!signingKey)throw fail(503,'DISHA_EVIDENCE_SIGNING_NOT_CONFIGURED');
+   let receipt;
+   try{receipt=createEvidenceAcknowledgement(serviceRequestId,row,signingKey)}
+   catch(_){throw fail(503,'DISHA_EVIDENCE_SIGNING_UNAVAILABLE')}
+   return res.json({success:true,evidenceReceipt:receipt,
+    evidenceAuthenticated:true,debitVerified:false,paymentVerified:false,
+    paymentStateChanged:false});
   }catch(e){return err(res,e)}
  });
  router.post('/present',async(req,res)=>{
