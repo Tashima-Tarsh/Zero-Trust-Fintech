@@ -33,3 +33,11 @@ No production Android APK is bundled with DISHA checkout. This fixture intention
 ## Status
 
 Kotlin source implementation; requires GitHub Android compile CI and physical Android Chrome integration test to establish working platform handshake.
+
+## Emulator evidence (2026-11-21)
+
+- **Android-to-server signed challenge: PASS.** The emulator installed the fixture, invoked the lab button, generated a P-256 key inside AndroidKeyStore, signed the server's 32-byte challenge and received a successful signature verification over the local `adb reverse` connection. CI emitted `ANDROID_SERVER_HANDSHAKE_PASS`. Node regression tests cover nonce substitution, changed signature, TTL expiry and replay; no UTR or bank success is generated.
+- **Chrome-to-Android credential provider: NOT PASSED.** On Android 35 Google Play, `RegistryManager.registerCredentials` first failed with no provider dependencies found. On Android 36 Google Play Store, diagnostics confirmed `GMS_VERSION=250834038`, `GMS_AVAILABILITY=0`, and `REGISTRY_METADATA_FOUND=true` with the correct provider class. The next registration step returned `RegisterCredentialsUnknownException: 17`. Google Play services identifies status 17 as `API_NOT_CONNECTED` for the relevant API. Credential registration therefore did not reach the Chrome callback.
+- This does not establish production readiness or customer-phone SMS access. The Google Play Identity Credential registration service must become available to the test app/device, or a separately supported Android platform credential-provider path must be used. Keep the e2e job failing until it reaches `Android handoff received`; never relax its assertion to merely detect `DigitalCredential`.
+
+Android 36 Google Play emulator result: CI job `136763710126`, commit `38815eaf3a59bc1ee261f4088935c59098526355`. Chrome/provider handoff was **not** demonstrated.
