@@ -28,7 +28,7 @@ class RegisterActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         val state = TextView(this).apply {
-            text = "DISHA credential registered automatically at app startup. Open Chrome test page to verify. Manual registration button below is now redundant but preserved for testing."
+            text = "Automatic registration runs in the background. Confirm APPLICATION_SCOPED_REGISTRATION_SUCCESS in Logcat before opening Chrome. The manual button is a separate retry test."
             textSize = 17f
             setPadding(20, 20, 20, 20)
         }
