@@ -56,6 +56,7 @@ const UNIT_TESTS = [
   'test-quantum-signal.js', // automatic post-UPI browser evidence packet and idempotent retries
   'test-android-checkout-handshake.js', // Opt-in test embedded in real P2P/P2M checkout after WebAuthn
   'test-debit-credential-probe.js',
+  'test-unsigned-openid4vp-challenge.js',
   'test-debit-evidence-receipt.js',
   'test-sms-observation.js', // authenticated device observation is never a bank debit receipt
   'test-android-master-server-handshake.js', // Opt-in Android credentials handshake, tamper proof, no ledger mutation
