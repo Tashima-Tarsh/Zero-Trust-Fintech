@@ -2,17 +2,22 @@ package ai.disha.credentialfixture
 
 import android.Manifest
 import android.app.AlertDialog
+import android.hardware.biometrics.BiometricManager
+import android.hardware.biometrics.BiometricPrompt
 import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Build
+import android.os.CancellationSignal
+import android.os.SystemClock
 import android.os.Bundle
 import android.provider.Settings
 import android.text.InputType
 import android.widget.ArrayAdapter
 import android.widget.Button
+import android.widget.CheckBox
 import android.widget.EditText
 import android.widget.LinearLayout
 import android.widget.ScrollView
@@ -30,6 +35,7 @@ class SessionObservationActivity : ComponentActivity() {
     private lateinit var result: TextView
     private lateinit var notifications: NotificationManager
     private var notificationId = 100
+    private var authentication: CancellationSignal? = null
     private var referencePrefix = Random.nextInt(10000000, 100000000).toString()
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -57,7 +63,7 @@ class SessionObservationActivity : ComponentActivity() {
         button("Android notification access") {
             startActivity(Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS))
         }
-        button("Set up real debit UTR observation") { requestRealObservation() }
+        button("Set up real debit UTR observation") { authenticateForObservation() }
         button("Consent and start synthetic session") {
             if (NotificationManagerCompat.getEnabledListenerPackages(this).contains(packageName) &&
                 SessionObservation.listenerConnected) {
@@ -87,10 +93,45 @@ class SessionObservationActivity : ComponentActivity() {
         super.onSaveInstanceState(outState)
     }
 
-    private fun requestRealObservation() {
+    private fun authenticateForObservation() {
+        if (Build.VERSION.SDK_INT < 30) {
+            result.text = "Device authentication is unavailable for this Android version"
+            return
+        }
+        if (authentication != null) return
+        val authenticators = BiometricManager.Authenticators.BIOMETRIC_STRONG or
+            BiometricManager.Authenticators.DEVICE_CREDENTIAL
+        if (getSystemService(BiometricManager::class.java).canAuthenticate(authenticators) !=
+            BiometricManager.BIOMETRIC_SUCCESS) {
+            result.text = "Set up a supported Android screen lock or biometric to continue"
+            return
+        }
+        val signal = CancellationSignal()
+        authentication = signal
+        BiometricPrompt.Builder(this).setTitle("Authenticate to observe debit evidence")
+            .setAllowedAuthenticators(authenticators).build()
+            .authenticate(signal, mainExecutor, object : BiometricPrompt.AuthenticationCallback() {
+                override fun onAuthenticationSucceeded(auth: BiometricPrompt.AuthenticationResult) {
+                    authentication = null
+                    if (!isFinishing && !isDestroyed) requestRealObservation(SystemClock.elapsedRealtime() + 60000)
+                }
+
+                override fun onAuthenticationError(code: Int, message: CharSequence) {
+                    authentication = null
+                    if (!isFinishing && !isDestroyed) result.text = "Device authentication did not complete"
+                }
+            })
+    }
+
+    override fun onDestroy() {
+        authentication?.cancel()
+        super.onDestroy()
+    }
+
+    private fun requestRealObservation(authDeadline: Long) {
         if (!NotificationManagerCompat.getEnabledListenerPackages(this).contains(packageName) ||
             !SessionObservation.listenerConnected) {
-            result.text = "Grant notification access in Android Settings first"
+            result.text = "Grant notification access in Android Settings, then authenticate again"
             return
         }
         val installed = DebitNotification.sources.filter {
@@ -122,12 +163,20 @@ class SessionObservationActivity : ComponentActivity() {
         fields.addView(source)
         fields.addView(amount)
         fields.addView(payee)
-        AlertDialog.Builder(this).setTitle("Real debit UTR observation")
+        val consent = CheckBox(this).apply {
+            text = "Allow DISHA to observe debit notifications for up to three minutes"
+        }
+        fields.addView(consent)
+        val dialog = AlertDialog.Builder(this).setTitle("Real debit UTR observation")
             .setView(fields).setNegativeButton("Cancel", null)
             .setPositiveButton("Consent and observe") { _, _ ->
                 val paise = amount.text.toString().trim()
                 val vpa = payee.text.toString().trim()
-                if (!paise.matches(Regex("[1-9][0-9]{0,15}")) ||
+                if (SystemClock.elapsedRealtime() >= authDeadline ||
+                    !NotificationManagerCompat.getEnabledListenerPackages(this).contains(packageName) ||
+                    !SessionObservation.listenerConnected) {
+                    result.text = "Authentication expired or Android notification access changed"
+                } else if (!paise.matches(Regex("[1-9][0-9]{0,15}")) ||
                     !vpa.matches(Regex("[a-zA-Z0-9._-]{2,100}@[a-zA-Z0-9._-]{2,40}"))) {
                     result.text = "Enter a valid expected amount and payee VPA"
                 } else if (!SessionObservation.start(packageName, JSONObject()
@@ -136,6 +185,9 @@ class SessionObservationActivity : ComponentActivity() {
                     result.text = "Stop the current observation before starting another"
                 }
             }.show()
+        val confirm = dialog.getButton(AlertDialog.BUTTON_POSITIVE)
+        confirm.isEnabled = false
+        consent.setOnCheckedChangeListener { _, checked -> confirm.isEnabled = checked }
     }
 
     private fun publish(amount: String, payee: String, reference: String) {

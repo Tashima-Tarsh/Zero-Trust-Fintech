@@ -1,0 +1,9 @@
+# Debit-first checkout fixture status
+
+The holder uses Android's built-in device authentication before real observation setup. Notification access is verified separately and the consent checkbox starts unchecked. The existing observer and Keystore evidence signing run against the loopback lab. The prompt result gates the local screen only. The server does not receive or trust a client assertion that a user authenticated.
+
+The checkout's existing order-token lookup delivers a read-only evidence result. A typed signed observation accepted at ingestion must match a pending, unexpired order and an active, non-revoked consent window. Multiple or conflicting observations fail closed. The evidence hash identifies the stored observation. It is not a new bank receipt signature. Repeated reads are side-effect free. The order-token holder can see the reference, and the checkout never sends it to a third-party recipient. Settlement broadcasts retain their financial meaning.
+
+The popup displays only the source app label as recorded by the server, amount, reference kind and value, time, order identifier and evidence identifier. It does not expose raw notification fields. Local SQL and browser interaction regressions use synthetic vectors.
+
+The native fixture is not connected to the live checkout. The repository needs a verified app-to-checkout pairing and a server-trusted proof bound to the order, origin, nonce, payee, amount and expiry before enabling authenticated copy. The existing manual copy remains the fallback. A qualifying live payer notification, browser-to-holder handoff, and live signed observation delivery require real-device validation.

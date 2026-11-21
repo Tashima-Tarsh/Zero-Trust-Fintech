@@ -152,6 +152,14 @@
   
   <footer class="checkout-footer"><span class="footer-pin" aria-hidden="true">✦</span> DISHA 8.2 <span aria-hidden="true">·</span> Made for direct payments</footer>
 </main>
+<dialog id="debitEvidenceDialog" aria-labelledby="debitEvidenceTitle"
+  style="max-width:min(32rem,calc(100vw - 2rem));max-height:85vh;overflow:auto;padding:1.25rem;border-radius:1rem">
+  <h2 id="debitEvidenceTitle">Debit evidence check</h2>
+  <p id="debitEvidenceDialogStatus" role="status" aria-live="polite"></p>
+  <dl id="debitEvidenceDialogFields" style="overflow-wrap:anywhere"></dl>
+  <button id="debitEvidenceRetry" type="button" hidden>Check again</button>
+  <form method="dialog"><button type="submit" autofocus>Close</button></form>
+</dialog>
 
 <!-- Mars scene module -->
 <script type="module" src="/assets/mars-scene.js"></script>
