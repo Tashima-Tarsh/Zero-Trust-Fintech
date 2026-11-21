@@ -685,19 +685,21 @@
    if(status)status.textContent='Checking available payer-side evidence for this service…';
    if(details){details.hidden=true;details.textContent='';}
    try{
-    // Check server-side provider delivery first; no merchant-credit dependency.
-    try{
-     const bridge=await fetch('/api/debit-credential/status/'+encodeURIComponent(session.orderId)+
-      '?token='+encodeURIComponent(session.token),{credentials:'same-origin',cache:'no-store'});
-     const signed=await bridge.json().catch(()=>({}));
-     if(bridge.ok&&signed.evidenceState==='ISSUER_SIGNED_DEBIT_CLAIM_UNVERIFIED'&&
-       /^\d{12}$/.test(signed.utrCandidate||'')){
-      if(details){details.hidden=false;details.textContent='Provider-signed UTR candidate: '+
-       signed.utrCandidate+' · Issuer: '+signed.issuerId;}
-      if(status)status.textContent='Trusted provider claim recorded. Independent bank debit proof is still required.';
-      return;
-     }
-    }catch(_){}
+    const checkSignedProviderClaim=async()=>{
+     try{
+      const bridge=await fetch('/api/debit-credential/status/'+encodeURIComponent(session.orderId)+
+       '?token='+encodeURIComponent(session.token),{credentials:'same-origin',cache:'no-store'});
+      const signed=await bridge.json().catch(()=>({}));
+      if(bridge.ok&&signed.evidenceState==='ISSUER_SIGNED_DEBIT_CLAIM_UNVERIFIED'&&
+        /^\d{12}$/.test(signed.utrCandidate||'')){
+       if(details){details.hidden=false;details.textContent='Provider-signed UTR candidate: '+
+        signed.utrCandidate+' · Issuer: '+signed.issuerId;}
+       if(status)status.textContent='Trusted provider claim recorded. Independent bank debit proof is still required.';
+       return true;
+      }
+     }catch(_){}
+     return false;
+    };
     // Digital Credentials requires a direct user gesture. The prepared
     // challenge is fetched during session setup, never after this click.
     if(mode==='generic'&&model.isPersonalPayment(session.upiUri)){
@@ -736,13 +738,15 @@
        if(status)status.textContent=error?.name==='NotAllowedError'?
         'Android credential request cancelled or no participating wallet. Payment remains unverified.':
         'Android credential request failed ('+String(error?.name||'unavailable')+'). No authenticated debit proof.';
+       if(await checkSignedProviderClaim())return;
        return;
       }
      }else{
       if(status)status.textContent='Digital Credentials API unavailable in this browser. Payment remains unverified.';
       return;
      }
-     // Continue the legacy evidence lookup if no challenge could be prepared.
+     // Credential API has been invoked (or is unavailable); check provider status only afterward.
+     if(await checkSignedProviderClaim())return;
      if(debitCredentialRequest)return;
     }
     const url='/api/payer-debit-evidence/'+encodeURIComponent(session.orderId)+
