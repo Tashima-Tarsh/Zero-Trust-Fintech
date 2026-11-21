@@ -76,7 +76,7 @@ if (-not $adb) {
         Save-CommandOutput 'device-gms-version' $adb @('shell','dumpsys','package','com.google.android.gms') | Out-Null
         Save-CommandOutput 'device-gms-features' $adb @('shell','pm','list','features') | Out-Null
         Save-CommandOutput 'device-fixture' $adb @('shell','dumpsys','package','ai.disha.credentialfixture') | Out-Null
-        Save-CommandOutput 'device-logcat' $adb @('logcat','-d','-s','DISHA_CREDENTIAL_FIXTURE:V','RegistryManager:V','CredentialManager:V','* :S') | Out-Null
+        Save-CommandOutput 'device-logcat' $adb @('logcat','-d','-s','DISHA_CREDENTIAL_FIXTURE:V','RegistryManager:V','CredentialManager:V','*:S') | Out-Null
         Write-Host 'If registration shows 17/API_NOT_CONNECTED, investigate GMS API eligibility; do not modify the payment ledger.'
     }
 }
