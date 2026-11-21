@@ -40,7 +40,10 @@ const capabilityPage=read('public/debit-credential-test.html');
 assert.match(capabilityPage,/Check Android Browser Support/);
 assert.match(capabilityPage,/DigitalCredential/);
 assert.match(capabilityPage,/Request Android Credential \(No Payment\)/);
-assert.match(capabilityPage,/navigator\.credentials\.get\(\{digital:/);
+assert.match(capabilityPage,/navigator\.credentials\.get\(\{signal:AbortSignal\.timeout\(30000\),digital:/,
+ 'The browser request must time out if Android never responds');
+assert.doesNotMatch(capabilityPage,/\bclient_id\s*:/,
+ 'Unsigned OpenID4VP requests must omit client_id');
 assert.doesNotMatch(capabilityPage,/fetch\s*\(|\/api\/debit-credential\/present/,'No-payment Android probe never uploads credential claims');
 assert.match(moduleSource,/router\.post\('\/provider-claim'/);
 assert.match(moduleSource,/router\.get\('\/status\/:serviceRequestId'/);
