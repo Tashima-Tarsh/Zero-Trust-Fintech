@@ -13,6 +13,29 @@ small,p{color:#c6cada}.result{color:#9bd0ff}.critical{color:#ffc9a3}code{overflo
 <section><h2>D — PaymentRequest API availability</h2><p>Checks API presence only. Personal UPI payment response and blank-MCC compatibility require separate authorized live tests.</p><button id="pr">Check PaymentRequest availability</button></section>
 <section><h2>E — Production DDEB verifier status</h2><p>Read-only capability report. Server-side signed evidence contract is not a bank-debit verifier and this page does not create evidence.</p><button id="verifier">Read verifier availability</button></section>
 <section><h2>F — Platform integration gates</h2><p>ASTEOS system SMS/notification observation, native consent, AOSP signer and Chrome Binder transport require separate platform implementation. This console cannot activate those services on an unmodified Android phone.</p><button id="platform">Show required platform gates</button></section>
+<section><h2>All 16 invention components — production test matrix</h2>
+<p><strong>Available for browser-only testing:</strong> signed evidence contract (server source presence), Chrome credential dispatch probe and API capability checks. These do not prove debit evidence acquisition.</p>
+<p><strong>Require Android/Chromium platform build:</strong> CSTR, NDEA, Android system consent, Chrome–Android evidence bridge and hardware attestation. Their status remains NOT IMPLEMENTED until device logs prove otherwise.</p>
+<table style="width:100%;border-collapse:collapse"><caption style="text-align:left">Source and integration status, not simulated successes</caption>
+<thead><tr><th style="text-align:left">Component</th><th style="text-align:left">Production verification status</th></tr></thead>
+<tbody>
+<tr><td>CSTR / ASTEOS</td><td>NOT IMPLEMENTED IN STOCK CHROME</td></tr>
+<tr><td>NDEA acquisition</td><td>DEVICE PROOF MISSING</td></tr>
+<tr><td>Android consent</td><td>SYSTEM UI NOT DEPLOYED</td></tr>
+<tr><td>Chrome–Android bridge</td><td>H-C PROBE AVAILABLE</td></tr>
+<tr><td>Digital Credentials</td><td>BROWSER DISPATCH PROBE AVAILABLE</td></tr>
+<tr><td>180-second challenge</td><td>REFERENCE MODULE; NO PRODUCTION EVIDENCE SESSION</td></tr>
+<tr><td>Fraud engine</td><td>REFERENCE MODULE; FINANCIAL STATE UNCHANGED</td></tr>
+<tr><td>Evidence attestation</td><td>SOFTWARE FIXTURE TEST ONLY</td></tr>
+<tr><td>Evidence receipt</td><td>EXISTING CHECKOUT; NO UDEB SOURCE CONNECTED</td></tr>
+<tr><td>Two-speed evidence</td><td>NOT CONNECTED TO UDEB</td></tr>
+<tr><td>SBAR</td><td>SEPARATE PAYMENTREQUEST LAB; P2P UNPROVEN</td></tr>
+<tr><td>URL Echo</td><td>NO AUTHENTICATED CALLBACK DEMONSTRATED</td></tr>
+<tr><td>UPI tn tag</td><td>REAL APP/BANK ECHO UNTESTED</td></tr>
+<tr><td>ContentProvider / BroadcastReceiver</td><td>NO EXISTING VERIFIED UPI SOURCE</td></tr>
+<tr><td>Universal UPI Web Method</td><td>NO ECOSYSTEM INTERFACE DEMONSTRATED</td></tr>
+<tr><td>DDEB</td><td>REFERENCE SIGNED ENVELOPE CONTRACT IN MAIN</td></tr>
+</tbody></table></section>
 <section><h2>Results</h2><pre id="output" role="status" aria-live="polite">READY. Run each test on Android Chrome.</pre><button id="copy">Copy redacted result report</button></section>
 <small>Diagnostic results stay in your browser unless you explicitly copy/share them. No UPI ID, payment reference, SMS content or authentication token is collected.</small>
 </body></html>
