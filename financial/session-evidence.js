@@ -363,5 +363,27 @@ function createSessionEvidenceRouter({ getPool, getSession, allowedPackages = AL
   return router;
 }
 
-module.exports = { ALLOWED_PACKAGES, canonicalEvidence, verifyDeviceEvidence,
+async function readDebitEvidenceReceipt(pool, id, session, now = Date.now()) {
+  if (String(session.status).toUpperCase() !== 'PENDING' || !(now < Number(session.expiresAt))) return {};
+  const amountPaise = rupeesToPaise(String(session.challengeAmount));
+  const payee = String(session.vpaAddress || '').trim().toLowerCase();
+  const {rows}=await pool.query(
+    "SELECT e.event_hash,e.package_name,e.transaction_ref,e.reference_kind,e.amount_paise,e.payee_vpa,e.posted_at,e.decision_state "+
+    'FROM disha_session_evidence_events e JOIN disha_session_evidence_consents c ON c.order_id=e.order_id '+
+    'WHERE e.order_id=$1 AND c.revoked_at IS NULL AND c.expires_at>$2 '+
+    "AND e.reference_kind IN ('UTR','RRN') AND e.posted_at>=c.consented_at AND e.posted_at<c.expires_at "+
+    'ORDER BY e.posted_at DESC LIMIT 2',[id,now]);
+  const [row]=rows;
+  if(!row)return {};
+  if(rows.length!==1||row.decision_state!=='SIGNAL_MATCHED'||
+    row.amount_paise!==amountPaise||String(row.payee_vpa).toLowerCase()!==payee||
+    !/^\d{12}$/.test(row.transaction_ref)||!/^[a-f0-9]{64}$/.test(row.event_hash)){
+    return {receiptError:'CONFLICTING_OR_INVALID_EVIDENCE'};
+  }
+  return {debitEvidenceReceipt:{orderId:id,state:'DEBIT_EVIDENCE_OBSERVED',
+    source:row.package_name,amountPaise,reference:row.transaction_ref,referenceKind:row.reference_kind,
+    observedAt:Number(row.posted_at),receiptReference:row.event_hash}};
+}
+
+module.exports = { readDebitEvidenceReceipt, ALLOWED_PACKAGES, canonicalEvidence, verifyDeviceEvidence,
   evaluateEvidence, aggregateSessionDecision, initializeSessionEvidenceSchema, createSessionEvidenceRouter };

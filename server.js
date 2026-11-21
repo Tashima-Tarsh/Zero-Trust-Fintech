@@ -19,7 +19,7 @@ const {createVaultEvidenceRouter,initializeVaultEvidenceSchema,rememberVaultAuth
 const {initializeQuantumSignal,createQuantumSignalRouter}=require('./financial/quantum-signal');
 const {initProofBridgeSchema,createProofBridgeRouter}=require('./financial/proofbridge');
 const {initDebitCredentialSchema,createDebitCredentialRouter}=require('./financial/debit-credential');
-const {initializeSessionEvidenceSchema,createSessionEvidenceRouter}=require('./financial/session-evidence');
+const {initializeSessionEvidenceSchema,createSessionEvidenceRouter,readDebitEvidenceReceipt}=require('./financial/session-evidence');
 const {initializeSessionUpiResultSchema,createSessionUpiResultRouter}=require('./financial/session-upi-result');
 const {createCheckoutDiagnostics}=require('./financial/checkout-diagnostics');
 const {initializeClaimObserver,observeClaim} = require('./financial/untrusted-utr-claims');
@@ -899,12 +899,13 @@ app.get('/api/payer-debit-evidence/:orderId', verifyLimiter, async (req,res)=>{
       return res.status(401).json({success:false,error:'SESSION_TOKEN_REQUIRED'});
     if(!['PERSONAL','P2P'].includes(String(session.merchantType||'').toUpperCase()))
       return res.status(409).json({success:false,error:'P2P_REQUIRED'});
-    const result={success:true,serviceId:session.txnRef||null,debitVerified:false,
+    const result={success:true,orderId:id,serviceId:session.txnRef||null,debitVerified:false,
       paymentVerified:false,paymentStateChanged:false,bankAttestationAvailable:false,
       evidence:[],state:'NO_AUTHENTICATED_PAYER_DEBIT_EVIDENCE'};
     if(!db.pgPool)return res.json(result);
     const amountPaise=require('./financial/money').rupeesToPaise(String(session.challengeAmount));
     const payee=String(session.vpaAddress||'').trim().toLowerCase();
+    Object.assign(result,await readDebitEvidenceReceipt(db.pgPool,id,session));
     const sources=[
       {source:'DEVICE_OBSERVATION',sql:
         'SELECT transaction_ref AS utr,amount_paise,payee_vpa,posted_at AS observed_at,reference_kind '+

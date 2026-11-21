@@ -366,7 +366,7 @@
     }
     if(disclosure)disclosure.hidden=true;
     const guide=get('paymentStageCopy');
-    if(guide)guide.textContent='Copy the receiving UPI ID, open any UPI app, paste it and enter the exact amount. No app launch or DISHA installation is required.';
+    if(guide)guide.textContent='Automatic Android debit observation is unavailable in this checkout. For manual payment, copy the receiving UPI ID and enter the exact amount in your UPI app.';
    }else{
     // Keep the existing consent-authorized ProofBridge flow for non-native
     // browsers; do not bypass its server authorization.
@@ -676,18 +676,61 @@
    }catch(_){message('Could not share the payment link.','error')}
   });
   const debitButton=get('payerDebitCheck');
-  if(debitButton)debitButton.addEventListener('click',async()=>{
-   if(!session?.orderId||!session?.token)return;
+  const evidenceDialog=get('debitEvidenceDialog');
+  const evidenceRetry=get('debitEvidenceRetry');
+  const showDebitEvidence=(state,receipt)=>{
+   if(typeof evidenceDialog?.showModal!=='function')return;
+   get('debitEvidenceTitle').textContent=receipt?'DISHA Debit Evidence Receipt':'Debit evidence check';
+   get('debitEvidenceDialogStatus').textContent=state;
+   evidenceRetry.hidden=Boolean(receipt);
+   const fields=get('debitEvidenceDialogFields');
+   fields.replaceChildren();
+   if(receipt){
+    for(const [label,value] of [
+     ['Source',receipt.source],['Debit amount',format(Number(receipt.amountPaise)/100)],
+     [receipt.referenceKind,receipt.reference],['Observed at',new Date(receipt.observedAt).toLocaleString()],
+     ['DISHA order ID',receipt.orderId],['Evidence reference',receipt.receiptReference]
+    ]){
+     const term=document.createElement('dt'),description=document.createElement('dd');
+     term.textContent=label;description.textContent=value;fields.append(term,description);
+    }
+   }
+   if(!evidenceDialog.open)evidenceDialog.showModal();
+  };
+  const checkDebitEvidence=async()=>{
+   if(!session?.orderId||!session?.token||debitButton.disabled)return;
+   if(expired()){showDebitEvidence('Debit evidence could not be validated. This checkout has expired.');return;}
    const status=get('payerDebitCheckStatus'),details=get('payerDebitCheckReference');
    debitButton.disabled=true;
+   if(evidenceRetry)evidenceRetry.disabled=true;
    if(status)status.textContent='Checking available payer-side evidence for this service…';
    if(details){details.hidden=true;details.textContent='';}
    try{
-    const url='/api/payer-debit-evidence/'+encodeURIComponent(session.orderId)+
-     '?token='+encodeURIComponent(session.token);
+    const boundSession=session;
+    const url='/api/payer-debit-evidence/'+encodeURIComponent(boundSession.orderId)+
+     '?token='+encodeURIComponent(boundSession.token);
     const response=await fetch(url,{credentials:'same-origin',cache:'no-store'});
     const evidence=await response.json().catch(()=>({}));
     if(!response.ok)throw Error('DEBIT_EVIDENCE_UNAVAILABLE');
+    if(session!==boundSession||expired()){
+     showDebitEvidence('Debit evidence could not be validated. This checkout changed or expired.');
+     return;
+    }
+    const receipt=evidence.debitEvidenceReceipt;
+    if(evidence.orderId===session.orderId&&receipt?.orderId===session.orderId&&
+     evidence.paymentVerified===false&&evidence.debitVerified===false&&
+     receipt.state==='DEBIT_EVIDENCE_OBSERVED'&&['UTR','RRN'].includes(receipt.referenceKind)&&
+     /^\d{12}$/.test(receipt.reference)&&/^[a-f0-9]{64}$/.test(receipt.receiptReference)&&
+     receipt.amountPaise===String(Math.round(session.amount*100))&&
+     Number.isSafeInteger(receipt.observedAt)&&receipt.observedAt>0){
+     showDebitEvidence('DEBIT EVIDENCE OBSERVED. Bank debit and payment remain unverified.',receipt);
+    }else if(evidence.receiptError||receipt){
+     showDebitEvidence('Debit evidence could not be validated. The observation conflicts with this checkout.');
+     if(status)status.textContent='Debit evidence could not be validated.';
+     return;
+    }else{
+     showDebitEvidence('Debit evidence not available yet');
+    }
     const first=evidence.evidence?.[0];
     if(first&&/^\d{12}$/.test(first.utr||'')){
      if(details){details.hidden=false;details.textContent=(first.referenceKind==='RRN'?'Observed RRN: ':first.referenceKind==='UTR'?'Observed UTR: ':'Reported UTR: ')+first.utr+
@@ -700,9 +743,12 @@
      status.textContent='No authenticated debit receipt was returned by Android or the UPI app. Payment remains unverified.';
     }
    }catch(_){
+    showDebitEvidence('Debit evidence could not be validated. The evidence service is unavailable.');
     if(status)status.textContent='Evidence service unavailable. Do not assume the payment failed or succeeded.';
-   }finally{debitButton.disabled=false;}
-  });
+   }finally{debitButton.disabled=false;if(evidenceRetry)evidenceRetry.disabled=false;}
+  };
+  if(debitButton)debitButton.addEventListener('click',checkDebitEvidence);
+  if(evidenceRetry&&debitButton)evidenceRetry.addEventListener('click',checkDebitEvidence);
   const diag=get('checkoutDebugPanel');
   if(debug&&diag){diag.hidden=false;get('checkoutDebugCopy').addEventListener('click',copyDebugReport)}
   get('saveReceipt').addEventListener('click',()=>{if(receiptShown)window.print()});

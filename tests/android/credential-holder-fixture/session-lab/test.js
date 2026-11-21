@@ -3,7 +3,7 @@
 const assert = require('node:assert/strict');
 const crypto = require('node:crypto');
 const { once } = require('node:events');
-const { canonicalEvidence } = require('../../../../financial/session-evidence');
+const { canonicalEvidence, readDebitEvidenceReceipt } = require('../../../../financial/session-evidence');
 const { createSessionLab, PACKAGE } = require('./server');
 
 async function main() {
@@ -96,6 +96,24 @@ async function main() {
     assert.equal(received.referenceKind, 'RRN');
     assert.equal(received.debitVerified, false);
     assert.equal(received.paymentVerified, false);
+    const checkout = {status:'PENDING',expiresAt:Date.now()+60000,
+      challengeAmount:'1.00',vpaAddress:'fixture@invalid'};
+    // The primary test order deliberately holds several conflicting attempts.
+    const conflict = await readDebitEvidenceReceipt(lab.pool, real.orderId, checkout);
+    assert.equal(conflict.receiptError, 'CONFLICTING_OR_INVALID_EVIDENCE');
+    const clean = await enroll(binding);
+    await expect(submit(clean, observed(clean,{transactionRef:'000000000105'})), 202, 'SIGNAL_MATCHED');
+    const firstLookup = await readDebitEvidenceReceipt(lab.pool, clean.orderId, checkout);
+    assert.deepEqual(await readDebitEvidenceReceipt(lab.pool, clean.orderId, checkout), firstLookup,
+      'Read-only callbacks return the same receipt without side effects');
+    assert.deepEqual(Object.keys(firstLookup.debitEvidenceReceipt).sort(),
+      ['orderId','state','source','amountPaise','reference','referenceKind','observedAt','receiptReference'].sort());
+    assert.equal(firstLookup.debitEvidenceReceipt.reference,'000000000105');
+    assert.equal(firstLookup.debitEvidenceReceipt.referenceKind,'RRN');
+    assert.deepEqual(await readDebitEvidenceReceipt(lab.pool, clean.orderId,{...checkout,expiresAt:0}),{});
+    assert.deepEqual(await readDebitEvidenceReceipt(lab.pool, second.orderId,checkout),{});
+    await post('/api/session-evidence/revoke', {orderId:clean.orderId,token:clean.token},clean.token);
+    assert.deepEqual(await readDebitEvidenceReceipt(lab.pool, clean.orderId,checkout),{});
     await expect(submit(real, observed(real)), 409, 'EVIDENCE_REPLAY_BLOCKED');
     const other = await enroll(binding);
     await expect(submit(other, observed(other)), 409, 'TRANSACTION_REFERENCE_REPLAY');

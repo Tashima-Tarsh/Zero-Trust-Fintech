@@ -7,10 +7,12 @@ function mount(status='PENDING',checkout='merchant',overrides={}){
  const nodes={},events={},stages=['initial','methods','qr','checking','receipt'].map(stage=>({dataset:{stage},hidden:stage!=='qr'}));
  const node=k=>nodes[k]||(nodes[k]={textContent:'',href:'#',disabled:true,hidden:true,dataset:{},attrs:{},events:{},
   addEventListener(k,v){this.events[k]=v},setAttribute(k,v){this.attrs[k]=v},getAttribute(k){return this.attrs[k]},
-  removeAttribute(k){delete this.attrs[k]},replaceChildren(){},classList:{toggle(){}}});
+  removeAttribute(k){delete this.attrs[k]},replaceChildren(){this.children=[]},
+  append(...children){this.children.push(...children)},classList:{toggle(){}}});
+ node('debitEvidenceDialog').showModal=function(){this.open=true};
  const data={status,utr:null,qr:null,prompt:0,proof:null,
   signal:{success:true,utrCandidate:'123456789012',eventState:'UTR_CANDIDATE_UNVERIFIED'},...overrides};
- const document={body:{dataset:{checkout}},visibilityState:'visible',getElementById:node,
+ const document={body:{dataset:{checkout}},visibilityState:'visible',getElementById:node,createElement:()=>({}),
   querySelectorAll:q=>q==='[data-stage]'?stages:[],addEventListener:(k,v)=>events[k]=v};
  const location={href:'https://checkout.example/merchant-checkout.html?orderId=ORD_TEST_1234&token='+('a'.repeat(48)),
   search:'?orderId=ORD_TEST_1234&token='+('a'.repeat(48))};
@@ -27,6 +29,7 @@ function mount(status='PENDING',checkout='merchant',overrides={}){
    },upiLink:uri})};
    if(url.includes('/api/payer-debit-evidence/'))return {ok:true,json:async()=>({
     success:true,debitVerified:false,paymentVerified:false,paymentStateChanged:false,
+    orderId:'ORD_TEST_1234',debitEvidenceReceipt:data.debitEvidenceReceipt,
     evidence:data.evidence??(data.signal?.utrCandidate?[{utr:data.signal.utrCandidate,source:'BROWSER_RETURN_OBSERVATION',
       amountPaise:'50000',payeeVpa:'merchant@oksbi',authenticatedDebit:false}]:[]),
     state:data.signal?.utrCandidate?'UTR_CANDIDATE_OBSERVED_UNVERIFIED':'NO_AUTHENTICATED_PAYER_DEBIT_EVIDENCE'})};
@@ -85,6 +88,18 @@ const active=app=>app.stages.find(s=>!s.hidden)?.dataset.stage;
  assert.match(observed.nodes.payerDebitCheckStatus.textContent,/device signature verified/i);
  assert.equal(observed.data.prompt,0);
  assert.equal(active(observed),'qr','A signed Android observation cannot unlock a bank receipt');
+ assert.equal(observed.nodes.debitEvidenceDialogStatus.textContent,'Debit evidence not available yet');
+ const qualified=mount('PENDING','generic',{debitEvidenceReceipt:{orderId:'ORD_TEST_1234',
+   state:'DEBIT_EVIDENCE_OBSERVED',source:'com.phonepe.app',amountPaise:'50000',
+   reference:'000000000123',referenceKind:'RRN',observedAt:Date.now(),receiptReference:'a'.repeat(64)}});
+ await flush();await qualified.nodes.payerDebitCheck.events.click();
+ assert.equal(qualified.nodes.debitEvidenceTitle.textContent,'DISHA Debit Evidence Receipt');
+ assert.ok(qualified.nodes.debitEvidenceDialogFields.children.some(node=>node.textContent==='000000000123'));
+ assert.equal(active(qualified),'qr');
+ const crossOrder=mount('PENDING','generic',{debitEvidenceReceipt:{...qualified.data.debitEvidenceReceipt,orderId:'OTHER_ORDER'}});
+ await flush();await crossOrder.nodes.payerDebitCheck.events.click();
+ assert.match(crossOrder.nodes.debitEvidenceDialogStatus.textContent,/could not be validated/);
+ assert.equal(crossOrder.nodes.debitEvidenceDialogFields.children.length,0);
  const unavailable=mount('PENDING','generic',{signal:null});await flush();
  await unavailable.nodes.payerDebitCheck.events.click();await flush();
  assert.match(unavailable.nodes.payerDebitCheckStatus.textContent,/No authenticated debit receipt/i);
