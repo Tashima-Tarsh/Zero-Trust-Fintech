@@ -56,12 +56,9 @@ const UNIT_TESTS = [
   'test-quantum-signal.js', // automatic post-UPI browser evidence packet and idempotent retries
   'test-android-checkout-handshake.js', // Opt-in test embedded in real P2P/P2M checkout after WebAuthn
   'test-debit-credential-probe.js',
-experiment/android-credential-provider-fixture
   'test-sms-observation.js', // authenticated device observation is never a bank debit receipt
   'test-android-master-server-handshake.js', // Opt-in Android credentials handshake, tamper proof, no ledger mutation
-=======
-  'test-master-debit-bridge-http.js', // signed trusted-provider ingress, replay and session-scoped read // Opt-in Android credentials handshake, tamper proof, no ledger mutation
-main
+  'test-master-debit-bridge-http.js', // signed trusted-provider ingress, replay and session-scoped read
   'test-payer-debit-button.js', // I Paid: read-only P2P evidence, no false verified payment
   'test-proofbridge.js', // zero-install consent gate and issuer-signed capsule contract
   'test-session-evidence.js', // multi-device session binding, signatures and fraud gates
