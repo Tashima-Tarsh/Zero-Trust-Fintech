@@ -882,6 +882,58 @@ app.get('/api/order-state/:orderId', async (req, res) => {
     return res.status(500).json({success:false,error:'ORDER_STATE_UNAVAILABLE'});
   }
 });
+// Observation-only P2P payer debit evidence. Never mutate checkout status or ledger.
+app.get('/api/payer-debit-evidence/:orderId', verifyLimiter, async (req,res)=>{
+  res.set('Cache-Control','no-store');
+  const id=req.params.orderId,token=req.query.token;
+  if(!/^[A-Za-z0-9_-]{6,150}$/.test(id)||typeof token!=='string')
+    return res.status(401).json({success:false,error:'SESSION_TOKEN_REQUIRED'});
+  try{
+    const session=await db.findSessionByOrderId(id);
+    if(!session||!safeCompareKeys(token,session.sessionId))
+      return res.status(401).json({success:false,error:'SESSION_TOKEN_REQUIRED'});
+    if(!['PERSONAL','P2P'].includes(String(session.merchantType||'').toUpperCase()))
+      return res.status(409).json({success:false,error:'P2P_REQUIRED'});
+    const result={success:true,serviceId:session.txnRef||null,debitVerified:false,
+      paymentVerified:false,paymentStateChanged:false,bankAttestationAvailable:false,
+      evidence:[],state:'NO_AUTHENTICATED_PAYER_DEBIT_EVIDENCE'};
+    if(!db.pgPool)return res.json(result);
+    const amountPaise=require('./financial/money').rupeesToPaise(String(session.challengeAmount));
+    const payee=String(session.vpaAddress||'').trim().toLowerCase();
+    const sources=[
+      {source:'DEVICE_UPI_RESULT',sql:
+        'SELECT utr_candidate AS utr,amount_paise,payee_vpa,returned_at AS observed_at '+
+        'FROM disha_session_upi_results WHERE order_id=$1 ORDER BY returned_at DESC LIMIT 5'},
+      {source:'DEVICE_OBSERVATION',sql:
+        'SELECT transaction_ref AS utr,amount_paise,payee_vpa,posted_at AS observed_at '+
+        'FROM disha_session_evidence_events WHERE order_id=$1 ORDER BY posted_at DESC LIMIT 5'},
+      {source:'ISSUER_SIGNED_CLAIM',enabled:process.env.DISHA_PROOFBRIDGE_EXPERIMENT==='1',sql:
+        'SELECT utr,amount_paise,payee_vpa,paid_at AS observed_at '+
+        'FROM disha_proofbridge_capsules WHERE order_id=$1 ORDER BY received_at DESC LIMIT 5'}
+    ];
+    let queried=false;
+    for(const source of sources){
+      if(source.enabled===false)continue;
+      try{
+        const rows=(await db.pgPool.query(source.sql,[id])).rows;
+        queried=true;
+        for(const r of rows){
+          if(!/^\d{12}$/.test(String(r.utr||''))||String(r.amount_paise)!==amountPaise||
+             String(r.payee_vpa||'').toLowerCase()!==payee)continue;
+          if(result.evidence.some(e=>e.utr===r.utr))continue;
+          result.evidence.push({utr:r.utr,source:source.source,amountPaise,payeeVpa:payee,
+            observedAt:Number(r.observed_at),authenticatedDebit:false});
+        }
+      }catch(e){
+        if(e.code!=='42P01')return res.status(503).json({success:false,error:'EVIDENCE_STORAGE_UNAVAILABLE'});
+      }
+    }
+    if(!queried)return res.status(503).json({success:false,error:'EVIDENCE_STORAGE_UNAVAILABLE'});
+    if(result.evidence.length)result.state='UTR_CANDIDATE_OBSERVED_UNVERIFIED';
+    return res.json(result);
+  }catch(_){return res.status(503).json({success:false,error:'DEBIT_EVIDENCE_UNAVAILABLE'});}
+});
+
 // ═══════════════════════════════════════════════════════════════════
 // ZERO-TRUST SERVER-SIDE RECEIPT EVIDENCE EXTRACTION
 // ═══════════════════════════════════════════════════════════════════

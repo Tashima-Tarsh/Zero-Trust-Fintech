@@ -714,6 +714,32 @@
     trace('APP_DISPATCH','APP_TARGETED',link.dataset.upiApp);
    });
   }
+  const debitButton=get('payerDebitCheck');
+  if(debitButton)debitButton.addEventListener('click',async()=>{
+   if(!session?.orderId||!session?.token)return;
+   const status=get('payerDebitCheckStatus'),details=get('payerDebitCheckReference');
+   debitButton.disabled=true;
+   if(status)status.textContent='Checking available payer-side evidence for this service…';
+   if(details){details.hidden=true;details.textContent='';}
+   try{
+    const url='/api/payer-debit-evidence/'+encodeURIComponent(session.orderId)+
+     '?token='+encodeURIComponent(session.token);
+    const response=await fetch(url,{credentials:'same-origin',cache:'no-store'});
+    const evidence=await response.json().catch(()=>({}));
+    if(!response.ok)throw Error('DEBIT_EVIDENCE_UNAVAILABLE');
+    const first=evidence.evidence?.[0];
+    if(first&&/^\d{12}$/.test(first.utr||'')){
+     if(details){details.hidden=false;details.textContent='Reported UTR: '+first.utr+
+      ' · Source: '+first.source+' · Amount: '+format(session.amount)+
+      ' · Payee: '+first.payeeVpa;}
+     if(status)status.textContent='UTR candidate found, but original bank debit is NOT authenticated. Service is pending verification.';
+    }else if(status){
+     status.textContent='No authenticated debit receipt was returned by Android or the UPI app. Payment remains unverified.';
+    }
+   }catch(_){
+    if(status)status.textContent='Evidence service unavailable. Do not assume the payment failed or succeeded.';
+   }finally{debitButton.disabled=false;}
+  });
   get('shareCheckout').addEventListener('click',async()=>{
    if(!session?.token||!session?.orderId)return;
    const link=secureCheckoutUrl();
@@ -797,6 +823,7 @@
    get('checkoutPaymentIdentity').textContent=(session.serviceNumber?'Service '+session.serviceNumber+' · ':'')+
     'UPI · '+(session.payeeVpa||params.get('pa')||'');
    get('paymentTrackingStatus').textContent='Payment status · Awaiting confirmation';
+   const debitCheck=get('payerDebitCheck');if(debitCheck)debitCheck.disabled=false;
    get('checkoutNote').textContent=params.get('tn')||'Service';
    get('qrTapToPayHint').textContent=model.isPersonalPayment(session.upiUri)
     ?'Personal UPI: scan or import this QR in your UPI app. One-tap P2P intent is restricted.'

@@ -111,6 +111,12 @@
       
       <p id="checkoutPaymentIdentity" class="inline-note" aria-live="polite"></p>
       <p id="paymentTrackingStatus" class="inline-note" role="status" aria-live="polite">Payment status · Checking…</p>
+      <section id="payerDebitCheckPanel" class="glass-panel" aria-label="Payer debit evidence check" style="padding:14px;margin:12px 0">
+        <button id="payerDebitCheck" class="action-primary glass-btn" type="button" disabled>I Paid — Check debit receipt</button>
+        <p id="payerDebitCheckStatus" class="inline-note" role="status" aria-live="polite">After paying in your UPI app, return here and check for available evidence.</p>
+        <p id="payerDebitCheckReference" class="inline-note" hidden></p>
+        <small>Only an independently authenticated debit receipt can confirm payment. An Android-submitted UTR alone stays unverified.</small>
+      </section>
       <!-- Payer-side issuer proof check. Never relies on the user's I Paid declaration. -->
       <div id="debitProofCheck" class="fusion-handoff" hidden>
         <button id="debitProofCheckButton" type="button" class="action-secondary glass-btn">I Paid · Check Debit Proof</button>
