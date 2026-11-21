@@ -17,6 +17,7 @@ import androidx.credentials.registry.digitalcredentials.openid4vp.OpenId4VpRegis
 import androidx.credentials.registry.digitalcredentials.sdjwt.SdJwtEntry
 import androidx.credentials.registry.digitalcredentials.sdjwt.SdJwtClaim
 import androidx.credentials.registry.provider.digitalcredentials.VerificationEntryDisplayProperties
+import androidx.credentials.registry.provider.digitalcredentials.VerificationFieldDisplayProperties
 import kotlinx.coroutines.launch
 
 /**
@@ -89,13 +90,13 @@ class RegisterActivity : ComponentActivity() {
                         verifiableCredentialType = "https://disha8-2.thenitishkr.in/credentials/upi-debit-v1",
                         claims = listOf(
                             SdJwtClaim(path = listOf("utr"), value = "000000000000",
-                                fieldDisplayPropertySet = emptySet()),
+                                fieldDisplayPropertySet = setOf(VerificationFieldDisplayProperties(displayName = "UTR (synthetic)"))),
                             SdJwtClaim(path = listOf("debitConfirmed"), value = false,
-                                fieldDisplayPropertySet = emptySet()),
+                                fieldDisplayPropertySet = setOf(VerificationFieldDisplayProperties(displayName = "Debit confirmed (false)"))),
                             SdJwtClaim(path = listOf("amountPaise"), value = "100",
-                                fieldDisplayPropertySet = emptySet()),
+                                fieldDisplayPropertySet = setOf(VerificationFieldDisplayProperties(displayName = "Amount in paise (synthetic)"))),
                             SdJwtClaim(path = listOf("payeeVpa"), value = "fixture@invalid",
-                                fieldDisplayPropertySet = emptySet())
+                                fieldDisplayPropertySet = setOf(VerificationFieldDisplayProperties(displayName = "Payee VPA (synthetic)")))
                         ),
                         entryDisplayPropertySet = setOf(display),
                         id = "disha-fixture-synthetic-v1"
