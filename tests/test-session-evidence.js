@@ -46,6 +46,13 @@ assert.equal(evaluateEvidence({ ...evidence, nonce: 'b'.repeat(40) }, session, 1
 assert.equal(evaluateEvidence({ ...evidence, amountPaise: '101' }, session, 160000).state, 'AMOUNT_MISMATCH');
 assert.equal(evaluateEvidence({ ...evidence, payeeVpa: 'attacker@upi' }, session, 160000).state, 'PAYEE_MISMATCH');
 assert.equal(evaluateEvidence({ ...evidence, postedAt: 300000 }, session, 310000).state, 'SESSION_TIME_INVALID');
+const observed = { ...evidence, protocol: 'DISHA-DEBIT-UTR-OBSERVATION-V1',
+  referenceKind: 'UTR', transactionRef: '123456789012', postedAt: 150000 };
+assert.equal(evaluateEvidence(observed, session, 160000).state, 'SIGNAL_MATCHED');
+assert.equal(evaluateEvidence({ ...observed, postedAt: 160001 }, session, 160000).state,
+  'SESSION_TIME_INVALID', 'Android observation cannot be future-dated even by one millisecond');
+assert.equal(evaluateEvidence({ ...observed, postedAt: 99999 }, session, 160000).state,
+  'SESSION_TIME_INVALID', 'Android observation must be after consent');
 assert.equal(evaluateEvidence({ ...evidence, transactionRef: null }, session, 160000).state, 'INCOMPLETE_SIGNAL');
 assert.equal(evaluateEvidence({ ...evidence, status: 'FAILED' }, session, 160000).state, 'PAYMENT_FAILED_SIGNAL');
 
