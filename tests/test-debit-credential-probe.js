@@ -45,6 +45,9 @@ assert.match(capabilityPage,/navigator\.credentials\.get\(\{signal:AbortSignal\.
 assert.doesNotMatch(capabilityPage,/\bclient_id\s*:/,
  'Unsigned OpenID4VP requests must omit client_id');
 assert.doesNotMatch(capabilityPage,/fetch\s*\(|\/api\/debit-credential\/present/,'No-payment Android probe never uploads credential claims');
+assert.doesNotMatch(moduleSource,/client_id\s*:/,
+ 'Production unsigned OpenID4VP request must not forge browser client_id');
+assert.match(moduleSource,/protocol:'openid4vp-v1-unsigned'/);
 assert.match(moduleSource,/router\.post\('\/provider-claim'/);
 assert.match(moduleSource,/router\.get\('\/status\/:serviceRequestId'/);
 assert.match(moduleSource,/verifyReceipt\(receipt,signature,publicKey/);
