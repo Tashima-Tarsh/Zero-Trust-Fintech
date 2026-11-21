@@ -1,0 +1,32 @@
+name: UDEB signed-observation transport and trust
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'financial/udeb-evidence-contract.js'
+      - 'financial/session-evidence.js'
+      - 'public/cosmic-checkout.js'
+      - 'tests/test-udeb-*.js'
+      - '.github/workflows/udeb-security.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  udeb-tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+      - run: npm ci --ignore-scripts
+      - name: Node source and syntax checks
+        run: node --check public/cosmic-checkout.js && node --check financial/session-evidence.js
+      - name: Claude DDEB contract negative tests
+        run: node tests/test-udeb-evidence-contract.js
+      - name: Browser handoff regression
+        run: node tests/test-udeb-browser-handoff.js
+      - name: Independent observer key trust regression
+        run: node tests/test-udeb-observer-trust.js
