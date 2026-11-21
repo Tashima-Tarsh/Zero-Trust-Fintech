@@ -17,6 +17,8 @@
  const stages=[...document.querySelectorAll('[data-stage]')];
  let session=null,polling=false,receiptShown=false;
  let proofbridgeReady=false,proofbridgePolling=false,proofbridgeAuthorized=null;
+ // Preload the challenge before the tap to preserve Android's user-gesture requirement.
+ let debitCredentialRequest=null;
  let proofbridgeAuthSequence=0,proofbridgePollTimer=null;
  let qrUri=null,lastStage='qr',expiryTicker=null,ledgerTicker=null;
  let expiryLogged=false;
@@ -683,6 +685,41 @@
    if(status)status.textContent='Checking available payer-side evidence for this service…';
    if(details){details.hidden=true;details.textContent='';}
    try{
+    // Digital Credentials requires a direct user gesture. The prepared
+    // challenge is fetched during session setup, never after this click.
+    if(query.get('debitprobe')==='1'){
+     if(!debitCredentialRequest){
+      if(status)status.textContent='Debit credential challenge unavailable. Check remains read-only.';
+     }else if(typeof navigator.credentials?.get==='function'&&window.DigitalCredential){
+      try{
+       const credential=await navigator.credentials.get({digital:{requests:[{
+        protocol:debitCredentialRequest.protocol,data:debitCredentialRequest.request
+       }]}});
+       const raw=credential?.data;
+       const presentation=raw&&typeof raw==='object'&&raw.receipt&&raw.signature?raw:
+        (typeof raw?.response==='string'?JSON.parse(raw.response):null);
+       if(presentation?.receipt&&presentation?.signature){
+        const submitted=await fetch('/api/debit-credential/present',{
+         method:'POST',credentials:'same-origin',cache:'no-store',
+         headers:{'Content-Type':'application/json','X-CSRF-Token':session.token},
+         body:JSON.stringify({serviceRequestId:session.orderId,token:session.token,presentation})
+        });
+        const result=await submitted.json().catch(()=>({}));
+        if(submitted.ok&&result.evidenceAuthenticated){
+         if(details){details.hidden=false;details.textContent='Issuer-signed reported UTR: '+result.utr+
+          ' · Service '+session.serviceNumber+' · This is not independently bank-confirmed.';}
+         if(status)status.textContent='Issuer signature validated; actual bank debit is not independently authenticated.';
+         return;
+        }
+        if(status)status.textContent='Debit credential rejected: '+(result.error||'INVALID_PRESENTATION');
+       }else if(status)status.textContent='Wallet response is not a DISHA debit credential. No payment confirmed.';
+      }catch(error){
+       if(status)status.textContent=error?.name==='NotAllowedError'?
+        'Credential request cancelled or no participating wallet. Payment remains unverified.':
+        'No compatible DISHA debit credential provider responded. Payment remains unverified.';
+      }
+     }else if(status)status.textContent='This Android browser has no supported Digital Credentials API.';
+    }
     const url='/api/payer-debit-evidence/'+encodeURIComponent(session.orderId)+
      '?token='+encodeURIComponent(session.token);
     const response=await fetch(url,{credentials:'same-origin',cache:'no-store'});
@@ -773,6 +810,25 @@
     'UPI · '+(session.payeeVpa||params.get('pa')||'');
    get('paymentTrackingStatus').textContent='Payment status · Awaiting confirmation';
    const debitCheck=get('payerDebitCheck');if(debitCheck)debitCheck.disabled=false;
+   if(mode==='generic'&&query.get('debitprobe')==='1'){
+    try{
+     const response=await fetch('/api/debit-credential/challenge',{
+      method:'POST',credentials:'same-origin',cache:'no-store',
+      headers:{'Content-Type':'application/json','X-CSRF-Token':session.token},
+      body:JSON.stringify({serviceRequestId:session.orderId,token:session.token})
+     });
+     const data=await response.json().catch(()=>({}));
+     if(response.ok&&data.protocol==='openid4vp-v1-unsigned'&&
+        data.serviceRequestId===session.orderId&&
+        Number.isSafeInteger(data.expiresAt)&&data.expiresAt>Date.now())
+      debitCredentialRequest=data;
+     else get('payerDebitCheckStatus').textContent=
+      'Debit credential experiment not enabled; existing evidence lookup remains available.';
+    }catch(_){
+     get('payerDebitCheckStatus').textContent=
+      'Credential challenge could not start; existing evidence lookup remains available.';
+    }
+   }
    get('checkoutNote').textContent=params.get('tn')||'Service';
    get('qrTapToPayHint').textContent=model.isPersonalPayment(session.upiUri)
     ?'Personal UPI: scan or import this QR in your UPI app. One-tap P2P intent is restricted.'

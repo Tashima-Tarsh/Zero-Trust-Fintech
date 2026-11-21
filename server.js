@@ -18,6 +18,7 @@ const {createReconciliationRouter,initializeReconciliationSchema,reconcileCredit
 const {createVaultEvidenceRouter,initializeVaultEvidenceSchema,rememberVaultAuthorization} = require('./financial/vault-evidence');
 const {initializeQuantumSignal,createQuantumSignalRouter}=require('./financial/quantum-signal');
 const {initProofBridgeSchema,createProofBridgeRouter}=require('./financial/proofbridge');
+const {initDebitCredentialSchema,createDebitCredentialRouter}=require('./financial/debit-credential');
 const {initializeSessionEvidenceSchema,createSessionEvidenceRouter}=require('./financial/session-evidence');
 const {initializeSessionUpiResultSchema,createSessionUpiResultRouter}=require('./financial/session-upi-result');
 const {createCheckoutDiagnostics}=require('./financial/checkout-diagnostics');
@@ -585,6 +586,10 @@ app.use('/api/session-evidence/upi-result',verifyLimiter,createSessionUpiResultR
 app.use('/api/session-evidence',verifyLimiter,createSessionEvidenceRouter({getPool:()=>db.pgPool,getSession:findSessionForEvidence}));
 // Per-order digital twin. Browser observations are never converted to financial credits.
 app.use('/api/quantum-signal',createQuantumSignalRouter({getPool:()=>db.pgPool}));
+// Digital Credentials API prototype: issuer-signed submissions never mutate payment state.
+app.use('/api/debit-credential',verifyLimiter,createDebitCredentialRouter({
+ getPool:()=>db.pgPool,getSession:id=>db.findSessionByOrderId(id)
+}));
 // Experimental only: signed receipt claims never update payment status or ledger.
 if(process.env.DISHA_PROOFBRIDGE_EXPERIMENT==='1')app.use('/api/proofbridge',
   createProofBridgeRouter({getPool:()=>db.pgPool,getSession:id=>db.findSessionByOrderId(id),
@@ -2150,6 +2155,7 @@ app.get('/failed', (req, res) => res.sendFile(path.join(__dirname, 'public', 'fa
     await initializeQuantumSignal(db.pgPool);
     await initializeSessionEvidenceSchema(db.pgPool);
     await initializeSessionUpiResultSchema(db.pgPool);
+    if(process.env.DISHA_DEBIT_CREDENTIAL_EXPERIMENT==='1')await initDebitCredentialSchema(db.pgPool);
     if(process.env.DISHA_PROOFBRIDGE_EXPERIMENT==='1')await initProofBridgeSchema(db.pgPool);
     await initializeClaimObserver(db.pgPool);
   }
