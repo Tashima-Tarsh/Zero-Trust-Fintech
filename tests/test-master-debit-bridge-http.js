@@ -54,6 +54,7 @@ const post=async payload=>{
 };
 (async()=>{
  try{
+  await new Promise(resolve=>server.listening?resolve():server.once('listening',resolve));
   const invalid=await post({receipt:{...receipt,amountPaise:'999'},signature:sign(receipt)});
   assert.equal(invalid.status,409,'Amount mismatch is rejected');
   assert.equal(invalid.body.error,'DEBIT_CREDENTIAL_BINDING_MISMATCH');
