@@ -3,7 +3,7 @@
 const crypto = require('node:crypto');
 const express = require('express');
 const { PGlite } = require('@electric-sql/pglite');
-const { createSessionEvidenceRouter, initializeSessionEvidenceSchema } =
+const { ALLOWED_PACKAGES, createSessionEvidenceRouter, initializeSessionEvidenceSchema } =
   require('../../../../financial/session-evidence');
 
 const PACKAGE = 'ai.disha.credentialfixture';
@@ -34,6 +34,13 @@ async function createSessionLab({ report = () => {}, sessionTtlMs = 180000 } = {
   const app = express();
   app.use(express.json({ limit: '8kb' }));
   app.post('/lab/session', (req, res) => {
+    const { sourcePackage, amountPaise, payeeVpa } = req.body || {};
+    const real = sourcePackage !== undefined;
+    if (real && (!ALLOWED_PACKAGES.has(sourcePackage) ||
+        typeof amountPaise !== 'string' || !/^[1-9][0-9]{0,15}$/.test(amountPaise) ||
+        typeof payeeVpa !== 'string' || !/^[a-z0-9._-]{2,100}@[a-z0-9._-]{2,40}$/i.test(payeeVpa))) {
+      return res.status(422).json({ error: 'OBSERVATION_BINDING_INVALID' });
+    }
     const now = Date.now();
     for (const [id, session] of sessions) {
       if (session.expiresAt <= now) sessions.delete(id);
@@ -43,7 +50,9 @@ async function createSessionLab({ report = () => {}, sessionTtlMs = 180000 } = {
     const token = crypto.randomBytes(24).toString('hex');
     sessions.set(orderId, {
       sessionId: token, status: 'PENDING', expiresAt: now + sessionTtlMs,
-      challengeAmount: '1.00', vpaAddress: 'fixture@invalid', merchantType: 'P2P'
+      challengeAmount: real ? (amountPaise.padStart(3,'0').slice(0,-2) + '.' + amountPaise.padStart(3,'0').slice(-2)) : '1.00',
+      vpaAddress: real ? payeeVpa : 'fixture@invalid', merchantType: 'P2P',
+      ...(real ? { observationPackage: sourcePackage } : {})
     });
     return res.status(201).set('Cache-Control', 'no-store').json({ orderId, token });
   });
@@ -51,9 +60,9 @@ async function createSessionLab({ report = () => {}, sessionTtlMs = 180000 } = {
     if (req.method === 'POST') {
       const send = res.json.bind(res);
       res.json = body => {
-        const { accepted, decisionState, error, paymentVerified, debitVerified, revoked } = body;
+        const { accepted, decisionState, error, paymentVerified, debitVerified, revoked, observationState, referenceKind } = body;
         report({ path: req.path, code: res.statusCode, accepted, decisionState, error,
-          paymentVerified, debitVerified, revoked });
+          paymentVerified, debitVerified, revoked, observationState, referenceKind });
         return send(body);
       };
     }

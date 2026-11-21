@@ -1,5 +1,6 @@
 package ai.disha.credentialfixture
 
+import android.app.Notification
 import android.os.SystemClock
 import android.security.keystore.KeyGenParameterSpec
 import android.security.keystore.KeyProperties
@@ -41,18 +42,20 @@ internal object SessionObservation {
 
     private data class Lease(
         val order: String, val token: String, val nonce: String, val device: String,
-        val consentedAt: Long, val expiresAt: Long, val elapsedDeadline: Long
+        val consentedAt: Long, val expiresAt: Long, val elapsedDeadline: Long,
+        val sourcePackage: String, val real: Boolean
     )
 
-    fun start(ownPackage: String): Boolean {
+    fun start(ownPackage: String, realBinding: JSONObject? = null): Boolean {
         if (!listenerConnected || enrolling || active != null) return false
         enrolling = true
         val signedOff = generation
-        report("Authorizing synthetic session")
+        report(if (realBinding == null) "Authorizing synthetic session" else "Authorizing real observation")
         scope.launch {
             try {
                 val lease = withContext(Dispatchers.IO) {
-                    val fixture = post("/lab/session", JSONObject()).require(201)
+                    val source = realBinding?.getString("sourcePackage") ?: ownPackage
+                    val fixture = post("/lab/session", realBinding ?: JSONObject()).require(201)
                     val order = fixture.getString("orderId")
                     val token = fixture.getString("token")
                     val device = UUID.randomUUID().toString()
@@ -64,12 +67,14 @@ internal object SessionObservation {
                         .put("orderId", order).put("token", token).put("consent", true)
                         .put("deviceId", device).put("publicKeyPem", pem), token).require(201)
                     check(response.getString("orderId") == order && response.getString("deviceId") == device)
-                    check(response.getJSONArray("allowedPackages").let { it.length() == 1 && it.getString(0) == ownPackage })
+                    check(response.getJSONArray("allowedPackages").let { it.length() == 1 && it.getString(0) == source })
                     val expires = response.getLong("expiresAt")
-                    val ttl = expires - response.getLong("serverTime")
+                    val serverTime = response.getLong("serverTime")
+                    val ttl = expires - serverTime
                     check(ttl in 1..180000)
                     Lease(order, token, response.getString("nonce"), device,
-                        response.getLong("consentedAt"), expires, started + ttl)
+                        maxOf(response.getLong("consentedAt"), serverTime), expires, started + ttl,
+                        source, realBinding != null)
                 }
                 if (signedOff != generation || !listenerConnected) {
                     revoke(lease)
@@ -81,7 +86,11 @@ internal object SessionObservation {
                     delay((lease.elapsedDeadline - SystemClock.elapsedRealtime()).coerceAtLeast(0))
                     if (active === lease) {
                         active = null
-                        report("Observation expired")
+                        if (!lease.real || !status.value.startsWith("DEBIT_UTR_OBSERVED")) {
+                            report(if (lease.real && !status.value.startsWith("UTR_AMBIGUOUS"))
+                                "UTR_NOT_AVAILABLE (session expired)" else if (!lease.real)
+                                "Observation expired" else "UTR_AMBIGUOUS (session expired)")
+                        }
                     }
                 }
             } catch (_: Exception) {
@@ -101,17 +110,34 @@ internal object SessionObservation {
         if (lease != null) scope.launch { revoke(lease) }
     }
 
-    fun observe(ownPackage: String, notification: StatusBarNotification) {
+    fun observe(notification: StatusBarNotification) {
         val lease = active ?: return
         if (!listenerConnected || SystemClock.elapsedRealtime() >= lease.elapsedDeadline ||
             notification.postTime !in lease.consentedAt until lease.expiresAt) return
         // Never inspect notification extras from a different app.
-        if (notification.packageName != ownPackage) {
+        if (notification.packageName != lease.sourcePackage) {
             Log.i("DISHA_SESSION_OBSERVATION", "Ignored wrong notification package")
             return
         }
-        if (notification.notification.channelId != CHANNEL || submitting) return
-        val extras = notification.notification.extras
+        val posted = notification.notification
+        if (submitting || posted.flags and Notification.FLAG_GROUP_SUMMARY != 0) return
+        val extras = posted.extras
+        if (lease.real) {
+            if (status.value.startsWith("DEBIT_UTR_OBSERVED")) return
+            val body = listOfNotNull(extras.getCharSequence(Notification.EXTRA_TEXT),
+                extras.getCharSequence(Notification.EXTRA_BIG_TEXT))
+                .plus(extras.getCharSequenceArray(Notification.EXTRA_TEXT_LINES)?.toList().orEmpty())
+                .distinct().joinToString("\n")
+            val result = DebitNotification.parse(extras.getCharSequence(Notification.EXTRA_TITLE), body)
+            val fields = result.evidence
+            if (fields == null) {
+                report(result.status)
+                return
+            }
+            submit(lease, notification.postTime, fields.amountPaise, fields.payee, fields.reference, fields.kind)
+            return
+        }
+        if (posted.channelId != CHANNEL) return
         val amount = extras.getString(AMOUNT)
         val payee = extras.getString(PAYEE)
         val reference = extras.getString(REFERENCE)
@@ -121,16 +147,23 @@ internal object SessionObservation {
             Log.i("DISHA_SESSION_OBSERVATION", "Rejected malformed synthetic fields")
             return
         }
-        // Both strings are validated ASCII. The field order mirrors canonicalEvidence.
+        submit(lease, notification.postTime, amount, payee, reference)
+    }
+
+    private fun submit(lease: Lease, postedAt: Long, amount: String, payee: String, reference: String,
+        referenceKind: String? = null) {
+        // Only the event ID is derived. The transaction reference is copied from its source.
         val eventId = MessageDigest.getInstance("SHA-256")
             .digest("${lease.order}:$reference".toByteArray(Charsets.UTF_8))
             .joinToString("") { "%02x".format(it) }
         val evidence = JSONObject()
-            .put("protocol", "DISHA-SESSION-EVIDENCE-V1").put("eventId", eventId)
+            .put("protocol", if (lease.real) "DISHA-DEBIT-UTR-OBSERVATION-V1" else "DISHA-SESSION-EVIDENCE-V1")
+            .put("eventId", eventId)
             .put("orderId", lease.order).put("nonce", lease.nonce).put("deviceId", lease.device)
-            .put("packageName", ownPackage).put("postedAt", notification.postTime)
+            .put("packageName", lease.sourcePackage).put("postedAt", postedAt)
             .put("amountPaise", amount).put("payeeVpa", payee)
             .put("transactionRef", reference).put("status", "SUCCESS")
+        if (referenceKind != null) evidence.put("referenceKind", referenceKind)
         submitting = true
         scope.launch {
             try {
@@ -147,11 +180,20 @@ internal object SessionObservation {
                 }
                 if (active !== lease) return@launch
                 val decision = response.body.optString("decisionState", response.body.optString("error"))
+                if (lease.real && response.code == 202 &&
+                    response.body.optString("observationState") == "DEBIT_UTR_OBSERVED" &&
+                    response.body.optString("referenceKind") == referenceKind &&
+                    response.body.opt("paymentVerified") == false && response.body.opt("debitVerified") == false) {
+                    report("DEBIT_UTR_OBSERVED ($referenceKind)")
+                    status.value = "DEBIT_UTR_OBSERVED ($referenceKind) $reference"
+                    return@launch
+                }
                 val message = when {
-                    response.code == 202 && decision == "SIGNAL_MATCHED" &&
+                    !lease.real && response.code == 202 && decision == "SIGNAL_MATCHED" &&
                         response.body.opt("paymentVerified") == false && response.body.opt("debitVerified") == false ->
                         "HTTP 202: Observation recorded; payment and debit unverified"
-                    decision in setOf("AMOUNT_MISMATCH", "PAYEE_MISMATCH", "EVIDENCE_REPLAY_BLOCKED", "SESSION_EXPIRED") ->
+                    decision in setOf("AMOUNT_MISMATCH", "PAYEE_MISMATCH", "EVIDENCE_REPLAY_BLOCKED",
+                        "TRANSACTION_REFERENCE_REPLAY", "DEVICE_SIGNATURE_INVALID", "SESSION_EXPIRED") ->
                         "HTTP ${response.code}: $decision"
                     else -> "Evidence submission rejected"
                 }

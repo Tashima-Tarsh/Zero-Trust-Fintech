@@ -21,6 +21,6 @@ class PaymentObservationListener : NotificationListenerService() {
     }
 
     override fun onNotificationPosted(notification: StatusBarNotification) {
-        SessionObservation.observe(packageName, notification)
+        SessionObservation.observe(notification)
     }
 }
