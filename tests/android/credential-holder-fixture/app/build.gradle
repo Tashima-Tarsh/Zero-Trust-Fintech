@@ -23,10 +23,6 @@ dependencies {
     implementation 'androidx.lifecycle:lifecycle-runtime-ktx:2.8.7'
     implementation 'com.google.android.gms:play-services-base:18.5.0'
     implementation 'androidx.credentials:credentials:1.5.0'
-    // Matched published IdentityCredentialClient.registerCredentials() status-17 reproduction.
-    // Controlled dependency experiment; CI must prove whether it resolves registration.
-    implementation 'androidx.credentials:credentials-play-services-auth:1.5.0'
-    implementation 'androidx.work:work-runtime:2.9.1'
     implementation 'androidx.credentials.registry:registry-provider:1.0.0-alpha05'
     implementation 'androidx.credentials.registry:registry-provider-play-services:1.0.0-alpha05'
     implementation 'androidx.credentials.registry:registry-digitalcredentials-openid:1.0.0-alpha05'
