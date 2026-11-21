@@ -78,3 +78,18 @@ powershell -ExecutionPolicy Bypass -File tests/android/credential-holder-fixture
 Reference implementation: https://android.googlesource.com/platform/frameworks/support/+/main/credentials/registry/registry-provider-play-services/src/main/java/androidx/credentials/registry/provider/playservices/RegistryManagerProviderPlayServicesImpl.kt
 
 The next test should compare *known supported* wallets/providers, rather than assume Google Cloud credentials, user login, or a special secret grants access. Never bypass platform security.
+
+## API 37 Pixel emulator: distinguish OS handoff failures
+
+After installing the debug fixture and successfully registering the synthetic credential, open the **corrected branch-preview** browser test page in emulator Chrome. Do not substitute the deployed page if its request payload differs. Before tapping the no-payment request, clear the fixture's Logcat buffer or record a timestamp, then observe:
+
+```bash
+adb logcat -c
+adb logcat -s DISHA_CREDENTIAL_FIXTURE:I
+```
+
+- No `HOLDER_ACTIVITY_CREATED`: no holder activity launch observed. Investigate the browser OpenID4VP payload, matching registered SD-JWT type, Google Play services provider selection and Chrome-origin prerequisites.
+- `HOLDER_ACTIVITY_CREATED` followed by `GET_CREDENTIAL_CALLBACK_REJECTED`: Android started the activity but the provider request could not be parsed or validated; inspect only the exception class, without dumping credential data.
+- `GET_CREDENTIAL_CALLBACK_PARSED` and `Android handoff received`: the OS-to-holder callback was observed. The fixture still deliberately returns a no-payment exception, never a bank receipt.
+
+A successful registration or consent prompt alone is **not** a passing Chrome-to-holder E2E test. The repository's `emulator-handshake.sh` retains a failing assertion until the parsed callback appears. Keep any Logcat exports free of credentials, origins, browser request data and device identifiers before sharing.
