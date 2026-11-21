@@ -7,7 +7,7 @@ const server=read('server.js'),proof=read('financial/proofbridge.js');
 assert.match(html,/id="payerDebitCheck"[^>]*disabled/);
 assert.match(js,/\/api\/payer-debit-evidence\//);
 assert.match(js,/No authenticated debit receipt/);
-assert.match(js,/original bank debit is NOT authenticated/);
+assert.match(js,/original bank debit is NOT authenticated/i);
 assert.match(server,/app\.get\('\/api\/payer-debit-evidence\/:orderId'/);
 assert.match(server,/debitVerified:false/);
 assert.match(server,/paymentVerified:false/);
