@@ -697,14 +697,24 @@
    }
    if(!evidenceDialog.open)evidenceDialog.showModal();
   };
-  const checkDebitEvidence=async()=>{
-   if(!session?.orderId||!session?.token||debitButton.disabled)return;
-   if(expired()){showDebitEvidence('Debit evidence could not be validated. This checkout has expired.');return;}
+  // Session-scoped, read-only acquisition transport: device observer -> DISHA
+  // signed evidence endpoint -> Chrome receipt. Never infer payment success.
+  let debitEvidenceMonitor=null, debitEvidenceRequestActive=false;
+  const stopDebitEvidenceMonitor=()=>{
+   if(debitEvidenceMonitor){clearInterval(debitEvidenceMonitor);debitEvidenceMonitor=null;}
+  };
+  const checkDebitEvidence=async(silent=false)=>{
+   const passive=silent===true;
+   if(!session?.orderId||!session?.token||debitEvidenceRequestActive)return;
+   if(expired()){stopDebitEvidenceMonitor();if(!passive)showDebitEvidence('Debit evidence could not be validated. This checkout has expired.');return;}
    const status=get('payerDebitCheckStatus'),details=get('payerDebitCheckReference');
+   debitEvidenceRequestActive=true;
    debitButton.disabled=true;
    if(evidenceRetry)evidenceRetry.disabled=true;
-   if(status)status.textContent='Checking available payer-side evidence for this service…';
-   if(details){details.hidden=true;details.textContent='';}
+   if(!passive){
+    if(status)status.textContent='Monitoring payer-side evidence for this active checkout…';
+    if(details){details.hidden=true;details.textContent='';}
+   }
    try{
     const boundSession=session;
     const url='/api/payer-debit-evidence/'+encodeURIComponent(boundSession.orderId)+
@@ -713,7 +723,8 @@
     const evidence=await response.json().catch(()=>({}));
     if(!response.ok)throw Error('DEBIT_EVIDENCE_UNAVAILABLE');
     if(session!==boundSession||expired()){
-     showDebitEvidence('Debit evidence could not be validated. This checkout changed or expired.');
+     stopDebitEvidenceMonitor();
+     if(!passive)showDebitEvidence('Debit evidence could not be validated. This checkout changed or expired.');
      return;
     }
     const receipt=evidence.debitEvidenceReceipt;
@@ -723,13 +734,15 @@
      /^\d{12}$/.test(receipt.reference)&&/^[a-f0-9]{64}$/.test(receipt.receiptReference)&&
      receipt.amountPaise===String(Math.round(session.amount*100))&&
      Number.isSafeInteger(receipt.observedAt)&&receipt.observedAt>0){
+     stopDebitEvidenceMonitor();
      showDebitEvidence('DEBIT EVIDENCE OBSERVED. Bank debit and payment remain unverified.',receipt);
     }else if(evidence.receiptError||receipt){
-     showDebitEvidence('Debit evidence could not be validated. The observation conflicts with this checkout.');
+     stopDebitEvidenceMonitor();
+     if(!passive)showDebitEvidence('Debit evidence could not be validated. The observation conflicts with this checkout.');
      if(status)status.textContent='Debit evidence could not be validated.';
      return;
     }else{
-     showDebitEvidence('Debit evidence not available yet');
+     if(!passive&& !debitEvidenceMonitor)showDebitEvidence('Debit evidence not available yet');
     }
     const first=evidence.evidence?.[0];
     if(first&&/^\d{12}$/.test(first.utr||'')){
@@ -743,12 +756,27 @@
      status.textContent='No authenticated debit receipt was returned by Android or the UPI app. Payment remains unverified.';
     }
    }catch(_){
-    showDebitEvidence('Debit evidence could not be validated. The evidence service is unavailable.');
+    if(!passive)showDebitEvidence('Debit evidence could not be validated. The evidence service is unavailable.');
     if(status)status.textContent='Evidence service unavailable. Do not assume the payment failed or succeeded.';
-   }finally{debitButton.disabled=false;if(evidenceRetry)evidenceRetry.disabled=false;}
+   }finally{debitEvidenceRequestActive=false;debitButton.disabled=false;if(evidenceRetry)evidenceRetry.disabled=false;}
   };
-  if(debitButton)debitButton.addEventListener('click',checkDebitEvidence);
-  if(evidenceRetry&&debitButton)evidenceRetry.addEventListener('click',checkDebitEvidence);
+  const startDebitEvidenceMonitor=()=>{
+   if(!session||expired())return;
+   stopDebitEvidenceMonitor();
+   const boundSession=session;
+   // The observer's consent is separately enforced by Android/backend.
+   // Polling is just a read of this order's authenticated evidence receipt.
+   debitEvidenceMonitor=setInterval(()=>{
+    if(session!==boundSession||expired()||receiptShown){
+     stopDebitEvidenceMonitor();return;
+    }
+    if(document.visibilityState==='visible')void checkDebitEvidence(true);
+   },3000);
+   void checkDebitEvidence(true);
+  };
+  if(debitButton)debitButton.addEventListener('click',startDebitEvidenceMonitor);
+  if(evidenceRetry&&debitButton)evidenceRetry.addEventListener('click',()=>void checkDebitEvidence(false));
+  window.addEventListener('pagehide',stopDebitEvidenceMonitor);
   const diag=get('checkoutDebugPanel');
   if(debug&&diag){diag.hidden=false;get('checkoutDebugCopy').addEventListener('click',copyDebugReport)}
   get('saveReceipt').addEventListener('click',()=>{if(receiptShown)window.print()});
