@@ -15,6 +15,8 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 
 /**
  * Application-scoped credential registration.
@@ -24,6 +26,7 @@ import kotlinx.coroutines.launch
 @OptIn(ExperimentalDigitalCredentialApi::class)
 class DishaCredentialApplication : Application() {
     private val applicationScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+    private val registrationLock = Mutex()
     private lateinit var registryManager: RegistryManager
 
     override fun onCreate() {
@@ -33,62 +36,67 @@ class DishaCredentialApplication : Application() {
         // Register synthetic credential at application startup
         applicationScope.launch {
             try {
-                val icon = Bitmap.createBitmap(32, 32, Bitmap.Config.ARGB_8888).apply {
-                    eraseColor(android.graphics.Color.rgb(20, 73, 128))
-                }
-                val display = VerificationEntryDisplayProperties(
-                    title = "DISHA research credential",
-                    subtitle = "Synthetic discovery test — no real debit",
-                    icon = icon
-                )
-                val entry = SdJwtEntry(
-                    verifiableCredentialType = "https://disha8-2.thenitishkr.in/credentials/upi-debit-v1",
-                    claims = listOf(
-                        SdJwtClaim(
-                            path = listOf("utr"),
-                            value = "000000000000",
-                            fieldDisplayPropertySet = setOf(VerificationFieldDisplayProperties(displayName = "UTR (synthetic)"))
-                        ),
-                        SdJwtClaim(
-                            path = listOf("debitConfirmed"),
-                            value = false,
-                            fieldDisplayPropertySet = setOf(VerificationFieldDisplayProperties(displayName = "Debit confirmed (false)"))
-                        ),
-                        SdJwtClaim(
-                            path = listOf("amountPaise"),
-                            value = "100",
-                            fieldDisplayPropertySet = setOf(VerificationFieldDisplayProperties(displayName = "Amount in paise (synthetic)"))
-                        ),
-                        SdJwtClaim(
-                            path = listOf("payeeVpa"),
-                            value = "fixture@invalid",
-                            fieldDisplayPropertySet = setOf(VerificationFieldDisplayProperties(displayName = "Payee VPA (synthetic)"))
-                        )
-                    ),
-                    entryDisplayPropertySet = setOf(display),
-                    id = "disha-fixture-synthetic-v1"
-                )
-                val registry = OpenId4VpRegistry(
-                    credentialEntries = listOf(entry),
-                    id = "disha-fixture-registry-v1"
-                )
-                // Diagnostic fingerprints identify the exact synthetic registry and matcher
-                // used in a device run. They do not establish matcher eligibility or success.
-                fun digest(bytes: ByteArray): String =
-                    MessageDigest.getInstance("SHA-256").digest(bytes)
-                        .joinToString("") { "%02x".format(it) }
-                Log.i(
-                    "DISHA_CREDENTIAL_FIXTURE",
-                    "REGISTRY_DIAGNOSTICS credentialBytes=${registry.credentials.size}" +
-                        " credentialSha256=${digest(registry.credentials)}" +
-                        " matcherBytes=${registry.matcher.size}" +
-                        " matcherSha256=${digest(registry.matcher)}"
-                )
-                registryManager.registerCredentials(registry)
+                registerSyntheticCredential()
                 Log.i("DISHA_CREDENTIAL_FIXTURE", "APPLICATION_SCOPED_REGISTRATION_SUCCESS")
             } catch (error: Exception) {
                 Log.e("DISHA_CREDENTIAL_FIXTURE", "APPLICATION_SCOPED_REGISTRATION_FAILED", error)
             }
         }
+    }
+
+    internal suspend fun registerSyntheticCredential() = registrationLock.withLock {
+        val icon = Bitmap.createBitmap(32, 32, Bitmap.Config.ARGB_8888).apply {
+            eraseColor(android.graphics.Color.rgb(20, 73, 128))
+        }
+        val display = VerificationEntryDisplayProperties(
+            title = "DISHA research credential",
+            subtitle = "Synthetic discovery test — no real debit",
+            icon = icon
+        )
+        // The selector rejects field rows when the matcher reports a null display value.
+        val entry = SdJwtEntry(
+            verifiableCredentialType = "https://disha8-2.thenitishkr.in/credentials/upi-debit-v1",
+            claims = listOf(
+                SdJwtClaim(
+                    path = listOf("utr"),
+                    value = "000000000000",
+                    fieldDisplayPropertySet = setOf(VerificationFieldDisplayProperties(displayName = "UTR (synthetic)", displayValue = "000000000000"))
+                ),
+                SdJwtClaim(
+                    path = listOf("debitConfirmed"),
+                    value = false,
+                    fieldDisplayPropertySet = setOf(VerificationFieldDisplayProperties(displayName = "Debit confirmed (false)", displayValue = "false"))
+                ),
+                SdJwtClaim(
+                    path = listOf("amountPaise"),
+                    value = "100",
+                    fieldDisplayPropertySet = setOf(VerificationFieldDisplayProperties(displayName = "Amount in paise (synthetic)", displayValue = "100"))
+                ),
+                SdJwtClaim(
+                    path = listOf("payeeVpa"),
+                    value = "fixture@invalid",
+                    fieldDisplayPropertySet = setOf(VerificationFieldDisplayProperties(displayName = "Payee VPA (synthetic)", displayValue = "fixture@invalid"))
+                )
+            ),
+            entryDisplayPropertySet = setOf(display),
+            id = "disha-fixture-synthetic-v1"
+        )
+        val registry = OpenId4VpRegistry(
+            credentialEntries = listOf(entry),
+            id = "disha-fixture-registry-v1"
+        )
+        // Diagnostic fingerprints identify the exact synthetic registry and matcher
+        // used in a device run. They do not establish matcher eligibility or success.
+        fun digest(bytes: ByteArray): String =
+            MessageDigest.getInstance("SHA-256").digest(bytes)
+                .joinToString("") { "%02x".format(it) }
+        Log.i(
+            "DISHA_CREDENTIAL_FIXTURE",
+            "REGISTRY_DIAGNOSTICS credentialBytes=${registry.credentials.size}" +
+                " credentialSha256=${digest(registry.credentials)}" +
+                " matcherBytes=${registry.matcher.size}" +
+                " matcherSha256=${digest(registry.matcher)}"
+        )
+        registryManager.registerCredentials(registry)
     }
 }

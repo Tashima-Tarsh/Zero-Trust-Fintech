@@ -1,7 +1,6 @@
 package ai.disha.credentialfixture
 
 import androidx.activity.ComponentActivity
-import android.graphics.Bitmap
 import android.os.Bundle
 import android.widget.Button
 import android.util.Log
@@ -12,12 +11,6 @@ import kotlinx.coroutines.withContext
 import android.widget.LinearLayout
 import android.widget.TextView
 import androidx.lifecycle.lifecycleScope
-import androidx.credentials.registry.provider.RegistryManager
-import androidx.credentials.registry.digitalcredentials.openid4vp.OpenId4VpRegistry
-import androidx.credentials.registry.digitalcredentials.sdjwt.SdJwtEntry
-import androidx.credentials.registry.digitalcredentials.sdjwt.SdJwtClaim
-import androidx.credentials.registry.provider.digitalcredentials.VerificationEntryDisplayProperties
-import androidx.credentials.registry.provider.digitalcredentials.VerificationFieldDisplayProperties
 import kotlinx.coroutines.launch
 
 /**
@@ -78,35 +71,7 @@ class RegisterActivity : ComponentActivity() {
             button.isEnabled = false
             lifecycleScope.launch {
                 try {
-                    val icon = Bitmap.createBitmap(32, 32, Bitmap.Config.ARGB_8888).apply {
-                        eraseColor(android.graphics.Color.rgb(20, 73, 128))
-                    }
-                    val display = VerificationEntryDisplayProperties(
-                        title = "DISHA research credential",
-                        subtitle = "Synthetic discovery test — no real debit",
-                        icon = icon
-                    )
-                    val entry = SdJwtEntry(
-                        verifiableCredentialType = "https://disha8-2.thenitishkr.in/credentials/upi-debit-v1",
-                        claims = listOf(
-                            SdJwtClaim(path = listOf("utr"), value = "000000000000",
-                                fieldDisplayPropertySet = setOf(VerificationFieldDisplayProperties(displayName = "UTR (synthetic)"))),
-                            SdJwtClaim(path = listOf("debitConfirmed"), value = false,
-                                fieldDisplayPropertySet = setOf(VerificationFieldDisplayProperties(displayName = "Debit confirmed (false)"))),
-                            SdJwtClaim(path = listOf("amountPaise"), value = "100",
-                                fieldDisplayPropertySet = setOf(VerificationFieldDisplayProperties(displayName = "Amount in paise (synthetic)"))),
-                            SdJwtClaim(path = listOf("payeeVpa"), value = "fixture@invalid",
-                                fieldDisplayPropertySet = setOf(VerificationFieldDisplayProperties(displayName = "Payee VPA (synthetic)")))
-                        ),
-                        entryDisplayPropertySet = setOf(display),
-                        id = "disha-fixture-synthetic-v1"
-                    )
-                    RegistryManager.create(this@RegisterActivity).registerCredentials(
-                        OpenId4VpRegistry(
-                            credentialEntries = listOf(entry),
-                            id = "disha-fixture-registry-v1"
-                        )
-                    )
+                    (application as DishaCredentialApplication).registerSyntheticCredential()
                     state.text = "Registered synthetic credential metadata with Android. Open the browser test page."
                 } catch (error: Exception) {
                     val reason = if (error.message?.trim()?.startsWith("17") == true)
