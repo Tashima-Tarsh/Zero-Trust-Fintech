@@ -108,8 +108,14 @@ class RegisterActivity : ComponentActivity() {
                     )
                     state.text = "Registered synthetic credential metadata with Android. Open the browser test page."
                 } catch (error: Exception) {
+                    val reason = if (error.message?.trim()?.startsWith("17") == true)
+                        "GMS_API_NOT_CONNECTED_17"
+                    else "REGISTRY_ERROR"
                     state.text = "Registration failed: " +
-                        error.javaClass.simpleName + ": " + error.message
+                        error.javaClass.simpleName + ": " + error.message +
+                        " [" + reason + "]"
+                    Log.e("DISHA_CREDENTIAL_FIXTURE",
+                        "CREDENTIAL_REGISTRATION_" + reason, error)
                 } finally {
                     button.isEnabled = true
                 }

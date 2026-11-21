@@ -34,6 +34,12 @@ adb pull /sdcard/disha-ui.xml "$out/registration-result.xml" >/dev/null
 if ! grep -q 'Registered synthetic credential metadata with Android' "$out/registration-result.xml"; then
   echo "Credential Manager fixture registration did not succeed."
   grep -o 'Registration failed[^<]*' "$out/registration-result.xml" || true
+  adb shell dumpsys package com.google.android.gms > "$out/gms-package.txt" 2>&1 || true
+  adb shell dumpsys activity service com.google.android.gms > "$out/gms-service.txt" 2>&1 || true
+  adb logcat -d -v time > "$out/registration-full-logcat.txt" 2>&1 || true
+  if grep -q 'RegisterCredentialsUnknownException: 17' "$out/registration-result.xml"; then
+    echo 'REGISTRATION_BLOCKED_GMS_API_NOT_CONNECTED_17: Google Play IdentityCredential service did not connect; not an APK compilation or AndroidKeyStore error.'
+  fi
   exit 1
 fi
 if ! adb shell pm list packages | grep -q 'package:com.android.chrome'; then
