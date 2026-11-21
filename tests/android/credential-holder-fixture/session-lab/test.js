@@ -7,7 +7,8 @@ const { canonicalEvidence } = require('../../../../financial/session-evidence');
 const { createSessionLab, PACKAGE } = require('./server');
 
 async function main() {
-  const lab = await createSessionLab();
+  console.log('Synthetic HTTP test vectors. No live notification or debit.');
+  const lab = await createSessionLab({ report: response => console.log(JSON.stringify(response)) });
   const server = lab.app.listen(0, '127.0.0.1');
   try {
     await once(server, 'listening');
@@ -20,8 +21,8 @@ async function main() {
     }
     const { privateKey, publicKey } = crypto.generateKeyPairSync('ec', { namedCurve: 'prime256v1' });
     const deviceId = crypto.randomUUID();
-    async function enroll() {
-      const [created, { orderId, token }] = await post('/lab/session', {});
+    async function enroll(binding = {}) {
+      const [created, { orderId, token }] = await post('/lab/session', binding);
       assert.equal(created, 201);
       const [status, lease] = await post('/api/session-evidence/authorize', {
         orderId, token, deviceId, consent: true, publicKeyPem: publicKey.export({ type: 'spki', format: 'pem' })
@@ -68,6 +69,39 @@ async function main() {
     await lab.pool.query('UPDATE disha_session_evidence_consents SET expires_at=$2 WHERE order_id=$1',
       [second.orderId, Date.now() - 1]);
     await expect(submit(second, event(second)), 410, 'SESSION_EXPIRED');
+    const sourcePackage = 'com.google.android.apps.nbu.paisa.user';
+    const binding = { sourcePackage, amountPaise: '100', payeeVpa: 'fixture@invalid' };
+    const real = await enroll(binding);
+    const observed = (lease, fields = {}) => event(lease, {
+      protocol: 'DISHA-DEBIT-UTR-OBSERVATION-V1', packageName: sourcePackage,
+      transactionRef: '000000000101', referenceKind: 'RRN', ...fields
+    });
+    const reference = observed(real);
+    assert.equal(canonicalEvidence(reference), JSON.stringify(reference));
+    assert.equal(accepted.observationState, undefined);
+    await expect(submit(real, event(real)), 422, 'EVIDENCE_FIELDS_INVALID');
+    await expect(submit(real, observed(real, { packageName: 'com.phonepe.app' })), 422, 'EVIDENCE_FIELDS_INVALID');
+    await expect(submit(real, observed(real, { referenceKind: 'TRANSACTION_ID' })), 422, 'EVIDENCE_FIELDS_INVALID');
+    await expect(submit(real, observed(real, { transactionRef: null })), 422, 'EVIDENCE_FIELDS_INVALID');
+    await expect(submit(real, observed(real, { referenceKind: 'UTR' }), sign(JSON.stringify(reference))),
+      401, 'DEVICE_SIGNATURE_INVALID');
+    await expect(submit(real, observed(real, { postedAt: 1000, transactionRef: '000000000102' })),
+      409, 'SESSION_TIME_INVALID');
+    await expect(submit(real, observed(real, { amountPaise: '101', transactionRef: '000000000103' })),
+      409, 'AMOUNT_MISMATCH');
+    await expect(submit(real, observed(real, { payeeVpa: 'other@invalid', transactionRef: '000000000104' })),
+      409, 'PAYEE_MISMATCH');
+    const received = await expect(submit(real, reference), 202, 'SIGNAL_MATCHED');
+    assert.equal(received.observationState, 'DEBIT_UTR_OBSERVED');
+    assert.equal(received.referenceKind, 'RRN');
+    assert.equal(received.debitVerified, false);
+    assert.equal(received.paymentVerified, false);
+    await expect(submit(real, observed(real)), 409, 'EVIDENCE_REPLAY_BLOCKED');
+    const other = await enroll(binding);
+    await expect(submit(other, observed(other)), 409, 'TRANSACTION_REFERENCE_REPLAY');
+    await post('/api/session-evidence/revoke', { orderId: real.orderId, token: real.token }, real.token);
+    await expect(submit(real, observed(real)), 410, 'SESSION_EXPIRED');
+    console.log('DEBIT_UTR_OBSERVATION_HTTP_PASS (synthetic protocol vectors only)');
     console.log('SESSION_OBSERVATION_HTTP_PASS: package, fields, signature, binding, replay, revoke, expiry, unverified flags');
   } finally {
     server.close();
