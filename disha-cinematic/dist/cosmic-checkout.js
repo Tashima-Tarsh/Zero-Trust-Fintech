@@ -772,7 +772,7 @@
     }
     if(document.visibilityState==='visible')void checkDebitEvidence(true);
    },3000);
-   void checkDebitEvidence(true);
+   return checkDebitEvidence(true);
   };
   if(debitButton)debitButton.addEventListener('click',startDebitEvidenceMonitor);
   if(evidenceRetry&&debitButton)evidenceRetry.addEventListener('click',()=>void checkDebitEvidence(false));
