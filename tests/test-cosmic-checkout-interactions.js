@@ -27,8 +27,8 @@ function mount(status='PENDING',checkout='merchant',overrides={}){
    },upiLink:uri})};
    if(url.includes('/api/payer-debit-evidence/'))return {ok:true,json:async()=>({
     success:true,debitVerified:false,paymentVerified:false,paymentStateChanged:false,
-    evidence:data.signal?.utrCandidate?[{utr:data.signal.utrCandidate,source:'BROWSER_RETURN_OBSERVATION',
-      amountPaise:'50000',payeeVpa:'merchant@oksbi',authenticatedDebit:false}]:[],
+    evidence:data.evidence??(data.signal?.utrCandidate?[{utr:data.signal.utrCandidate,source:'BROWSER_RETURN_OBSERVATION',
+      amountPaise:'50000',payeeVpa:'merchant@oksbi',authenticatedDebit:false}]:[]),
     state:data.signal?.utrCandidate?'UTR_CANDIDATE_OBSERVED_UNVERIFIED':'NO_AUTHENTICATED_PAYER_DEBIT_EVIDENCE'})};
    if(url.includes('/api/proofbridge/status/'))return {ok:Boolean(data.proof),
     status:data.proof?200:503,json:async()=>data.proof||{success:false}};
@@ -38,7 +38,9 @@ function mount(status='PENDING',checkout='merchant',overrides={}){
     status:data.status,utr:data.utr,challengeAmount:500})};
    throw Error('Unexpected fetch '+url);
  };
- vm.runInNewContext(source,{window,document,location,navigator:{userAgent:'Mozilla/5.0 (Linux; Android 15) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/157.0.0.0 Mobile Safari/537.36'},
+ window.DigitalCredential=function(){};
+ vm.runInNewContext(source,{window,document,location,navigator:{credentials:{get(){data.prompt++;throw Error('Unexpected credential prompt')}},
+   userAgent:'Mozilla/5.0 (Linux; Android 15) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/157.0.0.0 Mobile Safari/537.36'},
    URL,URLSearchParams,Date,Intl,console,fetch,setInterval:()=>1,clearInterval(){},
    sessionStorage:{getItem:()=>null,setItem(){}}});
  return {nodes,events,stages,data};
@@ -75,6 +77,14 @@ const active=app=>app.stages.find(s=>!s.hidden)?.dataset.stage;
  assert.match(p2p.nodes.payerDebitCheckReference.textContent,/Reported UTR: 123456789012/,
    'Observed reference can be displayed without a fabricated paid status');
  assert.equal(active(p2p),'qr','Unverified debit cannot unlock receipt');
+ assert.equal(p2p.data.prompt,0,'I Paid must not request a browser credential');
+ const observed=mount('PENDING','generic',{evidence:[{utr:'123456789012',referenceKind:'RRN',
+   source:'DEVICE_OBSERVATION',payeeVpa:'merchant@oksbi',deviceSignatureVerified:true}]});
+ await flush();await observed.nodes.payerDebitCheck.events.click();
+ assert.match(observed.nodes.payerDebitCheckReference.textContent,/Observed RRN: 123456789012/);
+ assert.match(observed.nodes.payerDebitCheckStatus.textContent,/device signature verified/i);
+ assert.equal(observed.data.prompt,0);
+ assert.equal(active(observed),'qr','A signed Android observation cannot unlock a bank receipt');
  const unavailable=mount('PENDING','generic',{signal:null});await flush();
  await unavailable.nodes.payerDebitCheck.events.click();await flush();
  assert.match(unavailable.nodes.payerDebitCheckStatus.textContent,/No authenticated debit receipt/i);

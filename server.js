@@ -906,12 +906,13 @@ app.get('/api/payer-debit-evidence/:orderId', verifyLimiter, async (req,res)=>{
     const amountPaise=require('./financial/money').rupeesToPaise(String(session.challengeAmount));
     const payee=String(session.vpaAddress||'').trim().toLowerCase();
     const sources=[
+      {source:'DEVICE_OBSERVATION',sql:
+        'SELECT transaction_ref AS utr,amount_paise,payee_vpa,posted_at AS observed_at,reference_kind '+
+        "FROM disha_session_evidence_events WHERE order_id=$1 AND decision_state='SIGNAL_MATCHED' "+
+        'ORDER BY (reference_kind IS NOT NULL) DESC, posted_at DESC LIMIT 5'},
       {source:'DEVICE_UPI_RESULT',sql:
         'SELECT utr_candidate AS utr,amount_paise,payee_vpa,returned_at AS observed_at '+
         'FROM disha_session_upi_results WHERE order_id=$1 ORDER BY returned_at DESC LIMIT 5'},
-      {source:'DEVICE_OBSERVATION',sql:
-        'SELECT transaction_ref AS utr,amount_paise,payee_vpa,posted_at AS observed_at '+
-        'FROM disha_session_evidence_events WHERE order_id=$1 ORDER BY posted_at DESC LIMIT 5'},
       // A browser return may carry a 12-digit reference, but its source is
       // not the UPI app's authenticated debit record.
       {source:'BROWSER_RETURN_OBSERVATION',sql:
@@ -933,7 +934,9 @@ app.get('/api/payer-debit-evidence/:orderId', verifyLimiter, async (req,res)=>{
              String(r.payee_vpa||'').toLowerCase()!==payee)continue;
           if(result.evidence.some(e=>e.utr===r.utr))continue;
           result.evidence.push({utr:r.utr,source:source.source,amountPaise,payeeVpa:payee,
-            observedAt:Number(r.observed_at),authenticatedDebit:false});
+            observedAt:Number(r.observed_at),authenticatedDebit:false,
+            ...(source.source==='DEVICE_OBSERVATION'&&['UTR','RRN'].includes(r.reference_kind)?
+              {referenceKind:r.reference_kind,deviceSignatureVerified:true}:{})});
         }
       }catch(e){
         if(e.code!=='42P01')return res.status(503).json({success:false,error:'EVIDENCE_STORAGE_UNAVAILABLE'});
