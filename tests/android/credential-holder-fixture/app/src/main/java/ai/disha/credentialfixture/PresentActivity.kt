@@ -19,6 +19,9 @@ import androidx.credentials.registry.provider.selectedCredentialSet
 class PresentActivity : Activity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        // Lifecycle entry is distinct from a successfully parsed OS credential request.
+        // Never log request payloads, credential contents, browser origin or Intent extras.
+        Log.i("DISHA_CREDENTIAL_FIXTURE", "HOLDER_ACTIVITY_CREATED")
         val result = Intent()
         try {
             val request = PendingIntentHandler.retrieveProviderGetCredentialRequest(intent)
@@ -28,11 +31,12 @@ class PresentActivity : Activity() {
             val selectedSet = request.selectedCredentialSet
             // No origin trust is claimed: provider verifies no browser without a configured
             // privileged browser allowlist, and this fixture never emits debit claims.
+            Log.i("DISHA_CREDENTIAL_FIXTURE", "GET_CREDENTIAL_CALLBACK_PARSED")
             Log.i("DISHA_CREDENTIAL_FIXTURE",
                 "Android handoff received; digitalOptions=" + options.size +
                     "; selected=" + (selectedSet != null))
         } catch (error: Exception) {
-            Log.w("DISHA_CREDENTIAL_FIXTURE", "Android handoff rejected: " + error.javaClass.simpleName)
+            Log.w("DISHA_CREDENTIAL_FIXTURE", "GET_CREDENTIAL_CALLBACK_REJECTED: " + error.javaClass.simpleName)
         }
         PendingIntentHandler.setGetCredentialException(
             result,
