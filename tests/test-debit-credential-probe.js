@@ -31,4 +31,8 @@ assert.match(checkout,/navigator\.credentials\.get/);
 assert.match(checkout,/debitprobe/);
 assert.match(checkout,/\/api\/debit-credential\/present/);
 assert.doesNotMatch(read('financial/debit-credential.js'),/UPDATE sessions SET|INSERT INTO transactions|INSERT INTO ledger_entries/);
+const capabilityPage=read('public/debit-credential-test.html');
+assert.match(capabilityPage,/Check Android Browser Support/);
+assert.match(capabilityPage,/DigitalCredential/);
+assert.doesNotMatch(capabilityPage,/fetch\s*\(|navigator\.credentials\.get\s*\(/,'Capability-only test does not access wallets');
 console.log('DEBIT_CREDENTIAL_PROBE_PASS: signed claims, binding, tamper, expiry, replay schema, no ledger mutation');
