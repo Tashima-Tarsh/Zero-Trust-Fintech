@@ -1,112 +1,94 @@
 <div align="center">
 
-<img src="public/assets/disha-8-2-wordmark-cropped.png" alt="DISHA 8.2 official logo" width="420">
+<img src="public/assets/disha-8-2-wordmark-cropped.png" alt="DISHA 8.2" width="420">
 
 # DISHA 8.2
-### Direct UPI. Device-bound trust. Merchant-owned intelligence.
+### हर UPI भुगतान के साथ, भरोसे की एक नई पहचान।
 
-**P2P + P2M checkout · DISHA Vault · Quantum Signal handshake · UTR/TR correlation · Merchant Workspace**
+**Direct UPI Checkout · Debit-First Evidence · DISHA Vault · Merchant Workspace**
 
-[Product website](https://disha8-2.thenitishkr.in/) · [Architecture](docs/architecture/SYSTEM-ARCHITECTURE.md) · [End-to-end flow](docs/architecture/END-TO-END-FLOW.md) · [Testing & release](docs/architecture/TEST-AND-RELEASE.md)
+[DISHA देखें](https://disha8-2.thenitishkr.in/) · [Checkout आज़माएँ](https://disha8-2.thenitishkr.in/choose-payment) · [पूरा परिचय](docs/product/DISHA-PRODUCT-HINDI.md)
 
 </div>
 
 ---
 
-## What we are building
+## DISHA क्या है?
 
-DISHA 8.2 is an innovative, self-hosted software layer around existing Indian UPI rails. Instead of sending a merchant through a conventional payment-aggregator checkout, DISHA creates an exact, merchant-owned P2P or P2M request and connects it to an order-bound trust and evidence journey.
+**DISHA एक Debit-First UPI Checkout और Payment Evidence Platform है।**
 
-**The intended business model is payer-side debit-event evidence correlated with UTR, TR, original payee, amount, DISHA Vault and Quantum Signal**—with no dependency on a merchant-side account notification in the product target architecture.
+यह व्यापारियों और ग्राहकों को एक सरल भुगतान अनुभव में जोड़ने के लिए बनाया जा रहा है। व्यापारी अपनी UPI ID पर सीधे भुगतान का अनुरोध बनाता है। ग्राहक राशि और प्राप्तकर्ता की जानकारी देखकर भुगतान करता है। DISHA उस भुगतान के साथ जुड़ी जानकारी और उपलब्ध transaction evidence को एक व्यवस्थित, सुरक्षित यात्रा में प्रस्तुत करता है।
 
-This is a **product direction, not a claim that direct payer-bank evidence is already technically accessible**. The merged handshake proves DISHA session-channel continuity. The independent debit-event source and real-phone acceptance still require demonstration.
+हमारा विचार सीधा है: **भुगतान का अनुभव जितना आसान हो, उससे जुड़ी जानकारी उतनी ही स्पष्ट और भरोसेमंद हो।**
 
-## Try Checkout and merchant operations
+## DISHA कैसे काम करता है?
 
-Use **[Try Checkout](https://disha8-2.thenitishkr.in/choose-payment)** to choose P2P or P2M, enter an exact INR amount and a receiving UPI ID, and continue to a real, time-limited payment request. Public P2P accepts only the configured personal receiving account; an unknown receiving handle is rejected. For P2M, Clerk sign-in is required and the prefilled request is issued only against an active bank-registered merchant receiving account and its real MCC.
+### व्यापारी के लिए
 
-Once issued, the payment amount, recipient and P2M transaction reference are bound to the original order; the Quantum Signal challenge/ACK and optional device Vault complement the Android intent and return evidence path. No simulated financial completion is created by this form.
+1. **भुगतान अनुरोध बनाएँ।** व्यापारी अपनी पंजीकृत receiving UPI ID, राशि और भुगतान का विवरण चुनता है।
+2. **सुरक्षित checkout साझा करें।** ग्राहक को उसी अनुरोध का लिंक या उपलब्ध QR मिलता है।
+3. **भुगतान की स्थिति देखें।** DISHA Workspace में अनुरोध, ग्राहक की भुगतान-यात्रा और उपलब्ध evidence की स्थिति दिखाई जाती है।
+4. **रिकॉर्ड व्यवस्थित रखें।** भुगतान के संदर्भ, समय और उपलब्ध प्रमाण को उसी अनुरोध के साथ जोड़ा जाता है।
 
-**The merchant workspace** has a single primary creation action in its main header, a simplified quick-request navigation and concise role-neutral access messaging. Customer-facing views do not expose private Super Admin email addresses, and the backend still enforces identity and tenancy checks.
+### ग्राहक के लिए
 
-**Locally served image system:** the Mars Perseverance landing scene is the merchant login visual; the spacecraft image is the checkout backdrop; the Earth-at-night photograph is shared by the landing page and merchant operations. All are optimized derivatives of the user-supplied images, stored in each deployment mirror. The official DISHA logo is unchanged. Visual layers never control payment status.
+1. **Checkout खोलें।** राशि और पैसे पाने वाले की UPI ID देखें।
+2. **अपनी पहचान और अनुमति दें।** जहाँ DISHA का Android evidence अनुभव उपलब्ध हो, वहाँ मोबाइल की सुरक्षित पहचान, notification access और प्रत्येक session की स्पष्ट सहमति इस्तेमाल की जाती है।
+3. **UPI ID कॉपी करें और भुगतान करें।** अपनी सुविधा के अनुसार UPI भुगतान पूरा करें।
+4. **“I Paid” चुनें।** DISHA उसी अनुरोध से जुड़े उपलब्ध debit evidence की स्थिति दिखाता है।
+5. **Debit Evidence Receipt देखें।** उपलब्ध जानकारी के आधार पर राशि, RRN/UTR, स्रोत का नाम और समय एक साफ receipt अनुभव में प्रस्तुत किए जा सकते हैं।
 
-## Six connected layers
+**Receipt का अर्थ:** यह भुगतान के लिए उपलब्ध *debit evidence* का विवरण है। इसमें evidence की वास्तविक स्थिति स्पष्ट दिखाई जाती है।
 
-| Layer | Merchant benefit | Repository status |
-| --- | --- | --- |
-| **Direct UPI checkout** | Exact merchant-controlled P2P / bank-registered P2M amount, payee and native app handoff | Implemented; real pre-PIN acceptance unresolved |
-| **DISHA Vault** | Optional device authorization and order-bound handoff/return evidence | Implemented |
-| **Quantum Signal** | Server payment twin, challenge, browser ACK, idempotent journey events | **PR #68 merged**, activated with `qs=1` |
-| **Evidence intelligence** | UTR/TR correlation, recipient/amount checks, event conflicts and replay detection | Partial; true payer-debit provenance unresolved |
-| **Merchant Operations** | Onboarding, receiving VPAs, real requests, statuses, timeline, risk and exports | Implemented; staging/production sign-in validation needed |
-| **Owner Control** | Tenant approval, access, incident monitoring, operational evidence, read-only finance | Implemented; end-to-end release check needed |
+## DISHA के मुख्य अनुभव
 
-## The flow in one view
+| अनुभव | आपके लिए उपयोगिता |
+| --- | --- |
+| **Direct UPI Checkout** | अपनी UPI ID पर राशि-आधारित भुगतान अनुरोध |
+| **Debit-First Evidence** | भुगतान से जुड़े debit संकेतों और RRN/UTR को संबंधित अनुरोध के साथ जोड़ने का अनुभव |
+| **DISHA Vault** | उपयोगकर्ता की अनुमति और सुरक्षित device-based पहचान को प्राथमिकता |
+| **Quantum Signal** | checkout के दौरान भुगतान अनुरोध की निरंतरता और स्थिति का समन्वय |
+| **Merchant Workspace** | भुगतान अनुरोध, गतिविधि, रिकॉर्ड और उपलब्ध evidence का एक स्थान पर दृश्य |
+| **Owner Workspace** | व्यवसाय संचालन, टीम और platform गतिविधियों का प्रबंधन |
 
-```mermaid
-flowchart LR
-  A["Merchant payment<br/>Personal P2P or merchant P2M"]
-  B["DISHA session<br/>Payee, amount, TR and expiry"]
-  C["Vault trust<br/>Optional device authorization"]
-  D["Quantum Signal<br/>Twin → challenge → ACK"]
-  E["One tap<br/>Android UPI Intent"]
-  F["Google Pay / PhonePe<br/>Payer authorization"]
-  G["Observed return<br/>Vault and Quantum events"]
-  H["UTR/TR and payer-debit<br/>evidence correlation"]
-  I["Transaction decision<br/>Receipt and merchant timeline"]
-  A --> B --> C --> D --> E --> F
-  F -.->|"App-provided return when available"| G
-  G --> H --> I
-```
+## Debit-First: DISHA की सोच
 
-**Boundary:** No customer app, forced SMS access or manual UTR form is required by the intended journey. A browser return, ACK or UTR string by itself must not be presented as a completed payer debit. The last evidence/decision layer remains a release gate.
+भुगतान करने वाले ग्राहक के पास अक्सर उसके अपने मोबाइल पर transaction से जुड़ी जानकारी आती है। DISHA का Debit-First अनुभव उस **उपलब्ध, उपयोगकर्ता-अनुमत जानकारी** को सही भुगतान अनुरोध से जोड़ने पर केंद्रित है।
 
-## Architecture and code
+जब स्रोत में RRN/UTR और debit amount उपलब्ध हों, DISHA उन्हें संदर्भ और समय के साथ दिखाने की दिशा में काम करता है। यदि उस समय पर्याप्त जानकारी उपलब्ध न हो, ग्राहक को उसका स्पष्ट status मिलता है।
 
-- **Cloudflare Pages + Worker:** canonical checkout shell and edge API forwarding, `public/_worker.js`.
-- **Node.js / Express:** `server.js`, `merchant-api.js`, `platform-control.js`.
-- **Payment rules:** `utils/upi-intent.js` and `public/cosmic-checkout-model.js`.
-- **DISHA Vault:** `financial/vault-evidence.js` and `public/one-touch-vault.js`.
-- **Quantum Signal:** `financial/quantum-signal.js` and `public/quantum-signal-client.js`.
-- **Identity:** Clerk for merchant/owner, with server-side tenant authorization.
-- **Database:** PostgreSQL for durable sessions, twin/handshake/evidence, financial controls; Redis optional for shared coordination.
-- **Customer UI:** responsive HTML/CSS/JS, native Android Intent and genuine `upi://pay` QR. Presentation effects do not influence payment state.
-- **Tests:** Node.js, disposable PostgreSQL, Android fixture API 35/37, independent real-device acceptance.
+यही सोच DISHA को केवल भुगतान का बटन नहीं, बल्कि **भुगतान की समझ और evidence का अनुभव** बनाती है।
 
-The canonical static source is `public/`. The `dist/` and `disha-cinematic/*` copies are build/deployment mirrors, **not independent sources to delete while deployment still references them**.
+## आपकी निजता, आपकी प्राथमिकता
 
-See the [TDD/IDD](docs/architecture/SYSTEM-ARCHITECTURE.md), [full Mermaid sequence and failure decision flow](docs/architecture/END-TO-END-FLOW.md), and [test/release gates](docs/architecture/TEST-AND-RELEASE.md).
+DISHA के प्रस्तावित debit-evidence अनुभव में काम की जानकारी को प्राथमिकता दी जाती है:
 
-## Run and verify
+- भुगतान की राशि और उपलब्ध RRN/UTR
+- बैंक या notification का स्रोत नाम
+- भुगतान से जुड़ा समय और अनुरोध का संदर्भ
 
-```bash
-npm ci
-npm run lint
-npm test
-npm run build
-```
+**Available balance, पूरा SMS, OTP और निजी account details receipt का हिस्सा नहीं हैं।** अनुमति ग्राहक के नियंत्रण में रहती है, और उसकी अवधि उसी checkout यात्रा से जुड़ी होती है।
 
-Root CI validates product code; the PostgreSQL workflow requires its disposable integration database. Physical Google Pay / PhonePe acceptance cannot be replaced with an emulator green check.
+## किसके लिए है DISHA?
 
-## Commercial approach
+**छोटे और मध्यम व्यापारी:** सीधे UPI भुगतान अनुरोध और व्यवस्थित transaction records के लिए।
 
-DISHA is positioned as **one-time software and implementation pricing**, with no DISHA percentage of the customer's UPI transfer. Hosting, any bank costs, compliance, maintenance and optional support are independent. We do not claim free operation for every deployment or guarantee an unverified payment outcome.
+**ऑनलाइन सेवाएँ और डिजिटल व्यवसाय:** साझा करने योग्य checkout और एक जगह payment activity देखने के लिए।
 
-## Current acceptance status
+**ग्राहक:** स्पष्ट राशि, प्राप्तकर्ता विवरण, अपनी पसंद का भुगतान तरीका और भुगतान के बाद evidence-status देखने के लिए।
 
-- Merged: Quantum Signal server/browser challenge and ACK; P2P/P2M route separation.
-- Automated: Node.js and PostgreSQL test suites plus Android fixture coverage.
-- **Open:** physical UPI app pre-PIN rejection investigation; deployed feature-flag parity; authenticatable payer-side debit-event acquisition; real-money reconciliation tests; scale, recovery and SaaS end-to-end UAT.
-- Production transactions and financial dashboards must show actual data only: no mock settlements, invented revenue or generated internal row IDs masquerading as payment references.
+## आज DISHA में क्या देख सकते हैं?
 
-## Documentation
+[DISHA वेबसाइट](https://disha8-2.thenitishkr.in/) पर checkout और व्यापारी अनुभव देखें। [Try Checkout](https://disha8-2.thenitishkr.in/choose-payment) में भुगतान का प्रकार चुनकर राशि और प्राप्तकर्ता के साथ अनुरोध की यात्रा समझें।
 
-- [System architecture — TDD and IDD](docs/architecture/SYSTEM-ARCHITECTURE.md)
-- [End-to-end handshake and decision Mermaid diagrams](docs/architecture/END-TO-END-FLOW.md)
-- [Tests, deployment gates and safe cleanup](docs/architecture/TEST-AND-RELEASE.md)
-- [Original Vault implementation details](docs/vault-browser-evidence.md)
-- [Quantum Signal implementation notes](docs/quantum-signal-session-twin.md)
-- [Ponytail stale-code inventory issue #69](https://github.com/Tashima-Tarsh/Zero-Trust-Fintech/issues/69)
+**नई दिशा:** मोबाइल पर permission-based debit evidence, **“I Paid”** के बाद status popup और receipt experience को DISHA checkout से एक सहज यात्रा में जोड़ने का काम आगे बढ़ रहा है। वास्तविक transaction evidence दिखाने का अनुभव स्रोत पर उपलब्ध जानकारी के अनुसार विकसित किया जा रहा है।
 
-**No code, screenshot or document should claim that the intended payer-debit source is proven until actual authenticated evidence has been observed in a real controlled transfer.**
+## DISHA का उद्देश्य
+
+> **UPI भुगतान सरल रहे। ग्राहक की अनुमति का सम्मान हो। व्यापारी को भुगतान से जुड़ी जानकारी साफ दिखे।**
+
+DISHA भारत के डिजिटल भुगतान अनुभव को **सीधे भुगतान, स्पष्ट evidence और बेहतर व्यापारी अनुभव** के साथ आगे ले जाने की पहल है।
+
+---
+
+**आगे पढ़ें:** [DISHA कैसे काम करता है — पूरा हिंदी परिचय](docs/product/DISHA-PRODUCT-HINDI.md) · [तकनीकी दस्तावेज़](docs/architecture/SYSTEM-ARCHITECTURE.md) · [परीक्षण और विकास](docs/architecture/DEBIT-FIRST-CHECKOUT-EVIDENCE-STATUS-2026-11-21.md)
