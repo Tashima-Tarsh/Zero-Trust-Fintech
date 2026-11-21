@@ -43,6 +43,7 @@ class PresentActivity : Activity() {
             GetCredentialUnknownException("DISHA_TEST_ONLY_NO_BANK_DEBIT_CREDENTIAL")
         )
         setResult(RESULT_OK, result)
+        Log.i("DISHA_CREDENTIAL_FIXTURE", "DISHA_TEST_ONLY_NO_BANK_DEBIT_CREDENTIAL")
         finish()
     }
 }
