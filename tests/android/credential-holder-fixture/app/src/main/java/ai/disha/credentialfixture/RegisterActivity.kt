@@ -34,6 +34,12 @@ class RegisterActivity : ComponentActivity() {
         }
         val labButton=Button(this).apply { text="Run signed Android to DISHA server handshake" }
         root.addView(labButton)
+        root.addView(Button(this).apply {
+            text = "Open notification evidence lab"
+            setOnClickListener {
+                startActivity(android.content.Intent(this@RegisterActivity, SessionObservationActivity::class.java))
+            }
+        })
         labButton.setOnClickListener {
             labButton.isEnabled=false
             lifecycleScope.launch {

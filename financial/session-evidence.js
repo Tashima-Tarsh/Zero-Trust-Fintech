@@ -26,17 +26,19 @@ const ALLOWED_PACKAGES = new Set([
   'in.org.npci.upiapp'
 ]);
 
-function canonicalEvidence(input) {
+function canonicalEvidence(input, allowedPackages = ALLOWED_PACKAGES) {
   if (!input || typeof input !== 'object' || Array.isArray(input)) throw fail('EVIDENCE_FIELDS_INVALID');
   const keys = ['protocol','eventId','orderId','nonce','deviceId','packageName','postedAt',
     'amountPaise','payeeVpa','transactionRef','status'];
+  const observed = input.protocol === 'DISHA-DEBIT-UTR-OBSERVATION-V1';
+  if (observed) keys.push('referenceKind');
   if (Object.keys(input).length !== keys.length || !keys.every(k => Object.hasOwn(input, k))) {
     throw fail('EVIDENCE_FIELDS_INVALID');
   }
   const e = Object.fromEntries(keys.map(k => [k, input[k]]));
-  if (e.protocol !== 'DISHA-SESSION-EVIDENCE-V1' ||
+  if ((!observed && e.protocol !== 'DISHA-SESSION-EVIDENCE-V1') ||
       !validId(e.eventId) || !validId(e.orderId) || !/^[a-f0-9]{40}$/i.test(e.nonce) ||
-      !validDevice(e.deviceId) || !ALLOWED_PACKAGES.has(e.packageName) ||
+      !validDevice(e.deviceId) || !allowedPackages.has(e.packageName) ||
       !Number.isSafeInteger(e.postedAt) || e.postedAt <= 0 ||
       !(e.amountPaise === null || (typeof e.amountPaise === 'string' && /^[1-9][0-9]{0,15}$/.test(e.amountPaise))) ||
       !(e.payeeVpa === null || validVpa(e.payeeVpa)) ||
@@ -44,11 +46,14 @@ function canonicalEvidence(input) {
       !['SUCCESS','FAILED','PENDING','UNKNOWN'].includes(e.status)) {
     throw fail('EVIDENCE_FIELDS_INVALID');
   }
+  if (observed && (!ALLOWED_PACKAGES.has(e.packageName) || e.status !== 'SUCCESS' ||
+      !e.amountPaise || !e.payeeVpa || !/^[0-9]{12}$/.test(e.transactionRef || '') ||
+      !['UTR','RRN'].includes(e.referenceKind))) throw fail('EVIDENCE_FIELDS_INVALID');
   return JSON.stringify(e);
 }
 
-function verifyDeviceEvidence(evidence, signature, publicKey) {
-  const bytes = canonicalEvidence(evidence);
+function verifyDeviceEvidence(evidence, signature, publicKey, allowedPackages = ALLOWED_PACKAGES) {
+  const bytes = canonicalEvidence(evidence, allowedPackages);
   if (typeof signature !== 'string' || !/^[A-Za-z0-9_-]{80,200}$/.test(signature)) {
     throw fail('DEVICE_SIGNATURE_INVALID', 401);
   }
@@ -64,7 +69,9 @@ function evaluateEvidence(e, session, now = Date.now()) {
   const expiry = Number(session.expires_at);
   const consentedAt = Number(session.consented_at);
   if (e.orderId !== session.order_id || e.nonce !== session.nonce) return { state: 'CROSS_SESSION', accepted: false };
-  if (now >= expiry || e.postedAt > expiry || e.postedAt < consentedAt - 30000 || e.postedAt > now + 120000) {
+  const isObservation = e.protocol === 'DISHA-DEBIT-UTR-OBSERVATION-V1';
+  if (now >= expiry || e.postedAt > expiry ||
+      e.postedAt < consentedAt - (isObservation ? 0 : 30000) || e.postedAt > now + 120000) {
     return { state: 'SESSION_TIME_INVALID', accepted: false };
   }
   const amountMatches = e.amountPaise !== null && e.amountPaise === session.amount_paise;
@@ -127,6 +134,10 @@ async function initializeSessionEvidenceSchema(pool) {
       decision_state TEXT NOT NULL
     );
     DROP INDEX IF EXISTS disha_session_evidence_txn_replay;
+    ALTER TABLE disha_session_evidence_events ADD COLUMN IF NOT EXISTS reference_kind TEXT;
+    CREATE UNIQUE INDEX IF NOT EXISTS disha_session_observed_ref_unique
+      ON disha_session_evidence_events(transaction_ref)
+      WHERE reference_kind IS NOT NULL AND decision_state = 'SIGNAL_MATCHED';
     CREATE INDEX IF NOT EXISTS disha_session_evidence_txn_lookup
       ON disha_session_evidence_events(transaction_ref)
       WHERE transaction_ref IS NOT NULL;
@@ -135,7 +146,7 @@ async function initializeSessionEvidenceSchema(pool) {
   `);
 }
 
-function createSessionEvidenceRouter({ getPool, getSession }) {
+function createSessionEvidenceRouter({ getPool, getSession, allowedPackages = ALLOWED_PACKAGES }) {
   const router = express.Router();
   const respondError = (res, err) => res.status(err.status || 500)
     .set('Cache-Control', 'no-store')
@@ -217,7 +228,8 @@ function createSessionEvidenceRouter({ getPool, getSession }) {
       return res.status(201).set('Cache-Control','no-store').json({
         success:true, orderId:b.orderId, nonce:activeNonce, deviceId:b.deviceId,
         amountPaise, payeeVpa:payee, paymentType, merchantReference, merchantCategoryCode,
-        expiresAt:activeExpiry, consentedAt:activeConsentTime, serverTime:now, allowedPackages:[...ALLOWED_PACKAGES]
+        expiresAt:activeExpiry, consentedAt:activeConsentTime, serverTime:now,
+        allowedPackages:session.observationPackage ? [session.observationPackage] : [...allowedPackages]
       });
     } catch (e) { console.error('[session-evidence] authorize failed:', e && (e.code || e.message) || 'unknown'); return respondError(res, e); }
   });
@@ -239,8 +251,15 @@ function createSessionEvidenceRouter({ getPool, getSession }) {
       const session = await getSession(b.evidence.orderId);
       if (!session || session.status !== 'PENDING' || !safeEqual(session.sessionId, b.token) ||
           !safeEqual(sha256(b.token || ''), consent.token_hash)) throw fail('SESSION_TOKEN_INVALID', 401);
+      const observed = b.evidence.protocol === 'DISHA-DEBIT-UTR-OBSERVATION-V1';
+      if (observed !== Boolean(session.observationPackage) ||
+          (observed && b.evidence.packageName !== session.observationPackage) ||
+          (!observed && !allowedPackages.has(b.evidence.packageName))) {
+        throw fail('EVIDENCE_FIELDS_INVALID');
+      }
       const publicKey = crypto.createPublicKey(device.public_key_pem);
-      const eventHash = verifyDeviceEvidence(b.evidence, b.signature, publicKey);
+      const eventHash = verifyDeviceEvidence(b.evidence, b.signature, publicKey,
+        observed ? ALLOWED_PACKAGES : allowedPackages);
       let decision = evaluateEvidence(b.evidence, consent);
       if (decision.accepted && b.evidence.transactionRef) {
         const previousRef = (await c.query(
@@ -267,6 +286,9 @@ function createSessionEvidenceRouter({ getPool, getSession }) {
         [eventHash,b.evidence.eventId,b.evidence.orderId,b.evidence.deviceId,b.evidence.packageName,
           b.evidence.postedAt,Date.now(),b.evidence.amountPaise,b.evidence.payeeVpa,
           b.evidence.transactionRef,b.evidence.status,decision.state]);
+      if (observed) await c.query(
+        'UPDATE disha_session_evidence_events SET reference_kind=$2 WHERE event_hash=$1',
+        [eventHash, b.evidence.referenceKind]);
       await c.query('UPDATE disha_session_evidence_devices SET last_seen_at=$3 WHERE order_id=$1 AND device_id=$2',
         [b.evidence.orderId,b.evidence.deviceId,Date.now()]);
       const aggregate = (await c.query(
@@ -282,6 +304,10 @@ function createSessionEvidenceRouter({ getPool, getSession }) {
       await c.query('COMMIT'); tx = false;
       const payload = {
         success:decision.accepted,accepted:decision.accepted,decisionState:decision.state,
+        paymentVerified:false,debitVerified:false,
+        ...(observed && decision.state === 'SIGNAL_MATCHED' ? {
+          observationState:'DEBIT_UTR_OBSERVED', referenceKind:b.evidence.referenceKind
+        } : {}),
         fraudDecision:unifiedDecision,
         sessionEvidence:{eventCount:aggregate.event_count,matchedSignalCount:aggregate.matched_count,
           participatingDeviceCount:aggregate.device_count,referenceCount:aggregate.reference_count}
