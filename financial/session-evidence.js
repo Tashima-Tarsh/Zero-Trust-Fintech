@@ -368,8 +368,9 @@ async function readDebitEvidenceReceipt(pool, id, session, now = Date.now()) {
   const amountPaise = rupeesToPaise(String(session.challengeAmount));
   const payee = String(session.vpaAddress || '').trim().toLowerCase();
   const {rows}=await pool.query(
-    "SELECT e.event_hash,e.package_name,e.transaction_ref,e.reference_kind,e.amount_paise,e.payee_vpa,e.posted_at,e.decision_state "+
+    "SELECT e.event_hash,e.package_name,e.transaction_ref,e.reference_kind,e.amount_paise,e.payee_vpa,e.posted_at,e.decision_state,d.public_key_pem "+
     'FROM disha_session_evidence_events e JOIN disha_session_evidence_consents c ON c.order_id=e.order_id '+
+    'JOIN disha_session_evidence_devices d ON d.order_id=e.order_id AND d.device_id=e.device_id '+
     'WHERE e.order_id=$1 AND c.revoked_at IS NULL AND c.expires_at>$2 '+
     "AND e.reference_kind IN ('UTR','RRN') AND e.posted_at>=c.consented_at AND e.posted_at<c.expires_at "+
     'ORDER BY e.posted_at DESC LIMIT 2',[id,now]);
@@ -380,6 +381,19 @@ async function readDebitEvidenceReceipt(pool, id, session, now = Date.now()) {
     !/^\d{12}$/.test(row.transaction_ref)||!/^[a-f0-9]{64}$/.test(row.event_hash)){
     return {receiptError:'CONFLICTING_OR_INVALID_EVIDENCE'};
   }
+  // A payer may enroll a software key using the checkout token. That is
+  // NOT proof of Android package identity. Only an independently provisioned,
+  // pinned observer key is eligible for the stronger observation receipt.
+  // Pins must be supplied by an authorized OEM/admin channel, never a checkout.
+  const pins = new Set((process.env.DISHA_UDEB_PINNED_DEVICE_KEY_SHA256||'')
+    .split(',').map(v=>v.trim().toLowerCase()).filter(v=>/^[a-f0-9]{64}$/.test(v)));
+  if(!pins.size)return {receiptError:'TRUSTED_DEVICE_NOT_CONFIGURED'};
+  let verifiedObserverKey=false;
+  try {
+    const spki=crypto.createPublicKey(row.public_key_pem).export({type:'spki',format:'der'});
+    verifiedObserverKey=pins.has(sha256(spki));
+  } catch (_) {}
+  if(!verifiedObserverKey)return {receiptError:'DEVICE_PROVENANCE_UNTRUSTED'};
   return {debitEvidenceReceipt:{orderId:id,state:'DEBIT_EVIDENCE_OBSERVED',
     source:row.package_name,amountPaise,reference:row.transaction_ref,referenceKind:row.reference_kind,
     observedAt:Number(row.posted_at),receiptReference:row.event_hash}};
