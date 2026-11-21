@@ -2,9 +2,27 @@
 set -euo pipefail
 mkdir -p test-results/credential-handshake
 out=test-results/credential-handshake
+node tests/android/credential-holder-fixture/lab-server.js > "$out/lab-server.log" 2>&1 &
+labpid=$!
+trap 'kill "$labpid" 2>/dev/null || true' EXIT
+sleep 1
+adb reverse tcp:8765 tcp:8765
 adb install -r tests/android/credential-holder-fixture/app/build/outputs/apk/debug/app-debug.apk
 adb shell am start -n ai.disha.credentialfixture/.RegisterActivity
 sleep 4
+adb shell uiautomator dump /sdcard/disha-ui.xml >/dev/null 2>&1
+adb pull /sdcard/disha-ui.xml "$out/registration-ui.xml" >/dev/null
+python3 tests/android/credential-holder-fixture/tap-label.py "$out/registration-ui.xml" "Run signed Android to DISHA server handshake"
+sleep 8
+adb shell uiautomator dump /sdcard/disha-ui.xml >/dev/null 2>&1
+adb pull /sdcard/disha-ui.xml "$out/server-handshake.xml" >/dev/null
+if ! grep -q 'DISHA_ANDROID_SERVER_SIGNED_HANDSHAKE_PASS' "$out/server-handshake.xml"; then
+  echo "Android -> server signature verification failed";exit 1
+fi
+echo "ANDROID_SERVER_HANDSHAKE_PASS"
+adb shell am force-stop ai.disha.credentialfixture
+adb shell am start -n ai.disha.credentialfixture/.RegisterActivity
+sleep 3
 adb shell uiautomator dump /sdcard/disha-ui.xml >/dev/null 2>&1
 adb pull /sdcard/disha-ui.xml "$out/registration-ui.xml" >/dev/null
 python3 tests/android/credential-holder-fixture/tap-label.py "$out/registration-ui.xml" "Register synthetic DISHA credential"

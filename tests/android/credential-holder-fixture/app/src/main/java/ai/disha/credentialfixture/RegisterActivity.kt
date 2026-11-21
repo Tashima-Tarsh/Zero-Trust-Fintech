@@ -4,6 +4,9 @@ import androidx.activity.ComponentActivity
 import android.graphics.Bitmap
 import android.os.Bundle
 import android.widget.Button
+import android.util.Log
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import android.widget.LinearLayout
 import android.widget.TextView
 import androidx.lifecycle.lifecycleScope
@@ -32,6 +35,21 @@ class RegisterActivity : ComponentActivity() {
             orientation = LinearLayout.VERTICAL
             addView(state)
             addView(button)
+        }
+        val labButton=Button(this).apply { text="Run signed Android to DISHA server handshake" }
+        root.addView(labButton)
+        labButton.setOnClickListener {
+            labButton.isEnabled=false
+            lifecycleScope.launch {
+                try {
+                    val result=withContext(Dispatchers.IO) { LabServerHandshake.execute() }
+                    state.text=result
+                    Log.i("DISHA_CREDENTIAL_FIXTURE", result)
+                } catch (e: Exception) {
+                    state.text="Lab handshake failed: "+e.javaClass.simpleName+": "+e.message
+                    Log.e("DISHA_CREDENTIAL_FIXTURE", "Lab handshake failed",e)
+                } finally { labButton.isEnabled=true }
+            }
         }
         setContentView(root)
         button.setOnClickListener {
