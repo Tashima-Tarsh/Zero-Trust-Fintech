@@ -25,6 +25,11 @@ function mount(status='PENDING',checkout='merchant',overrides={}){
     orderId:'ORD_TEST_1234',challengeAmount:500,expiresAt:Date.now()+180000,status:'PENDING',
     merchantType:'PERSONAL',vpaAddress:'merchant@oksbi',txnRef:'SERVICE_TEST'
    },upiLink:uri})};
+   if(url.includes('/api/payer-debit-evidence/'))return {ok:true,json:async()=>({
+    success:true,debitVerified:false,paymentVerified:false,paymentStateChanged:false,
+    evidence:data.signal?.utrCandidate?[{utr:data.signal.utrCandidate,source:'BROWSER_RETURN_OBSERVATION',
+      amountPaise:'50000',payeeVpa:'merchant@oksbi',authenticatedDebit:false}]:[],
+    state:data.signal?.utrCandidate?'UTR_CANDIDATE_OBSERVED_UNVERIFIED':'NO_AUTHENTICATED_PAYER_DEBIT_EVIDENCE'})};
    if(url.includes('/api/proofbridge/status/'))return {ok:Boolean(data.proof),
     status:data.proof?200:503,json:async()=>data.proof||{success:false}};
    if(url.includes('/api/quantum-signal/status/'))return {ok:Boolean(data.signal),
@@ -61,36 +66,24 @@ const active=app=>app.stages.find(s=>!s.hidden)?.dataset.stage;
  running.events.focus();await flush();
  assert.equal(active(running),'receipt','Ledger credit updates original browser from any paying device');
  const p2p=mount('PENDING','generic');await flush();
- assert.equal(p2p.nodes.debitProofCheck.hidden,false,'P2P proof check should be visible');
- assert.equal(active(p2p),'qr','P2P starts in original checkout');
- assert.equal(typeof p2p.nodes.debitProofCheckButton.events.click,'function');
- await p2p.nodes.debitProofCheckButton.events.click();await flush();
- assert.match(p2p.nodes.debitProofCheckStatus.textContent,/unverified/i,
-   'I Paid must not certify a debit without issuer evidence');
- assert.match(p2p.nodes.debitProofCheckUtr.textContent,/Reported UTR \(not verified\)/,
-   'Returned UTR candidates must remain explicitly unverified');
- assert.equal(active(p2p),'qr','Unverified debit must not unlock receipt');
+ assert.equal(typeof p2p.nodes.payerDebitCheck.events.click,'function',
+   'P2P checkout must expose exactly one payer evidence check');
+ assert.equal(p2p.nodes.payerDebitCheck.disabled,false,'Evidence check enabled after session loads');
+ await p2p.nodes.payerDebitCheck.events.click();await flush();
+ assert.match(p2p.nodes.payerDebitCheckStatus.textContent,/NOT authenticated/i,
+   'Browser return UTR must never certify bank debit');
+ assert.match(p2p.nodes.payerDebitCheckReference.textContent,/Reported UTR: 123456789012/,
+   'Observed reference can be displayed without a fabricated paid status');
+ assert.equal(active(p2p),'qr','Unverified debit cannot unlock receipt');
  const unavailable=mount('PENDING','generic',{signal:null});await flush();
- await unavailable.nodes.debitProofCheckButton.events.click();await flush();
- assert.match(unavailable.nodes.debitProofCheckStatus.textContent,/service unavailable/i);
- assert.equal(active(unavailable),'qr','Unavailable service is not payment failure or receipt');
- const validIssuer={success:true,orderId:'ORD_TEST_1234',paymentVerified:true,
-  payerDebitVerified:true,payerDebitEvidence:{debitVerified:true,
-   evidenceState:'PAYER_DEBIT_VERIFIED',utr:'123456789012',
-   payerTransactionId:'PAYERTXN12345',issuerId:'Issuer-Test',
-   claimedPaidAt:Date.now()}};
- const otherRequest=mount('PENDING','generic',{proof:{...validIssuer,orderId:'OTHER_ORDER_99'}});
- await flush();await otherRequest.nodes.debitProofCheckButton.events.click();await flush();
- assert.equal(active(otherRequest),'qr','Evidence for a different service request is rejected');
- const incomplete=mount('PENDING','generic',{proof:{...validIssuer,
-  payerDebitEvidence:{...validIssuer.payerDebitEvidence,payerTransactionId:null}}});
- await flush();await incomplete.nodes.debitProofCheckButton.events.click();await flush();
- assert.equal(active(incomplete),'qr','Signed evidence lacking a payer transaction ID cannot issue receipt');
- const authenticated=mount('PENDING','generic',{proof:validIssuer});await flush();
- await authenticated.nodes.debitProofCheckButton.events.click();await flush();
- assert.equal(active(authenticated),'receipt','Configured issuer debit evidence may render receipt');
- assert.equal(authenticated.nodes.receiptUtr.textContent,'123456789012');
- assert.equal(authenticated.nodes.receiptPayerTxn.textContent,'PAYERTXN12345');
+ await unavailable.nodes.payerDebitCheck.events.click();await flush();
+ assert.match(unavailable.nodes.payerDebitCheckStatus.textContent,/No authenticated debit receipt/i);
+ assert.equal(active(unavailable),'qr','Missing payer evidence is not payment confirmation');
+ const spoofedIssuer=mount('PENDING','generic',{proof:{success:true,paymentVerified:true,
+   payerDebitVerified:true,payerDebitEvidence:{utr:'123456789012',debitVerified:true}}});
+ await flush();await spoofedIssuer.nodes.payerDebitCheck.events.click();await flush();
+ assert.equal(active(spoofedIssuer),'qr',
+   'The payer button must not accept issuer-signed claims as authentic bank debit');
   const expired=mount('EXPIRED');await flush();
  assert.equal(active(expired),'qr');
  assert.equal(expired.nodes.qrTapToPay.href,'#');
