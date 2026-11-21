@@ -19,7 +19,7 @@ DISHA 8.2 is an innovative, self-hosted software layer around existing Indian UP
 
 **The intended business model is payer-side debit-event evidence correlated with UTR, TR, original payee, amount, DISHA Vault and Quantum Signal**—with no dependency on a merchant-side account notification in the product target architecture.
 
-This is a **product direction, not a claim that direct payer-bank evidence is already technically accessible**. The merged handshake proves DISHA session-channel continuity. The independent debit-event source and real-phone acceptance still require demonstration.
+**Evidence boundary (21 November 2026):** Android credential selection and holder callback are device-verified (PR #98); consented **synthetic** notification → Keystore-signed session-evidence delivery is device-verified (PR #99); an opt-in labelled UTR/RRN notification parser passes **synthetic** tests (PR #100). **No real payer-debit UTR/RRN has been captured or bank-authenticated.** The complete biometric → notification access → consent → copy → I Paid → evidence modal → callback flow is still an implementation target. [Evidence-based status and next acceptance gates](docs/architecture/DEBIT-FIRST-CHECKOUT-EVIDENCE-STATUS-2026-11-21.md).
 
 ## Try Checkout and merchant operations
 
@@ -38,7 +38,7 @@ Once issued, the payment amount, recipient and P2M transaction reference are bou
 | **Direct UPI checkout** | Exact merchant-controlled P2P / bank-registered P2M amount, payee and native app handoff | Implemented; real pre-PIN acceptance unresolved |
 | **DISHA Vault** | Optional device authorization and order-bound handoff/return evidence | Implemented |
 | **Quantum Signal** | Server payment twin, challenge, browser ACK, idempotent journey events | **PR #68 merged**, activated with `qs=1` |
-| **Evidence intelligence** | UTR/TR correlation, recipient/amount checks, event conflicts and replay detection | Partial; true payer-debit provenance unresolved |
+| **Evidence intelligence** | UTR/TR correlation, recipient/amount checks, event conflicts and replay detection | Signed synthetic Android observation passed on Pixel; real payer debit RRN/UTR and source authenticity unverified |
 | **Merchant Operations** | Onboarding, receiving VPAs, real requests, statuses, timeline, risk and exports | Implemented; staging/production sign-in validation needed |
 | **Owner Control** | Tenant approval, access, incident monitoring, operational evidence, read-only finance | Implemented; end-to-end release check needed |
 
@@ -60,7 +60,7 @@ flowchart LR
   G --> H --> I
 ```
 
-**Boundary:** No customer app, forced SMS access or manual UTR form is required by the intended journey. A browser return, ACK or UTR string by itself must not be presented as a completed payer debit. The last evidence/decision layer remains a release gate.
+**Boundary:** The existing web-only journey does **not** provide notification access. An optional Android evidence mode requires an installed, user-authorized DISHA component plus separate Android system notification permission and per-session consent; browser PIN/passkey authentication does not grant notification access. The reference APK is currently a **research fixture**, not a deployed consumer app. No mandatory payment-app API, PSP, aggregator, bank API, webhook or merchant-credit callback is part of this observation target. A browser return, ACK, RRN/UTR string or device signature alone must not be presented as a bank-confirmed debit or completed merchant payment.
 
 ## Architecture and code
 
@@ -97,7 +97,8 @@ DISHA is positioned as **one-time software and implementation pricing**, with no
 
 - Merged: Quantum Signal server/browser challenge and ACK; P2P/P2M route separation.
 - Automated: Node.js and PostgreSQL test suites plus Android fixture coverage.
-- **Open:** physical UPI app pre-PIN rejection investigation; deployed feature-flag parity; authenticatable payer-side debit-event acquisition; real-money reconciliation tests; scale, recovery and SaaS end-to-end UAT.
+- **Device-verified (synthetic):** PR #98 Android Credential Manager selector and holder callback; PR #99 Android notification consent, Keystore-signed event (HTTP 202), session binding, replay, expiry and revocation. PR #100 added the opt-in labelled debit UTR/RRN parser with synthetic negative tests; its Pixel showed `UTR_NOT_AVAILABLE` because no eligible payer package was installed.
+- **Open:** actual RRN/UTR from a real consented notification; optional bank-SMS notification feasibility and privacy tests; end-to-end biometric/permission/consent-gated checkout copy; `I Paid` evidence-only popup and authenticated evidence callback; physical UPI pre-PIN acceptance, deployment parity, scale, recovery and SaaS UAT.
 - Production transactions and financial dashboards must show actual data only: no mock settlements, invented revenue or generated internal row IDs masquerading as payment references.
 
 ## Documentation
@@ -108,5 +109,8 @@ DISHA is positioned as **one-time software and implementation pricing**, with no
 - [Original Vault implementation details](docs/vault-browser-evidence.md)
 - [Quantum Signal implementation notes](docs/quantum-signal-session-twin.md)
 - [Ponytail stale-code inventory issue #69](https://github.com/Tashima-Tarsh/Zero-Trust-Fintech/issues/69)
+- [Debit-first checkout: verified implementation, privacy limits and pending gates](docs/architecture/DEBIT-FIRST-CHECKOUT-EVIDENCE-STATUS-2026-11-21.md)
+- [Android session observation lab](tests/android/credential-holder-fixture/session-lab/README.md)
+- [Real UTR observation rules and Pixel limitation](tests/android/credential-holder-fixture/session-lab/REAL-UTR.md)
 
 **No code, screenshot or document should claim that the intended payer-debit source is proven until actual authenticated evidence has been observed in a real controlled transfer.**
