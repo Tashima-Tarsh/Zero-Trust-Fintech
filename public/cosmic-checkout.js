@@ -714,6 +714,17 @@
     trace('APP_DISPATCH','APP_TARGETED',link.dataset.upiApp);
    });
   }
+  get('shareCheckout').addEventListener('click',async()=>{
+   if(!session?.token||!session?.orderId)return;
+   const link=secureCheckoutUrl();
+   try{
+    if(navigator.share)await navigator.share({title:'DISHA payment',url:link});
+    else if(navigator.clipboard?.writeText){
+     await navigator.clipboard.writeText(link);
+     message('Payment link copied. Share only with the payer.','info');
+    }else message('Sharing unavailable in this browser.','error');
+   }catch(_){message('Could not share the payment link.','error')}
+  });
   const debitButton=get('payerDebitCheck');
   if(debitButton)debitButton.addEventListener('click',async()=>{
    if(!session?.orderId||!session?.token)return;
@@ -739,17 +750,6 @@
    }catch(_){
     if(status)status.textContent='Evidence service unavailable. Do not assume the payment failed or succeeded.';
    }finally{debitButton.disabled=false;}
-  });
-  get('shareCheckout').addEventListener('click',async()=>{
-   if(!session?.token||!session?.orderId)return;
-   const link=secureCheckoutUrl();
-   try{
-    if(navigator.share)await navigator.share({title:'DISHA payment',url:link});
-    else if(navigator.clipboard?.writeText){
-     await navigator.clipboard.writeText(link);
-     message('Payment link copied. Share only with the payer.','info');
-    }else message('Sharing unavailable in this browser.','error');
-   }catch(_){message('Could not share the payment link.','error')}
   });
   const diag=get('checkoutDebugPanel');
   if(debug&&diag){diag.hidden=false;get('checkoutDebugCopy').addEventListener('click',copyDebugReport)}

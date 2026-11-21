@@ -106,7 +106,9 @@ assert.throws(()=>receiptIntegrity({...capsule,paidAt:now+160000},bound),/PROOF_
 // The experimental issuer signed a CLAIM, not a real bank credit.
 const source=fs.readFileSync(path.join(__dirname,'../financial/proofbridge.js'),'utf8');
 assert.doesNotMatch(source,/UPDATE sessions SET status='SUCCESS'|INSERT INTO transactions|INSERT INTO ledger_entries|INSERT INTO utr_order_bindings/);
-assert.match(source,/paymentVerified:c\?\.evidence_state==='PAYER_DEBIT_VERIFIED'/,'Only the issuer-confirmed payer debit may become verified');
+assert.match(source,/paymentVerified:false/,'Experimental issuer signature must never verify a bank debit');
+assert.match(source,/const confirmedDebit=false/,'Signed V4 capsule is a claim, not independent bank evidence');
+assert.match(source,/ISSUER_DEBIT_CLAIM_UNVERIFIED/,'Legacy falsely verified rows must be downgraded');
 assert.match(source,/payerDebitVerified:confirmedDebit/,'Confirmed debit is distinct from unverified claim');
 assert.match(source,/UTR_OBSERVED_UNVERIFIED/);
 const html=fs.readFileSync(path.join(__dirname,'../public/checkout.html'),'utf8');
