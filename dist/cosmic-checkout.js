@@ -742,7 +742,7 @@
      if(status)status.textContent='Debit evidence could not be validated.';
      return;
     }else{
-     if(!passive&& !debitEvidenceMonitor)showDebitEvidence('Debit evidence not available yet');
+     if(!passive)showDebitEvidence('Debit evidence not available yet');
     }
     const first=evidence.evidence?.[0];
     if(first&&/^\d{12}$/.test(first.utr||'')){
@@ -772,7 +772,7 @@
     }
     if(document.visibilityState==='visible')void checkDebitEvidence(true);
    },3000);
-   return checkDebitEvidence(true);
+   return checkDebitEvidence(false);
   };
   if(debitButton)debitButton.addEventListener('click',startDebitEvidenceMonitor);
   if(evidenceRetry&&debitButton)evidenceRetry.addEventListener('click',()=>void checkDebitEvidence(false));
