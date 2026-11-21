@@ -46,6 +46,12 @@ function makeChallenge({orderId,amountPaise,payeeVpa,now=Date.now(),randomBytes=
 function verify({evidence,signature,trustedPublicKey,challenge,approvedSource,now=Date.now(),replayStore}){
  let bytes;
  try{bytes=normalize(evidence)}catch(_){return fail('EVIDENCE_SCHEMA')}
+ if(typeof signature!=='string'||!/^[A-Za-z0-9_-]{60,200}$/.test(signature)||
+  !trustedPublicKey)return fail('SIGNATURE_INVALID');
+ let valid=false;
+ try{valid=crypto.verify('sha256',Buffer.from(bytes),trustedPublicKey,
+  Buffer.from(signature,'base64url'))}catch(_){}
+ if(!valid)return fail('SIGNATURE_INVALID');
  if(!challenge||!Number.isSafeInteger(challenge.issuedAt)||
   !Number.isSafeInteger(challenge.expiresAt)||
   challenge.expiresAt!==challenge.issuedAt+180000||
@@ -55,24 +61,18 @@ function verify({evidence,signature,trustedPublicKey,challenge,approvedSource,no
  if(evidence.amountPaise!==challenge.amountPaise)return fail('AMOUNT_MISMATCH');
  if(evidence.payeeVpa.toLowerCase()!==challenge.payeeVpa)return fail('PAYEE_MISMATCH');
  if(evidence.observedAt<challenge.issuedAt||evidence.observedAt>now||
-  evidence.consentedAt<evidence.observedAt||evidence.consentedAt>now)
+  evidence.consentedAt<challenge.issuedAt||evidence.consentedAt>evidence.observedAt)
   return fail('TIME_INVALID');
  if(typeof approvedSource!=='function'||
   !approvedSource(evidence.sourceClass,evidence.sourceIdentity,evidence.sourceCertificateSha256))
   return fail('SOURCE_UNTRUSTED');
- if(typeof signature!=='string'||!/^[A-Za-z0-9_-]{60,200}$/.test(signature)||
-  !trustedPublicKey)return fail('SIGNATURE_INVALID');
- let valid=false;
- try{valid=crypto.verify('sha256',Buffer.from(bytes),trustedPublicKey,
-  Buffer.from(signature,'base64url'))}catch(_){}
- if(!valid)return fail('SIGNATURE_INVALID');
  if(!replayStore||typeof replayStore.claim!=='function')return fail('REPLAY_STORE_UNAVAILABLE');
  const digest=crypto.createHash('sha256').update(bytes).digest('hex');
  // In production claim() must use a persistent atomic UNIQUE constraint.
  if(!replayStore.claim(evidence.sourceClass+':'+evidence.reference,digest))
   return fail('REPLAYED');
  return {ok:true,code:'DEVICE_OBSERVATION_AUTHENTICATED',
-  evidenceClass:evidence.sourceClass==='notification'?'SOURCE_IDENTIFIED_NOTIFICATION':'SMS_HEADER_OBSERVED',
+  evidenceClass:evidence.sourceClass==='notification'?'DECLARED_NOTIFICATION_SOURCE':'DECLARED_SMS_SOURCE',
   receiptId:digest,paymentVerified:false,debitVerified:false,paymentStateChanged:false};
 }
 module.exports={ORIGIN,PROTOCOL,normalize,makeChallenge,verify};
