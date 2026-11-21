@@ -48,7 +48,8 @@ function verifyReceipt(receipt,signature,publicKey,bound,now=Date.now()){
   throw fail(401,'DEBIT_CREDENTIAL_SIGNATURE_INVALID');
  const sig=Buffer.from(signature,'base64url');
  let key;
- try{key=crypto.createPublicKey(publicKey)}catch(_){throw fail(503,'DEBIT_ISSUER_KEY_INVALID');}
+ try{key=publicKey?.type==='public'?publicKey:crypto.createPublicKey(publicKey)}
+ catch(_){throw fail(503,'DEBIT_ISSUER_KEY_INVALID');}
  if(key.asymmetricKeyType!=='ed25519'||sig.length!==64||
     !crypto.verify(null,Buffer.from(data),key,sig))
   throw fail(401,'DEBIT_CREDENTIAL_SIGNATURE_INVALID');
