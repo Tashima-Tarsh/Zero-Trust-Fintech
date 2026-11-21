@@ -107,7 +107,7 @@ internal object SessionObservation {
             notification.postTime !in lease.consentedAt until lease.expiresAt) return
         // Never inspect notification extras from a different app.
         if (notification.packageName != ownPackage) {
-            report("Ignored wrong notification package")
+            Log.i("DISHA_SESSION_OBSERVATION", "Ignored wrong notification package")
             return
         }
         if (notification.notification.channelId != CHANNEL || submitting) return
@@ -118,7 +118,7 @@ internal object SessionObservation {
         if (amount == null || !amount.matches(Regex("[1-9][0-9]{0,15}")) ||
             payee == null || !payee.matches(Regex("[a-z0-9._-]{2,100}@[a-z0-9._-]{2,40}")) ||
             reference == null || !reference.matches(Regex("[0-9]{12}"))) {
-            report("Rejected malformed synthetic fields")
+            Log.i("DISHA_SESSION_OBSERVATION", "Rejected malformed synthetic fields")
             return
         }
         // Both strings are validated ASCII. The field order mirrors canonicalEvidence.

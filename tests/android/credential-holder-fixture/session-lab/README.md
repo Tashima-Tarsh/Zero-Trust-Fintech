@@ -23,6 +23,19 @@ In another terminal, build and install the existing holder fixture. Use `adb -s 
 
 For a short expiry run, pass a third command-line argument such as `15000` after the port.
 
+## Pixel API 37 verification
+
+| Check | Observed result |
+| --- | --- |
+| Android and in-app consent | Android Settings granted listener access, followed by a separate in-app opt-in and HTTP 201 enrollment |
+| Matching notification | Real Android listener callback, Keystore signature, HTTP 202 `SIGNAL_MATCHED`, both verification flags false |
+| Wrong package and malformed fields | Rejected on device with no event submission |
+| Amount or payee mismatch | HTTP 409 `AMOUNT_MISMATCH` or `PAYEE_MISMATCH` |
+| Reposted reference | HTTP 409 `EVIDENCE_REPLAY_BLOCKED` |
+| Modified Android signature | HTTP 401 `DEVICE_SIGNATURE_INVALID` after changing the signature in a loopback-only test interceptor |
+| Expiry | Short lease expired on Pixel and later notification produced no request. HTTP regression checks rejection of late submissions |
+| Revocation | HTTP 200 with `revoked=true`, then no request after another notification |
+
 ## Supported data and financial trust
 
 Android documents notification access and platform protections such as OTP redaction. Google Play requires disclosure, consent and handling protections for sensitive financial and payment information. A release would need review of the in-app disclosure, privacy policy and Data safety declaration for the exact data practices. [Listener API](https://developer.android.com/reference/android/service/notification/NotificationListenerService) · [Android 15 redaction](https://developer.android.com/about/versions/15/behavior-changes-all#otp-redaction) · [Google Play User Data policy](https://support.google.com/googleplay/android-developer/answer/10144311)
