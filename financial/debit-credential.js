@@ -127,7 +127,9 @@ function createDebitCredentialRouter({getPool,getSession}){
    return res.json({success:true,serviceRequestId,expiresAt,
     protocol:'openid4vp-v1-unsigned',request:{
      response_type:'vp_token',response_mode:'dc_api',
-     nonce:challenge,client_id:'web-origin:'+req.protocol+'://'+req.get('host'),
+     // The browser supplies its verified origin; the unsigned DC API request
+     // must not construct a client_id from Host or proxy-controlled headers.
+     nonce:challenge,
      dcql_query:{credentials:[{id:'disha_debit',format:'dc+sd-jwt',
       meta:{vct_values:['https://disha8-2.thenitishkr.in/credentials/upi-debit-v1']},
       claims:[{path:['utr']},{path:['debitConfirmed']},{path:['amountPaise']},{path:['payeeVpa']}]}]}
