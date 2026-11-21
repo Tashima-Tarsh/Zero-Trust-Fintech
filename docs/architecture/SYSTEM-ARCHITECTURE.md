@@ -1,14 +1,14 @@
 # DISHA 8.2 — Technical Design Document (TDD) and Interface Design Document (IDD)
 
-**Architecture baseline:** 19 November 2026 · GitHub PR #68 merged into `main` · **Payment release: NOT YET ACCEPTED ON A REAL DEVICE**.
+**Architecture baseline:** 19 November 2026, with Android evidence status refreshed 21 November 2026 (PRs #98–#100 merged) · **Real bank-debit and end-to-end checkout release: NOT VERIFIED**.
 
-This is the canonical engineering design for DISHA 8.2: a merchant-controlled direct UPI checkout with order-bound Vault evidence, Quantum Signal session handshake, payer-side debit-evidence correlation as a target capability, risk controls and audited transaction decisions. No payment aggregator, customer companion APK, SMS reader, mandatory customer passkey, manual UTR entry or external settlement callback is part of the intended user journey.
+This is the canonical engineering design for DISHA 8.2: a merchant-controlled direct UPI checkout with order-bound Vault evidence, Quantum Signal session handshake, payer-side debit-evidence correlation as a target capability, risk controls and audited transaction decisions. No payment aggregator, PSP or bank API, payment-app API, manual UTR entry or external settlement webhook is required for the proposed debit-observation journey. The optional Android evidence mode **does** require an installed DISHA Android component, separately granted system notification-listener access and explicit short-lived user consent; the web-only route cannot read other apps' notifications.
 
 ## 1. Product and boundaries
 
 The merchant owns the receiving UPI account and checkout. DISHA issues a specific P2P or P2M payment request, preserves its original amount/payee/reference, establishes an acknowledged session channel, opens the payer's chosen UPI app, correlates observable return signals and attempts to classify the underlying debit event. DISHA is software around existing UPI rails; it cannot command a third-party UPI app or read the payer's private bank state merely because a browser handshake succeeded.
 
-**Current gap:** The merged Quantum Signal protocol authenticates continuity of the DISHA browser/session channel, **not the payer bank's debit event**. A genuinely authenticatable payer-side debit observation channel and independently labelled physical-device acceptance tests remain unimplemented or unverified. Consequently the existing financial posting path must not be replaced by an assumption or a fabricated debit signal.
+**Current evidence (21 November 2026):** Quantum Signal authenticates browser/session continuity, not a bank debit. PR #98 verified a synthetic Android Credential Manager selector and provider callback on Pixel API 37 / Chrome 145. PR #99 verified consented **synthetic** Android notification → Keystore-signed local session-evidence delivery. PR #100 added a strict labelled UTR/RRN parser but did **not** capture any real debit RRN/UTR; the Pixel had no eligible payer app. The full biometric/permission/consent/copy/I Paid/evidence modal/callback integration and financial source authenticity remain unverified. [Detailed test matrix](DEBIT-FIRST-CHECKOUT-EVIDENCE-STATUS-2026-11-21.md).
 
 ## 2. System architecture — current + proposed boundary
 
@@ -76,6 +76,8 @@ The dashed debit-evidence interface is a **design requirement**, not an existing
 | Device Vault | `public/one-touch-vault.js`, `financial/vault-evidence.js` | Optional passkey authorization and bound observed evidence |
 | Quantum Signal | `public/quantum-signal-client.js`, `financial/quantum-signal.js` | `/start` → `/challenge` → `/ack` → `/event`; 30-second challenge |
 | Risk and claims | `utils/trust-score.js`, `financial/untrusted-utr-claims.js` | Event classification, conflicting return fields and replay detection |
+| Android credential fixture | `tests/android/credential-holder-fixture/` | Synthetic credential selector/callback proven; research no-payment exception retained |
+| Android notification evidence | `PaymentObservationListener.kt`, `SessionObservation.kt`, `DebitNotification.kt` in fixture; `financial/session-evidence.js` | Consented synthetic signed device events; strict RRN/UTR parser unverified on real debit notifications |
 | Financial state | `financial/postgres-store.js` and existing financial modules | Transactional, tenant-bound, idempotent journal/receipt decisions |
 | Owner / merchant UI | `public/premium-dashboard.js`, `public/platform-console.js` | No generated internal IDs shown as human-facing payment reference |
 | Edge frontend | `public/_worker.js`, `wrangler.toml` | Static checkout + authenticated server API proxy |
