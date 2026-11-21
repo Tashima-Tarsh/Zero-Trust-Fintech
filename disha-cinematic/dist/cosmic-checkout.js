@@ -729,8 +729,8 @@
       if(status)status.textContent='Digital Credentials API unavailable in this browser. Payment remains unverified.';
       return;
      }
-     // A compatible provider is required; do not replace a precise Android result with a generic message.
-     return;
+     // Continue the legacy evidence lookup if no challenge could be prepared.
+     if(debitCredentialRequest)return;
     }
     const url='/api/payer-debit-evidence/'+encodeURIComponent(session.orderId)+
      '?token='+encodeURIComponent(session.token);
