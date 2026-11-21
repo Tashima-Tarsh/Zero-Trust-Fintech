@@ -262,6 +262,19 @@ if (process.env.NODE_ENV === 'production') {
     next();
   });
 }
+// Isolated production-origin Android Chrome PaymentRequest research endpoint.
+// GET-only lab, no DISHA checkout integration, payment mutation, storage or callback.
+// Cloudflare Pages proxies /api/* to this same Railway backend.
+app.get('/api/experiments/paymentresponse', (req, res) => {
+  res.set('Cache-Control', 'no-store, no-cache, must-revalidate');
+  res.set('X-Robots-Tag', 'noindex, nofollow');
+  return res.type('html').sendFile(path.join(__dirname, 'tests', 'browser', 'paymentresponse-lab.html'));
+});
+app.get('/api/experiments/paymentresponse-lab.js', (req, res) => {
+  res.set('Cache-Control', 'no-store, no-cache, must-revalidate');
+  res.set('X-Robots-Tag', 'noindex, nofollow');
+  return res.type('js').sendFile(path.join(__dirname, 'tests', 'browser', 'paymentresponse-lab.js'));
+});
 // Serve first-party runtime JS/CSS from Railway, not a potentially stale
 // Cloudflare Pages static deployment. Strict names prevent file traversal.
 const RUNTIME_ASSETS=new Set([
