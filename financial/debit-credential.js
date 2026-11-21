@@ -87,7 +87,7 @@ function createDebitCredentialRouter({getPool,getSession}){
  }
  router.post('/challenge',async(req,res)=>{
   res.set('Cache-Control','no-store');
-  if(!enabled())return err(res,fail(503,'DEBIT_CREDENTIAL_DISABLED'));
+  // A read-only challenge is always available. Signing/presentation ingestion stays gated.
   const pool=getPool();if(!pool)return err(res,fail(503,'POSTGRES_REQUIRED'));
   const {serviceRequestId,token}=req.body||{};
   let client,tx=false;

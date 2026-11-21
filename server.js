@@ -2155,7 +2155,7 @@ app.get('/failed', (req, res) => res.sendFile(path.join(__dirname, 'public', 'fa
     await initializeQuantumSignal(db.pgPool);
     await initializeSessionEvidenceSchema(db.pgPool);
     await initializeSessionUpiResultSchema(db.pgPool);
-    if(process.env.DISHA_DEBIT_CREDENTIAL_EXPERIMENT==='1')await initDebitCredentialSchema(db.pgPool);
+    await initDebitCredentialSchema(db.pgPool);
     if(process.env.DISHA_PROOFBRIDGE_EXPERIMENT==='1')await initProofBridgeSchema(db.pgPool);
     await initializeClaimObserver(db.pgPool);
   }

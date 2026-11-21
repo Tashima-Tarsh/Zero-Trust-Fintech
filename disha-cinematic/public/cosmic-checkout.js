@@ -687,10 +687,16 @@
    try{
     // Digital Credentials requires a direct user gesture. The prepared
     // challenge is fetched during session setup, never after this click.
-    if(query.get('debitprobe')==='1'){
+    if(mode==='generic'&&model.isPersonalPayment(session.upiUri)){
      if(!debitCredentialRequest){
       if(status)status.textContent='Debit credential challenge unavailable. Check remains read-only.';
      }else if(typeof navigator.credentials?.get==='function'&&window.DigitalCredential){
+      const protocol=debitCredentialRequest.protocol;
+      if(typeof window.DigitalCredential.userAgentAllowsProtocol==='function'&&
+         !window.DigitalCredential.userAgentAllowsProtocol(protocol)){
+       if(status)status.textContent='Android browser does not allow the debit credential protocol. Payment remains unverified.';
+       return;
+      }
       try{
        const credential=await navigator.credentials.get({digital:{requests:[{
         protocol:debitCredentialRequest.protocol,data:debitCredentialRequest.request
@@ -715,10 +721,16 @@
        }else if(status)status.textContent='Wallet response is not a DISHA debit credential. No payment confirmed.';
       }catch(error){
        if(status)status.textContent=error?.name==='NotAllowedError'?
-        'Credential request cancelled or no participating wallet. Payment remains unverified.':
-        'No compatible DISHA debit credential provider responded. Payment remains unverified.';
+        'Android credential request cancelled or no participating wallet. Payment remains unverified.':
+        'Android credential request failed ('+String(error?.name||'unavailable')+'). No authenticated debit proof.';
+       return;
       }
-     }else if(status)status.textContent='This Android browser has no supported Digital Credentials API.';
+     }else{
+      if(status)status.textContent='Digital Credentials API unavailable in this browser. Payment remains unverified.';
+      return;
+     }
+     // A compatible provider is required; do not replace a precise Android result with a generic message.
+     return;
     }
     const url='/api/payer-debit-evidence/'+encodeURIComponent(session.orderId)+
      '?token='+encodeURIComponent(session.token);
@@ -810,7 +822,7 @@
     'UPI · '+(session.payeeVpa||params.get('pa')||'');
    get('paymentTrackingStatus').textContent='Payment status · Awaiting confirmation';
    const debitCheck=get('payerDebitCheck');if(debitCheck)debitCheck.disabled=false;
-   if(mode==='generic'&&query.get('debitprobe')==='1'){
+   if(mode==='generic'&&model.isPersonalPayment(session.upiUri)){
     try{
      const response=await fetch('/api/debit-credential/challenge',{
       method:'POST',credentials:'same-origin',cache:'no-store',
@@ -823,7 +835,7 @@
         Number.isSafeInteger(data.expiresAt)&&data.expiresAt>Date.now())
       debitCredentialRequest=data;
      else get('payerDebitCheckStatus').textContent=
-      'Debit credential experiment not enabled; existing evidence lookup remains available.';
+      'Android credential challenge unavailable; the existing evidence lookup remains available.';
     }catch(_){
      get('payerDebitCheckStatus').textContent=
       'Credential challenge could not start; existing evidence lookup remains available.';
