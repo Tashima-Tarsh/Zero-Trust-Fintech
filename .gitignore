@@ -34,3 +34,6 @@ Thumbs.db
 .idea/
 .claude/
 scratch/
+
+# Android credential fixture local diagnostics (may include device identifiers)
+tests/android/credential-holder-fixture/local-diagnostics/
