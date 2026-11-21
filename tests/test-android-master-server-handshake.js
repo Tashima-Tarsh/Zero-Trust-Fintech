@@ -1,6 +1,6 @@
 'use strict';
 const crypto=require('node:crypto'),assert=require('node:assert/strict');
-const {createLabServer}=require('../android/credential-holder-fixture/lab-server');
+const {createLabServer}=require('./android/credential-holder-fixture/lab-server');
 let now=Date.now();const lab=createLabServer(()=>now);
 const pair=crypto.generateKeyPairSync('ec',{namedCurve:'prime256v1'});
 const start=()=>lab.issue({sessionId:'lab-android-session'});
