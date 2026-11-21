@@ -1,6 +1,6 @@
 package ai.disha.credentialfixture
 
-import android.app.Activity
+import androidx.activity.ComponentActivity
 import android.graphics.Bitmap
 import android.os.Bundle
 import android.widget.Button
@@ -19,7 +19,7 @@ import kotlinx.coroutines.launch
  * Metadata is synthetic. NO bank transaction, SMS, UTR or debit claim is stored here.
  * The intentionally non-issuable record only exercises Credential Manager discovery.
  */
-class RegisterActivity : Activity() {
+class RegisterActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         val state = TextView(this).apply {
