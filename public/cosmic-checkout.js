@@ -589,56 +589,6 @@
    });
   });
  }
- // The payer explicitly requests a read-only proof check. This never starts
- // a UPI Intent, scans Android app data, or changes payment/ledger state.
- function configureDebitProofCheck(){
-  if(mode!=='generic')return;
-  const panel=get('debitProofCheck'),button=get('debitProofCheckButton');
-  const status=get('debitProofCheckStatus'),reported=get('debitProofCheckUtr');
-  if(!panel||!button||!status||!reported)return;
-  panel.hidden=false;
-  let busy=false;
-  button.addEventListener('click',async()=>{
-   if(!session||busy||receiptShown)return;
-   busy=true;button.disabled=true;reported.hidden=true;reported.textContent='';
-   status.textContent='Checking service-bound issuer evidence…';
-   const suffix=encodeURIComponent(session.orderId)+'?token='+encodeURIComponent(session.token);
-   const check=async path=>{
-    try{
-     const response=await fetch(path+suffix,{cache:'no-store',credentials:'same-origin'});
-     if(!response.ok)return null;
-     const data=await response.json();
-     return data?.success===true?data:null;
-    }catch(_){return null}
-   };
-   try{
-    const [issuer,signal]=await Promise.all([
-     check('/api/proofbridge/status/'),check('/api/quantum-signal/status/')
-    ]);
-    const debit=issuer?.payerDebitEvidence;
-    // Only the configured issuer's signed payer-debit record can produce
-    // the existing payer receipt. A reported UTR or browser return cannot.
-    if(issuer?.orderId===session.orderId&&issuer?.paymentVerified===true&&
-       issuer?.payerDebitVerified===true&&debit?.debitVerified===true&&
-       debit.evidenceState==='PAYER_DEBIT_VERIFIED'&&
-       /^\d{12}$/.test(debit.utr||'')&&
-       /^[A-Za-z0-9][A-Za-z0-9._:\/-]{5,99}$/.test(debit.payerTransactionId||'')&&
-       /^[A-Za-z0-9._-]{3,64}$/.test(debit.issuerId||'')){
-     status.textContent='Issuer-signed payer-side debit evidence found.';
-     createPayerDebitReceipt(issuer);
-     return;
-    }
-    const candidate=issuer?.utrCandidate||signal?.utrCandidate;
-    if(/^\d{12}$/.test(candidate||'')){
-     reported.textContent='Reported UTR (not verified): '+candidate;
-     reported.hidden=false;
-    }
-    status.textContent=!issuer&&!signal
-     ?'Debit evidence service unavailable. Payment may have completed; check your UPI app before paying again.'
-     :'No authenticated debit confirmation found. Payment may still be processing; service remains unverified.';
-   }finally{busy=false;button.disabled=false}
-  });
- }
  function setEventHandlers(){
 
   // P2P action copies the receiving VPA only. Never dispatch an app intent.
@@ -818,7 +768,6 @@
    setMoney(session.amount);
    get('serviceIdentifier').textContent='Service ID · '+(session.serviceNumber||'Not assigned');
    setPaymentKind();
-   configureDebitProofCheck();
    const params=new URLSearchParams(session.upiUri.split('?')[1]||'');
    get('checkoutPaymentIdentity').textContent=(session.serviceNumber?'Service '+session.serviceNumber+' · ':'')+
     'UPI · '+(session.payeeVpa||params.get('pa')||'');

@@ -907,6 +907,12 @@ app.get('/api/payer-debit-evidence/:orderId', verifyLimiter, async (req,res)=>{
       {source:'DEVICE_OBSERVATION',sql:
         'SELECT transaction_ref AS utr,amount_paise,payee_vpa,posted_at AS observed_at '+
         'FROM disha_session_evidence_events WHERE order_id=$1 ORDER BY posted_at DESC LIMIT 5'},
+      // A browser return may carry a 12-digit reference, but its source is
+      // not the UPI app's authenticated debit record.
+      {source:'BROWSER_RETURN_OBSERVATION',sql:
+        'SELECT e.utr_candidate AS utr,t.amount_paise,t.payee_vpa,e.observed_at '+
+        'FROM disha_quantum_events e JOIN disha_quantum_twins t ON t.order_id=e.order_id '+
+        "WHERE e.order_id=$1 AND e.event_kind='RETURN' ORDER BY e.observed_at DESC LIMIT 5"},
       {source:'ISSUER_SIGNED_CLAIM',enabled:process.env.DISHA_PROOFBRIDGE_EXPERIMENT==='1',sql:
         'SELECT utr,amount_paise,payee_vpa,paid_at AS observed_at '+
         'FROM disha_proofbridge_capsules WHERE order_id=$1 ORDER BY received_at DESC LIMIT 5'}

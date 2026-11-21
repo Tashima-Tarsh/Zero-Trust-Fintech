@@ -16,4 +16,10 @@ assert.match(server,/UTR_CANDIDATE_OBSERVED_UNVERIFIED/);
 assert.match(proof,/const confirmedDebit=false/);
 assert.match(proof,/paymentVerified:false/);
 assert.match(proof,/debitVerified:false/);
+
+assert.equal((html.match(/I Paid — Check Debit Evidence/g)||[]).length,1,'Single action button');
+assert.doesNotMatch(html,/id="debitProofCheckButton"/,'No legacy duplicate payer button');
+assert.doesNotMatch(html,/id="debitProofCheck"/,'No duplicate payer evidence panel');
+assert.doesNotMatch(js,/configureDebitProofCheck/,'No duplicate listener');
+assert.match(server,/BROWSER_RETURN_OBSERVATION/,'Return observations are included in evidence lookup');
 console.log('PAYER_DEBIT_BUTTON_PASS: read-only payer evidence, no false verification');
