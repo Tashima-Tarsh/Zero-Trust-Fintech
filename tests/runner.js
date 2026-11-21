@@ -63,7 +63,8 @@ const UNIT_TESTS = [
   'test-master-debit-bridge-http.js', // signed trusted-provider ingress, replay and session-scoped read
   'test-payer-debit-button.js', // I Paid: read-only P2P evidence, no false verified payment
   'test-proofbridge.js', // zero-install consent gate and issuer-signed capsule contract
-  'test-session-evidence.js', // multi-device session binding, signatures and fraud gates
+  'test-session-evidence.js',
+  'test-udeb-evidence-contract.js', // Claude iteration 1: signed observation, fraud/nonce/replay (never settlement) // multi-device session binding, signatures and fraud gates
   'test-session-upi-result.js', // native Android UPI result payload, signature and app allowlist
   'test-android-upi-host-contract.js', // no special permissions, activity result, checkout handoff and server EBIT route
   'test-proofbridge-checkout-flow.js', // consent preflight + native gesture copy + return proof
