@@ -134,6 +134,81 @@ function createDebitCredentialRouter({getPool,getSession}){
   }catch(e){if(tx)await client.query('ROLLBACK').catch(()=>{});return err(res,e)}
   finally{client?.release()}
  });
+
+ // Master Bridge ingress. Only allowlisted issuer signatures, never text/SMS
+ // supplied by a browser, can enter this evidence store.
+ router.post('/provider-claim',async(req,res)=>{
+  res.set('Cache-Control','no-store');
+  if(!enabled())return err(res,fail(503,'DEBIT_CREDENTIAL_DISABLED'));
+  const pool=getPool();if(!pool)return err(res,fail(503,'POSTGRES_REQUIRED'));
+  const issuerId=process.env.DISHA_DEBIT_CREDENTIAL_ISSUER_ID||'';
+  const keyBase64=process.env.DISHA_DEBIT_CREDENTIAL_ISSUER_PUBLIC_KEY_BASE64||'';
+  if(!issuerId||!keyBase64)return err(res,fail(503,'DEBIT_ISSUER_NOT_CONFIGURED'));
+  const {receipt,signature}=req.body||{};
+  let client,tx=false;
+  try{
+   const data=canonicalReceipt(receipt);
+   if(data.length>4096||!same(receipt.issuerId,issuerId))
+    throw fail(401,'DEBIT_PROVIDER_NOT_TRUSTED');
+   const session=await getSession(receipt.serviceRequestId);
+   if(!session||!['PERSONAL','P2P'].includes(String(session.merchantType||'').toUpperCase()))
+    throw fail(404,'SERVICE_REQUEST_NOT_FOUND');
+   if(String(session.status).toUpperCase()!=='PENDING'||
+     Date.now()>=Number(session.expiresAt))throw fail(409,'SERVICE_REQUEST_INACTIVE');
+   client=await pool.connect();await client.query('BEGIN');tx=true;
+   const row=(await client.query(
+    'SELECT * FROM disha_debit_credential_challenges WHERE service_request_id=$1 FOR UPDATE',
+    [receipt.serviceRequestId])).rows[0];
+   if(!row)throw fail(404,'DEBIT_CHALLENGE_MISSING');
+   const amountPaise=rupeesToPaise(String(session.challengeAmount));
+   const payeeVpa=String(session.vpaAddress||'').toLowerCase();
+   if(row.amount_paise!==amountPaise||row.payee_vpa!==payeeVpa)
+    throw fail(409,'SERVICE_REQUEST_BINDING_MISMATCH');
+   const publicKey=crypto.createPublicKey({
+    key:Buffer.from(keyBase64,'base64'),format:'der',type:'spki'
+   });
+   const receiptHash=verifyReceipt(receipt,signature,publicKey,{
+    serviceRequestId:receipt.serviceRequestId,issuerId,
+    challenge:row.challenge,amountPaise,payeeVpa,
+    createdAt:Number(row.created_at),expiresAt:Number(row.expires_at)
+   });
+   await client.query(
+    'INSERT INTO disha_debit_credential_claims(service_request_id,utr,issuer_id,receipt_hash,received_at) VALUES($1,$2,$3,$4,$5)',
+    [receipt.serviceRequestId,receipt.utr,issuerId,receiptHash,Date.now()]);
+   await client.query('COMMIT');tx=false;
+   // A signed provider claim alone is NOT independent settlement evidence.
+   return res.status(202).json({success:true,
+    evidenceState:'ISSUER_SIGNED_DEBIT_CLAIM_UNVERIFIED',
+    paymentVerified:false,debitVerified:false,paymentStateChanged:false});
+  }catch(e){
+   if(tx)await client.query('ROLLBACK').catch(()=>{});
+   if(e.code==='23505')return err(res,fail(409,'DEBIT_REFERENCE_REPLAY'));
+   return err(res,e);
+  }finally{client?.release()}
+ });
+ // Checkout can retrieve its own signed claims, not arbitrary service IDs.
+ router.get('/status/:serviceRequestId',async(req,res)=>{
+  res.set('Cache-Control','no-store');
+  const pool=getPool();if(!pool)return err(res,fail(503,'POSTGRES_REQUIRED'));
+  try{
+   const serviceRequestId=req.params.serviceRequestId,token=req.query.token;
+   if(!validId(serviceRequestId)||!validToken(token))
+    throw fail(401,'SESSION_TOKEN_REQUIRED');
+   const session=await getSession(serviceRequestId);
+   if(!session||!same(session.sessionId,token))
+    throw fail(401,'SESSION_TOKEN_REQUIRED');
+   if(!['PERSONAL','P2P'].includes(String(session.merchantType||'').toUpperCase()))
+    throw fail(409,'P2P_REQUIRED');
+   const row=(await pool.query(
+    'SELECT utr,issuer_id,received_at FROM disha_debit_credential_claims '+
+    'WHERE service_request_id=$1',[serviceRequestId])).rows[0];
+   return res.json({success:true,serviceRequestId,
+    evidenceState:row?'ISSUER_SIGNED_DEBIT_CLAIM_UNVERIFIED':'AWAITING_TRUSTED_PROVIDER',
+    issuerId:row?.issuer_id||null,utrCandidate:row?.utr||null,
+    signedClaimReceivedAt:row?Number(row.received_at):null,
+    paymentVerified:false,debitVerified:false,paymentStateChanged:false});
+  }catch(e){return err(res,e)}
+ });
  router.post('/present',async(req,res)=>{
   res.set('Cache-Control','no-store');
   if(!enabled())return err(res,fail(503,'DEBIT_CREDENTIAL_DISABLED'));

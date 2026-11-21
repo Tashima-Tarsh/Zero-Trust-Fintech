@@ -685,6 +685,19 @@
    if(status)status.textContent='Checking available payer-side evidence for this service…';
    if(details){details.hidden=true;details.textContent='';}
    try{
+    // Check server-side provider delivery first; no merchant-credit dependency.
+    try{
+     const bridge=await fetch('/api/debit-credential/status/'+encodeURIComponent(session.orderId)+
+      '?token='+encodeURIComponent(session.token),{credentials:'same-origin',cache:'no-store'});
+     const signed=await bridge.json().catch(()=>({}));
+     if(bridge.ok&&signed.evidenceState==='ISSUER_SIGNED_DEBIT_CLAIM_UNVERIFIED'&&
+       /^\d{12}$/.test(signed.utrCandidate||'')){
+      if(details){details.hidden=false;details.textContent='Provider-signed UTR candidate: '+
+       signed.utrCandidate+' · Issuer: '+signed.issuerId;}
+      if(status)status.textContent='Trusted provider claim recorded. Independent bank debit proof is still required.';
+      return;
+     }
+    }catch(_){}
     // Digital Credentials requires a direct user gesture. The prepared
     // challenge is fetched during session setup, never after this click.
     if(mode==='generic'&&model.isPersonalPayment(session.upiUri)){
