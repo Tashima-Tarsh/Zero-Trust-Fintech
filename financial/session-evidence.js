@@ -26,7 +26,7 @@ const ALLOWED_PACKAGES = new Set([
   'in.org.npci.upiapp'
 ]);
 
-function canonicalEvidence(input) {
+function canonicalEvidence(input, allowedPackages = ALLOWED_PACKAGES) {
   if (!input || typeof input !== 'object' || Array.isArray(input)) throw fail('EVIDENCE_FIELDS_INVALID');
   const keys = ['protocol','eventId','orderId','nonce','deviceId','packageName','postedAt',
     'amountPaise','payeeVpa','transactionRef','status'];
@@ -36,7 +36,7 @@ function canonicalEvidence(input) {
   const e = Object.fromEntries(keys.map(k => [k, input[k]]));
   if (e.protocol !== 'DISHA-SESSION-EVIDENCE-V1' ||
       !validId(e.eventId) || !validId(e.orderId) || !/^[a-f0-9]{40}$/i.test(e.nonce) ||
-      !validDevice(e.deviceId) || !ALLOWED_PACKAGES.has(e.packageName) ||
+      !validDevice(e.deviceId) || !allowedPackages.has(e.packageName) ||
       !Number.isSafeInteger(e.postedAt) || e.postedAt <= 0 ||
       !(e.amountPaise === null || (typeof e.amountPaise === 'string' && /^[1-9][0-9]{0,15}$/.test(e.amountPaise))) ||
       !(e.payeeVpa === null || validVpa(e.payeeVpa)) ||
@@ -47,8 +47,8 @@ function canonicalEvidence(input) {
   return JSON.stringify(e);
 }
 
-function verifyDeviceEvidence(evidence, signature, publicKey) {
-  const bytes = canonicalEvidence(evidence);
+function verifyDeviceEvidence(evidence, signature, publicKey, allowedPackages = ALLOWED_PACKAGES) {
+  const bytes = canonicalEvidence(evidence, allowedPackages);
   if (typeof signature !== 'string' || !/^[A-Za-z0-9_-]{80,200}$/.test(signature)) {
     throw fail('DEVICE_SIGNATURE_INVALID', 401);
   }
@@ -135,7 +135,7 @@ async function initializeSessionEvidenceSchema(pool) {
   `);
 }
 
-function createSessionEvidenceRouter({ getPool, getSession }) {
+function createSessionEvidenceRouter({ getPool, getSession, allowedPackages = ALLOWED_PACKAGES }) {
   const router = express.Router();
   const respondError = (res, err) => res.status(err.status || 500)
     .set('Cache-Control', 'no-store')
@@ -217,7 +217,7 @@ function createSessionEvidenceRouter({ getPool, getSession }) {
       return res.status(201).set('Cache-Control','no-store').json({
         success:true, orderId:b.orderId, nonce:activeNonce, deviceId:b.deviceId,
         amountPaise, payeeVpa:payee, paymentType, merchantReference, merchantCategoryCode,
-        expiresAt:activeExpiry, consentedAt:activeConsentTime, serverTime:now, allowedPackages:[...ALLOWED_PACKAGES]
+        expiresAt:activeExpiry, consentedAt:activeConsentTime, serverTime:now, allowedPackages:[...allowedPackages]
       });
     } catch (e) { console.error('[session-evidence] authorize failed:', e && (e.code || e.message) || 'unknown'); return respondError(res, e); }
   });
@@ -240,7 +240,7 @@ function createSessionEvidenceRouter({ getPool, getSession }) {
       if (!session || session.status !== 'PENDING' || !safeEqual(session.sessionId, b.token) ||
           !safeEqual(sha256(b.token || ''), consent.token_hash)) throw fail('SESSION_TOKEN_INVALID', 401);
       const publicKey = crypto.createPublicKey(device.public_key_pem);
-      const eventHash = verifyDeviceEvidence(b.evidence, b.signature, publicKey);
+      const eventHash = verifyDeviceEvidence(b.evidence, b.signature, publicKey, allowedPackages);
       let decision = evaluateEvidence(b.evidence, consent);
       if (decision.accepted && b.evidence.transactionRef) {
         const previousRef = (await c.query(
@@ -282,6 +282,7 @@ function createSessionEvidenceRouter({ getPool, getSession }) {
       await c.query('COMMIT'); tx = false;
       const payload = {
         success:decision.accepted,accepted:decision.accepted,decisionState:decision.state,
+        paymentVerified:false,debitVerified:false,
         fraudDecision:unifiedDecision,
         sessionEvidence:{eventCount:aggregate.event_count,matchedSignalCount:aggregate.matched_count,
           participatingDeviceCount:aggregate.device_count,referenceCount:aggregate.reference_count}
