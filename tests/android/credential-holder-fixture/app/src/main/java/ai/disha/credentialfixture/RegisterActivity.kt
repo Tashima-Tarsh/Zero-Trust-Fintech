@@ -5,6 +5,8 @@ import android.graphics.Bitmap
 import android.os.Bundle
 import android.widget.Button
 import android.util.Log
+import com.google.android.gms.common.GoogleApiAvailability
+import android.content.pm.PackageManager
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import android.widget.LinearLayout
@@ -53,6 +55,25 @@ class RegisterActivity : ComponentActivity() {
         }
         setContentView(root)
         button.setOnClickListener {
+            try {
+                val minGms=243100000
+                val gmsCode=GoogleApiAvailability.getInstance()
+                    .isGooglePlayServicesAvailable(this,minGms)
+                val gmsInfo=packageManager.getPackageInfo("com.google.android.gms",0)
+                val serviceInfo=packageManager.getPackageInfo(packageName,
+                    PackageManager.GET_SERVICES or PackageManager.GET_META_DATA)
+                val provider=serviceInfo.services?.firstOrNull {
+                    it.name.endsWith("RegistryManagerProviderMetadataHolder")
+                }
+                Log.i("DISHA_CREDENTIAL_FIXTURE",
+                    "GMS_VERSION="+gmsInfo.longVersionCode+
+                    " GMS_AVAILABILITY="+gmsCode+
+                    " REGISTRY_METADATA_FOUND="+(provider!=null)+
+                    " REGISTRY_CLASS="+provider?.metaData?.getString(
+                        "androidx.credentials.registry.provider.REGISTRY_MANAGER_PROVIDER_KEY"))
+            } catch (e: Exception) {
+                Log.e("DISHA_CREDENTIAL_FIXTURE","PROVIDER_DIAGNOSTICS_FAILED",e)
+            }
             button.isEnabled = false
             lifecycleScope.launch {
                 try {

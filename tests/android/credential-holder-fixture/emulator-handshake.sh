@@ -27,6 +27,8 @@ adb shell uiautomator dump /sdcard/disha-ui.xml >/dev/null 2>&1
 adb pull /sdcard/disha-ui.xml "$out/registration-ui.xml" >/dev/null
 python3 tests/android/credential-holder-fixture/tap-label.py "$out/registration-ui.xml" "Register synthetic DISHA credential"
 sleep 6
+adb logcat -d -s DISHA_CREDENTIAL_FIXTURE:I > "$out/registration-diagnostics.txt"
+cat "$out/registration-diagnostics.txt"
 adb shell uiautomator dump /sdcard/disha-ui.xml >/dev/null 2>&1
 adb pull /sdcard/disha-ui.xml "$out/registration-result.xml" >/dev/null
 if ! grep -q 'Registered synthetic credential metadata with Android' "$out/registration-result.xml"; then
