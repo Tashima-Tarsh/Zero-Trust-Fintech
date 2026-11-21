@@ -71,7 +71,8 @@ function evaluateEvidence(e, session, now = Date.now()) {
   if (e.orderId !== session.order_id || e.nonce !== session.nonce) return { state: 'CROSS_SESSION', accepted: false };
   const isObservation = e.protocol === 'DISHA-DEBIT-UTR-OBSERVATION-V1';
   if (now >= expiry || e.postedAt > expiry ||
-      e.postedAt < consentedAt - (isObservation ? 0 : 30000) || e.postedAt > now + 120000) {
+      e.postedAt < consentedAt - (isObservation ? 0 : 30000) ||
+      e.postedAt > now + (isObservation ? 0 : 120000)) {
     return { state: 'SESSION_TIME_INVALID', accepted: false };
   }
   const amountMatches = e.amountPaise !== null && e.amountPaise === session.amount_paise;
