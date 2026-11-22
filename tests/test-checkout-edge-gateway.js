@@ -43,27 +43,31 @@ vm.runInContext(worker.replace('export default','globalThis.edge ='),context,{fi
   const body=u.pathname.endsWith('.js')?'// DISHA static checkout JS':checkout;
   return new Response(body,{status:200,headers:{'content-type':u.pathname.endsWith('.js')?'text/javascript':'text/html'}});
  }}};
- for(const route of ['/checkout','/checkout/','/pay','/pay/']){
+ for(const route of ['/checkout','/checkout/','/pay','/pay/','/p2p','/p2m/checkout']){
   const res=await context.edge.fetch(new Request('https://disha8-2.thenitishkr.in'+route),env);
   assert.equal(res.status,200,route+' must remain static even if Railway is down');
   assert.match(await res.text(),/<html/i);
  }
+ // The legacy public /checkout remains static when Railway is offline.
+ // Canonical authenticated P2P checkout and runtime JS/CSS must NOT silently
+ // fall back to an older independently deployed Pages asset.
  for(const url of [
   '/api/runtime/checkout?amount=1',
-  '/api/runtime/merchant-checkout?paymentRef=PAY_EXAMPLE&token=aaa',
+  '/api/runtime/merchant-checkout?paymentRef=EXAMPLE',
   '/api/runtime-assets/cosmic-checkout.js?v=ci',
   '/api/runtime-assets/cosmic-checkout-model.js',
   '/api/runtime-assets/cosmic-checkout.css',
   '/api/runtime-assets/checkout-moonlight.css',
-  '/api/runtime-assets/android-checkout-handshake.js'
+  '/api/runtime-assets/android-checkout-handshake.js',
+  '/api/runtime-assets/p2p-paymentrequest-probe.js'
  ]){
   const result=await context.edge.fetch(new Request('https://disha8-2.thenitishkr.in'+url),env);
-  assert.equal(result.status,200,'Static checkout asset failed '+url);
+  assert.equal(result.status,502,'Canonical runtime should expose backend outage, not stale Pages code: '+url);
  }
- assert.equal(upstream,0,'Checkout HTML, CSS, and JS must work without Railway');
- assert.equal(assets,11);
+ assert.equal(assets,6,'Legacy P2P and P2M fallback pages stay on Pages');
+ assert.equal(upstream,8,'Eight canonical P2P/P2M runtime requests must use Railway');
  const api=await context.edge.fetch(new Request('https://disha8-2.thenitishkr.in/api/merchant/public/order/example'),env);
  assert.equal(api.status,502,'Dynamic merchant payment order depends on Railway backend');
- assert.equal(upstream,1);
- console.log('CHECKOUT_EDGE_ISOLATION_PASS: static checkout never relies on Railway availability; dynamic APIs proxy as expected');
+ assert.equal(upstream,9);
+ console.log('CHECKOUT_EDGE_CONSISTENCY_PASS: canonical P2P/P2M HTML and JS use Railway; static fallbacks preserved');
 })().catch(error=>{console.error(error);process.exitCode=1});

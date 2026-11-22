@@ -20,6 +20,18 @@ test('all checkout mirrors use identical authenticated timed provider wiring',()
   assert.match(code,/bank debit not independently verified/);
  }
 });
+test('visible signed provider choice follows mandatory payer authentication',()=>{
+ const html=fs.readFileSync(path.join(root,'public/checkout.html'),'utf8');
+ const auth=html.indexOf('id="p2pPrepaymentGate"');
+ const pay=html.indexOf('id="p2pPaymentRequestProbe"');
+ const legacy=html.indexOf('id="vaultProceed"');
+ assert.ok(auth>=0&&pay>auth&&legacy>pay,
+  'Customer Pay button should follow device authentication, before legacy fallback controls');
+ const code=fs.readFileSync(path.join(root,'public/p2p-paymentrequest-probe.js'),'utf8');
+ assert.match(code,/Pay securely with Google Pay/);
+ assert.match(code,/probe.hidden=true/);
+ assert.match(code,/probe.hidden=available/);
+});
 test('signed response flow is opt-in and Chrome pay still requires gesture',()=>{
  const code=fs.readFileSync(path.join(root,'public/p2p-paymentrequest-probe.js'),'utf8');
  assert.match(code,/query\.get\('timedprovider'\)==='1'/);

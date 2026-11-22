@@ -4,30 +4,9 @@ export default {
   async fetch(request, env) {
     const url = new URL(request.url);
 
-    // Keep checkout shell and allowlisted client assets on Cloudflare Pages.
-    // Railway still handles payment session, ledger, merchant and auth APIs.
-    const checkoutFiles = new Set([
-      "cosmic-checkout.js", "cosmic-checkout-model.js",
-      "cosmic-checkout.css", "checkout-moonlight.css",
-      "one-touch-vault.js", "quantum-signal-client.js",
-      "android-checkout-handshake.js"
-    ]);
-    let localCheckout = null;
-    if (url.pathname === "/api/runtime/checkout" || url.pathname === "/api/runtime/merchant-checkout") {
-      localCheckout = url.pathname.endsWith("/merchant-checkout") ? "/merchant-checkout.html" : "/checkout.html";
-    } else if (url.pathname.startsWith("/api/runtime-assets/")) {
-      const filename = url.pathname.slice("/api/runtime-assets/".length);
-      if (checkoutFiles.has(filename)) localCheckout = "/" + filename;
-    }
-    if (localCheckout) {
-      const staticUrl = new URL(localCheckout + url.search, request.url);
-      const response = await env.ASSETS.fetch(new Request(staticUrl, request));
-      const headers = new Headers(response.headers);
-      headers.set("cache-control", "no-store");
-      headers.set("x-disha-edge", "cloudflare-pages-checkout");
-      return new Response(response.body, {status:response.status,headers});
-    }
-
+    // Canonical /api/runtime/checkout, /api/runtime/merchant-checkout and
+    // /api/runtime-assets/* all pass to the same Railway deployment below.
+    // Legacy /checkout, /p2p and /p2m/checkout keep their static Pages fallback.
     // The selected payment account type determines which static checkout loads.
     // P2M never falls through to /checkout or /api/session/new.
     const paymentPages={

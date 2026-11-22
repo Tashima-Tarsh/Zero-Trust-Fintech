@@ -6,6 +6,18 @@ const merchant=read('public/merchant-console.html'),owner=read('public/owner-con
 const clerk=read('public/premium-dashboard.js'),consoleJS=read('public/platform-console.js');
 assert.match(server,/app\.get\('\/api\/runtime-assets\/:asset'/);
 assert.match(server,/RUNTIME_ASSETS\.has\(asset\)/);
+// Every checkout's first-party runtime dependency must be available from the
+// same Railway build as the canonical HTML: no Cloudflare-only hidden scripts.
+const assetSet=/const RUNTIME_ASSETS=new Set\(\[([\s\S]*?)\]\);/.exec(server);
+assert.ok(assetSet,'Runtime asset allowlist declared');
+for(const page of ['public/checkout.html','public/merchant-checkout.html']){
+ const html=read(page);
+ for(const [,asset] of html.matchAll(/\/api\/runtime-assets\/([A-Za-z0-9._-]+)/g)){
+  assert.ok(assetSet[1].includes("'"+asset+"'"),
+   'Railway missing checkout asset '+asset+' required by '+page);
+ }
+}
+
 assert.match(server,/\['\/api\/runtime\/checkout','\/api\/runtime\/merchant-checkout'\]/);
 assert.match(owner,/src="\/api\/runtime-assets\/platform-console\.js/);
 assert.match(merchant,/src="\/api\/runtime-assets\/premium-dashboard\.js/);

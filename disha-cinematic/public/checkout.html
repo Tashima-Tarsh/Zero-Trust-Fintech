@@ -74,6 +74,14 @@
         <p id="p2pPrepaymentStatus" class="inline-note" role="status" aria-live="polite">Payment locked until server-verified passkey and device integrity checks pass.</p>
         <button id="p2pPrepaymentAuthenticate" type="button" class="action-primary glass-btn">Verify fingerprint / device PIN and integrity</button>
       </section>
+      <!-- Existing Chrome signed-provider payment choice (P2P only). -->
+      <section id="p2pPaymentRequestProbe" class="glass-panel" hidden aria-label="P2P Chrome PaymentRequest compatibility experiment" style="padding:14px;margin:12px 0">
+        <strong>P2P Android payment response experiment</strong>
+        <p class="inline-note">Tests whether an installed Android payment handler supports this personal UPI request. This may trigger a real payment. Returned app data is not verified bank debit evidence.</p>
+        <button id="p2pPaymentRequestCheck" class="glass-btn" type="button">Check installed payment handler</button>
+        <button id="p2pPaymentRequestLaunch" class="glass-btn" type="button" disabled>Launch P2P payment test</button>
+        <p id="p2pPaymentRequestStatus" class="inline-note" role="status" aria-live="polite">Waiting for session</p>
+      </section>
       <!-- Glass Proceed button -->
       <a id="vaultProceed" role="button" href="#" aria-disabled="true" class="action-primary glass-btn" hidden>Proceed to UPI</a>
       <p id="vaultStatus" class="inline-note" aria-live="polite"></p>
@@ -117,14 +125,6 @@
       
       <p id="checkoutPaymentIdentity" class="inline-note" aria-live="polite"></p>
       <p id="paymentTrackingStatus" class="inline-note" role="status" aria-live="polite">Payment status · Checking…</p>
-      <!-- Opt-in isolated Android PaymentRequest compatibility test. No ledger write. -->
-      <section id="p2pPaymentRequestProbe" class="glass-panel" hidden aria-label="P2P Chrome PaymentRequest compatibility experiment" style="padding:14px;margin:12px 0">
-        <strong>P2P Android payment response experiment</strong>
-        <p class="inline-note">Tests whether an installed Android payment handler supports this personal UPI request. This may trigger a real payment. Returned app data is not verified bank debit evidence.</p>
-        <button id="p2pPaymentRequestCheck" class="glass-btn" type="button">Check installed payment handler</button>
-        <button id="p2pPaymentRequestLaunch" class="glass-btn" type="button" disabled>Launch P2P payment test</button>
-        <p id="p2pPaymentRequestStatus" class="inline-note" role="status" aria-live="polite">Waiting for session</p>
-      </section>
       <section id="payerDebitCheckPanel" class="glass-panel" aria-label="Payer debit evidence check" style="padding:14px;margin:12px 0">
         <button id="payerDebitCheck" class="action-primary glass-btn" type="button" disabled>I Paid — Check Debit Evidence</button>
         <p id="payerDebitCheckStatus" class="inline-note" role="status" aria-live="polite">After paying in your UPI app, return here and check for available evidence.</p>

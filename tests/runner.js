@@ -49,7 +49,8 @@ const UNIT_TESTS = [
   'test-cors-origin-contract.js', // configured multi-origin CSRF / CORS agreement
   'test-ponytail-retired-paths.js', // no stale browser controller, debug console or dead workflows
   'test-frontend-parity.js', // all canonical assets and binary files must match deployment copies
-  'test-checkout-edge-gateway.js', // Pages checkout HTML must remain independent from Railway 502
+  'test-checkout-edge-gateway.js',
+  'test-checkout-deployment-freshness.js', // Ponytail: local vs live checkout drift detection, no payment // Pages checkout HTML must remain independent from Railway 502
   'test-financial-money.js',
   'test-utr-confidence-source.js', // forged UTR success receipts cannot release
   'test-clerk-merchant-auth.js', // Clerk FAPI CSP, signup and login bootstrapping

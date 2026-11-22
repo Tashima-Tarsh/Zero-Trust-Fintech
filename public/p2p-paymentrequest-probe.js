@@ -75,11 +75,18 @@ function attach(session,env){
  const launch=doc.getElementById('p2pPaymentRequestLaunch');
  const status=doc.getElementById('p2pPaymentRequestStatus');
  if(timed){
-  // Keep the legacy P2P experiment untouched; only label the opt-in signed path.
-  if(probe)probe.textContent='Recheck Google Pay availability';
+  // Keep legacy diagnostics behind ?paymentrequest=1, but show customer copy
+  // for the signed Google Pay method on the actual P2P chooser route.
+  const heading=node.querySelector?.('strong');
+  const intro=node.querySelector?.('p.inline-note');
+  if(heading)heading.textContent='Pay securely with Google Pay';
+  if(intro)intro.textContent='Verify your device, then pay in your existing Google Pay app.';
+  if(probe){probe.textContent='Recheck Google Pay availability';probe.hidden=true}
   if(launch)launch.textContent='Pay with Google Pay';
  }
- const emit=o=>{status.textContent=JSON.stringify(o)};
+ const emit=o=>{status.textContent=timed&&o?.message?o.message:
+   timed&&o?.state==='READY_FOR_USER_INITIATED_PAYMENT'?
+     'Verify yourself to check Google Pay availability':JSON.stringify(o)};
  const inWindow=()=>Number.isFinite(session.expiresAt)&&Date.now()<session.expiresAt;
  let request=null,used=false,cleanup=()=>{},timedRef=null,timedExpiresAt=null;
  launch.disabled=timed||!(inWindow()&&win.isSecureContext&&typeof win.PaymentRequest==='function'&&env.isAuthorized?.()===true);
@@ -104,6 +111,7 @@ function attach(session,env){
     if(!inWindow()||Date.now()>=timedExpiresAt){request=null;emit({state:'SESSION_EXPIRED'});return}
     if(!available)request=null;
     launch.disabled=!available||env.isAuthorized?.()!==true;
+    if(probe)probe.hidden=available; // Recheck is available if the method is missing.
     emit({state:available?'TIMED_PROVIDER_METHOD_FOUND':'NO_TIMED_PROVIDER_METHOD',
      message:available?'Google Pay payment method available · ready for Pay click':
       'Supported Google Pay method unavailable for this checkout',
@@ -115,7 +123,11 @@ function attach(session,env){
    if(!inWindow()){emit({state:'SESSION_EXPIRED'});return}
    request=available?candidate:null;launch.disabled=!available||env.isAuthorized?.()!==true;
    emit({state:available?'P2P_METHOD_HANDLER_FOUND':'NO_P2P_METHOD_HANDLER',realPaymentStarted:false});
-  }catch(e){emit({state:'CAPABILITY_PROBE_FAILED',errorName:e?.name||'Error'})}
+  }catch(e){
+   if(timed&&probe)probe.hidden=false;
+   emit({state:'CAPABILITY_PROBE_FAILED',errorName:e?.name||'Error',
+    message:timed?'Could not prepare Google Pay. You can retry or use Copy UPI ID.':undefined});
+  }
  });
  launch.addEventListener('click',async()=>{
   if(used||!inWindow())return;

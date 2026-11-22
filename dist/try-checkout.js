@@ -34,10 +34,15 @@
    if(!/^[A-Za-z0-9_-]{6,150}$/.test(result.orderId||'')||
       !/^[a-f0-9]{24,64}$/i.test(result.sessionId||'')||result.paymentType!=='P2P')
     throw Error('Payment session validation failed.');
-   const checkout=new URL('/p2p',location.origin);
+   // Use Railway's canonical server-served checkout, not an older Pages shell.
+   // Cloudflare keeps /p2p as a static offline fallback for historical links.
+   const checkout=new URL('/api/runtime/checkout',location.origin);
    checkout.searchParams.set('orderId',result.orderId);
    checkout.searchParams.set('token',result.sessionId);
    checkout.searchParams.set('proofbridge','1');
+   // PR #140's signed-return path must be reachable from the actual P2P chooser.
+   // Eligibility is checked after the existing payer authentication succeeds.
+   checkout.searchParams.set('timedprovider','1');
    location.assign(checkout.pathname+checkout.search);
   }catch(e){fail(e.message||'Payment request unavailable.')}
  }

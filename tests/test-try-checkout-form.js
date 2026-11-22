@@ -41,7 +41,8 @@ async function flush(){for(let i=0;i<60;i++)await Promise.resolve()}
  assert.equal(url.searchParams.get('amount'),'1.00');
  assert.equal(url.searchParams.has('vpa'),false,'Never copy customer-substituted receiving UPI ID');
  const selected=new URL(p2p.nav[0],'https://checkout.test');
- assert.equal(selected.pathname,'/p2p');
+ assert.equal(selected.pathname,'/api/runtime/checkout', 'Customer uses canonical Railway P2P shell');
+ assert.equal(selected.searchParams.get('timedprovider'),'1', 'Signed Google Pay return must be reachable through actual chooser');
  assert.equal(selected.searchParams.get('proofbridge'),'1');
  assert.equal(selected.searchParams.get('token'),'b'.repeat(48));
 
