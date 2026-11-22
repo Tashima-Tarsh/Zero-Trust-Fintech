@@ -137,7 +137,12 @@ internal object SessionObservation {
                 extras.getCharSequence(Notification.EXTRA_BIG_TEXT))
                 .plus(extras.getCharSequenceArray(Notification.EXTRA_TEXT_LINES)?.toList().orEmpty())
                 .distinct().joinToString("\n")
-            val result = DebitNotification.parse(extras.getCharSequence(Notification.EXTRA_TITLE), body)
+            // A messaging-app notification is not an authenticated bank SMS.
+            // Its visible preview requires the same explicit, complete debit
+            // facts as a payer-app alert and remains unverified server-side.
+            val result = if (DebitSmsNotification.sources.contains(lease.sourcePackage))
+                DebitSmsNotification.parse(extras.getCharSequence(Notification.EXTRA_TITLE), body)
+            else DebitNotification.parse(extras.getCharSequence(Notification.EXTRA_TITLE), body)
             val fields = result.evidence
             if (fields == null) {
                 report(result.status)
