@@ -1,13 +1,13 @@
 'use strict';
 const test=require('node:test'),assert=require('node:assert/strict');
 const {fingerprint,makeReplayGuard,initUpiAppEvidenceReplay}=require('../financial/upi-app-evidence-replay');
-test('same transaction fingerprint is stable but differs on provider, transaction id or ref',()=>{
+test('same provider transaction cannot be reused with a different transaction reference',()=>{
  const a=fingerprint('GOOGLE_PAY','TXN-1','ORDER1');
  assert.match(a,/^[a-f0-9]{64}$/);
  assert.equal(fingerprint('GOOGLE_PAY','TXN-1','ORDER1'),a);
  assert.notEqual(fingerprint('GOOGLE_PAY','TXN-2','ORDER1'),a);
  assert.notEqual(fingerprint('PHONEPE','TXN-1','ORDER1'),a);
- assert.notEqual(fingerprint('GOOGLE_PAY','TXN-1','ORDER2'),a);
+ assert.equal(fingerprint('GOOGLE_PAY','TXN-1','ORDER2'),a);
 });
 test('atomic duplicate guard returns false for repeated provider transaction',async()=>{
  const seen=new Set();
