@@ -35,6 +35,21 @@ for(const [label,result,reason] of cases){
  assert.equal(result.paymentVerified,false,label);
  assert.equal(result.debitVerified,false,label);
 }
+// User-supplied signed Google Pay evidence prototype: invalid explicit UPI
+// result codes must never be promoted, even when Status says SUCCESS.
+for(const badCode of ['ZM','Z9','91','05',null]){
+ const r=verifyGooglePay(signed({responseCode:badCode}),expected,keys);
+ assert.equal(r.signatureVerified,true);
+ assert.equal(r.providerReportedSuccess,false,'explicit failure code: '+badCode);
+ assert.equal(r.debitVerified,false);
+}
+for(const okCode of ['0','00']){
+ const r=verifyGooglePay(signed({responseCode:okCode}),expected,keys);
+ assert.equal(r.providerReportedSuccess,true);
+ assert.equal(r.debitVerified,false);
+}
+const submitted=verifyGooglePay(signed({Status:'SUBMITTED',responseCode:'00'}),expected,keys);
+assert.equal(submitted.providerReportedSuccess,false);
 const failure=verifyGooglePay(signed({Status:'FAILURE'}),expected,keys);
 assert.equal(failure.signatureVerified,true);
 assert.equal(failure.providerReportedSuccess,false);
