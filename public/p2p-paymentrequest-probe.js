@@ -117,6 +117,12 @@ function attach(session,env){
    timeline.record('PAYMENT_RESPONSE');
    const observation=inspect(response,config.expected);
    emit({...observation,automaticSignals:timeline.snapshot(observation)});
+   // The checkout controller sends the raw response to DISHA's session-authenticated
+   // verification endpoint; the probe itself neither stores nor promotes payment claims.
+   if(typeof env.onPaymentResponse==='function'){
+    try{await env.onPaymentResponse({methodName:response.methodName,details:response.details});}
+    catch(_){emit({state:'APP_RESPONSE_VERIFICATION_UNAVAILABLE',debitVerified:false,paymentVerified:false})}
+   }
   }catch(e){
    timeline.record('PAYMENT_ERROR');
    emit({state:'P2P_PAYMENT_REQUEST_CANCELLED_OR_FAILED',errorName:e?.name||'Error',
