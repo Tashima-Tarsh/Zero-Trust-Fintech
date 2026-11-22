@@ -29,7 +29,7 @@ test('visible signed provider choice follows mandatory payer authentication',()=
   'Customer Pay button should follow device authentication, before legacy fallback controls');
  const code=fs.readFileSync(path.join(root,'public/p2p-paymentrequest-probe.js'),'utf8');
  assert.match(code,/Pay securely with Google Pay/);
- assert.match(code,/probe.hidden=true/);
+ assert.match(code,/probe.hidden=false/);
  assert.match(code,/probe.hidden=available/);
 });
 test('signed response flow is default on P2P and Chrome pay still requires gesture',()=>{
@@ -39,7 +39,7 @@ test('signed response flow is default on P2P and Chrome pay still requires gestu
  assert.match(code,/response=await request\.show\(\)/);
  assert.match(code,/if\(env\.isAuthorized\?\.\(\)!==true\)/);
  assert.match(code,/Date\.now\(\)>=timedExpiresAt/);
- assert.match(code,/Recheck Google Pay availability/);
+ assert.match(code,/Check Google Pay compatibility/);
  assert.match(code,/Pay with Google Pay/);
  const server=fs.readFileSync(path.join(root,'financial/timed-payment-bridge.js'),'utf8');
  assert.match(server,/crypto\.randomBytes\(16\)\.toString\('hex'\)/);
