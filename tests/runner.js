@@ -65,7 +65,8 @@ const UNIT_TESTS = [
   'test-upi-app-evidence-replay.js', // atomic PostgreSQL replay, concurrent rejects and fail-closed storage // authenticated payment handler callback, read-only signature checks // fail-closed provider signature verification, no ledger write
   'test-p2p-paymentrequest-experiment.js', // gated P2P PaymentRequest capability and response, no ledger mutation
   'test-p2p-ninety-second-evidence-gate.js', // server timer, copy-only display and no false payments // Sourced headers: never promote claimed sender to debit proof
-  'test-payer-debit-button.js', // I Paid: read-only P2P evidence, no false verified payment
+  'test-payer-debit-button.js',
+  'test-copy-return-observer.js', // automatic copy/background/return evidence lookup, no debit promotion // I Paid: read-only P2P evidence, no false verified payment
   'test-proofbridge.js', // zero-install consent gate and issuer-signed capsule contract
   'test-proofbridge-checkout-flow.js', // consent preflight + native gesture copy + return proof
   'test-high-concurrency-limiter.js', // no O(total IPs) hot-path cleanup before 100K load tests

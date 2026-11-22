@@ -22,6 +22,7 @@
  let expiryLogged=false;
  // Browser-only diagnostics for direct QR taps. Not evidence of a bank payment.
  let qrTapStartedAt=0,qrAppBackgrounded=false,lastNativeLaunchAt=0;
+ let copyReturnObserver=null;
  // Prevent rapid repeated taps from dispatching another UPI activity while
  // the first handoff is still opening or returning.
  const nativeLaunchCooldownMs=6000;
@@ -401,6 +402,9 @@
  function onReturn(){
   if(!session||receiptShown||document.visibilityState==='hidden')return;
   tickSessionTimer();
+  // A return after a copied UPI ID triggers an automatic session-bound read,
+  // not a bank-debit assertion. Observer ignores duplicate focus/pageshow events.
+  copyReturnObserver?.foreground();
   if(quantumEnabled&&quantumReady&&quantumClient){
    void quantumClient.returned(session).then(result=>{
     if(!result)return;
@@ -586,6 +590,7 @@
    if(!payee){message('Receiving UPI ID is unavailable. Request a fresh link.','error');return;}
    get('vaultProceed').setAttribute('aria-disabled','true');
    proofbridgeCopyVpa(payee).then(()=>{
+    copyReturnObserver?.markCopied(session);
     get('vaultProceed').setAttribute('aria-disabled','false');
     const handoff=get('copyHandoff');
     if(handoff){
@@ -702,7 +707,7 @@
   });
   document.addEventListener('visibilitychange',()=>{
    if(document.visibilityState==='hidden'){
-
+    copyReturnObserver?.background();
 
     if(qrTapStartedAt&&!qrAppBackgrounded){
      qrAppBackgrounded=true;
@@ -720,6 +725,26 @@
   setEventHandlers();showStage('qr');
   try{
    session=await getSession();
+   // Read-only automatic check on Chrome return after copying the receiving VPA.
+   copyReturnObserver=window.DISHACopyReturnObserver?.create({
+    onState:event=>trace(event),
+    onObservation:async bound=>{
+     if(session!==bound||expired()||receiptShown)return;
+     const label=get('payerDebitCheckStatus');
+     if(label)label.textContent='Checking payer-side evidence automatically after Android return…';
+     try{
+      const url='/api/payer-debit-evidence/'+encodeURIComponent(bound.orderId)+
+       '?token='+encodeURIComponent(bound.token);
+      const response=await fetch(url,{credentials:'same-origin',cache:'no-store'});
+      if(!response.ok||session!==bound||expired())return;
+      const result=await response.json();
+      if(label)label.textContent=result.debitVerified===true&&result.paymentVerified===true?
+       'Authenticated debit evidence reported.':'Android return observed; authenticated debit evidence not yet available.';
+     }catch(_){
+      if(label)label.textContent='Android return observed; evidence check unavailable.';
+     }
+    }
+   })||null;
    configureProofbridge();
 
 
