@@ -597,6 +597,8 @@
     p2pTrustedUntil=verdict.expiresAt;
     if(status)status.textContent='Payer and device checks verified for this checkout.';
     renderQr();
+    const payLaunch=get('p2pPaymentRequestLaunch');
+    if(payLaunch&&window.isSecureContext!==false&&typeof window.PaymentRequest==='function')payLaunch.disabled=false;
    }catch(_){
     p2pTrustedUntil=0;
     if(status)status.textContent='Payment locked: payer authentication or trusted device checks unavailable.';
