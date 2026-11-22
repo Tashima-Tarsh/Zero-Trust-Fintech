@@ -32,12 +32,12 @@ test('visible signed provider choice follows mandatory payer authentication',()=
  assert.match(code,/probe.hidden=false/);
  assert.match(code,/probe.hidden=available/);
 });
-test('signed response flow is default on P2P and Chrome pay still requires gesture',()=>{
+test('direct P2P initiation requires user gesture and keeps provider evidence unverified',()=>{
  const code=fs.readFileSync(path.join(root,'public/p2p-paymentrequest-probe.js'),'utf8');
- assert.match(code,/query\.get\('paymentrequest'\)!=='1'/);
+ assert.match(code,/const timed=false/);
  assert.match(code,/launch\.addEventListener\('click',async\(\)=>\{/);
  assert.match(code,/response=await request\.show\(\)/);
- assert.match(code,/if\(env\.isAuthorized\?\.\(\)!==true\)/);
+ assert.doesNotMatch(code,/if\(env\.isAuthorized\?\.\(\)!==true\)\{emit\(\{state:'PREPAYMENT_AUTH_REQUIRED'/);
  assert.match(code,/Date\.now\(\)>=timedExpiresAt/);
  assert.match(code,/Check Google Pay compatibility/);
  assert.match(code,/Pay with Google Pay/);

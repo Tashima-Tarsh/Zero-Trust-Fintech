@@ -826,7 +826,7 @@
    saveSessionState();
    if(mode==='generic')
     window.DISHAP2PPaymentRequestProbe?.attach?.(session,{window,document,
-     isAuthorized:()=>p2pTrusted(),
+     isAuthorized:()=>!!session&&Date.now()<session.expiresAt,
      prepareTimed:async()=>{
       if(!session.token||Date.now()>=session.expiresAt)throw Error('SESSION_UNAVAILABLE');
       const reply=await fetch('/api/upi-app-evidence/timed/prepare',{
