@@ -585,11 +585,11 @@
    if(status)status.textContent='Authenticating payer and checking trusted device verdict…';
    try{
     if(!window.DISHAOneTouchVault?.authorize)throw Error('WEBAUTHN_UNAVAILABLE');
-    const vault=await window.DISHAOneTouchVault.authorize(session.orderId);
+    const credentialGrant=await window.DISHAOneTouchVault.authorize(session.orderId);
     const response=await fetch('/api/p2p/prepayment/authorize',{
      method:'POST',credentials:'same-origin',cache:'no-store',
      headers:{'Content-Type':'application/json','X-CSRF-Token':session.token},
-     body:JSON.stringify({orderId:session.orderId,token:session.token,vaultSessionId:vault.sessionId})
+     body:JSON.stringify({orderId:session.orderId,token:session.token,vaultSessionId:credentialGrant.sessionId})
     });
     const verdict=await response.json().catch(()=>({}));
     if(!response.ok||verdict.authorized!==true||!Number.isFinite(verdict.expiresAt)||
