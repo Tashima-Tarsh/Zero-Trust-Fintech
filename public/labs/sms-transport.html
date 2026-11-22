@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="referrer" content="no-referrer">
+<title>DISHA · Android SMS Transport Differential Lab</title>
+<style>
+:root{font-family:system-ui,sans-serif;color-scheme:dark;background:#101725;color:#e8eef8}
+body{max-width:660px;margin:2rem auto;padding:1rem;line-height:1.5}
+h1{font-size:1.45rem}button{font:inherit;padding:.7rem 1rem;margin:.5rem .5rem .5rem 0}
+button:disabled{opacity:.5}code{overflow-wrap:anywhere}
+section{border:1px solid #65718c;border-radius:10px;padding:1rem;margin-top:1rem}
+strong{color:#e9bd7e}li{margin:.3rem 0;font-size:.9rem}
+</style>
+<script src="/labs/sms-transport.js" defer></script>
+</head>
+<body>
+<h1>DISHA Android → Chrome SMS Transport Experiment</h1>
+<p>Test-only. No payment is started. No SMS is uploaded, saved, or transmitted to DISHA.</p>
+<section>
+<strong>Question: can Chrome receive a bank-like debit SMS through WebOTP?</strong>
+<p>This experiment separately injects a synthetic bank alert and an origin-bound OTP via Android Emulator ADB. A WebOTP result is NOT a bank debit or a general SMS reader.</p>
+<p>Origin for the OTP SMS: <code id="smsLabDomain">—</code></p>
+<p>Current one-time test code: <strong><code id="smsLabOtp">Press Start to generate</code></strong></p>
+<label><input type="checkbox" id="smsLabConsent"> I explicitly authorize this 90-second synthetic SMS transport test.</label>
+<p><button id="smsLabBegin" type="button" disabled>Start 90-second WebOTP listener</button>
+<button id="smsLabEnd" type="button" disabled>Stop and revoke</button></p>
+<p id="smsLabStatus" role="status" aria-live="polite">Initializing…</p>
+</section>
+<section>
+<strong>Experiment procedure</strong>
+<ol>
+<li>Open this page through local Chrome on the emulator using the supplied ADB script.</li>
+<li>Tick consent and press Start; keep the page open and note the displayed 6-digit code.</li>
+<li>Run <code>run.ps1 -Mode Debit</code> and observe whether Chrome returns a code.</li>
+<li>Restart the 90-second listener, run <code>run.ps1 -Mode Otp -Code 123456</code>, replacing <code>123456</code> with the displayed code. If the phone prompts, accept it.</li>
+<li>Compare the states. Bank-like SMS delivery to Android is distinct from Chrome getting the full bank SMS.</li>
+</ol>
+<p>This does not test real banking SMS, message origin authenticity, root/debugger attestation, or customer production checkout.</p>
+</section>
+<section>
+<strong>Observed browser events (local only)</strong>
+<ul id="smsLabObservations" aria-live="polite"></ul>
+</section>
+</body>
+</html>
