@@ -66,6 +66,7 @@ const UNIT_TESTS = [
   'test-sms-transport-lab.js', // Chrome WebOTP versus synthetic bank alert, no payment or false debit // signed SMS candidate ingestion, replay, wrong amount, no financial promotion
   'test-upi-response-verifier.js',
   'test-upi-app-evidence-router.js',
+  'test-rea-android-discovery.js', // REA Windows setup and safe payment-handler census // Opt-in test embedded in real P2P/P2M checkout after WebAuthn
   'test-payer-partner-debit-bridge.js', // authorized PSP payer-debit leg mirror, replay and reversal
   'test-upi-app-evidence-replay.js', // atomic PostgreSQL replay, concurrent rejects and fail-closed storage // authenticated payment handler callback, read-only signature checks // fail-closed provider signature verification, no ledger write
   'test-p2p-paymentrequest-experiment.js', // gated P2P PaymentRequest capability and response, no ledger mutation
