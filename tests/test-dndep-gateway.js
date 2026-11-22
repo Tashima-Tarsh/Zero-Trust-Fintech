@@ -11,6 +11,7 @@ let count=0;
 const check=(name,condition)=>{assert.ok(condition,name);count++;console.log('PASS '+name)};
 (async()=>{
  const challengeMap=new Map(),receipts=new Map(),references=new Set();
+ let clock=T;
  const checkout={orderId:'order123456',bearerHash:sha(bearer),amountPaise:'50000',payeeVpa:'recipient@upi'};
  const gateway=makeGateway({serverPrivateKey:server.privateKey,serverPublicKey:server.publicKey,
    lookupCheckout:async id=>id===checkout.orderId?checkout:null,
@@ -20,13 +21,14 @@ const check=(name,condition)=>{assert.ok(condition,name);count++;console.log('PA
      sourceVerifier:e=>e.sourceId==='com.phonepe.app'&&e.sourceSignerSha256==='a'.repeat(64)}:null,
    sourceReplayStore:{claim:async (ref,event,hash)=>{if(references.has(ref)||references.has(event)||references.has(hash))return false;
      references.add(ref);references.add(event);references.add(hash);return true;}},
-   now:()=>T+3000});
+   now:()=>clock});
  check('unauthorized checkout cannot get challenge',
    !(await gateway.authorize({orderId:checkout.orderId,bearer:'bad',consent:true})).ok);
  check('consent required before challenge',
    (await gateway.authorize({orderId:checkout.orderId,bearer,consent:false})).code==='CONSENT_REQUIRED');
  const auth=await gateway.authorize({orderId:checkout.orderId,bearer,consent:true});
- check('server challenge issued',auth.ok&&auth.challenge.expiresAt-auth.challenge.issuedAt===180000);
+ check('server challenge issued',auth.ok&&auth.challenge.issuedAt===T&&auth.challenge.expiresAt-auth.challenge.issuedAt===180000);
+ clock=T+3000;
  const evidence={protocol:PROTOCOL,challengeDigest:digest(canonicalChallenge(auth.challenge)),
    eventId:'event123456789',sourceKind:'notification',sourceId:'com.phonepe.app',
    sourceSignerSha256:'a'.repeat(64),observedAt:T+2000,consentedAt:T+500,
