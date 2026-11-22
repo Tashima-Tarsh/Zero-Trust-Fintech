@@ -10,7 +10,7 @@ test('all checkout mirrors use identical authenticated timed provider wiring',()
  for(const code of contents){
   const auth=code.indexOf('p2pTrustedUntil=verdict.expiresAt;');
   const auto=code.indexOf("if(query.get('paymentrequest')!=='1'){",auth);
-  const challenge=code.indexOf("get('p2pPaymentRequestCheck')?.click();",auto);
+  const challenge=code.indexOf("if(typeof capabilityButton?.click==='function')capabilityButton.click();",auto);
   assert.ok(auth>=0&&auto>auth&&challenge>auto);
   assert.match(code,/if\(payLaunch\)payLaunch\.disabled=true;/);
   assert.match(code,/prepareTimed:async\(\)=>\{/);
