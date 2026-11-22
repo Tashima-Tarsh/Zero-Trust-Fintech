@@ -778,7 +778,8 @@
   // User-initiated Android bridge. A 60-second one-time ticket (not the
   // checkout bearer) moves from Chrome to the installed DISHA observation app.
   // Both steps require user gestures; no SMS/notification content enters Chrome.
-  if(debitButton&&/Android/i.test(navigator.userAgent)){
+  if(debitButton&&/Android/i.test(navigator.userAgent)&&
+     typeof document.createElement==='function'&&typeof debitButton.insertAdjacentElement==='function'){
    const pairButton=document.createElement('button');
    pairButton.type='button';
    pairButton.textContent='Connect Android debit observer';
