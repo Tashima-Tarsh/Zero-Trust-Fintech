@@ -9,8 +9,8 @@ function constantEqual(a,b){
  const ha=crypto.createHash('sha256').update(a).digest(),hb=crypto.createHash('sha256').update(b).digest();
  return crypto.timingSafeEqual(ha,hb);
 }
-function createUpiAppEvidenceRouter({getSession,getTrustedKeys,clock=()=>Date.now()}){
- if(typeof getSession!=='function'||typeof getTrustedKeys!=='function')throw Error('EVIDENCE_DEPENDENCIES_REQUIRED');
+function createUpiAppEvidenceRouter({getSession,getTrustedKeys,consumeReplay,clock=()=>Date.now()}){
+ if(typeof getSession!=='function'||typeof getTrustedKeys!=='function'||typeof consumeReplay!=='function')throw Error('EVIDENCE_DEPENDENCIES_REQUIRED');
  const router=express.Router();
  router.post('/verify',async(req,res)=>{
   res.set('Cache-Control','no-store');
@@ -37,9 +37,23 @@ function createUpiAppEvidenceRouter({getSession,getTrustedKeys,clock=()=>Date.no
   try{keys=getTrustedKeys()}catch(_){keys={}}
   const evidence=verifyUPIResponse({provider:methodName==='https://tez.google.com/pay'?'GOOGLE_PAY':'OTHER_UPI',
    response:{methodName,details},expected,trustedKeys:keys});
+  let replayProtected=false;
+  if(evidence.signatureVerified===true&&evidence.reason==='AUTHENTIC_APP_REPORTED_SUCCESS'){
+   try{
+    replayProtected=await consumeReplay({provider:evidence.provider,txnId:evidence.txnId,
+     txnRef:evidence.txnRef,orderId});
+   }catch(_){
+    return res.status(503).json({state:'EVIDENCE_REPLAY_STORE_UNAVAILABLE',
+     signatureVerified:false,debitVerified:false,paymentVerified:false,paymentStateChanged:false});
+   }
+   if(!replayProtected)return res.status(409).json({
+    state:'DUPLICATE_APP_RESPONSE',signatureVerified:false,
+    debitVerified:false,paymentVerified:false,paymentStateChanged:false});
+  }
   // No response payload or payer PII is stored. Verified signature is not confirmation of debit.
   return res.json({state:'APP_RESPONSE_VERIFICATION_COMPLETED',orderId,
    signatureVerified:evidence.signatureVerified===true,
+   replayProtected,
    responseReason:evidence.reason,provider:evidence.provider,
    providerReportedSuccess:evidence.providerReportedSuccess===true,
    debitVerified:false,paymentVerified:false,settlementVerified:false,paymentStateChanged:false});
