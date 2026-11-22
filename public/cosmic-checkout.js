@@ -743,7 +743,25 @@
      const explanation=trustMissing?
       'Android evidence is present but trusted device provenance is not established. Bank debit remains unverified.':
       'Debit evidence could not be validated because it conflicts with this checkout. No payment is verified.';
-     if(!passive)showDebitEvidence(explanation);
+     const candidate=trustMissing&&evidence.paymentVerified===false&&
+       evidence.debitVerified===false&&evidence.evidence?.find(x=>
+       x.source==='DEVICE_OBSERVATION'&&x.deviceSignatureVerified===true&&
+       /^\\d{12}$/.test(x.utr||'')&&['UTR','RRN'].includes(x.referenceKind)&&
+       x.amountPaise===String(Math.round(session.amount*100))&&
+       String(x.payeeVpa).toLowerCase()===String(session.payeeVpa).toLowerCase());
+     if(candidate&&typeof evidenceDialog?.showModal==='function'&&!passive){
+      get('debitEvidenceTitle').textContent='Unverified Android debit observation';
+      get('debitEvidenceDialogStatus').textContent=explanation;
+      const fields=get('debitEvidenceDialogFields');fields.replaceChildren();
+      for(const [name,value] of [
+       ['Source',candidate.source],['Amount',format(Number(candidate.amountPaise)/100)],
+       [candidate.referenceKind,candidate.utr],['Trust level','Device signature only; bank and OS provenance unverified']
+      ]){
+       const term=document.createElement('dt'),description=document.createElement('dd');
+       term.textContent=name;description.textContent=value;fields.append(term,description);
+      }
+      if(!evidenceDialog.open)evidenceDialog.showModal();
+     }else if(!passive)showDebitEvidence(explanation);
      if(status)status.textContent=explanation;
      return;
     }else{
