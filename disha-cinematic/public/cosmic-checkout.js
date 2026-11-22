@@ -593,7 +593,12 @@
     });
     const verdict=await response.json().catch(()=>({}));
     if(!response.ok||verdict.authorized!==true||!Number.isFinite(verdict.expiresAt)||
-       verdict.expiresAt<=Date.now())throw Error('PREPAYMENT_TRUST_DENIED');
+       verdict.expiresAt<=Date.now()){
+      const allowedReasons=['DEVICE_INTEGRITY_NOT_VERIFIED','DEBUGGER_RISK_NOT_VERIFIED',
+       'PAYER_USER_VERIFICATION_REQUIRED','SESSION_INVALID_OR_EXPIRED'];
+      const reasons=Array.isArray(verdict.reasons)?verdict.reasons.filter(x=>allowedReasons.includes(x)):[];
+      throw Error(reasons[0]||'PREPAYMENT_TRUST_DENIED');
+    }
     p2pTrustedUntil=verdict.expiresAt;
     if(status)status.textContent='Payer and device checks verified for this checkout.';
     renderQr();
@@ -610,7 +615,8 @@
    }catch(error){
     p2pTrustedUntil=0;
     const reason=error?.message==='WEBAUTHN_UNAVAILABLE'?'WEBAUTHN_UNAVAILABLE':
-      error?.message==='PREPAYMENT_TRUST_DENIED'?'PREPAYMENT_TRUST_DENIED':
+      ['PREPAYMENT_TRUST_DENIED','DEVICE_INTEGRITY_NOT_VERIFIED','DEBUGGER_RISK_NOT_VERIFIED',
+       'PAYER_USER_VERIFICATION_REQUIRED','SESSION_INVALID_OR_EXPIRED'].includes(error?.message)?error.message:
       error?.name==='NotAllowedError'?'AUTHENTICATION_CANCELLED_OR_DENIED':
       error?.name==='SecurityError'?'AUTHENTICATION_SECURITY_ERROR':
       'AUTHENTICATION_OR_DEVICE_TRUST_FAILED';
