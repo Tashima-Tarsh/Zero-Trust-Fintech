@@ -13,6 +13,12 @@ test "$(adb shell getprop ro.kernel.qemu | tr -d '\r')" = 1 || {
 }
 adb root
 adb wait-for-device
+# OverlayFS requires disabling verified boot and rebooting the disposable emulator first.
+adb disable-verity
+adb reboot
+adb wait-for-device
+adb root
+adb wait-for-device
 adb remount
 adb shell mkdir -p /system/priv-app/DishaBroker
 adb push "$apk" /system/priv-app/DishaBroker/DishaBroker.apk
