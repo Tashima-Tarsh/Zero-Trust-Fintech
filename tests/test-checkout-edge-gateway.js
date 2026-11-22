@@ -43,7 +43,7 @@ vm.runInContext(worker.replace('export default','globalThis.edge ='),context,{fi
   const body=u.pathname.endsWith('.js')?'// DISHA static checkout JS':checkout;
   return new Response(body,{status:200,headers:{'content-type':u.pathname.endsWith('.js')?'text/javascript':'text/html'}});
  }}};
- for(const route of ['/checkout','/checkout/','/pay','/pay/']){
+ for(const route of ['/checkout','/checkout/','/pay','/pay/','/p2p','/p2m/checkout']){
   const res=await context.edge.fetch(new Request('https://disha8-2.thenitishkr.in'+route),env);
   assert.equal(res.status,200,route+' must remain static even if Railway is down');
   assert.match(await res.text(),/<html/i);
@@ -64,7 +64,7 @@ vm.runInContext(worker.replace('export default','globalThis.edge ='),context,{fi
   const result=await context.edge.fetch(new Request('https://disha8-2.thenitishkr.in'+url),env);
   assert.equal(result.status,502,'Canonical runtime should expose backend outage, not stale Pages code: '+url);
  }
- assert.equal(assets,4,'Legacy offline P2P pages stay on Pages');
+ assert.equal(assets,6,'Legacy P2P and P2M fallback pages stay on Pages');
  assert.equal(upstream,8,'Eight canonical P2P/P2M runtime requests must use Railway');
  const api=await context.edge.fetch(new Request('https://disha8-2.thenitishkr.in/api/merchant/public/order/example'),env);
  assert.equal(api.status,502,'Dynamic merchant payment order depends on Railway backend');
