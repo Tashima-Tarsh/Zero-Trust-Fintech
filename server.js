@@ -945,7 +945,7 @@ app.get('/api/payer-debit-evidence/:orderId', verifyLimiter, async (req,res)=>{
     Object.assign(result,await readDebitEvidenceReceipt(db.pgPool,id,session));
     const sources=[
       {source:'DEVICE_OBSERVATION',sql:
-        'SELECT transaction_ref AS utr,amount_paise,payee_vpa,posted_at AS observed_at,reference_kind '+
+        'SELECT transaction_ref AS utr,amount_paise,payee_vpa,posted_at AS observed_at,reference_kind,package_name '+
         "FROM disha_session_evidence_events WHERE order_id=$1 AND decision_state='SIGNAL_MATCHED' "+
         'ORDER BY (reference_kind IS NOT NULL) DESC, posted_at DESC LIMIT 5'},
       {source:'DEVICE_UPI_RESULT',sql:
@@ -971,7 +971,11 @@ app.get('/api/payer-debit-evidence/:orderId', verifyLimiter, async (req,res)=>{
           if(!/^\d{12}$/.test(String(r.utr||''))||String(r.amount_paise)!==amountPaise||
              String(r.payee_vpa||'').toLowerCase()!==payee)continue;
           if(result.evidence.some(e=>e.utr===r.utr))continue;
-          result.evidence.push({utr:r.utr,source:source.source,amountPaise,payeeVpa:payee,
+          result.evidence.push({utr:r.utr,
+            source:source.source==='DEVICE_OBSERVATION' &&
+              ['com.google.android.apps.messaging','com.android.mms'].includes(r.package_name)?
+              'SMS_NOTIFICATION_UNVERIFIED':source.source,
+            amountPaise,payeeVpa:payee,
             observedAt:Number(r.observed_at),authenticatedDebit:false,
             ...(source.source==='DEVICE_OBSERVATION'&&['UTR','RRN'].includes(r.reference_kind)?
               {referenceKind:r.reference_kind,deviceSignatureVerified:true}:{})});
