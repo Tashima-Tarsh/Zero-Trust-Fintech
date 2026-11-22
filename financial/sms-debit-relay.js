@@ -7,7 +7,7 @@ const {lookupBankSender}=require('./bank-sms-header-registry');
 const TABLE='disha_sms_debit_candidates';
 async function initSmsDebitRelay(pool){
  if(!pool)throw Error('SMS_RELAY_POSTGRES_REQUIRED');
- await pool.query(\`CREATE TABLE IF NOT EXISTS \${TABLE} (
+ await pool.query(`CREATE TABLE IF NOT EXISTS ${TABLE} (
   event_hash TEXT PRIMARY KEY,
   order_id TEXT NOT NULL,
   source_id TEXT NOT NULL,
@@ -21,8 +21,8 @@ async function initSmsDebitRelay(pool){
   evidence_authenticated BOOLEAN NOT NULL DEFAULT FALSE,
   debit_verified BOOLEAN NOT NULL DEFAULT FALSE,
   payment_verified BOOLEAN NOT NULL DEFAULT FALSE
- )\`);
- await pool.query(\`CREATE INDEX IF NOT EXISTS idx_sms_debit_candidates_order ON \${TABLE}(order_id,received_at DESC)\`);
+ )`);
+ await pool.query(`CREATE INDEX IF NOT EXISTS idx_sms_debit_candidates_order ON ${TABLE}(order_id,received_at DESC)`);
 }
 function canonicalEnvelope(input){
  if(!input||typeof input!=='object'||Array.isArray(input))throw Error('INVALID_ENVELOPE');
@@ -66,10 +66,10 @@ function createSmsDebitRelayRouter({getPool,getSession,getTrustedKeys,clock=()=>
    const match=matchDebitSmsToCheckout(candidate,session,{now});
    if(!match.matched)return res.status(409).json({accepted:false,error:'CHECKOUT_SMS_MISMATCH',reasons:match.reasons});
    const eventHash=crypto.createHash('sha256').update(canonicalEnvelope(envelope)).digest('hex');
-   const sql=\`INSERT INTO \${TABLE} (event_hash,order_id,source_id,amount_paise,utr_candidate,payee_vpa,
+   const sql=`INSERT INTO ${TABLE} (event_hash,order_id,source_id,amount_paise,utr_candidate,payee_vpa,
      sender_header_matched,observed_at,received_at,match_state,evidence_authenticated,debit_verified,payment_verified)
      VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,FALSE,FALSE,FALSE)
-     ON CONFLICT(event_hash) DO NOTHING RETURNING event_hash\`;
+     ON CONFLICT(event_hash) DO NOTHING RETURNING event_hash`;
    const result=await pool.query(sql,[eventHash,envelope.orderId,envelope.sourceId,candidate.amountPaise,
     candidate.utrCandidate,candidate.payeeVpaCandidate,candidate.senderHeaderMatched,candidate.receivedAt,
     now,'SESSION_MATCHED_SOURCE_SIGNED_SMS_UNVERIFIED']);
