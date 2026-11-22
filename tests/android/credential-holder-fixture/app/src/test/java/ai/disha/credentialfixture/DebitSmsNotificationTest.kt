@@ -19,6 +19,7 @@ class DebitSmsNotificationTest {
         assertNull(DebitSmsNotification.parse("Debited", body.replace("debited", "processed")).evidence)
         assertNull(DebitSmsNotification.parse("BANK", body.replace("RRN:", "transaction ID:")).evidence)
         assertNull(DebitSmsNotification.parse("BANK", body.replace("Payee VPA:", "beneficiary:")).evidence)
+        assertNull(DebitSmsNotification.parse("BANK", body.replace("fixture@invalid", "fixture@invalid@evil")).evidence)
         assertNull(DebitSmsNotification.parse("BANK", body.replace("Rs. 1.05", "1.05")).evidence)
         assertNull(DebitSmsNotification.parse("BANK", body.replace("debited", "will be debited")).evidence)
         assertNull(DebitSmsNotification.parse("BANK", body + "\nPayment pending").evidence)
