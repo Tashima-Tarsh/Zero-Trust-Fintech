@@ -20,7 +20,11 @@ for(const html of [checkout,merchant]){
  assert.match(html,/android-checkout-handshake\.js/);
  assert.match(html,/Bank|bank/);
 }
-assert.match(worker,/"android-checkout-handshake\.js"/);
+// After the Ponytail runtime fix, this experimental transport is delivered
+// by Railway's canonical JS allowlist, not an independently deployed Pages asset.
+const server=fs.readFileSync(path.join(rootPath,'server.js'),'utf8');
+assert.match(server,/'android-checkout-handshake\\.js'/);
+assert.doesNotMatch(worker,/checkoutFiles = new Set/);
 assert.match(paymentJs,/DISHAAndroidCheckoutHandshake\?\.attach/);
 assert.doesNotMatch(script,/(PAYER_DEBIT_VERIFIED|paymentVerified\s*:\s*true|fetch\s*\(|XMLHttpRequest)/);
 
