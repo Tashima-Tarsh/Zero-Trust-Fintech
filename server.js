@@ -671,7 +671,9 @@ app.post('/api/settlement/confirm', requireAdminAuth, async (req, res) => {
 async function generateSession(baseAmount = 100, description = '', customVpa = null) {
   const sessionId = crypto.randomBytes(16).toString('hex');
   const now = Date.now();
-  const expiresAt = now + (180 * 1000); // 3 minutes TTL
+  // P2P browser-only payment window is capped at 90 seconds from issuance.
+  // Server time is authoritative; this is a freshness limit, not debit proof.
+  const expiresAt = now + (90 * 1000);
   const qrRefreshAt = now + (15 * 1000); // 15 seconds dynamic refresh
   const orderId = 'PAY_' + crypto.randomBytes(5).toString('hex').toUpperCase();
   const txnRef = 'SRV' + crypto.randomBytes(12).toString('hex').toUpperCase();
