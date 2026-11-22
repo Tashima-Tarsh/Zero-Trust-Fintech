@@ -6,7 +6,7 @@ const html=read('public/checkout.html'),js=read('public/cosmic-checkout.js');
 const server=read('server.js'),proof=read('financial/proofbridge.js');
 assert.match(html,/id="payerDebitCheck"[^>]*disabled/);
 assert.match(js,/\/api\/payer-debit-evidence\//);
-assert.match(js,/No authenticated debit receipt/);
+assert.match(js,/No authenticated debit evidence is available/);
 assert.match(js,/original bank debit is NOT authenticated/i);
 assert.match(server,/app\.get\('\/api\/payer-debit-evidence\/:orderId'/);
 assert.match(server,/debitVerified:false/);
