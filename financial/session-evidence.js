@@ -491,36 +491,37 @@ async function readDebitEvidenceReceipt(pool, id, session, now = Date.now()) {
   if (String(session.status).toUpperCase() !== 'PENDING' || !(now < Number(session.expiresAt))) return {};
   const amountPaise = rupeesToPaise(String(session.challengeAmount));
   const payee = String(session.vpaAddress || '').trim().toLowerCase();
-  const {rows}=await pool.query(
+  const {rows} = await pool.query(
     "SELECT e.event_hash,e.package_name,e.transaction_ref,e.reference_kind,e.amount_paise,e.payee_vpa,e.posted_at,e.decision_state,d.public_key_pem "+
     'FROM disha_session_evidence_events e JOIN disha_session_evidence_consents c ON c.order_id=e.order_id '+
     'JOIN disha_session_evidence_devices d ON d.order_id=e.order_id AND d.device_id=e.device_id '+
     'WHERE e.order_id=$1 AND c.revoked_at IS NULL AND c.expires_at>$2 '+
     "AND e.reference_kind IN ('UTR','RRN') AND e.posted_at>=c.consented_at AND e.posted_at<c.expires_at "+
-    'ORDER BY e.posted_at DESC LIMIT 2',[id,now]);
-  const [row]=rows;
-  if(!row)return {};
-  if(rows.length!==1||row.decision_state!=='SIGNAL_MATCHED'||
-    row.amount_paise!==amountPaise||String(row.payee_vpa).toLowerCase()!==payee||
-    !/^\d{12}$/.test(row.transaction_ref)||!/^[a-f0-9]{64}$/.test(row.event_hash)){
-    return {receiptError:'CONFLICTING_OR_INVALID_EVIDENCE'};
-  }
-  // A payer may enroll a software key using the checkout token. That is
-  // NOT proof of Android package identity. Only an independently provisioned,
-  // pinned observer key is eligible for the stronger observation receipt.
-  // Pins must be supplied by an authorized OEM/admin channel, never a checkout.
-  if (!(process.env.DISHA_UDEB_PINNED_DEVICE_KEY_SHA256||'').split(',')
-      .some(value => /^[a-f0-9]{64}$/.test(value.trim().toLowerCase()))) {
-    return {receiptError:'TRUSTED_DEVICE_NOT_CONFIGURED'};
-  }
-  if (!isIndependentlyPinnedObserverKey(row.public_key_pem)) {
-    return {receiptError:'DEVICE_PROVENANCE_UNTRUSTED'};
-  }
+    'ORDER BY e.posted_at DESC LIMIT 41',[id,now]);
+  if (!rows.length) return {};
+  const references = new Set(rows.map(row => row.transaction_ref));
+  if (references.size !== 1 || !rows.every(row =>
+    row.decision_state === 'SIGNAL_MATCHED' &&
+    row.amount_paise === amountPaise &&
+    String(row.payee_vpa).toLowerCase() === payee &&
+    /^\d{12}$/.test(row.transaction_ref) &&
+    /^[a-f0-9]{64}$/.test(row.event_hash)
+  )) return {receiptError:'CONFLICTING_OR_INVALID_EVIDENCE'};
+  // Different authorized notification sources may describe the SAME debit.
+  // Device provenance must still be independently pinned for every source.
+  if (!rows.every(row => isIndependentlyPinnedObserverKey(row.public_key_pem)))
+    return {receiptError: (process.env.DISHA_UDEB_PINNED_DEVICE_KEY_SHA256 || '').trim()
+      ? 'DEVICE_PROVENANCE_UNTRUSTED' : 'TRUSTED_DEVICE_NOT_CONFIGURED'};
+  const sources = [...new Set(rows.map(row => row.package_name))];
+  const row = rows[0];
   return {debitEvidenceReceipt:{orderId:id,state:'DEBIT_EVIDENCE_OBSERVED',
     source:row.package_name,sourceTrust:row.package_name==='com.google.android.apps.messaging'||
       row.package_name==='com.android.mms'?'SMS_NOTIFICATION_SENDER_UNVERIFIED':'PAYER_APP_NOTIFICATION_UNVERIFIED',
     amountPaise,reference:row.transaction_ref,referenceKind:row.reference_kind,
-    observedAt:Number(row.posted_at),receiptReference:row.event_hash}};
+    observedAt:Number(row.posted_at),receiptReference:row.event_hash,sources,
+    observedSources:rows.map(event => ({packageName:event.package_name,
+      referenceKind:event.reference_kind,observedAt:Number(event.posted_at),
+      receiptReference:event.event_hash}))}};
 }
 
 module.exports = { readDebitEvidenceReceipt, ALLOWED_PACKAGES, canonicalEvidence, verifyDeviceEvidence,
