@@ -13,8 +13,8 @@ internal object SharedReceiptCanonicalJson {
         require(data.getString("protocol") == "DISHA-SHARED-RECEIPT-V1")
         return ("{" + keys.joinToString(",") { key ->
             JSONObject.quote(key) + ":" +
-                if (key == "postedAt" || key == "byteLength") data.getLong(key).toString()
-                else JSONObject.quote(data.getString(key))
+                (if (key == "postedAt" || key == "byteLength") data.getLong(key).toString()
+                else JSONObject.quote(data.getString(key)))
         } + "}").toByteArray(Charsets.UTF_8)
     }
 }
