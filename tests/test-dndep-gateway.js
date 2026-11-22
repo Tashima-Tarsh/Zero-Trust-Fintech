@@ -12,7 +12,7 @@ const check=(name,condition)=>{assert.ok(condition,name);count++;console.log('PA
 (async()=>{
  const challengeMap=new Map(),receipts=new Map(),references=new Set();
  let clock=T;
- const checkout={orderId:'order123456',bearerHash:sha(bearer),amountPaise:'50000',payeeVpa:'recipient@upi'};
+ const checkout={orderId:'order123456',bearerHash:sha(bearer),amountPaise:'50000',payeeVpa:'recipient@upi',status:'PENDING',expiresAt:T+200000};
  const gateway=makeGateway({serverPrivateKey:server.privateKey,serverPublicKey:server.publicKey,
    lookupCheckout:async id=>id===checkout.orderId?checkout:null,
    challengeStore:{put:async(id,item)=>challengeMap.set(id,item),get:async id=>challengeMap.get(id)},
@@ -53,6 +53,23 @@ const check=(name,condition)=>{assert.ok(condition,name);count++;console.log('PA
    read.ok&&read.receipt.receiptHash===submitted.receipt.receiptHash);
  check('same observation rejected by persistent replay adapter',
    (await gateway.ingest({orderId:checkout.orderId,bearer,assertion:evidence,observerSignature:sign()})).code==='REPLAYED');
+ const originalAmount=checkout.amountPaise;
+ checkout.amountPaise='50001';
+ check('changed checkout amount invalidates stored receipt',
+   (await gateway.readReceipt({orderId:checkout.orderId,bearer})).code==='OBSERVATION_NOT_AVAILABLE');
+ check('changed checkout amount invalidates signed challenge',
+   (await gateway.ingest({orderId:checkout.orderId,bearer,assertion:evidence,observerSignature:sign()})).code==='CHECKOUT_BINDING_CHANGED');
+ checkout.amountPaise=originalAmount;
+ const originalStatus=checkout.status;
+ checkout.status='CANCELLED';
+ check('cancelled checkout cannot issue or read observations',
+   (await gateway.authorize({orderId:checkout.orderId,bearer,consent:true})).code==='CHECKOUT_UNAUTHORIZED' &&
+   (await gateway.readReceipt({orderId:checkout.orderId,bearer})).code==='CHECKOUT_UNAUTHORIZED');
+ checkout.status=originalStatus;
+ clock=T+200000;
+ check('expired checkout cannot reveal a previously observed receipt',
+   (await gateway.readReceipt({orderId:checkout.orderId,bearer})).code==='CHECKOUT_UNAUTHORIZED');
+ clock=T+3000;
  check('foreign order cannot consume evidence',
    (await gateway.ingest({orderId:'other12345',bearer,assertion:evidence,observerSignature:sign()})).code==='CHECKOUT_UNAUTHORIZED');
  console.log('D-NDEP gateway '+count+'/'+count+' synthetic integration checks PASS');
