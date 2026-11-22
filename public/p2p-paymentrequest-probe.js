@@ -75,7 +75,8 @@ function attach(session,env){
  const emit=o=>{status.textContent=JSON.stringify(o)};
  const inWindow=()=>Number.isFinite(session.expiresAt)&&Date.now()<session.expiresAt;
  let request=null,used=false,cleanup=()=>{};
- emit({state:'READY_FOR_P2P_CAPABILITY_CHECK',method:METHOD,realPaymentStarted:false});
+ launch.disabled=!(inWindow()&&win.isSecureContext&&typeof win.PaymentRequest==='function');
+ emit({state:'READY_FOR_USER_INITIATED_PAYMENT',method:METHOD,realPaymentStarted:false});
  probe.addEventListener('click',async()=>{
   launch.disabled=true;request=null;
   if(!inWindow()){emit({state:'SESSION_EXPIRED'});return}
@@ -89,7 +90,15 @@ function attach(session,env){
   }catch(e){emit({state:'CAPABILITY_PROBE_FAILED',errorName:e?.name||'Error'})}
  });
  launch.addEventListener('click',async()=>{
-  if(!request||used||!inWindow())return;
+  if(used||!inWindow())return;
+  if(!win.isSecureContext||typeof win.PaymentRequest!=='function'){
+   emit({state:'PAYMENT_REQUEST_UNAVAILABLE'});return;
+  }
+  // Construct on the direct user gesture. A pre-check is diagnostic, not mandatory.
+  if(!request){
+   try{request=new win.PaymentRequest(config.methods,config.details)}
+   catch(e){emit({state:'PAYMENT_REQUEST_CREATION_FAILED',errorName:e?.name||'Error'});return}
+  }
   used=true;probe.disabled=true;launch.disabled=true;
   let response;
   const timeline=createTimeline(session);
