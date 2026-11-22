@@ -101,7 +101,7 @@ test('single user payment gesture launches and automatically invokes response ca
  };
  const document={getElementById:node,visibilityState:'visible',
   addEventListener(){},removeEventListener(){}};
- assert.equal(lib.attach(session,{window,document,onPaymentResponse:async()=>{
+ assert.equal(lib.attach(session,{window,document,isAuthorized:()=>true,onPaymentResponse:async()=>{
   callbackCalls++;
  }}),true);
  assert.equal(node('p2pPaymentRequestLaunch').disabled,false);
@@ -110,4 +110,19 @@ test('single user payment gesture launches and automatically invokes response ca
  assert.equal(capabilityCalls,0,'No handler pre-check required');
  assert.equal(callbackCalls,1);
  assert.equal(completeCalls,1);
+});
+
+test('unsigned or absent prepayment authorization cannot launch PaymentRequest',async()=>{
+ const nodes={};let launches=0;
+ function node(id){return nodes[id]||(nodes[id]={hidden:true,disabled:true,textContent:'',
+  events:{},addEventListener(k,fn){this.events[k]=fn},removeEventListener(){}})}
+ const win={isSecureContext:true,location:{search:'?paymentrequest=1',origin:'https://disha8-2.thenitishkr.in'},
+  PaymentRequest:class{async show(){launches++;throw Error('MUST_NOT_RUN')}},
+  addEventListener(){},removeEventListener(){}};
+ const doc={getElementById:node,addEventListener(){},removeEventListener(){}};
+ assert.equal(lib.attach(session,{window:win,document:doc,isAuthorized:()=>false}),true);
+ assert.equal(node('p2pPaymentRequestLaunch').disabled,true);
+ await node('p2pPaymentRequestLaunch').events.click();
+ assert.equal(launches,0);
+ assert.match(node('p2pPaymentRequestStatus').textContent,/PREPAYMENT_AUTH_REQUIRED/);
 });

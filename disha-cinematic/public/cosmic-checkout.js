@@ -23,6 +23,8 @@
  // Browser-only diagnostics for direct QR taps. Not evidence of a bank payment.
  let qrTapStartedAt=0,qrAppBackgrounded=false,lastNativeLaunchAt=0;
  let copyReturnObserver=null;
+ let p2pTrustedUntil=0;
+ const p2pTrusted=()=>mode!=='generic'||(p2pTrustedUntil>Date.now()&&!expired());
  // Prevent rapid repeated taps from dispatching another UPI activity while
  // the first handoff is still opening or returning.
  const nativeLaunchCooldownMs=6000;
@@ -346,7 +348,7 @@
     if(proceed){
      proceed.hidden=false;proceed.href='#';
      proceed.textContent='Copy UPI ID';
-     proceed.setAttribute('aria-disabled','false');
+     proceed.setAttribute('aria-disabled',p2pTrusted()?'false':'true');
     }
      const guide=get('paymentStageCopy');
     if(guide)guide.textContent='Automatic Android debit observation is unavailable in this checkout. For manual payment, copy the receiving UPI ID and enter the exact amount in your UPI app.';
@@ -539,6 +541,7 @@
    }
   });
   button.addEventListener('click',()=>{
+   if(!p2pTrusted()){status.textContent='Payer and device security checks required before payment.';return;}
    if(!consent.checked||!proofbridgeAuthorized||proofbridgeReady||
       !session||expired()||receiptShown||Date.now()>=proofbridgeAuthorized.expiresAt){
     status.textContent='Payment not authorized. Request a fresh checkout.';return;
@@ -574,11 +577,39 @@
   });
  }
  function setEventHandlers(){
+  const trustButton=get('p2pPrepaymentAuthenticate');
+  if(trustButton)trustButton.addEventListener('click',async()=>{
+   const status=get('p2pPrepaymentStatus');
+   if(!session||expired()||receiptShown)return;
+   trustButton.disabled=true;p2pTrustedUntil=0;
+   if(status)status.textContent='Authenticating payer and checking trusted device verdict…';
+   try{
+    if(!window.DISHAOneTouchVault?.authorize)throw Error('WEBAUTHN_UNAVAILABLE');
+    const credentialGrant=await window.DISHAOneTouchVault.authorize(session.orderId);
+    const response=await fetch('/api/p2p/prepayment/authorize',{
+     method:'POST',credentials:'same-origin',cache:'no-store',
+     headers:{'Content-Type':'application/json','X-CSRF-Token':session.token},
+     body:JSON.stringify({orderId:session.orderId,token:session.token,vaultSessionId:credentialGrant.sessionId})
+    });
+    const verdict=await response.json().catch(()=>({}));
+    if(!response.ok||verdict.authorized!==true||!Number.isFinite(verdict.expiresAt)||
+       verdict.expiresAt<=Date.now())throw Error('PREPAYMENT_TRUST_DENIED');
+    p2pTrustedUntil=verdict.expiresAt;
+    if(status)status.textContent='Payer and device checks verified for this checkout.';
+    renderQr();
+    const payLaunch=get('p2pPaymentRequestLaunch');
+    if(payLaunch&&window.isSecureContext!==false&&typeof window.PaymentRequest==='function')payLaunch.disabled=false;
+   }catch(_){
+    p2pTrustedUntil=0;
+    if(status)status.textContent='Payment locked: payer authentication or trusted device checks unavailable.';
+    renderQr();
+   }finally{trustButton.disabled=expired()}
+  });
 
   // P2P action copies the receiving VPA only. Never dispatch an app intent.
   get('vaultProceed').addEventListener('click',event=>{
    event.preventDefault();
-   if(!session||receiptShown||expired()||
+   if(!session||receiptShown||expired()||!p2pTrusted()||
       ['EXPIRED','FAILED','CANCELLED'].includes(session.initialStatus)||
       get('vaultProceed').getAttribute('aria-disabled')==='true'){
     message('Payment unavailable or expired. Request a fresh link.','info');return;
@@ -607,7 +638,7 @@
    });
   });
   get('qrTapToPay').addEventListener('click',event=>{
-   if(!session||receiptShown||expired()||
+   if(!session||receiptShown||expired()||!p2pTrusted()||
       ['EXPIRED','FAILED','CANCELLED'].includes(session.initialStatus)||!model.supportsNativeUPI(userAgent)||
       get('qrTapToPay').getAttribute('aria-disabled')==='true') {
     event.preventDefault();
@@ -635,7 +666,7 @@
   });
   for(const link of document.querySelectorAll('[data-upi-app]')){
    link.addEventListener('click',event=>{
-    if(!session||receiptShown||expired()||
+    if(!session||receiptShown||expired()||!p2pTrusted()||
        ['EXPIRED','FAILED','CANCELLED'].includes(session.initialStatus)||
        !model.supportsTargetedAppLaunch(userAgent)){
      event.preventDefault();
@@ -775,6 +806,7 @@
    saveSessionState();
    if(mode==='generic'&&query.get('paymentrequest')==='1')
     window.DISHAP2PPaymentRequestProbe?.attach?.(session,{window,document,
+     isAuthorized:()=>p2pTrusted(),
      onPaymentResponse:async paymentResponse=>{
       const output=document.getElementById('p2pPaymentRequestStatus');
       if(!session.token||Date.now()>=session.expiresAt){
@@ -789,6 +821,8 @@
       const result=await reply.json();
       if(output)output.textContent=JSON.stringify(result);
      }});
+   const trustPanel=get('p2pPrepaymentGate');
+   if(trustPanel)trustPanel.hidden=mode!=='generic';
    setMoney(session.amount);
    get('serviceIdentifier').textContent='Service ID · '+(session.serviceNumber||'Not assigned');
    setPaymentKind();

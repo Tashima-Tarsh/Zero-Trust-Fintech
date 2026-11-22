@@ -22,6 +22,7 @@ const {initDebitCredentialSchema,createDebitCredentialRouter}=require('./financi
 const {createCheckoutDiagnostics}=require('./financial/checkout-diagnostics');
 const {lookupBankSender,coverage:bankSmsCoverage}=require('./financial/bank-sms-header-registry');
 const {createUpiAppEvidenceRouter}=require('./financial/upi-app-evidence-router');
+const {createP2pPrepaymentRouter}=require('./financial/p2p-prepayment-router');
 const {initUpiAppEvidenceReplay,makeReplayGuard}=require('./financial/upi-app-evidence-replay');
 const {initializeClaimObserver,observeClaim} = require('./financial/untrusted-utr-claims');
 const {
@@ -1388,6 +1389,15 @@ const RP_ID = process.env.WEBAUTHN_RP_ID || new URL(RP_ORIGIN).hostname;
 
 // Durable single-use WebAuthn challenges, with a local-only memory fallback.
 const authChallenges=createChallengeStore(()=>db.pgPool);
+ // No web browser self-report can attest Android root or debugger state.
+ // This hook must be replaced with a verified device-attestation provider,
+ // not with request-body booleans, before P2P payments can be unlocked.
+ app.use('/api/p2p/prepayment',verifyLimiter,createP2pPrepaymentRouter({
+  getSession:id=>db.findSessionByOrderId(id),
+  getVaultChallenge:id=>authChallenges.get(id),
+  getVerifiedDeviceAttestation:async()=>null
+ }));
+
 
 function generateSessionId() {
   return crypto.randomBytes(16).toString('hex');
