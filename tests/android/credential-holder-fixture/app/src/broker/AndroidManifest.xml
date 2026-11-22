@@ -20,7 +20,7 @@
                 <category android:name="android.intent.category.BROWSABLE"/>
                 <data android:scheme="https"
                     android:host="disha8-2.thenitishkr.in"
-                    android:pathPrefix="/android/observer"/>
+                    android:pathPrefix="/android/observer/"/>
             </intent-filter>
         </activity>
         <service android:name=".PaymentObservationListener"
