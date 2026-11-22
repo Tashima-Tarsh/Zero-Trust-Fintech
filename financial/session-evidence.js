@@ -644,8 +644,20 @@ async function readDebitEvidenceReceipt(pool, id, session, now = Date.now()) {
     return {receiptError: (process.env.DISHA_UDEB_PINNED_DEVICE_KEY_SHA256 || '').trim()
       ? 'DEVICE_PROVENANCE_UNTRUSTED' : 'TRUSTED_DEVICE_NOT_CONFIGURED'};
   const sources = [...new Set(rows.map(row => row.package_name))];
+  const shared = (await pool.query(
+    'SELECT reference,text_matched,mime_type,source_sha256 FROM disha_session_shared_receipts WHERE order_id=$1',
+    [id])).rows[0];
+  const smsSources = new Set(['com.google.android.apps.messaging','com.android.mms']);
+  const hasPaymentAlert = sources.some(source => !smsSources.has(source));
+  const hasSms = sources.some(source => smsSources.has(source));
   const row = rows[0];
-  return {debitEvidenceReceipt:{orderId:id,state:'DEBIT_EVIDENCE_OBSERVED',
+  const sharedMatched = shared?.text_matched === true && shared.reference === row.transaction_ref;
+  const threeProofMatched = hasPaymentAlert && hasSms && sharedMatched;
+  return {debitEvidenceReceipt:{orderId:id,state:threeProofMatched?
+    'CHECKOUT_DEBIT_OBSERVED':'DEBIT_EVIDENCE_OBSERVED',
+    proofStatus:{paymentNotification:hasPaymentAlert?'MATCHED':'PENDING',
+      debitSms:hasSms?'MATCHED':'PENDING',
+      sharedReceipt:sharedMatched?'MATCHED':shared?'RECEIVED':'PENDING'},
     source:row.package_name,sourceTrust:row.package_name==='com.google.android.apps.messaging'||
       row.package_name==='com.android.mms'?'SMS_NOTIFICATION_SENDER_UNVERIFIED':'PAYER_APP_NOTIFICATION_UNVERIFIED',
     amountPaise,reference:row.transaction_ref,referenceKind:row.reference_kind,
