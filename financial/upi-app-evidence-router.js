@@ -21,7 +21,8 @@ function createUpiAppEvidenceRouter({getSession,getTrustedKeys,consumeReplay,clo
    JSON.stringify(details).length>12000)return res.status(400).json({state:'INVALID_REQUEST',debitVerified:false,paymentVerified:false});
   let session;
   try{session=await getSession(orderId)}catch(_){return res.status(503).json({state:'SESSION_UNAVAILABLE',debitVerified:false,paymentVerified:false})}
-  if(!session||!constantEqual(token,session.sessionId))
+  // Fail closed if a session lookup returns a different checkout identity.
+ if(!session||session.orderId!==orderId||!constantEqual(token,session.sessionId))
    return res.status(401).json({state:'SESSION_AUTH_REQUIRED',debitVerified:false,paymentVerified:false});
   if(!['PERSONAL','P2P'].includes(String(session.merchantType||'').toUpperCase()))
    return res.status(409).json({state:'P2P_ONLY',debitVerified:false,paymentVerified:false});
