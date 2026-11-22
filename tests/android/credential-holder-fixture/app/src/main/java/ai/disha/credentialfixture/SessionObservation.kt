@@ -150,6 +150,32 @@ internal object SessionObservation {
         submit(lease, notification.postTime, amount, payee, reference)
     }
 
+    /**
+     * Match financial/session-evidence.js canonicalEvidence exactly.
+     * Android JSONObject has no guaranteed insertion order; signing toString()
+     * can generate a valid signature over the WRONG bytes on real devices.
+     */
+    private fun canonicalEvidenceBytes(evidence: JSONObject): ByteArray {
+        val keys = mutableListOf(
+            "protocol", "eventId", "orderId", "nonce", "deviceId",
+            "packageName", "postedAt", "amountPaise", "payeeVpa",
+            "transactionRef", "status"
+        )
+        if (evidence.getString("protocol") == "DISHA-DEBIT-UTR-OBSERVATION-V1") {
+            keys.add("referenceKind")
+        }
+        check(evidence.length() == keys.size && keys.all { evidence.has(it) })
+        val fields = keys.joinToString(",") { key ->
+            val value = if (key == "postedAt") {
+                evidence.getLong(key).toString()
+            } else {
+                JSONObject.quote(evidence.getString(key))
+            }
+            JSONObject.quote(key) + ":" + value
+        }
+        return "{$fields}".toByteArray(Charsets.UTF_8)
+    }
+
     private fun submit(lease: Lease, postedAt: Long, amount: String, payee: String, reference: String,
         referenceKind: String? = null) {
         // Only the event ID is derived. The transaction reference is copied from its source.
@@ -170,7 +196,7 @@ internal object SessionObservation {
                 val signature = withContext(Dispatchers.IO) {
                     val signer = Signature.getInstance("SHA256withECDSA")
                     signer.initSign(keyStore().getKey(KEY_ALIAS, null) as PrivateKey)
-                    signer.update(evidence.toString().toByteArray(Charsets.UTF_8))
+                    signer.update(canonicalEvidenceBytes(evidence))
                     Base64.encodeToString(signer.sign(), Base64.URL_SAFE or Base64.NO_PADDING or Base64.NO_WRAP)
                 }
                 if (active !== lease || SystemClock.elapsedRealtime() >= lease.elapsedDeadline) return@launch
