@@ -47,6 +47,31 @@ test('server verifies signed app response against OWN session fields; no financi
   assert.equal(expired.code,200);
  }finally{server.close();}
 });
+test('repeated signed success fails closed when replay storage denies or is unavailable',async()=>{
+ const variants=[
+  {consumeReplay:async()=>false,code:409,state:'DUPLICATE_APP_RESPONSE'},
+  {consumeReplay:async()=>{throw Error('DB_OUTAGE')},code:503,state:'EVIDENCE_REPLAY_STORE_UNAVAILABLE'}
+ ];
+ for(const variant of variants){
+  const app=express();app.use(express.json());
+  app.use('/api/upi-app-evidence',createUpiAppEvidenceRouter({
+   getSession:async()=>session,getTrustedKeys:()=>keys,consumeReplay:variant.consumeReplay
+  }));
+  const server=app.listen(0,'127.0.0.1');
+  await new Promise(resolve=>server.listening?resolve():server.once('listening',resolve));
+  try{
+   const response=await fetch('http://127.0.0.1:'+server.address().port+'/api/upi-app-evidence/verify',{
+    method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({orderId:session.orderId,token:session.sessionId,...signed()})
+   });
+   const body=await response.json();
+   assert.equal(response.status,variant.code);
+   assert.equal(body.state,variant.state);
+   assert.equal(body.debitVerified,false);
+   assert.equal(body.paymentVerified,false);
+  }finally{server.close()}
+ }
+});
 test('browser is connected to authenticated verification endpoint with no manual evidence submission',()=>{
  const fs=require('node:fs'),path=require('node:path'),root=path.resolve(__dirname,'..');
  const server=fs.readFileSync(path.join(root,'server.js'),'utf8');
