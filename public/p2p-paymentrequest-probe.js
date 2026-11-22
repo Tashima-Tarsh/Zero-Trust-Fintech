@@ -66,8 +66,8 @@ function attach(session,env){
  const win=env.window,doc=env.document;
  const node=doc.getElementById('p2pPaymentRequestProbe');
  const query=new URLSearchParams(win.location.search);
- const timed=query.get('timedprovider')==='1';
- if(!node||!win||!win.location||(query.get('paymentrequest')!=='1'&&!timed))return false;
+ const timed=query.get('paymentrequest')!=='1';
+ if(!node||!win||!win.location)return false;
  const config=build(session,win.location.origin);
  if(!config)return false;
  node.hidden=false;
