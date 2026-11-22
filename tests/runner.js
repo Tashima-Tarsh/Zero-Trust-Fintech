@@ -71,6 +71,7 @@ const UNIT_TESTS = [
   'test-upi-app-evidence-replay.js', // atomic PostgreSQL replay, concurrent rejects and fail-closed storage // authenticated payment handler callback, read-only signature checks // fail-closed provider signature verification, no ledger write
   'test-disha-debit-bridge-lab.js', // Ponytail minimal synthetic Android-to-Chrome bridge protocol // gated P2P PaymentRequest capability and response, no ledger mutation
   'test-timed-payment-bridge.js',
+  'test-timed-provider-checkout-wiring.js', // authenticated one-click Google Pay checkout UI and 120s reply
   'test-payer-evidence-outbox.js', // seller HMAC, atomic outbox and retry with no debit promotion // 120s signed checkout return, PostgreSQL one-time challenge and browser adapter // atomic PostgreSQL replay, concurrent rejects and fail-closed storage // authenticated payment handler callback, read-only signature checks // fail-closed provider signature verification, no ledger write
   'test-p2p-paymentrequest-experiment.js', // gated P2P PaymentRequest capability and response, no ledger mutation
   'test-p2p-ninety-second-evidence-gate.js', // server timer, copy-only display and no false payments // Sourced headers: never promote claimed sender to debit proof
