@@ -38,6 +38,9 @@
    checkout.searchParams.set('orderId',result.orderId);
    checkout.searchParams.set('token',result.sessionId);
    checkout.searchParams.set('proofbridge','1');
+   // PR #140's signed-return path must be reachable from the actual P2P chooser.
+   // Eligibility is checked after the existing payer authentication succeeds.
+   checkout.searchParams.set('timedprovider','1');
    location.assign(checkout.pathname+checkout.search);
   }catch(e){fail(e.message||'Payment request unavailable.')}
  }
