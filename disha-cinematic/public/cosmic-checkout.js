@@ -775,6 +775,55 @@
    return checkDebitEvidence(false);
   };
   if(debitButton)debitButton.addEventListener('click',startDebitEvidenceMonitor);
+  // User-initiated Android bridge. A 60-second one-time ticket (not the
+  // checkout bearer) moves from Chrome to the installed DISHA observation app.
+  // Both steps require user gestures; no SMS/notification content enters Chrome.
+  if(debitButton&&/Android/i.test(navigator.userAgent)){
+   const pairButton=document.createElement('button');
+   pairButton.type='button';
+   pairButton.textContent='Connect Android debit observer';
+   pairButton.setAttribute('aria-label','Pair installed DISHA Android observer');
+   const pairHint=document.createElement('p');
+   pairHint.setAttribute('role','status');
+   pairHint.textContent='Requires the DISHA Android observer app and Android notification permission.';
+   const pairLink=document.createElement('a');
+   pairLink.textContent='Open DISHA observer on this phone';
+   pairLink.hidden=true;
+   pairLink.rel='nofollow';
+   debitButton.insertAdjacentElement('afterend',pairHint);
+   pairHint.insertAdjacentElement('beforebegin',pairButton);
+   pairHint.insertAdjacentElement('afterend',pairLink);
+   pairButton.addEventListener('click',async()=>{
+    pairLink.hidden=true;
+    pairLink.removeAttribute('href');
+    const boundSession=session;
+    if(!boundSession?.orderId||!boundSession?.token||expired()){
+     pairHint.textContent='Checkout expired or unavailable.';return;
+    }
+    pairButton.disabled=true;
+    pairHint.textContent='Creating a one-time Android pairing ticket…';
+    try{
+     const response=await fetch('/api/session-evidence/pairing/issue',{
+      method:'POST',credentials:'same-origin',cache:'no-store',
+      headers:{'Content-Type':'application/json','X-CSRF-Token':boundSession.token},
+      body:JSON.stringify({orderId:boundSession.orderId,token:boundSession.token})
+     });
+     const data=await response.json().catch(()=>({}));
+     if(!response.ok||!data.success||!/^[A-Za-z0-9_-]{43}$/.test(data.ticket)||
+        !Number.isSafeInteger(data.expiresAt)||data.expiresAt<=Date.now()||
+        session!==boundSession||expired())throw Error('PAIRING_UNAVAILABLE');
+     // Explicit app package is used for Chrome intent routing. The ticket
+     // expires after 60s, is single-use and holds no checkout credentials.
+     pairLink.href='intent://pair/'+encodeURIComponent(data.ticket)+
+      '#Intent;scheme=disha-observe;package=ai.disha.credentialfixture;end';
+     pairLink.hidden=false;
+     pairHint.textContent='Tap Open DISHA observer within 60 seconds. Authenticate and consent on Android.';
+    }catch(_){
+     pairHint.textContent='Pairing unavailable. No debit has been verified.';
+    }finally{pairButton.disabled=false;}
+   });
+  }
+
   if(evidenceRetry&&debitButton)evidenceRetry.addEventListener('click',()=>void checkDebitEvidence(false));
   window.addEventListener('pagehide',stopDebitEvidenceMonitor);
   const diag=get('checkoutDebugPanel');
