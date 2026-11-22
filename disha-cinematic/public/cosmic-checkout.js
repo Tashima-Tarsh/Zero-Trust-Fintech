@@ -313,27 +313,25 @@
   const anchor=get('qrTapToPay'),container=get('paymentQr');
   // P2P ProofBridge is copy-to-pay, NOT QR-to-pay. Neither consent
   // nor Proceed may render a personal-account QR in this mode.
-  const nativeHostEligible=device==='android';
+  const androidChromeEligible=device==='android';
   const disclosure=get('nativeEvidenceDisclosure');
-  if(disclosure)disclosure.hidden=!nativeHostEligible;
+  if(disclosure)disclosure.hidden=!androidChromeEligible;
   const proofbridgeGate=get('proofbridgeGate');
   if(proofbridgeGate&&!proofbridgeEnabled)proofbridgeGate.hidden=true;
   if(expired()||['EXPIRED','FAILED','CANCELLED'].includes(session.initialStatus)){
    anchor.href='#';anchor.hidden=true;anchor.setAttribute('aria-disabled','true');
    get('upiAppOptions').hidden=true;
-   if(disclosure)disclosure.hidden=true;
    container.replaceChildren();qrUri=null;handleQrExpiry();return;
   }
-  const p2pCopyOnly=model.isPersonalPayment(session.upiUri)&&(proofbridgeEnabled||nativeHostEligible);
+  const p2pCopyOnly=model.isPersonalPayment(session.upiUri)&&(proofbridgeEnabled||androidChromeEligible);
   anchor.hidden=p2pCopyOnly;
   get('qrExpiry').hidden=p2pCopyOnly;
   get('qrTapToPayHint').hidden=p2pCopyOnly;
   if(p2pCopyOnly){
    anchor.href='#';anchor.setAttribute('aria-disabled','true');
    container.replaceChildren();qrUri=null;
-   if(nativeHostEligible){
-    // Android Chrome P2P is copy-to-pay. Never launch a UPI app or require
-    // the DISHA host APK; the customer chooses their UPI app manually.
+   if(androidChromeEligible){
+    // Personal UPI remains copy-to-pay on Android Chrome.
     get('upiAppOptions').hidden=true;
     const proceed=get('vaultProceed');
     if(proceed){
@@ -341,8 +339,7 @@
      proceed.textContent='Copy UPI ID';
      proceed.setAttribute('aria-disabled','false');
     }
-    if(disclosure)disclosure.hidden=true;
-    const guide=get('paymentStageCopy');
+     const guide=get('paymentStageCopy');
     if(guide)guide.textContent='Automatic Android debit observation is unavailable in this checkout. For manual payment, copy the receiving UPI ID and enter the exact amount in your UPI app.';
    }else{
     // Keep the existing consent-authorized ProofBridge flow for non-native
