@@ -39,7 +39,7 @@ test('signed response flow is default on P2P and Chrome pay still requires gestu
  assert.match(code,/response=await request\.show\(\)/);
  assert.match(code,/if\(env\.isAuthorized\?\.\(\)!==true\)/);
  assert.match(code,/Date\.now\(\)>=timedExpiresAt/);
- assert.match(code,/Recheck Google Pay availability/);
+ assert.match(code,/Check Google Pay compatibility/);
  assert.match(code,/Pay with Google Pay/);
  const server=fs.readFileSync(path.join(root,'financial/timed-payment-bridge.js'),'utf8');
  assert.match(server,/crypto\.randomBytes\(16\)\.toString\('hex'\)/);
