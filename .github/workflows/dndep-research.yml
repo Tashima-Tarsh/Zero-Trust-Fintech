@@ -3,6 +3,7 @@ on:
   push:
     branches:
       - 'research/dndep-platform-evidence-fabric'
+      - 'fix/dndep-checkout-lifecycle-binding-20261122'
   pull_request:
     branches:
       - main
