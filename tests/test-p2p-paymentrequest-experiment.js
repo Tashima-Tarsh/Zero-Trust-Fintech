@@ -43,3 +43,31 @@ test('optional experiment is only shown on P2P and never writes to ledger',()=>{
  const probe=fs.readFileSync(path.join(root,'public/p2p-paymentrequest-probe.js'),'utf8');
  assert.doesNotMatch(probe,/fetch\(|sendBeacon\(|XMLHttpRequest|ledger\//);
 });
+
+test('automatic Android lifecycle and motion signals are bounded and never prove debit',()=>{
+ let now=1000;
+ const timeline=lib.createTimeline({orderId:'PAY_P2P_1',expiresAt:91000},()=>now);
+ assert.equal(timeline.record('PAYMENT_LAUNCHED'),true);
+ now=1100;timeline.record('DOCUMENT_HIDDEN');timeline.record('WINDOW_BLUR');
+ for(let i=0;i<400;i++)timeline.motion();
+ now=2200;timeline.record('DOCUMENT_VISIBLE');timeline.record('WINDOW_FOCUS');
+ const observation={state:'ANDROID_PAYMENT_RESPONSE_OBSERVED',amountMatched:true,payeeMatched:true};
+ const snapshot=timeline.snapshot(observation);
+ assert.equal(snapshot.motionSamples,300);
+ assert.equal(snapshot.events.length,5);
+ assert.equal(snapshot.responseObserved,true);
+ assert.equal(snapshot.responseFieldsMatched,true);
+ assert.equal(snapshot.debitVerified,false);
+ assert.equal(snapshot.signatureVerified,false);
+ timeline.close();
+ assert.equal(timeline.record('PAYMENT_RESPONSE'),false);
+ now=92000;timeline.motion();
+ assert.equal(timeline.snapshot(null).motionSamples,300);
+});
+test('expired timelines discard motion and lifecycle signals',()=>{
+ let now=1000;
+ const timeline=lib.createTimeline({orderId:'EXP',expiresAt:1100},()=>now);
+ now=1200;timeline.record('DOCUMENT_HIDDEN');timeline.motion();
+ assert.equal(timeline.snapshot(null).events.length,0);
+ assert.equal(timeline.snapshot(null).motionSamples,0);
+});
