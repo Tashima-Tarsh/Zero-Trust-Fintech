@@ -44,12 +44,19 @@ function makeGateway({serverPrivateKey,serverPublicKey,lookupCheckout,challengeS
       const stored=await challengeStore.get(orderId);
       if(!stored||!stored.challenge||stored.challenge.orderId!==orderId)
         return invalid('CHALLENGE_NOT_FOUND');
+      let verifiedClaim=null;
       const r=verify({
         challenge:stored.challenge,serverSignature:stored.serverSignature,
         serverPublicKey,assertion,observerSignature,resolveObserver,
-        claimUniqueReference:(ref,event,hash)=>sourceReplayStore.claim(ref,event,hash),
+        claimUniqueReference:(ref,event,hash)=>{verifiedClaim={ref,event,hash};return true;},
         now:now()});
       if(!r.ok)return r;
+      // Await a durable atomic UNIQUE claim before exposing a receipt.
+      // Returning a Promise from the synchronous wire verifier is not sufficient.
+      let claimed=false;
+      try { claimed=(await sourceReplayStore.claim(verifiedClaim.ref,verifiedClaim.event,verifiedClaim.hash))===true; }
+      catch (_) { return invalid('REPLAY_STORE_UNAVAILABLE'); }
+      if(!claimed)return invalid('REPLAYED');
       // Persist only sanitized receipt fields, never raw SMS or notification body.
       const receipt=Object.freeze({orderId,challengeDigest:digest(canonicalChallenge(stored.challenge)),
         status:'DEBIT_EVIDENCE_OBSERVED',sourceKind:r.sourceKind,receiptHash:r.receiptHash,
