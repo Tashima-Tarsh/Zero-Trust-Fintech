@@ -86,6 +86,16 @@ async function main() {
     const scopedStatus=await fetch(origin+'/api/session-evidence/status/'+
       encodeURIComponent(pairOrder.orderId)+'?token='+encodeURIComponent(redeemed.observerToken));
     assert.equal(scopedStatus.status,401,'observer token must not access checkout status');
+    await lab.pool.query(
+      'UPDATE disha_android_observation_pairings SET expires_at=$2 WHERE order_id=$1',
+      [pairOrder.orderId,Date.now()-1]);
+    const expiredScopedEvent={...pairedEvent,eventId:crypto.randomUUID(),transactionRef:'000000000191'};
+    const [expiredScopedStatus,expiredScopedBody]=await post('/api/session-evidence/event',{
+      token:redeemed.observerToken,evidence:expiredScopedEvent,
+      signature:sign(canonicalEvidence(expiredScopedEvent))
+    });
+    assert.equal(expiredScopedStatus,401,JSON.stringify(expiredScopedBody),
+      'expired observer capability cannot submit new events');
     const [badPairStatus]=await post('/api/session-evidence/pairing/issue',{
       orderId:pairOrder.orderId,token:'bad'
     },'bad');
