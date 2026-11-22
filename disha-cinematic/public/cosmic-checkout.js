@@ -63,7 +63,7 @@
  // Test-only, fire-and-forget. No raw browser error, UPI URI, PIN, passkey
  // response, device identifier or transaction data are collected.
  function trace(event,code='OK',app='none'){
-  if((!debug&&!['COPY_READY','BROWSER_HIDDEN','BROWSER_RETURN'].includes(event))||!session?.token||!session?.orderId)return;
+  if(!debug||!session?.token||!session?.orderId)return;
   const selected=['gpay','phonepe','paytm','bhim','cred','generic'].includes(app)?app:'none';
   try{
    debugHistory.push({time:new Date().toISOString(),event,code,app:selected});
