@@ -1,0 +1,14 @@
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <application android:allowBackup="false" android:usesCleartextTraffic="false"
+        android:theme="@android:style/Theme.Material.Light.NoActionBar">
+        <activity android:name="ai.disha.testupi.SyntheticPaymentActivity"
+            android:exported="true" android:label="DISHA synthetic payment fixture">
+            <intent-filter>
+                <action android:name="org.chromium.intent.action.PAY"/>
+                <category android:name="android.intent.category.DEFAULT"/>
+            </intent-filter>
+            <meta-data android:name="org.chromium.default_payment_method_name"
+                android:value="${fixturePaymentMethod}"/>
+        </activity>
+    </application>
+</manifest>
