@@ -29,7 +29,7 @@ test('visible signed provider choice follows mandatory payer authentication',()=
   'Customer Pay button should follow device authentication, before legacy fallback controls');
  const code=fs.readFileSync(path.join(root,'public/p2p-paymentrequest-probe.js'),'utf8');
  assert.match(code,/Pay securely with Google Pay/);
- assert.match(code,/probe.hidden=true/);
+ assert.match(code,/probe.hidden=false/);
  assert.match(code,/probe.hidden=available/);
 });
 test('signed response flow is default on P2P and Chrome pay still requires gesture',()=>{
