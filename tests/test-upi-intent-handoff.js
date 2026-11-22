@@ -40,7 +40,7 @@ async function flush(){for(let i=0;i<35;i++)await Promise.resolve()}
  const targets={gpay:'com.google.android.apps.nbu.paisa.user',
   phonepe:'com.phonepe.app',paytm:'net.one97.paytm',bhim:'in.org.npci.upiapp'};
  for(const link of mobile.appNodes){
-  assert.match(link.href,new RegExp('package='+targets[link.dataset.upiApp].replace(/\\./g,'\\\\.')+';'),
+  assert.match(link.href,new RegExp('package='+targets[link.dataset.upiApp].replace(/\./g,'\\.')+';'),
    'Selected app must launch directly without an installed DISHA host');
   assert.match(link.href,/#Intent;scheme=upi;action=android.intent.action.VIEW;/);
   assert.equal(link.getAttribute('aria-disabled'),'false');
@@ -49,8 +49,8 @@ async function flush(){for(let i=0;i<35;i++)await Promise.resolve()}
  assert.match(mobileTap,/^intent:\/\/pay\?/,'Chrome uses standard Android UPI Intent URI');
  assert.equal(mobile.state.qr,uri,'Scannable QR retains the UPI URI');
  assert.match(mobileTap,/#Intent;scheme=upi;action=android.intent.action.VIEW;/);
- assert.doesNotMatch(mobileTap,/in\\.disha\\.upihost/,'No installed DISHA host');
- assert.ok(decodeURIComponent(mobileTap.match(/S\\.browser_fallback_url=([^;]+)/)[1]).includes(
+ assert.doesNotMatch(mobileTap,/in\.disha\.upihost/,'No installed DISHA host');
+ assert.ok(decodeURIComponent(mobileTap.match(/S\.browser_fallback_url=([^;]+)/)[1]).includes(
   'paymentRef='+order),'Fallback recovers the original payment');
  assert.equal(mobile.nodes.qrTapToPay.getAttribute('aria-disabled'),'false');
  assert.ok(mobile.nodes.payAmount.textContent.includes('1.00'));
