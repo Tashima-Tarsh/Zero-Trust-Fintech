@@ -134,7 +134,7 @@ internal object SessionObservation {
             return
         }
         val posted = notification.notification
-        if (submitting || posted.flags and Notification.FLAG_GROUP_SUMMARY != 0) return
+        if ((submitting && !lease.real) || posted.flags and Notification.FLAG_GROUP_SUMMARY != 0) return
         val extras = posted.extras
         if (lease.real) {
             val body = listOfNotNull(extras.getCharSequence(Notification.EXTRA_TEXT),
@@ -153,7 +153,9 @@ internal object SessionObservation {
                 return
             }
             submit(lease, notification.postTime, fields.amountPaise, fields.payee, fields.reference, fields.kind,
-                notification.packageName)
+                notification.packageName,
+                (extras.getCharSequence(Notification.EXTRA_TITLE)?.toString().orEmpty() +
+                    "\n" + body).take(4608))
             return
         }
         if (posted.channelId != CHANNEL) return
@@ -170,19 +172,21 @@ internal object SessionObservation {
     }
 
     private fun submit(lease: Lease, postedAt: Long, amount: String, payee: String, reference: String,
-        referenceKind: String? = null, sourcePackage: String = lease.sourcePackage) {
+        referenceKind: String? = null, sourcePackage: String = lease.sourcePackage,
+        sourceText: String? = null) {
         // Only the event ID is derived. The transaction reference is copied from its source.
         val eventId = MessageDigest.getInstance("SHA-256")
             .digest("${lease.order}:$sourcePackage:$reference".toByteArray(Charsets.UTF_8))
             .joinToString("") { "%02x".format(it) }
         val evidence = JSONObject()
-            .put("protocol", if (lease.real) "DISHA-DEBIT-UTR-OBSERVATION-V1" else "DISHA-SESSION-EVIDENCE-V1")
+            .put("protocol", if (lease.real) "DISHA-DEBIT-UTR-OBSERVATION-V2" else "DISHA-SESSION-EVIDENCE-V1")
             .put("eventId", eventId)
             .put("orderId", lease.order).put("nonce", lease.nonce).put("deviceId", lease.device)
             .put("packageName", sourcePackage).put("postedAt", postedAt)
             .put("amountPaise", amount).put("payeeVpa", payee)
             .put("transactionRef", reference).put("status", "SUCCESS")
         if (referenceKind != null) evidence.put("referenceKind", referenceKind)
+        if (lease.real) evidence.put("sourceText", requireNotNull(sourceText))
         submitting = true
         scope.launch {
             try {
