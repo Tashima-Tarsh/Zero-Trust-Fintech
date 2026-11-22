@@ -51,11 +51,9 @@ vm.runInContext(worker.replace('export default','globalThis.edge ='),context,{fi
  // The legacy public /checkout remains static when Railway is offline.
  // Canonical authenticated P2P checkout and runtime JS/CSS must NOT silently
  // fall back to an older independently deployed Pages asset.
- const merchantStatic=await context.edge.fetch(
-  new Request('https://disha8-2.thenitishkr.in/api/runtime/merchant-checkout?paymentRef=EXAMPLE'),env);
- assert.equal(merchantStatic.status,200);
  for(const url of [
   '/api/runtime/checkout?amount=1',
+  '/api/runtime/merchant-checkout?paymentRef=EXAMPLE',
   '/api/runtime-assets/cosmic-checkout.js?v=ci',
   '/api/runtime-assets/cosmic-checkout-model.js',
   '/api/runtime-assets/cosmic-checkout.css',
@@ -66,10 +64,10 @@ vm.runInContext(worker.replace('export default','globalThis.edge ='),context,{fi
   const result=await context.edge.fetch(new Request('https://disha8-2.thenitishkr.in'+url),env);
   assert.equal(result.status,502,'Canonical runtime should expose backend outage, not stale Pages code: '+url);
  }
- assert.equal(assets,5,'Four offline legacy shells and merchant static shell stay on Pages');
- assert.equal(upstream,7,'Seven canonical runtime requests must use Railway');
+ assert.equal(assets,4,'Legacy offline P2P pages stay on Pages');
+ assert.equal(upstream,8,'Eight canonical P2P/P2M runtime requests must use Railway');
  const api=await context.edge.fetch(new Request('https://disha8-2.thenitishkr.in/api/merchant/public/order/example'),env);
  assert.equal(api.status,502,'Dynamic merchant payment order depends on Railway backend');
- assert.equal(upstream,8);
- console.log('CHECKOUT_EDGE_CONSISTENCY_PASS: canonical P2P HTML/JS from Railway; legacy static fallback preserved');
+ assert.equal(upstream,9);
+ console.log('CHECKOUT_EDGE_CONSISTENCY_PASS: canonical P2P/P2M HTML and JS use Railway; static fallbacks preserved');
 })().catch(error=>{console.error(error);process.exitCode=1});
