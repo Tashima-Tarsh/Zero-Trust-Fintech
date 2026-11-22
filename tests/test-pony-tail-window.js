@@ -25,8 +25,8 @@ assert.equal(evaluateTemporalGate({createdAt:5000,expiresAt:4000},5001).state,'I
 assert.equal(evaluateTemporalGate({createdAt,expiresAt},NaN).state,'INVALID_SESSION_CLOCK');
 assert.equal(evaluateTemporalGate({createdAt,expiresAt},Infinity).state,'INVALID_SESSION_CLOCK');
 const server=fs.readFileSync(path.join(__dirname,'../server.js'),'utf8');
-assert.equal((server.match(/evaluateTemporalGate\(session,now\)/g)||[]).length,3,
-  'Legacy verify, CFC and Web Share must call the same temporal policy');
+assert.equal((server.match(/evaluateTemporalGate\(session,now\)/g)||[]).length,2,
+  'Legacy verify and CFC must call the same temporal policy after removing Web Share');
 assert.doesNotMatch(server,/covers 99\.7%/i,'Do not invent empirical success rates');
 assert.doesNotMatch(server,/db\.bindUtrToOrder\(/,
   'Untrusted public claims must never reserve authoritative bank references');

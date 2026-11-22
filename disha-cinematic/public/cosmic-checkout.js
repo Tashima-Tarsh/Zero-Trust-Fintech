@@ -308,55 +308,30 @@
   if(forFallback)u.searchParams.set('upi_intent_fallback','1');
   return u.href;
  }
- function nativeHostIntentUri(app){
-  const packages={
-   gpay:'com.google.android.apps.nbu.paisa.user',
-   phonepe:'com.phonepe.app',
-   paytm:'net.one97.paytm',
-   bhim:'in.org.npci.upiapp'
-  };
-  const upiPackage=packages[app];
-  if(!upiPackage||!session||!session.token||!session.orderId)return '#';
-  const params=new URLSearchParams({
-   apiBase:location.origin,
-   orderId:session.orderId,
-   token:session.token,
-   upiUri:session.upiUri,
-   upiPackage,
-   returnUrl:secureCheckoutUrl(true)
-  });
-  const fallback=new URL(secureCheckoutUrl(true));
-  fallback.searchParams.set('nativeHostUnavailable','1');
-  return 'intent://pay?'+params.toString()+
-   '#Intent;scheme=disha;package=in.disha.upihost;S.browser_fallback_url='+
-   encodeURIComponent(fallback.href)+';end';
- }
  function renderQr(){
   if(!session)return;
   const anchor=get('qrTapToPay'),container=get('paymentQr');
   // P2P ProofBridge is copy-to-pay, NOT QR-to-pay. Neither consent
   // nor Proceed may render a personal-account QR in this mode.
-  const nativeHostEligible=device==='android'&&/Chrome\/\d+/i.test(userAgent)&&!/[;\s]wv[);\s]/i.test(userAgent)&&!query.has('nativeHostUnavailable');
+  const androidChromeEligible=device==='android';
   const disclosure=get('nativeEvidenceDisclosure');
-  if(disclosure)disclosure.hidden=!nativeHostEligible;
+  if(disclosure)disclosure.hidden=!androidChromeEligible;
   const proofbridgeGate=get('proofbridgeGate');
   if(proofbridgeGate&&!proofbridgeEnabled)proofbridgeGate.hidden=true;
   if(expired()||['EXPIRED','FAILED','CANCELLED'].includes(session.initialStatus)){
    anchor.href='#';anchor.hidden=true;anchor.setAttribute('aria-disabled','true');
    get('upiAppOptions').hidden=true;
-   if(disclosure)disclosure.hidden=true;
    container.replaceChildren();qrUri=null;handleQrExpiry();return;
   }
-  const p2pCopyOnly=model.isPersonalPayment(session.upiUri)&&(proofbridgeEnabled||nativeHostEligible);
+  const p2pCopyOnly=model.isPersonalPayment(session.upiUri)&&(proofbridgeEnabled||androidChromeEligible);
   anchor.hidden=p2pCopyOnly;
   get('qrExpiry').hidden=p2pCopyOnly;
   get('qrTapToPayHint').hidden=p2pCopyOnly;
   if(p2pCopyOnly){
    anchor.href='#';anchor.setAttribute('aria-disabled','true');
    container.replaceChildren();qrUri=null;
-   if(nativeHostEligible){
-    // Android Chrome P2P is copy-to-pay. Never launch a UPI app or require
-    // the DISHA host APK; the customer chooses their UPI app manually.
+   if(androidChromeEligible){
+    // Personal UPI remains copy-to-pay on Android Chrome.
     get('upiAppOptions').hidden=true;
     const proceed=get('vaultProceed');
     if(proceed){
@@ -364,8 +339,7 @@
      proceed.textContent='Copy UPI ID';
      proceed.setAttribute('aria-disabled','false');
     }
-    if(disclosure)disclosure.hidden=true;
-    const guide=get('paymentStageCopy');
+     const guide=get('paymentStageCopy');
     if(guide)guide.textContent='Automatic Android debit observation is unavailable in this checkout. For manual payment, copy the receiving UPI ID and enter the exact amount in your UPI app.';
    }else{
     // Keep the existing consent-authorized ProofBridge flow for non-native
@@ -388,8 +362,7 @@
   // Payment dispatch is independent of optional Quantum evidence telemetry.
   // Check the literal launch target BEFORE Android resolves an anchor's "#"
   // to the current absolute URL. Personal P2P remains scan/copy-only.
-  const launchUri=nativeHostEligible?nativeHostIntentUri('gpay'):
-   (model.supportsNativeUPI(userAgent)?model.qrTapLaunchUri(session.upiUri,userAgent,secureCheckoutUrl(true)):'#');
+  const launchUri=model.supportsNativeUPI(userAgent)?model.qrTapLaunchUri(session.upiUri,userAgent,secureCheckoutUrl(true)):'#';
   anchor.href=launchUri;
   anchor.setAttribute('aria-disabled',launchUri==='#'?'true':'false');
   if(quantumEnabled){
@@ -397,10 +370,10 @@
    proceed.href=launchUri;
    proceed.setAttribute('aria-disabled',launchUri==='#'?'true':'false');
   }
-  const targeted=nativeHostEligible||model.supportsTargetedAppLaunch(userAgent)&&!model.isPersonalPayment(session.upiUri);
+  const targeted=model.supportsTargetedAppLaunch(userAgent)&&!model.isPersonalPayment(session.upiUri);
   get('upiAppOptions').hidden=!targeted;
   for(const link of document.querySelectorAll('[data-upi-app]')){
-   link.href=targeted?(nativeHostEligible?nativeHostIntentUri(link.dataset.upiApp):model.appTapLaunchUri(session.upiUri,userAgent,secureCheckoutUrl(true),link.dataset.upiApp)):'#';
+   link.href=targeted?model.appTapLaunchUri(session.upiUri,userAgent,secureCheckoutUrl(true),link.dataset.upiApp):'#';
    link.setAttribute('aria-disabled',targeted?'false':'true');
   }
   if(qrUri!==session.upiUri){
@@ -416,7 +389,6 @@
    qrUri=session.upiUri;
   }
   handleQrExpiry();
-  if(query.has('nativeHostUnavailable'))message('DISHA Android host was not found. Standard UPI launch remains available; this attempt will not return native transaction evidence.','info');
  }
  function onReturn(){
   if(!session||receiptShown||document.visibilityState==='hidden')return;
@@ -678,181 +650,32 @@
   const debitButton=get('payerDebitCheck');
   const evidenceDialog=get('debitEvidenceDialog');
   const evidenceRetry=get('debitEvidenceRetry');
-  const showDebitEvidence=(state,receipt)=>{
-   if(typeof evidenceDialog?.showModal!=='function')return;
-   get('debitEvidenceTitle').textContent=receipt?'DISHA Debit Evidence Receipt':'Debit evidence check';
-   get('debitEvidenceDialogStatus').textContent=state;
-   evidenceRetry.hidden=Boolean(receipt);
-   const fields=get('debitEvidenceDialogFields');
-   fields.replaceChildren();
-   if(receipt){
-    for(const [label,value] of [
-     ['Source',receipt.source],
-     ['Source trust',receipt.sourceTrust==='SMS_NOTIFICATION_SENDER_UNVERIFIED'?
-      'Unverified SMS sender; not bank authenticated':'Payment-app notification; not bank authenticated'],
-     ['Debit amount',format(Number(receipt.amountPaise)/100)],
-     [receipt.referenceKind,receipt.reference],['Observed at',new Date(receipt.observedAt).toLocaleString()],
-     ['DISHA order ID',receipt.orderId],['Evidence reference',receipt.receiptReference]
-    ]){
-     const term=document.createElement('dt'),description=document.createElement('dd');
-     term.textContent=label;description.textContent=value;fields.append(term,description);
-    }
-   }
-   if(!evidenceDialog.open)evidenceDialog.showModal();
-  };
-  // Session-scoped, read-only acquisition transport: device observer -> DISHA
-  // signed evidence endpoint -> Chrome receipt. Never infer payment success.
-  let debitEvidenceMonitor=null, debitEvidenceRequestActive=false;
-  const stopDebitEvidenceMonitor=()=>{
-   if(debitEvidenceMonitor){clearInterval(debitEvidenceMonitor);debitEvidenceMonitor=null;}
-  };
-  const checkDebitEvidence=async(silent=false)=>{
-   const passive=silent===true;
-   if(!session?.orderId||!session?.token||debitEvidenceRequestActive)return;
-   if(expired()){stopDebitEvidenceMonitor();if(!passive)showDebitEvidence('Debit evidence could not be validated. This checkout has expired.');return;}
-   const status=get('payerDebitCheckStatus'),details=get('payerDebitCheckReference');
-   debitEvidenceRequestActive=true;
-   debitButton.disabled=true;
-   if(evidenceRetry)evidenceRetry.disabled=true;
-   if(!passive){
-    if(status)status.textContent='Monitoring payer-side evidence for this active checkout…';
-    if(details){details.hidden=true;details.textContent='';}
-   }
+  const checkDebitEvidence=async()=>{
+   if(!session?.orderId||!session?.token||expired())return;
+   if(debitButton)debitButton.disabled=true;
    try{
-    const boundSession=session;
-    const url='/api/payer-debit-evidence/'+encodeURIComponent(boundSession.orderId)+
-     '?token='+encodeURIComponent(boundSession.token);
-    const response=await fetch(url,{credentials:'same-origin',cache:'no-store'});
-    const evidence=await response.json().catch(()=>({}));
-    if(!response.ok)throw Error('DEBIT_EVIDENCE_UNAVAILABLE');
-    if(session!==boundSession||expired()){
-     stopDebitEvidenceMonitor();
-     if(!passive)showDebitEvidence('Debit evidence could not be validated. This checkout changed or expired.');
-     return;
-    }
-    const receipt=evidence.debitEvidenceReceipt;
-    if(evidence.orderId===session.orderId&&receipt?.orderId===session.orderId&&
-     evidence.paymentVerified===false&&evidence.debitVerified===false&&
-     receipt.state==='DEBIT_EVIDENCE_OBSERVED'&&['UTR','RRN'].includes(receipt.referenceKind)&&
-     /^\d{12}$/.test(receipt.reference)&&/^[a-f0-9]{64}$/.test(receipt.receiptReference)&&
-     receipt.amountPaise===String(Math.round(session.amount*100))&&
-     Number.isSafeInteger(receipt.observedAt)&&receipt.observedAt>0){
-     stopDebitEvidenceMonitor();
-     showDebitEvidence('DEBIT EVIDENCE OBSERVED. Bank debit and payment remain unverified.',receipt);
-    }else if(evidence.receiptError||receipt){
-     stopDebitEvidenceMonitor();
-     const trustMissing=['TRUSTED_DEVICE_NOT_CONFIGURED','DEVICE_PROVENANCE_UNTRUSTED']
-      .includes(evidence.receiptError);
-     const explanation=trustMissing?
-      'Android evidence is present but trusted device provenance is not established. Bank debit remains unverified.':
-      'Debit evidence could not be validated because it conflicts with this checkout. No payment is verified.';
-     const candidate=trustMissing&&evidence.paymentVerified===false&&
-       evidence.debitVerified===false&&evidence.evidence?.find(x=>
-       ['DEVICE_OBSERVATION','SMS_NOTIFICATION_UNVERIFIED'].includes(x.source)&&x.deviceSignatureVerified===true&&
-       /^\d{12}$/.test(x.utr||'')&&['UTR','RRN'].includes(x.referenceKind)&&
-       x.amountPaise===String(Math.round(session.amount*100))&&
-       String(x.payeeVpa).toLowerCase()===String(session.payeeVpa).toLowerCase());
-     if(candidate&&typeof evidenceDialog?.showModal==='function'&&!passive){
-      get('debitEvidenceTitle').textContent='Unverified Android debit observation';
-      get('debitEvidenceDialogStatus').textContent=explanation;
-      const fields=get('debitEvidenceDialogFields');fields.replaceChildren();
-      for(const [name,value] of [
-       ['Source',candidate.source],['Amount',format(Number(candidate.amountPaise)/100)],
-       [candidate.referenceKind,candidate.utr],['Trust level','Device signature only; bank and OS provenance unverified']
-      ]){
-       const term=document.createElement('dt'),description=document.createElement('dd');
-       term.textContent=name;description.textContent=value;fields.append(term,description);
-      }
-      if(!evidenceDialog.open)evidenceDialog.showModal();
-     }else if(!passive)showDebitEvidence(explanation);
-     if(status)status.textContent=explanation;
-     return;
-    }else{
-     if(!passive)showDebitEvidence('Debit evidence not available yet');
-    }
-    const first=evidence.evidence?.[0];
-    if(first&&/^\d{12}$/.test(first.utr||'')){
-     if(details){details.hidden=false;details.textContent=(first.referenceKind==='RRN'?'Observed RRN: ':first.referenceKind==='UTR'?'Observed UTR: ':'Reported UTR: ')+first.utr+
-      ' · Source: '+first.source+' · Amount: '+format(session.amount)+
-      ' · Payee: '+first.payeeVpa;}
-     if(status)status.textContent=first.deviceSignatureVerified===true?
-      'Android device signature verified. Original bank debit is NOT authenticated.':
-      'UTR candidate found. Original bank debit is NOT authenticated.';
-    }else if(status){
-     status.textContent='No authenticated debit receipt was returned by Android or the UPI app. Payment remains unverified.';
+    const bound=session;
+    const response=await fetch('/api/payer-debit-evidence/'+encodeURIComponent(bound.orderId)+
+     '?token='+encodeURIComponent(bound.token),{credentials:'same-origin',cache:'no-store'});
+    if(!response.ok||session!==bound||expired())throw Error('EVIDENCE_UNAVAILABLE');
+    const result=await response.json();
+    const status=result.paymentVerified===true&&result.debitVerified===true?
+     'Authenticated receipt is available.':
+     'No authenticated debit evidence is available for this checkout.';
+    const node=get('payerDebitCheckStatus');if(node)node.textContent=status;
+    if(evidenceDialog?.showModal){
+     get('debitEvidenceTitle').textContent='Debit evidence status';
+     get('debitEvidenceDialogStatus').textContent=status;
+     get('debitEvidenceDialogFields')?.replaceChildren();
+     if(!evidenceDialog.open)evidenceDialog.showModal();
     }
    }catch(_){
-    if(!passive)showDebitEvidence('Debit evidence could not be validated. The evidence service is unavailable.');
-    if(status)status.textContent='Evidence service unavailable. Do not assume the payment failed or succeeded.';
-   }finally{debitEvidenceRequestActive=false;debitButton.disabled=false;if(evidenceRetry)evidenceRetry.disabled=false;}
+    const node=get('payerDebitCheckStatus');
+    if(node)node.textContent='Evidence check unavailable; payment state unchanged.';
+   }finally{if(debitButton)debitButton.disabled=false;}
   };
-  const startDebitEvidenceMonitor=()=>{
-   if(!session||expired())return;
-   stopDebitEvidenceMonitor();
-   const boundSession=session;
-   // The observer's consent is separately enforced by Android/backend.
-   // Polling is just a read of this order's authenticated evidence receipt.
-   debitEvidenceMonitor=setInterval(()=>{
-    if(session!==boundSession||expired()||receiptShown){
-     stopDebitEvidenceMonitor();return;
-    }
-    if(document.visibilityState==='visible')void checkDebitEvidence(true);
-   },3000);
-   return checkDebitEvidence(false);
-  };
-  if(debitButton)debitButton.addEventListener('click',startDebitEvidenceMonitor);
-  // User-initiated Android bridge. A 60-second one-time ticket (not the
-  // checkout bearer) moves from Chrome to the installed DISHA observation app.
-  // Both steps require user gestures; no SMS/notification content enters Chrome.
-  if(debitButton&&/Android/i.test(navigator.userAgent)&&
-     typeof document.createElement==='function'&&typeof debitButton.insertAdjacentElement==='function'){
-   const pairButton=document.createElement('button');
-   pairButton.type='button';
-   pairButton.textContent='Connect Android debit observer';
-   pairButton.setAttribute('aria-label','Pair installed DISHA Android observer');
-   const pairHint=document.createElement('p');
-   pairHint.setAttribute('role','status');
-   pairHint.textContent='Requires the DISHA Android observer app and Android notification permission.';
-   const pairLink=document.createElement('a');
-   pairLink.textContent='Open DISHA observer on this phone';
-   pairLink.hidden=true;
-   pairLink.rel='nofollow';
-   debitButton.insertAdjacentElement('afterend',pairHint);
-   pairHint.insertAdjacentElement('beforebegin',pairButton);
-   pairHint.insertAdjacentElement('afterend',pairLink);
-   pairButton.addEventListener('click',async()=>{
-    pairLink.hidden=true;
-    pairLink.removeAttribute('href');
-    const boundSession=session;
-    if(!boundSession?.orderId||!boundSession?.token||expired()){
-     pairHint.textContent='Checkout expired or unavailable.';return;
-    }
-    pairButton.disabled=true;
-    pairHint.textContent='Creating a one-time Android pairing ticket…';
-    try{
-     const response=await fetch('/api/session-evidence/pairing/issue',{
-      method:'POST',credentials:'same-origin',cache:'no-store',
-      headers:{'Content-Type':'application/json','X-CSRF-Token':boundSession.token},
-      body:JSON.stringify({orderId:boundSession.orderId,token:boundSession.token})
-     });
-     const data=await response.json().catch(()=>({}));
-     if(!response.ok||!data.success||!/^[A-Za-z0-9_-]{43}$/.test(data.ticket)||
-        !Number.isSafeInteger(data.expiresAt)||data.expiresAt<=Date.now()||
-        session!==boundSession||expired())throw Error('PAIRING_UNAVAILABLE');
-     // Explicit app package is used for Chrome intent routing. The ticket
-     // expires after 60s, is single-use and holds no checkout credentials.
-     pairLink.href='intent://pair/'+encodeURIComponent(data.ticket)+
-      '#Intent;scheme=disha-observe;package=ai.disha.credentialfixture;end';
-     pairLink.hidden=false;
-     pairHint.textContent='Tap Open DISHA observer within 60 seconds. Authenticate and consent on Android.';
-    }catch(_){
-     pairHint.textContent='Pairing unavailable. No debit has been verified.';
-    }finally{pairButton.disabled=false;}
-   });
-  }
-
-  if(evidenceRetry&&debitButton)evidenceRetry.addEventListener('click',()=>void checkDebitEvidence(false));
-  window.addEventListener('pagehide',stopDebitEvidenceMonitor);
+  if(debitButton)debitButton.addEventListener('click',checkDebitEvidence);
+  if(evidenceRetry)evidenceRetry.addEventListener('click',checkDebitEvidence);
   const diag=get('checkoutDebugPanel');
   if(debug&&diag){diag.hidden=false;get('checkoutDebugCopy').addEventListener('click',copyDebugReport)}
   get('saveReceipt').addEventListener('click',()=>{if(receiptShown)window.print()});

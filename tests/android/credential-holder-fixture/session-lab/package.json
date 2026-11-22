@@ -1,8 +1,0 @@
-{
-  "name": "disha-session-evidence-lab",
-  "version": "1.0.0",
-  "private": true,
-  "dependencies": {
-    "@electric-sql/pglite": "0.3.15"
-  }
-}

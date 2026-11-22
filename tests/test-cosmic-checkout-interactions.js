@@ -34,9 +34,6 @@ function mount(status='PENDING',checkout='merchant',overrides={}){
     orderId:'ORD_TEST_1234',challengeAmount:500,expiresAt:Date.now()+180000,status:'PENDING',
     merchantType:'PERSONAL',vpaAddress:'merchant@oksbi',txnRef:'SERVICE_TEST'
    },upiLink:uri})};
-   if(url.includes('/api/session-evidence/pairing/issue'))return {ok:true,json:async()=>({
-    success:true,ticket:'p'.repeat(43),expiresAt:Date.now()+60000
-   })};
    if(url.includes('/api/payer-debit-evidence/'))return {ok:true,json:async()=>({
     success:true,debitVerified:false,paymentVerified:false,paymentStateChanged:false,
     orderId:'ORD_TEST_1234',debitEvidenceReceipt:data.debitEvidenceReceipt,
@@ -85,77 +82,13 @@ const active=app=>app.stages.find(s=>!s.hidden)?.dataset.stage;
  assert.equal(typeof p2p.nodes.payerDebitCheck.events.click,'function',
    'P2P checkout must expose exactly one payer evidence check');
  assert.equal(p2p.nodes.payerDebitCheck.disabled,false,'Evidence check enabled after session loads');
- const pairButton=p2p.created.find(element=>element.textContent==='Connect Android debit observer');
- assert.ok(pairButton,'Android checkout offers explicit observer pairing');
- await pairButton.events.click();await flush();
- const pairLink=p2p.created.find(element=>element.textContent==='Open DISHA observer on this phone');
- assert.ok(pairLink?.href?.includes('scheme=disha-observe;package=ai.disha.credentialfixture'),
-  'one-time ticket is handed to explicit DISHA Android app');
- assert.ok(!pairLink.href.includes('a'.repeat(48)),
-  'app handoff must not include checkout bearer token');
-
+ assert.ok(!p2p.created.some(element=>/observer|broker/i.test(element.textContent||'')),
+  'Checkout must not offer any installed Android observer or broker');
  await p2p.nodes.payerDebitCheck.events.click();await flush();
- assert.match(p2p.nodes.payerDebitCheckStatus.textContent,/NOT authenticated/i,
-   'Browser return UTR must never certify bank debit');
- assert.match(p2p.nodes.payerDebitCheckReference.textContent,/Reported UTR: 123456789012/,
-   'Observed reference can be displayed without a fabricated paid status');
+ assert.match(p2p.nodes.payerDebitCheckStatus.textContent,/No authenticated debit evidence/i);
  assert.equal(active(p2p),'qr','Unverified debit cannot unlock receipt');
- assert.equal(p2p.data.prompt,0,'I Paid must not request a browser credential');
- const observed=mount('PENDING','generic',{evidence:[{utr:'123456789012',referenceKind:'RRN',
-   source:'DEVICE_OBSERVATION',payeeVpa:'merchant@oksbi',deviceSignatureVerified:true}]});
- await flush();await observed.nodes.payerDebitCheck.events.click();
- assert.match(observed.nodes.payerDebitCheckReference.textContent,/Observed RRN: 123456789012/);
- assert.match(observed.nodes.payerDebitCheckStatus.textContent,/device signature verified/i);
- assert.equal(observed.data.prompt,0);
- assert.equal(active(observed),'qr','A signed Android observation cannot unlock a bank receipt');
- assert.equal(observed.nodes.debitEvidenceDialogStatus.textContent,'Debit evidence not available yet');
- const qualified=mount('PENDING','generic',{debitEvidenceReceipt:{orderId:'ORD_TEST_1234',
-   state:'DEBIT_EVIDENCE_OBSERVED',source:'com.phonepe.app',amountPaise:'50000',
-   reference:'000000000123',referenceKind:'RRN',observedAt:Date.now(),receiptReference:'a'.repeat(64)}});
- await flush();await qualified.nodes.payerDebitCheck.events.click();
- assert.equal(qualified.nodes.debitEvidenceTitle.textContent,'DISHA Debit Evidence Receipt');
- assert.ok(qualified.nodes.debitEvidenceDialogFields.children.some(node=>node.textContent==='000000000123'));
- assert.equal(active(qualified),'qr');
- const untrustedDevice=mount('PENDING','generic',{
-   receiptError:'TRUSTED_DEVICE_NOT_CONFIGURED',
-   evidence:[{source:'DEVICE_OBSERVATION',deviceSignatureVerified:true,referenceKind:'RRN',
-    utr:'000000000999',amountPaise:'50000',payeeVpa:'merchant@oksbi'}]
- });
- await flush();await untrustedDevice.nodes.payerDebitCheck.events.click();
- assert.equal(untrustedDevice.nodes.debitEvidenceTitle.textContent,'Unverified Android debit observation');
- assert.match(untrustedDevice.nodes.debitEvidenceDialogStatus.textContent,/bank debit remains unverified/i);
- assert.ok(untrustedDevice.nodes.debitEvidenceDialogFields.children.some(n=>n.textContent==='000000000999'));
- assert.equal(active(untrustedDevice),'qr','unverified device observation cannot mark checkout paid');
- const smsObserved=mount('PENDING','generic',{
-  receiptError:'TRUSTED_DEVICE_NOT_CONFIGURED',
-  evidence:[{source:'SMS_NOTIFICATION_UNVERIFIED',deviceSignatureVerified:true,referenceKind:'UTR',
-    utr:'000000000998',amountPaise:'50000',payeeVpa:'merchant@oksbi'}]
- });
- await flush();await smsObserved.nodes.payerDebitCheck.events.click();
- assert.equal(smsObserved.nodes.debitEvidenceTitle.textContent,'Unverified Android debit observation');
- assert.ok(smsObserved.nodes.debitEvidenceDialogFields.children.some(n=>n.textContent==='SMS_NOTIFICATION_UNVERIFIED'));
- assert.equal(active(smsObserved),'qr','SMS sender label cannot verify payment');
- const smsReceipt=mount('PENDING','generic',{debitEvidenceReceipt:{
-   ...qualified.data.debitEvidenceReceipt,source:'com.google.android.apps.messaging',
-   sourceTrust:'SMS_NOTIFICATION_SENDER_UNVERIFIED'
- }});
- await flush();await smsReceipt.nodes.payerDebitCheck.events.click();
- assert.ok(smsReceipt.nodes.debitEvidenceDialogFields.children.some(n=>
-   /Unverified SMS sender/.test(n.textContent||'')));
- assert.equal(active(smsReceipt),'qr','even pinned device cannot authenticate SMS sender');
- const crossOrder=mount('PENDING','generic',{debitEvidenceReceipt:{...qualified.data.debitEvidenceReceipt,orderId:'OTHER_ORDER'}});
- await flush();await crossOrder.nodes.payerDebitCheck.events.click();
- assert.match(crossOrder.nodes.debitEvidenceDialogStatus.textContent,/could not be validated/);
- assert.equal(crossOrder.nodes.debitEvidenceDialogFields.children.length,0);
- const unavailable=mount('PENDING','generic',{signal:null});await flush();
- await unavailable.nodes.payerDebitCheck.events.click();await flush();
- assert.match(unavailable.nodes.payerDebitCheckStatus.textContent,/No authenticated debit receipt/i);
- assert.equal(active(unavailable),'qr','Missing payer evidence is not payment confirmation');
- const spoofedIssuer=mount('PENDING','generic',{proof:{success:true,paymentVerified:true,
-   payerDebitVerified:true,payerDebitEvidence:{utr:'123456789012',debitVerified:true}}});
- await flush();await spoofedIssuer.nodes.payerDebitCheck.events.click();await flush();
- assert.equal(active(spoofedIssuer),'qr',
-   'The payer button must not accept issuer-signed claims as authentic bank debit');
+ assert.equal(p2p.data.prompt,0,'I Paid must not request another credential');
+ assert.equal(p2p.nodes.debitEvidenceDialog.open,true,'Evidence status dialog remains available');
   const expired=mount('EXPIRED');await flush();
  assert.equal(active(expired),'qr');
  assert.equal(expired.nodes.qrTapToPay.href,'#');

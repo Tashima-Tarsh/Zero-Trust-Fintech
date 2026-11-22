@@ -5,6 +5,7 @@ const assert=require('node:assert/strict');
 const {spawn}=require('node:child_process');
 const crypto=require('node:crypto');
 const path=require('node:path');
+const fs=require('node:fs');
 const {Pool}=require('pg');
 
 (async()=>{
@@ -98,12 +99,10 @@ const {Pool}=require('pg');
   console.log('PASS cancellation requires correct checkout token and CSRF header');
 
   const share=await createCase();
-  const shared='UPI Payment Successful\nTo: qa-receiver@oksbi\nAmount INR 499.01\nUTR: '+
-   share.utr+'\nOrder ID: '+share.id;
-  const sharedResult=await send('/handle-share',{text:shared});
-  assert.equal(sharedResult.status,202,'Share-target return is not bank credit: '+JSON.stringify(sharedResult));
-  assert.equal(sharedResult.data.verified,false);
-  console.log('PASS Android share-sheet claim: observation only');
+  const source=fs.readFileSync(path.join(__dirname,'../server.js'),'utf8');
+  assert.ok(!source.includes("app.post('/handle-share'"),
+    'Retired Android Sharesheet receipt-ingestion endpoint must remain absent');
+  console.log('PASS retired Android Sharesheet endpoint not registered');
 
   const callback=await send('/api/npci-callback',
    {Status:'SUCCESS',responseCode:'00',txnId:'631902884112',amount:'499.01'});
