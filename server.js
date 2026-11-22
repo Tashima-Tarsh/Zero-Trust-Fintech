@@ -23,6 +23,7 @@ const {createCheckoutDiagnostics}=require('./financial/checkout-diagnostics');
 const {lookupBankSender,coverage:bankSmsCoverage}=require('./financial/bank-sms-header-registry');
 const {initSmsDebitRelay,createSmsDebitRelayRouter}=require('./financial/sms-debit-relay');
 const {createUpiAppEvidenceRouter}=require('./financial/upi-app-evidence-router');
+const {initPayerPartnerDebit,createPayerPartnerDebitRouter}=require('./financial/payer-partner-debit-bridge');
 const {createP2pPrepaymentRouter}=require('./financial/p2p-prepayment-router');
 const {initUpiAppEvidenceReplay,makeReplayGuard}=require('./financial/upi-app-evidence-replay');
 const {initializeClaimObserver,observeClaim} = require('./financial/untrusted-utr-claims');
@@ -313,6 +314,26 @@ app.use('/api/sms-debit-relay',verifyLimiter,createSmsDebitRelayRouter({
   try{
    const keys=JSON.parse(process.env.DISHA_SMS_RELAY_TRUSTED_PUBLIC_KEYS_JSON||'{}');
    return keys&&typeof keys==='object'&&!Array.isArray(keys)?keys:{};
+  }catch(_){return {}}
+ }
+}));
+// Authorized PSP bank -> DISHA payer-debit leg *research* mirror.
+// The Google UPI Callback is NOT a generic merchant webhook; this adapter
+// requires explicit PSP partner onboarding and configured Ed25519 public keys.
+app.use('/api/payer-partner-debit',verifyLimiter,createPayerPartnerDebitRouter({
+ getPool:()=>db.pgPool,
+ getSession:id=>db.findSessionByOrderId(id),
+ isOnboarded:sourceId=>{
+  try{
+   if(process.env.DISHA_PAYER_PSP_PARTNER_MODE!=='enabled')return false;
+   const sourceIds=JSON.parse(process.env.DISHA_PAYER_PSP_ONBOARDED_SOURCES_JSON||'[]');
+   return Array.isArray(sourceIds)&&sourceIds.includes(sourceId);
+  }catch(_){return false}
+ },
+ getTrustedKeys:()=>{
+  try{
+   const p=JSON.parse(process.env.DISHA_PAYER_PSP_TRUSTED_ED25519_KEYS_JSON||'{}');
+   return p&&typeof p==='object'&&!Array.isArray(p)?p:{};
   }catch(_){return {}}
  }
 }));
@@ -953,6 +974,17 @@ app.get('/api/payer-debit-evidence/:orderId', verifyLimiter, async (req,res)=>{
         'SELECT utr_candidate AS utr,amount_paise,payee_vpa,observed_at '+
         "FROM disha_sms_debit_candidates WHERE order_id=$1 AND utr_candidate IS NOT NULL "+
         'ORDER BY received_at DESC LIMIT 5'},
+      // Separately onboarded PSP-bank payer-debit leg, not Google Pay's
+      // restricted callback and never beneficiary-credit evidence.
+      {source:'PSP_PARTNER_DEBIT_LEG_OBSERVED_UNVERIFIED',
+       enabled:process.env.DISHA_PAYER_PSP_PARTNER_MODE==='enabled',
+       sql:'SELECT e.utr,e.amount_paise,e.payee_vpa,e.occurred_at AS observed_at '+
+        'FROM disha_payer_partner_debit_events e '+
+        "WHERE e.order_id=$1 AND e.debit_leg_status='CONFIRMED' "+
+        'AND NOT EXISTS (SELECT 1 FROM disha_payer_partner_debit_events r '+
+         "WHERE r.order_id=e.order_id AND r.source_id=e.source_id AND r.utr=e.utr AND r.debit_leg_status='REVERSED' "+
+         'AND r.occurred_at>=e.occurred_at) '+
+        'ORDER BY e.received_at DESC LIMIT 5'},
       // A browser return may carry a 12-digit reference, but its source is
       // not the UPI app's authenticated debit record.
       {source:'BROWSER_RETURN_OBSERVATION',sql:
@@ -2057,6 +2089,7 @@ app.get('/failed', (req, res) => res.sendFile(path.join(__dirname, 'public', 'fa
     await initializeVaultEvidenceSchema(db.pgPool);
     await initializeQuantumSignal(db.pgPool);
     await initUpiAppEvidenceReplay(db.pgPool);
+    await initPayerPartnerDebit(db.pgPool);
     await initSmsDebitRelay(db.pgPool);
     await initDebitCredentialSchema(db.pgPool);
     if(process.env.DISHA_PROOFBRIDGE_EXPERIMENT==='1')await initProofBridgeSchema(db.pgPool);
