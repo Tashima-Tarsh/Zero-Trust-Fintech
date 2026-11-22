@@ -148,6 +148,14 @@ async function main() {
     assert.equal(conflict.receiptError, 'CONFLICTING_OR_INVALID_EVIDENCE');
     const clean = await enroll(binding);
     await expect(submit(clean, observed(clean,{transactionRef:'000000000105'})), 202, 'SIGNAL_MATCHED');
+    // Test-only synthetic pin: production does NOT trust checkout-enrolled keys.
+    // The stronger receipt is intentionally unavailable without OEM/admin pin.
+    assert.equal((await readDebitEvidenceReceipt(lab.pool, clean.orderId, checkout)).receiptError,
+      'TRUSTED_DEVICE_NOT_CONFIGURED');
+    const syntheticPin = crypto.createHash('sha256')
+      .update(publicKey.export({type:'spki',format:'der'})).digest('hex');
+    const previousPin=process.env.DISHA_UDEB_PINNED_DEVICE_KEY_SHA256;
+    process.env.DISHA_UDEB_PINNED_DEVICE_KEY_SHA256=syntheticPin;
     const firstLookup = await readDebitEvidenceReceipt(lab.pool, clean.orderId, checkout);
     assert.deepEqual(await readDebitEvidenceReceipt(lab.pool, clean.orderId, checkout), firstLookup,
       'Read-only callbacks return the same receipt without side effects');
@@ -157,6 +165,8 @@ async function main() {
     assert.equal(firstLookup.debitEvidenceReceipt.referenceKind,'RRN');
     assert.deepEqual(await readDebitEvidenceReceipt(lab.pool, clean.orderId,{...checkout,expiresAt:0}),{});
     assert.deepEqual(await readDebitEvidenceReceipt(lab.pool, second.orderId,checkout),{});
+    if (previousPin===undefined) delete process.env.DISHA_UDEB_PINNED_DEVICE_KEY_SHA256;
+    else process.env.DISHA_UDEB_PINNED_DEVICE_KEY_SHA256=previousPin;
     await post('/api/session-evidence/revoke', {orderId:clean.orderId,token:clean.token},clean.token);
     assert.deepEqual(await readDebitEvidenceReceipt(lab.pool, clean.orderId,checkout),{});
     await expect(submit(real, observed(real)), 409, 'EVIDENCE_REPLAY_BLOCKED');
