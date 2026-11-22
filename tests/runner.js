@@ -69,6 +69,7 @@ const UNIT_TESTS = [
   'test-rea-android-discovery.js', // REA Windows setup and safe payment-handler census // Opt-in test embedded in real P2P/P2M checkout after WebAuthn
   'test-payer-partner-debit-bridge.js', // authorized PSP payer-debit leg mirror, replay and reversal
   'test-upi-app-evidence-replay.js', // atomic PostgreSQL replay, concurrent rejects and fail-closed storage // authenticated payment handler callback, read-only signature checks // fail-closed provider signature verification, no ledger write
+  'test-disha-debit-bridge-lab.js', // Ponytail minimal synthetic Android-to-Chrome bridge protocol // gated P2P PaymentRequest capability and response, no ledger mutation
   'test-p2p-paymentrequest-experiment.js', // gated P2P PaymentRequest capability and response, no ledger mutation
   'test-p2p-ninety-second-evidence-gate.js', // server timer, copy-only display and no false payments // Sourced headers: never promote claimed sender to debit proof
   'test-payer-debit-button.js',
