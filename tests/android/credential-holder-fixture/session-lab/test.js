@@ -85,11 +85,11 @@ async function main() {
     assert.equal(pairEventResponse.debitVerified,false);
     // One checkout can receive payer-app and messaging notification evidence
     // bearing the same real-world RRN without a false duplicate-reference error.
-    const smsEvent={...pairedEvent,eventId:crypto.randomUUID(),
+    const pairedSmsEvent={...pairedEvent,eventId:crypto.randomUUID(),
       packageName:'com.google.android.apps.messaging'};
     const [smsStatus,smsResult]=await post('/api/session-evidence/event',{
-      token:redeemed.observerToken,evidence:smsEvent,
-      signature:sign(canonicalEvidence(smsEvent))
+      token:redeemed.observerToken,evidence:pairedSmsEvent,
+      signature:sign(canonicalEvidence(pairedSmsEvent))
     });
     assert.equal(smsStatus,202,JSON.stringify(smsResult));
     assert.equal(smsResult.observationState,'DEBIT_UTR_OBSERVED');
