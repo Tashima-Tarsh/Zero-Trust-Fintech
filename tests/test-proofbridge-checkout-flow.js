@@ -112,7 +112,8 @@ async function flush(){for(let i=0;i<55;i++)await Promise.resolve()}
  const payer=launch(false,'P2P','generic');await flush();
  // The generic payer lane requires completed server-side trust authorization.
  await payer.elems.p2pPrepaymentAuthenticate.events.click();await flush();
- assert.equal(payer.elems.vaultProceed.getAttribute('aria-disabled'),'false');
+ assert.match(payer.elems.p2pPrepaymentStatus.textContent,/checks verified/);
+ assert.equal(payer.elems.proofbridgeProceed.disabled,false);
 
  assert.equal(payer.elems.serviceIdentifier.textContent,'Service ID · SRVTEST123');
  payer.elems.proofbridgeConsent.checked=true;
