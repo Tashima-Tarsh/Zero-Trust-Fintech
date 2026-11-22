@@ -192,7 +192,7 @@
   const kind=session.paymentType==='P2M'?'P2M':'P2P';
   const name=kind==='P2M'?'Merchant receiving UPI':'Personal receiving UPI';
   const payee=session.payeeVpa||p.get('pa')||'';
-  label.textContent=kind+' · '+name+(payee?' · '+payee:'');
+  label.textContent=kind+' · '+name;
  }
  // Issuer-confirmed payer debit evidence produces its own receipt, without
  // consulting the receiving account's settlement state.
@@ -277,6 +277,14 @@
   const ss=String(remaining%60).padStart(2,'0');
   node.textContent=remaining?'Session expires in '+mm+':'+ss:'Session expired · Request a new payment link';
   node.dataset.expired=String(remaining===0);
+  if(remaining===0) {
+   const pay=get('vaultProceed');
+   if(pay){pay.setAttribute('aria-disabled','true');pay.setAttribute('tabindex','-1')}
+   const copy=get('proofbridgeProceed');
+   if(copy)copy.disabled=true;
+   const debit=get('payerDebitCheck');
+   if(debit)debit.disabled=true;
+  }
   if(remaining===0&&!expiryLogged){expiryLogged=true;trace('SESSION_EXPIRED')}
   if(lastStage==='qr')handleQrExpiry();
  }
@@ -542,7 +550,7 @@
     proofbridgeReady=true;gate.hidden=true;renderQr();
     const handoff=get('copyHandoff');
     if(handoff){
-     get('copiedPayee').textContent=proofbridgeAuthorized.ticket.payeeVpa;
+     get('copiedPayee').textContent='Receiving UPI ID copied securely';
      handoff.hidden=false;
      get('copyHandoffStatus').textContent='Open your payment app, paste the receiving address and confirm the exact amount. Return here for the receipt check.';
     }
@@ -581,7 +589,7 @@
     get('vaultProceed').setAttribute('aria-disabled','false');
     const handoff=get('copyHandoff');
     if(handoff){
-     get('copiedPayee').textContent=payee;
+     get('copiedPayee').textContent='Receiving UPI ID copied securely';
      handoff.hidden=false;
      get('copyHandoffStatus').textContent='UPI ID copied. Open Google Pay, PhonePe, Paytm or BHIM yourself, paste the ID, enter the exact amount and pay. Return here for the receipt check.';
     }
@@ -672,7 +680,7 @@
    }catch(_){
     const node=get('payerDebitCheckStatus');
     if(node)node.textContent='Evidence check unavailable; payment state unchanged.';
-   }finally{if(debitButton)debitButton.disabled=false;}
+   }finally{if(debitButton)debitButton.disabled=expired();}
   };
   if(debitButton)debitButton.addEventListener('click',checkDebitEvidence);
   if(evidenceRetry)evidenceRetry.addEventListener('click',checkDebitEvidence);
@@ -745,7 +753,7 @@
    setPaymentKind();
    const params=new URLSearchParams(session.upiUri.split('?')[1]||'');
    get('checkoutPaymentIdentity').textContent=(session.serviceNumber?'Service '+session.serviceNumber+' · ':'')+
-    'UPI · '+(session.payeeVpa||params.get('pa')||'');
+    'Receiving UPI ID hidden · Use Copy UPI ID';
    get('paymentTrackingStatus').textContent='Payment status · Awaiting confirmation';
    const debitCheck=get('payerDebitCheck');if(debitCheck)debitCheck.disabled=false;
    get('checkoutNote').textContent=params.get('tn')||'Service';

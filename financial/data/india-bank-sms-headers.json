@@ -1,0 +1,1188 @@
+{
+  "registry": "DISHA Indian Bank SMS Sender Header Registry",
+  "version": "0.2-preliminary",
+  "compiled_on": "2026-11-22",
+  "scope": "RBI published scheduled commercial bank roster, including nationalized, private, small finance, payments, RRB and foreign institutions in India. Some may be restricted or not actively offer UPI.",
+  "classification": "Research data only; sender-only match cannot confirm payment",
+  "primary_sources": {
+    "rbi_roster": "https://www.rbi.org.in/scripts/bs_viewcontent.aspx?Id=3657",
+    "trai_header_information_portal": "https://smsheader.trai.gov.in/",
+    "trai_portal_documentation": "https://www.trai.gov.in/portal-and-apps"
+  },
+  "important_notes": [
+    "Bank names from RBI roster; no automatically downloaded TRAI bulk header file was obtained, because the portal timed out.",
+    "Headers are from cited bank-authored materials only, not extrapolated from logo, screenshot label or IFSC.",
+    "Full sender prefixes such as AD or AX can vary by route; compare registered core header and applicable suffix against TRAI record, not screenshot display labels.",
+    "One-way/reply-disabled SMS UI does not by itself establish registered sender ID or debit settlement.",
+    "A header lookup does not prove that the bank ledger posted a debit.",
+    "RBI roster flags Paytm Payments Bank banking licence as cancelled.",
+    "For Axis, bank publications show multiple codes; do not treat them as an exhaustive present-day whitelist until TRAI check."
+  ],
+  "banks": [
+    {
+      "bank_name": "State Bank of India",
+      "category": "public_sector",
+      "rbi_source": "https://www.rbi.org.in/scripts/bs_viewcontent.aspx?Id=3657",
+      "headers": [
+        {
+          "core_header": "SBIUPI",
+          "example_full_sender": "AD-SBIUPI-S",
+          "purpose": "UPI transaction alerts and updates",
+          "evidence_source": "https://sbi.bank.in/documents/16012/1557541/SBI_INFO_SEC_BOOKLET_V11%2B-%2BEnglish.pdf/56639b39-ea7e-81f4-8957-f388982be13d?download=true&t=1759132607762&version=1.0",
+          "source_type": "BANK_OFFICIAL",
+          "status": "BANK_PUBLISHED_NEEDS_CURRENT_TRAI_RECHECK"
+        },
+        {
+          "core_header": "SBIBNK",
+          "example_full_sender": "AX-SBIBNK-S",
+          "purpose": "General banking alerts, OTP, account updates",
+          "evidence_source": "https://sbi.bank.in/documents/16012/1557541/SBI_INFO_SEC_BOOKLET_V11%2B-%2BEnglish.pdf/56639b39-ea7e-81f4-8957-f388982be13d?download=true&t=1759132607762&version=1.0",
+          "source_type": "BANK_OFFICIAL",
+          "status": "BANK_PUBLISHED_NEEDS_CURRENT_TRAI_RECHECK"
+        }
+      ],
+      "header_status": "BANK_PUBLISHED_NEEDS_CURRENT_TRAI_RECHECK",
+      "special_status": null,
+      "user_screenshot_observed": true
+    },
+    {
+      "bank_name": "Bank of Baroda",
+      "category": "public_sector",
+      "rbi_source": "https://www.rbi.org.in/scripts/bs_viewcontent.aspx?Id=3657",
+      "headers": [],
+      "header_status": "NOT_YET_VERIFIED",
+      "special_status": null,
+      "user_screenshot_observed": false
+    },
+    {
+      "bank_name": "Bank of India",
+      "category": "public_sector",
+      "rbi_source": "https://www.rbi.org.in/scripts/bs_viewcontent.aspx?Id=3657",
+      "headers": [],
+      "header_status": "NOT_YET_VERIFIED",
+      "special_status": null,
+      "user_screenshot_observed": false
+    },
+    {
+      "bank_name": "Bank of Maharashtra",
+      "category": "public_sector",
+      "rbi_source": "https://www.rbi.org.in/scripts/bs_viewcontent.aspx?Id=3657",
+      "headers": [],
+      "header_status": "NOT_YET_VERIFIED",
+      "special_status": null,
+      "user_screenshot_observed": false
+    },
+    {
+      "bank_name": "Canara Bank",
+      "category": "public_sector",
+      "rbi_source": "https://www.rbi.org.in/scripts/bs_viewcontent.aspx?Id=3657",
+      "headers": [],
+      "header_status": "NOT_YET_VERIFIED",
+      "special_status": null,
+      "user_screenshot_observed": false
+    },
+    {
+      "bank_name": "Central Bank of India",
+      "category": "public_sector",
+      "rbi_source": "https://www.rbi.org.in/scripts/bs_viewcontent.aspx?Id=3657",
+      "headers": [],
+      "header_status": "NOT_YET_VERIFIED",
+      "special_status": null,
+      "user_screenshot_observed": false
+    },
+    {
+      "bank_name": "Indian Bank",
+      "category": "public_sector",
+      "rbi_source": "https://www.rbi.org.in/scripts/bs_viewcontent.aspx?Id=3657",
+      "headers": [],
+      "header_status": "NOT_YET_VERIFIED",
+      "special_status": null,
+      "user_screenshot_observed": false
+    },
+    {
+      "bank_name": "Indian Overseas Bank",
+      "category": "public_sector",
+      "rbi_source": "https://www.rbi.org.in/scripts/bs_viewcontent.aspx?Id=3657",
+      "headers": [],
+      "header_status": "NOT_YET_VERIFIED",
+      "special_status": null,
+      "user_screenshot_observed": false
+    },
+    {
+      "bank_name": "Punjab & Sind Bank",
+      "category": "public_sector",
+      "rbi_source": "https://www.rbi.org.in/scripts/bs_viewcontent.aspx?Id=3657",
+      "headers": [],
+      "header_status": "NOT_YET_VERIFIED",
+      "special_status": null,
+      "user_screenshot_observed": false
+    },
+    {
+      "bank_name": "Punjab National Bank",
+      "category": "public_sector",
+      "rbi_source": "https://www.rbi.org.in/scripts/bs_viewcontent.aspx?Id=3657",
+      "headers": [],
+      "header_status": "NOT_YET_VERIFIED",
+      "special_status": null,
+      "user_screenshot_observed": false
+    },
+    {
+      "bank_name": "UCO Bank",
+      "category": "public_sector",
+      "rbi_source": "https://www.rbi.org.in/scripts/bs_viewcontent.aspx?Id=3657",
+      "headers": [],
+      "header_status": "NOT_YET_VERIFIED",
+      "special_status": null,
+      "user_screenshot_observed": false
+    },
+    {
+      "bank_name": "Union Bank of India",
+      "category": "public_sector",
+      "rbi_source": "https://www.rbi.org.in/scripts/bs_viewcontent.aspx?Id=3657",
+      "headers": [
+        {
+          "core_header": "UNIONB",
+          "example_full_sender": null,
+          "purpose": "Service/transactional messages; bank example of TRAI 1909 lookup",
+          "evidence_source": "https://www.unionbankofindia.bank.in/pdf/cyber-security-customer-awareness-guide-vol-iii-jan-26.pdf",
+          "source_type": "BANK_OFFICIAL",
+          "status": "BANK_PUBLISHED_NEEDS_CURRENT_TRAI_RECHECK"
+        }
+      ],
+      "header_status": "BANK_PUBLISHED_NEEDS_CURRENT_TRAI_RECHECK",
+      "special_status": null,
+      "user_screenshot_observed": false
+    },
+    {
+      "bank_name": "Axis Bank",
+      "category": "private_sector",
+      "rbi_source": "https://www.rbi.org.in/scripts/bs_viewcontent.aspx?Id=3657",
+      "headers": [
+        {
+          "core_header": "AXSBKS",
+          "example_full_sender": null,
+          "purpose": "Service messages",
+          "evidence_source": "https://application.axis.bank.in/webforms/axis-support/Blogs/identify_genuine.aspx",
+          "source_type": "BANK_OFFICIAL",
+          "status": "BANK_PUBLISHED_NEEDS_CURRENT_TRAI_RECHECK"
+        },
+        {
+          "core_header": "AXSBKT",
+          "example_full_sender": null,
+          "purpose": "Transaction alerts",
+          "evidence_source": "https://application.axis.bank.in/webforms/axis-support/Blogs/identify_genuine.aspx",
+          "source_type": "BANK_OFFICIAL",
+          "status": "BANK_PUBLISHED_NEEDS_CURRENT_TRAI_RECHECK"
+        },
+        {
+          "core_header": "AXISMRP",
+          "example_full_sender": null,
+          "purpose": "Promotional messages",
+          "evidence_source": "https://application.axis.bank.in/webforms/axis-support/Blogs/identify_genuine.aspx",
+          "source_type": "BANK_OFFICIAL",
+          "status": "BANK_PUBLISHED_NEEDS_CURRENT_TRAI_RECHECK"
+        },
+        {
+          "core_header": "AXISBK",
+          "example_full_sender": null,
+          "purpose": "Official SMS ID cited in fraud-awareness guidance; reconcile with bank newer registered list",
+          "evidence_source": "https://cug.axisbank.com/fraud-awareness/prevent-frauds/kyc-and-pan-update-fraud-awareness",
+          "source_type": "BANK_OFFICIAL",
+          "status": "BANK_PUBLISHED_NEEDS_CURRENT_TRAI_RECHECK"
+        },
+        {
+          "core_header": "AXISMR",
+          "example_full_sender": null,
+          "purpose": "Official SMS ID cited in fraud-awareness guidance; reconcile with bank newer registered list",
+          "evidence_source": "https://cug.axisbank.com/fraud-awareness/prevent-frauds/kyc-and-pan-update-fraud-awareness",
+          "source_type": "BANK_OFFICIAL",
+          "status": "BANK_PUBLISHED_NEEDS_CURRENT_TRAI_RECHECK"
+        }
+      ],
+      "header_status": "BANK_PUBLISHED_NEEDS_CURRENT_TRAI_RECHECK",
+      "special_status": null,
+      "user_screenshot_observed": false
+    },
+    {
+      "bank_name": "Bandhan Bank",
+      "category": "private_sector",
+      "rbi_source": "https://www.rbi.org.in/scripts/bs_viewcontent.aspx?Id=3657",
+      "headers": [],
+      "header_status": "NOT_YET_VERIFIED",
+      "special_status": null,
+      "user_screenshot_observed": false
+    },
+    {
+      "bank_name": "CSB Bank",
+      "category": "private_sector",
+      "rbi_source": "https://www.rbi.org.in/scripts/bs_viewcontent.aspx?Id=3657",
+      "headers": [],
+      "header_status": "NOT_YET_VERIFIED",
+      "special_status": null,
+      "user_screenshot_observed": false
+    },
+    {
+      "bank_name": "City Union Bank",
+      "category": "private_sector",
+      "rbi_source": "https://www.rbi.org.in/scripts/bs_viewcontent.aspx?Id=3657",
+      "headers": [],
+      "header_status": "NOT_YET_VERIFIED",
+      "special_status": null,
+      "user_screenshot_observed": false
+    },
+    {
+      "bank_name": "DCB Bank",
+      "category": "private_sector",
+      "rbi_source": "https://www.rbi.org.in/scripts/bs_viewcontent.aspx?Id=3657",
+      "headers": [],
+      "header_status": "NOT_YET_VERIFIED",
+      "special_status": null,
+      "user_screenshot_observed": false
+    },
+    {
+      "bank_name": "Dhanlaxmi Bank",
+      "category": "private_sector",
+      "rbi_source": "https://www.rbi.org.in/scripts/bs_viewcontent.aspx?Id=3657",
+      "headers": [],
+      "header_status": "NOT_YET_VERIFIED",
+      "special_status": null,
+      "user_screenshot_observed": false
+    },
+    {
+      "bank_name": "Federal Bank",
+      "category": "private_sector",
+      "rbi_source": "https://www.rbi.org.in/scripts/bs_viewcontent.aspx?Id=3657",
+      "headers": [],
+      "header_status": "NOT_YET_VERIFIED",
+      "special_status": null,
+      "user_screenshot_observed": false
+    },
+    {
+      "bank_name": "HDFC Bank",
+      "category": "private_sector",
+      "rbi_source": "https://www.rbi.org.in/scripts/bs_viewcontent.aspx?Id=3657",
+      "headers": [],
+      "header_status": "NOT_YET_VERIFIED",
+      "special_status": null,
+      "user_screenshot_observed": false
+    },
+    {
+      "bank_name": "ICICI Bank",
+      "category": "private_sector",
+      "rbi_source": "https://www.rbi.org.in/scripts/bs_viewcontent.aspx?Id=3657",
+      "headers": [],
+      "header_status": "NOT_YET_VERIFIED",
+      "special_status": null,
+      "user_screenshot_observed": false
+    },
+    {
+      "bank_name": "IndusInd Bank",
+      "category": "private_sector",
+      "rbi_source": "https://www.rbi.org.in/scripts/bs_viewcontent.aspx?Id=3657",
+      "headers": [],
+      "header_status": "NOT_YET_VERIFIED",
+      "special_status": null,
+      "user_screenshot_observed": false
+    },
+    {
+      "bank_name": "IDFC FIRST Bank",
+      "category": "private_sector",
+      "rbi_source": "https://www.rbi.org.in/scripts/bs_viewcontent.aspx?Id=3657",
+      "headers": [],
+      "header_status": "NOT_YET_VERIFIED",
+      "special_status": null,
+      "user_screenshot_observed": true
+    },
+    {
+      "bank_name": "Jammu & Kashmir Bank",
+      "category": "private_sector",
+      "rbi_source": "https://www.rbi.org.in/scripts/bs_viewcontent.aspx?Id=3657",
+      "headers": [],
+      "header_status": "NOT_YET_VERIFIED",
+      "special_status": null,
+      "user_screenshot_observed": false
+    },
+    {
+      "bank_name": "Karnataka Bank",
+      "category": "private_sector",
+      "rbi_source": "https://www.rbi.org.in/scripts/bs_viewcontent.aspx?Id=3657",
+      "headers": [],
+      "header_status": "NOT_YET_VERIFIED",
+      "special_status": null,
+      "user_screenshot_observed": false
+    },
+    {
+      "bank_name": "Karur Vysya Bank",
+      "category": "private_sector",
+      "rbi_source": "https://www.rbi.org.in/scripts/bs_viewcontent.aspx?Id=3657",
+      "headers": [],
+      "header_status": "NOT_YET_VERIFIED",
+      "special_status": null,
+      "user_screenshot_observed": false
+    },
+    {
+      "bank_name": "Kotak Mahindra Bank",
+      "category": "private_sector",
+      "rbi_source": "https://www.rbi.org.in/scripts/bs_viewcontent.aspx?Id=3657",
+      "headers": [],
+      "header_status": "NOT_YET_VERIFIED",
+      "special_status": null,
+      "user_screenshot_observed": false
+    },
+    {
+      "bank_name": "Nainital Bank",
+      "category": "private_sector",
+      "rbi_source": "https://www.rbi.org.in/scripts/bs_viewcontent.aspx?Id=3657",
+      "headers": [],
+      "header_status": "NOT_YET_VERIFIED",
+      "special_status": null,
+      "user_screenshot_observed": false
+    },
+    {
+      "bank_name": "RBL Bank",
+      "category": "private_sector",
+      "rbi_source": "https://www.rbi.org.in/scripts/bs_viewcontent.aspx?Id=3657",
+      "headers": [],
+      "header_status": "NOT_YET_VERIFIED",
+      "special_status": null,
+      "user_screenshot_observed": false
+    },
+    {
+      "bank_name": "South Indian Bank",
+      "category": "private_sector",
+      "rbi_source": "https://www.rbi.org.in/scripts/bs_viewcontent.aspx?Id=3657",
+      "headers": [],
+      "header_status": "NOT_YET_VERIFIED",
+      "special_status": null,
+      "user_screenshot_observed": false
+    },
+    {
+      "bank_name": "Tamilnad Mercantile Bank",
+      "category": "private_sector",
+      "rbi_source": "https://www.rbi.org.in/scripts/bs_viewcontent.aspx?Id=3657",
+      "headers": [],
+      "header_status": "NOT_YET_VERIFIED",
+      "special_status": null,
+      "user_screenshot_observed": false
+    },
+    {
+      "bank_name": "YES Bank",
+      "category": "private_sector",
+      "rbi_source": "https://www.rbi.org.in/scripts/bs_viewcontent.aspx?Id=3657",
+      "headers": [],
+      "header_status": "NOT_YET_VERIFIED",
+      "special_status": null,
+      "user_screenshot_observed": false
+    },
+    {
+      "bank_name": "IDBI Bank",
+      "category": "private_sector",
+      "rbi_source": "https://www.rbi.org.in/scripts/bs_viewcontent.aspx?Id=3657",
+      "headers": [],
+      "header_status": "NOT_YET_VERIFIED",
+      "special_status": null,
+      "user_screenshot_observed": false
+    },
+    {
+      "bank_name": "AU Small Finance Bank",
+      "category": "small_finance",
+      "rbi_source": "https://www.rbi.org.in/scripts/bs_viewcontent.aspx?Id=3657",
+      "headers": [],
+      "header_status": "NOT_YET_VERIFIED",
+      "special_status": null,
+      "user_screenshot_observed": false
+    },
+    {
+      "bank_name": "Capital Small Finance Bank",
+      "category": "small_finance",
+      "rbi_source": "https://www.rbi.org.in/scripts/bs_viewcontent.aspx?Id=3657",
+      "headers": [],
+      "header_status": "NOT_YET_VERIFIED",
+      "special_status": null,
+      "user_screenshot_observed": false
+    },
+    {
+      "bank_name": "Equitas Small Finance Bank",
+      "category": "small_finance",
+      "rbi_source": "https://www.rbi.org.in/scripts/bs_viewcontent.aspx?Id=3657",
+      "headers": [],
+      "header_status": "NOT_YET_VERIFIED",
+      "special_status": null,
+      "user_screenshot_observed": false
+    },
+    {
+      "bank_name": "ESAF Small Finance Bank",
+      "category": "small_finance",
+      "rbi_source": "https://www.rbi.org.in/scripts/bs_viewcontent.aspx?Id=3657",
+      "headers": [],
+      "header_status": "NOT_YET_VERIFIED",
+      "special_status": null,
+      "user_screenshot_observed": false
+    },
+    {
+      "bank_name": "Suryoday Small Finance Bank",
+      "category": "small_finance",
+      "rbi_source": "https://www.rbi.org.in/scripts/bs_viewcontent.aspx?Id=3657",
+      "headers": [],
+      "header_status": "NOT_YET_VERIFIED",
+      "special_status": null,
+      "user_screenshot_observed": false
+    },
+    {
+      "bank_name": "Ujjivan Small Finance Bank",
+      "category": "small_finance",
+      "rbi_source": "https://www.rbi.org.in/scripts/bs_viewcontent.aspx?Id=3657",
+      "headers": [],
+      "header_status": "NOT_YET_VERIFIED",
+      "special_status": null,
+      "user_screenshot_observed": false
+    },
+    {
+      "bank_name": "Utkarsh Small Finance Bank",
+      "category": "small_finance",
+      "rbi_source": "https://www.rbi.org.in/scripts/bs_viewcontent.aspx?Id=3657",
+      "headers": [],
+      "header_status": "NOT_YET_VERIFIED",
+      "special_status": null,
+      "user_screenshot_observed": false
+    },
+    {
+      "bank_name": "slice Small Finance Bank",
+      "category": "small_finance",
+      "rbi_source": "https://www.rbi.org.in/scripts/bs_viewcontent.aspx?Id=3657",
+      "headers": [],
+      "header_status": "NOT_YET_VERIFIED",
+      "special_status": null,
+      "user_screenshot_observed": false
+    },
+    {
+      "bank_name": "Jana Small Finance Bank",
+      "category": "small_finance",
+      "rbi_source": "https://www.rbi.org.in/scripts/bs_viewcontent.aspx?Id=3657",
+      "headers": [],
+      "header_status": "NOT_YET_VERIFIED",
+      "special_status": null,
+      "user_screenshot_observed": false
+    },
+    {
+      "bank_name": "Shivalik Small Finance Bank",
+      "category": "small_finance",
+      "rbi_source": "https://www.rbi.org.in/scripts/bs_viewcontent.aspx?Id=3657",
+      "headers": [],
+      "header_status": "NOT_YET_VERIFIED",
+      "special_status": null,
+      "user_screenshot_observed": false
+    },
+    {
+      "bank_name": "Unity Small Finance Bank",
+      "category": "small_finance",
+      "rbi_source": "https://www.rbi.org.in/scripts/bs_viewcontent.aspx?Id=3657",
+      "headers": [],
+      "header_status": "NOT_YET_VERIFIED",
+      "special_status": null,
+      "user_screenshot_observed": false
+    },
+    {
+      "bank_name": "India Post Payments Bank",
+      "category": "payments",
+      "rbi_source": "https://www.rbi.org.in/scripts/bs_viewcontent.aspx?Id=3657",
+      "headers": [],
+      "header_status": "NOT_YET_VERIFIED",
+      "special_status": null,
+      "user_screenshot_observed": false
+    },
+    {
+      "bank_name": "Fino Payments Bank",
+      "category": "payments",
+      "rbi_source": "https://www.rbi.org.in/scripts/bs_viewcontent.aspx?Id=3657",
+      "headers": [],
+      "header_status": "NOT_YET_VERIFIED",
+      "special_status": null,
+      "user_screenshot_observed": false
+    },
+    {
+      "bank_name": "Paytm Payments Bank",
+      "category": "payments",
+      "rbi_source": "https://www.rbi.org.in/scripts/bs_viewcontent.aspx?Id=3657",
+      "headers": [],
+      "header_status": "NOT_YET_VERIFIED",
+      "special_status": "LICENCE_CANCELLED_PER_RBI_ROSTER",
+      "user_screenshot_observed": false
+    },
+    {
+      "bank_name": "Airtel Payments Bank",
+      "category": "payments",
+      "rbi_source": "https://www.rbi.org.in/scripts/bs_viewcontent.aspx?Id=3657",
+      "headers": [],
+      "header_status": "NOT_YET_VERIFIED",
+      "special_status": null,
+      "user_screenshot_observed": true
+    },
+    {
+      "bank_name": "NSDL Payments Bank",
+      "category": "payments",
+      "rbi_source": "https://www.rbi.org.in/scripts/bs_viewcontent.aspx?Id=3657",
+      "headers": [],
+      "header_status": "NOT_YET_VERIFIED",
+      "special_status": null,
+      "user_screenshot_observed": false
+    },
+    {
+      "bank_name": "Andhra Pradesh Grameena Bank",
+      "category": "regional_rural",
+      "rbi_source": "https://www.rbi.org.in/scripts/bs_viewcontent.aspx?Id=3657",
+      "headers": [],
+      "header_status": "NOT_YET_VERIFIED",
+      "special_status": null,
+      "user_screenshot_observed": false
+    },
+    {
+      "bank_name": "Assam Gramin Bank",
+      "category": "regional_rural",
+      "rbi_source": "https://www.rbi.org.in/scripts/bs_viewcontent.aspx?Id=3657",
+      "headers": [],
+      "header_status": "NOT_YET_VERIFIED",
+      "special_status": null,
+      "user_screenshot_observed": false
+    },
+    {
+      "bank_name": "Arunachal Pradesh Rural Bank",
+      "category": "regional_rural",
+      "rbi_source": "https://www.rbi.org.in/scripts/bs_viewcontent.aspx?Id=3657",
+      "headers": [],
+      "header_status": "NOT_YET_VERIFIED",
+      "special_status": null,
+      "user_screenshot_observed": false
+    },
+    {
+      "bank_name": "Bihar Gramin Bank",
+      "category": "regional_rural",
+      "rbi_source": "https://www.rbi.org.in/scripts/bs_viewcontent.aspx?Id=3657",
+      "headers": [],
+      "header_status": "NOT_YET_VERIFIED",
+      "special_status": null,
+      "user_screenshot_observed": false
+    },
+    {
+      "bank_name": "Chhattisgarh Gramin Bank",
+      "category": "regional_rural",
+      "rbi_source": "https://www.rbi.org.in/scripts/bs_viewcontent.aspx?Id=3657",
+      "headers": [],
+      "header_status": "NOT_YET_VERIFIED",
+      "special_status": null,
+      "user_screenshot_observed": false
+    },
+    {
+      "bank_name": "Gujarat Gramin Bank",
+      "category": "regional_rural",
+      "rbi_source": "https://www.rbi.org.in/scripts/bs_viewcontent.aspx?Id=3657",
+      "headers": [],
+      "header_status": "NOT_YET_VERIFIED",
+      "special_status": null,
+      "user_screenshot_observed": false
+    },
+    {
+      "bank_name": "Haryana Gramin Bank",
+      "category": "regional_rural",
+      "rbi_source": "https://www.rbi.org.in/scripts/bs_viewcontent.aspx?Id=3657",
+      "headers": [],
+      "header_status": "NOT_YET_VERIFIED",
+      "special_status": null,
+      "user_screenshot_observed": false
+    },
+    {
+      "bank_name": "Himachal Pradesh Gramin Bank",
+      "category": "regional_rural",
+      "rbi_source": "https://www.rbi.org.in/scripts/bs_viewcontent.aspx?Id=3657",
+      "headers": [],
+      "header_status": "NOT_YET_VERIFIED",
+      "special_status": null,
+      "user_screenshot_observed": false
+    },
+    {
+      "bank_name": "Jharkhand Gramin Bank",
+      "category": "regional_rural",
+      "rbi_source": "https://www.rbi.org.in/scripts/bs_viewcontent.aspx?Id=3657",
+      "headers": [],
+      "header_status": "NOT_YET_VERIFIED",
+      "special_status": null,
+      "user_screenshot_observed": false
+    },
+    {
+      "bank_name": "Jammu and Kashmir Grameen Bank",
+      "category": "regional_rural",
+      "rbi_source": "https://www.rbi.org.in/scripts/bs_viewcontent.aspx?Id=3657",
+      "headers": [],
+      "header_status": "NOT_YET_VERIFIED",
+      "special_status": null,
+      "user_screenshot_observed": false
+    },
+    {
+      "bank_name": "Karnataka Grameena Bank",
+      "category": "regional_rural",
+      "rbi_source": "https://www.rbi.org.in/scripts/bs_viewcontent.aspx?Id=3657",
+      "headers": [],
+      "header_status": "NOT_YET_VERIFIED",
+      "special_status": null,
+      "user_screenshot_observed": false
+    },
+    {
+      "bank_name": "Kerala Grameena Bank",
+      "category": "regional_rural",
+      "rbi_source": "https://www.rbi.org.in/scripts/bs_viewcontent.aspx?Id=3657",
+      "headers": [],
+      "header_status": "NOT_YET_VERIFIED",
+      "special_status": null,
+      "user_screenshot_observed": false
+    },
+    {
+      "bank_name": "Maharashtra Gramin Bank",
+      "category": "regional_rural",
+      "rbi_source": "https://www.rbi.org.in/scripts/bs_viewcontent.aspx?Id=3657",
+      "headers": [],
+      "header_status": "NOT_YET_VERIFIED",
+      "special_status": null,
+      "user_screenshot_observed": false
+    },
+    {
+      "bank_name": "Madhya Pradesh Gramin Bank",
+      "category": "regional_rural",
+      "rbi_source": "https://www.rbi.org.in/scripts/bs_viewcontent.aspx?Id=3657",
+      "headers": [],
+      "header_status": "NOT_YET_VERIFIED",
+      "special_status": null,
+      "user_screenshot_observed": false
+    },
+    {
+      "bank_name": "Manipur Rural Bank",
+      "category": "regional_rural",
+      "rbi_source": "https://www.rbi.org.in/scripts/bs_viewcontent.aspx?Id=3657",
+      "headers": [],
+      "header_status": "NOT_YET_VERIFIED",
+      "special_status": null,
+      "user_screenshot_observed": false
+    },
+    {
+      "bank_name": "Meghalaya Rural Bank",
+      "category": "regional_rural",
+      "rbi_source": "https://www.rbi.org.in/scripts/bs_viewcontent.aspx?Id=3657",
+      "headers": [],
+      "header_status": "NOT_YET_VERIFIED",
+      "special_status": null,
+      "user_screenshot_observed": false
+    },
+    {
+      "bank_name": "Mizoram Rural Bank",
+      "category": "regional_rural",
+      "rbi_source": "https://www.rbi.org.in/scripts/bs_viewcontent.aspx?Id=3657",
+      "headers": [],
+      "header_status": "NOT_YET_VERIFIED",
+      "special_status": null,
+      "user_screenshot_observed": false
+    },
+    {
+      "bank_name": "Nagaland Rural Bank",
+      "category": "regional_rural",
+      "rbi_source": "https://www.rbi.org.in/scripts/bs_viewcontent.aspx?Id=3657",
+      "headers": [],
+      "header_status": "NOT_YET_VERIFIED",
+      "special_status": null,
+      "user_screenshot_observed": false
+    },
+    {
+      "bank_name": "Odisha Grameen Bank",
+      "category": "regional_rural",
+      "rbi_source": "https://www.rbi.org.in/scripts/bs_viewcontent.aspx?Id=3657",
+      "headers": [],
+      "header_status": "NOT_YET_VERIFIED",
+      "special_status": null,
+      "user_screenshot_observed": false
+    },
+    {
+      "bank_name": "Punjab Gramin Bank",
+      "category": "regional_rural",
+      "rbi_source": "https://www.rbi.org.in/scripts/bs_viewcontent.aspx?Id=3657",
+      "headers": [],
+      "header_status": "NOT_YET_VERIFIED",
+      "special_status": null,
+      "user_screenshot_observed": false
+    },
+    {
+      "bank_name": "Puducherry Grama Bank",
+      "category": "regional_rural",
+      "rbi_source": "https://www.rbi.org.in/scripts/bs_viewcontent.aspx?Id=3657",
+      "headers": [],
+      "header_status": "NOT_YET_VERIFIED",
+      "special_status": null,
+      "user_screenshot_observed": false
+    },
+    {
+      "bank_name": "Rajasthan Gramin Bank",
+      "category": "regional_rural",
+      "rbi_source": "https://www.rbi.org.in/scripts/bs_viewcontent.aspx?Id=3657",
+      "headers": [],
+      "header_status": "NOT_YET_VERIFIED",
+      "special_status": null,
+      "user_screenshot_observed": false
+    },
+    {
+      "bank_name": "Tamil Nadu Grama Bank",
+      "category": "regional_rural",
+      "rbi_source": "https://www.rbi.org.in/scripts/bs_viewcontent.aspx?Id=3657",
+      "headers": [],
+      "header_status": "NOT_YET_VERIFIED",
+      "special_status": null,
+      "user_screenshot_observed": false
+    },
+    {
+      "bank_name": "Telangana Grameena Bank",
+      "category": "regional_rural",
+      "rbi_source": "https://www.rbi.org.in/scripts/bs_viewcontent.aspx?Id=3657",
+      "headers": [],
+      "header_status": "NOT_YET_VERIFIED",
+      "special_status": null,
+      "user_screenshot_observed": false
+    },
+    {
+      "bank_name": "Tripura Gramin Bank",
+      "category": "regional_rural",
+      "rbi_source": "https://www.rbi.org.in/scripts/bs_viewcontent.aspx?Id=3657",
+      "headers": [],
+      "header_status": "NOT_YET_VERIFIED",
+      "special_status": null,
+      "user_screenshot_observed": false
+    },
+    {
+      "bank_name": "Uttar Pradesh Gramin Bank",
+      "category": "regional_rural",
+      "rbi_source": "https://www.rbi.org.in/scripts/bs_viewcontent.aspx?Id=3657",
+      "headers": [],
+      "header_status": "NOT_YET_VERIFIED",
+      "special_status": null,
+      "user_screenshot_observed": false
+    },
+    {
+      "bank_name": "Uttarakhand Gramin Bank",
+      "category": "regional_rural",
+      "rbi_source": "https://www.rbi.org.in/scripts/bs_viewcontent.aspx?Id=3657",
+      "headers": [],
+      "header_status": "NOT_YET_VERIFIED",
+      "special_status": null,
+      "user_screenshot_observed": false
+    },
+    {
+      "bank_name": "West Bengal Gramin Bank",
+      "category": "regional_rural",
+      "rbi_source": "https://www.rbi.org.in/scripts/bs_viewcontent.aspx?Id=3657",
+      "headers": [],
+      "header_status": "NOT_YET_VERIFIED",
+      "special_status": null,
+      "user_screenshot_observed": false
+    },
+    {
+      "bank_name": "AB Bank PLC",
+      "category": "foreign_operating_india",
+      "rbi_source": "https://www.rbi.org.in/scripts/bs_viewcontent.aspx?Id=3657",
+      "headers": [],
+      "header_status": "NOT_YET_VERIFIED",
+      "special_status": null,
+      "user_screenshot_observed": false
+    },
+    {
+      "bank_name": "American Express Banking Corporation",
+      "category": "foreign_operating_india",
+      "rbi_source": "https://www.rbi.org.in/scripts/bs_viewcontent.aspx?Id=3657",
+      "headers": [],
+      "header_status": "NOT_YET_VERIFIED",
+      "special_status": null,
+      "user_screenshot_observed": false
+    },
+    {
+      "bank_name": "Australia and New Zealand Banking Group Ltd.",
+      "category": "foreign_operating_india",
+      "rbi_source": "https://www.rbi.org.in/scripts/bs_viewcontent.aspx?Id=3657",
+      "headers": [],
+      "header_status": "NOT_YET_VERIFIED",
+      "special_status": null,
+      "user_screenshot_observed": false
+    },
+    {
+      "bank_name": "Barclays Bank Plc.",
+      "category": "foreign_operating_india",
+      "rbi_source": "https://www.rbi.org.in/scripts/bs_viewcontent.aspx?Id=3657",
+      "headers": [],
+      "header_status": "NOT_YET_VERIFIED",
+      "special_status": null,
+      "user_screenshot_observed": false
+    },
+    {
+      "bank_name": "Bank of America National Association",
+      "category": "foreign_operating_india",
+      "rbi_source": "https://www.rbi.org.in/scripts/bs_viewcontent.aspx?Id=3657",
+      "headers": [],
+      "header_status": "NOT_YET_VERIFIED",
+      "special_status": null,
+      "user_screenshot_observed": false
+    },
+    {
+      "bank_name": "Bank of Bahrain and Kuwait B.S.C.",
+      "category": "foreign_operating_india",
+      "rbi_source": "https://www.rbi.org.in/scripts/bs_viewcontent.aspx?Id=3657",
+      "headers": [],
+      "header_status": "NOT_YET_VERIFIED",
+      "special_status": null,
+      "user_screenshot_observed": false
+    },
+    {
+      "bank_name": "Bank of Ceylon",
+      "category": "foreign_operating_india",
+      "rbi_source": "https://www.rbi.org.in/scripts/bs_viewcontent.aspx?Id=3657",
+      "headers": [],
+      "header_status": "NOT_YET_VERIFIED",
+      "special_status": null,
+      "user_screenshot_observed": false
+    },
+    {
+      "bank_name": "Bank of China Limited",
+      "category": "foreign_operating_india",
+      "rbi_source": "https://www.rbi.org.in/scripts/bs_viewcontent.aspx?Id=3657",
+      "headers": [],
+      "header_status": "NOT_YET_VERIFIED",
+      "special_status": null,
+      "user_screenshot_observed": false
+    },
+    {
+      "bank_name": "Bank of Nova Scotia",
+      "category": "foreign_operating_india",
+      "rbi_source": "https://www.rbi.org.in/scripts/bs_viewcontent.aspx?Id=3657",
+      "headers": [],
+      "header_status": "NOT_YET_VERIFIED",
+      "special_status": null,
+      "user_screenshot_observed": false
+    },
+    {
+      "bank_name": "BNP Paribas",
+      "category": "foreign_operating_india",
+      "rbi_source": "https://www.rbi.org.in/scripts/bs_viewcontent.aspx?Id=3657",
+      "headers": [],
+      "header_status": "NOT_YET_VERIFIED",
+      "special_status": null,
+      "user_screenshot_observed": false
+    },
+    {
+      "bank_name": "Citibank N.A.",
+      "category": "foreign_operating_india",
+      "rbi_source": "https://www.rbi.org.in/scripts/bs_viewcontent.aspx?Id=3657",
+      "headers": [],
+      "header_status": "NOT_YET_VERIFIED",
+      "special_status": null,
+      "user_screenshot_observed": false
+    },
+    {
+      "bank_name": "Cooperatieve Rabobank U.A./ Coöperatieve Centrale Raiffeisen-Boerenleenbank B.A.",
+      "category": "foreign_operating_india",
+      "rbi_source": "https://www.rbi.org.in/scripts/bs_viewcontent.aspx?Id=3657",
+      "headers": [],
+      "header_status": "NOT_YET_VERIFIED",
+      "special_status": null,
+      "user_screenshot_observed": false
+    },
+    {
+      "bank_name": "Credit Agricole Corporate and Investment Bank",
+      "category": "foreign_operating_india",
+      "rbi_source": "https://www.rbi.org.in/scripts/bs_viewcontent.aspx?Id=3657",
+      "headers": [],
+      "header_status": "NOT_YET_VERIFIED",
+      "special_status": null,
+      "user_screenshot_observed": false
+    },
+    {
+      "bank_name": "CTBC Bank Co., Ltd.",
+      "category": "foreign_operating_india",
+      "rbi_source": "https://www.rbi.org.in/scripts/bs_viewcontent.aspx?Id=3657",
+      "headers": [],
+      "header_status": "NOT_YET_VERIFIED",
+      "special_status": null,
+      "user_screenshot_observed": false
+    },
+    {
+      "bank_name": "DBS Bank India Limited",
+      "category": "foreign_operating_india",
+      "rbi_source": "https://www.rbi.org.in/scripts/bs_viewcontent.aspx?Id=3657",
+      "headers": [],
+      "header_status": "NOT_YET_VERIFIED",
+      "special_status": null,
+      "user_screenshot_observed": false
+    },
+    {
+      "bank_name": "Deutsche Bank A.G.",
+      "category": "foreign_operating_india",
+      "rbi_source": "https://www.rbi.org.in/scripts/bs_viewcontent.aspx?Id=3657",
+      "headers": [],
+      "header_status": "NOT_YET_VERIFIED",
+      "special_status": null,
+      "user_screenshot_observed": false
+    },
+    {
+      "bank_name": "Doha Bank Q.P.S.C",
+      "category": "foreign_operating_india",
+      "rbi_source": "https://www.rbi.org.in/scripts/bs_viewcontent.aspx?Id=3657",
+      "headers": [],
+      "header_status": "NOT_YET_VERIFIED",
+      "special_status": null,
+      "user_screenshot_observed": false
+    },
+    {
+      "bank_name": "Emirates NBD Bank P.J.S.C",
+      "category": "foreign_operating_india",
+      "rbi_source": "https://www.rbi.org.in/scripts/bs_viewcontent.aspx?Id=3657",
+      "headers": [],
+      "header_status": "NOT_YET_VERIFIED",
+      "special_status": null,
+      "user_screenshot_observed": false
+    },
+    {
+      "bank_name": "First Abu Dhabi Bank PJSC",
+      "category": "foreign_operating_india",
+      "rbi_source": "https://www.rbi.org.in/scripts/bs_viewcontent.aspx?Id=3657",
+      "headers": [],
+      "header_status": "NOT_YET_VERIFIED",
+      "special_status": null,
+      "user_screenshot_observed": false
+    },
+    {
+      "bank_name": "FirstRand Bank Limited",
+      "category": "foreign_operating_india",
+      "rbi_source": "https://www.rbi.org.in/scripts/bs_viewcontent.aspx?Id=3657",
+      "headers": [],
+      "header_status": "NOT_YET_VERIFIED",
+      "special_status": null,
+      "user_screenshot_observed": false
+    },
+    {
+      "bank_name": "Hong Kong and Shanghai Banking Corporation Limited",
+      "category": "foreign_operating_india",
+      "rbi_source": "https://www.rbi.org.in/scripts/bs_viewcontent.aspx?Id=3657",
+      "headers": [],
+      "header_status": "NOT_YET_VERIFIED",
+      "special_status": null,
+      "user_screenshot_observed": false
+    },
+    {
+      "bank_name": "Industrial and Commercial Bank of China",
+      "category": "foreign_operating_india",
+      "rbi_source": "https://www.rbi.org.in/scripts/bs_viewcontent.aspx?Id=3657",
+      "headers": [],
+      "header_status": "NOT_YET_VERIFIED",
+      "special_status": null,
+      "user_screenshot_observed": false
+    },
+    {
+      "bank_name": "Industrial Bank of Korea",
+      "category": "foreign_operating_india",
+      "rbi_source": "https://www.rbi.org.in/scripts/bs_viewcontent.aspx?Id=3657",
+      "headers": [],
+      "header_status": "NOT_YET_VERIFIED",
+      "special_status": null,
+      "user_screenshot_observed": false
+    },
+    {
+      "bank_name": "J.P. Morgan Chase Bank N.A.",
+      "category": "foreign_operating_india",
+      "rbi_source": "https://www.rbi.org.in/scripts/bs_viewcontent.aspx?Id=3657",
+      "headers": [],
+      "header_status": "NOT_YET_VERIFIED",
+      "special_status": null,
+      "user_screenshot_observed": false
+    },
+    {
+      "bank_name": "JSC VTB Bank",
+      "category": "foreign_operating_india",
+      "rbi_source": "https://www.rbi.org.in/scripts/bs_viewcontent.aspx?Id=3657",
+      "headers": [],
+      "header_status": "NOT_YET_VERIFIED",
+      "special_status": null,
+      "user_screenshot_observed": false
+    },
+    {
+      "bank_name": "KEB Hana Bank",
+      "category": "foreign_operating_india",
+      "rbi_source": "https://www.rbi.org.in/scripts/bs_viewcontent.aspx?Id=3657",
+      "headers": [],
+      "header_status": "NOT_YET_VERIFIED",
+      "special_status": null,
+      "user_screenshot_observed": false
+    },
+    {
+      "bank_name": "Kookmin Bank",
+      "category": "foreign_operating_india",
+      "rbi_source": "https://www.rbi.org.in/scripts/bs_viewcontent.aspx?Id=3657",
+      "headers": [],
+      "header_status": "NOT_YET_VERIFIED",
+      "special_status": null,
+      "user_screenshot_observed": false
+    },
+    {
+      "bank_name": "Mashreqbank P.S.C",
+      "category": "foreign_operating_india",
+      "rbi_source": "https://www.rbi.org.in/scripts/bs_viewcontent.aspx?Id=3657",
+      "headers": [],
+      "header_status": "NOT_YET_VERIFIED",
+      "special_status": null,
+      "user_screenshot_observed": false
+    },
+    {
+      "bank_name": "Mizuho Bank Ltd.",
+      "category": "foreign_operating_india",
+      "rbi_source": "https://www.rbi.org.in/scripts/bs_viewcontent.aspx?Id=3657",
+      "headers": [],
+      "header_status": "NOT_YET_VERIFIED",
+      "special_status": null,
+      "user_screenshot_observed": false
+    },
+    {
+      "bank_name": "MUFG Bank, Ltd.",
+      "category": "foreign_operating_india",
+      "rbi_source": "https://www.rbi.org.in/scripts/bs_viewcontent.aspx?Id=3657",
+      "headers": [],
+      "header_status": "NOT_YET_VERIFIED",
+      "special_status": null,
+      "user_screenshot_observed": false
+    },
+    {
+      "bank_name": "NatWest Markets Plc",
+      "category": "foreign_operating_india",
+      "rbi_source": "https://www.rbi.org.in/scripts/bs_viewcontent.aspx?Id=3657",
+      "headers": [],
+      "header_status": "NOT_YET_VERIFIED",
+      "special_status": null,
+      "user_screenshot_observed": false
+    },
+    {
+      "bank_name": "NongHyup Bank",
+      "category": "foreign_operating_india",
+      "rbi_source": "https://www.rbi.org.in/scripts/bs_viewcontent.aspx?Id=3657",
+      "headers": [],
+      "header_status": "NOT_YET_VERIFIED",
+      "special_status": null,
+      "user_screenshot_observed": false
+    },
+    {
+      "bank_name": "PT Bank Maybank Indonesia TBK",
+      "category": "foreign_operating_india",
+      "rbi_source": "https://www.rbi.org.in/scripts/bs_viewcontent.aspx?Id=3657",
+      "headers": [],
+      "header_status": "NOT_YET_VERIFIED",
+      "special_status": null,
+      "user_screenshot_observed": false
+    },
+    {
+      "bank_name": "Qatar National Bank (Q.P.S.C.)",
+      "category": "foreign_operating_india",
+      "rbi_source": "https://www.rbi.org.in/scripts/bs_viewcontent.aspx?Id=3657",
+      "headers": [],
+      "header_status": "NOT_YET_VERIFIED",
+      "special_status": null,
+      "user_screenshot_observed": false
+    },
+    {
+      "bank_name": "Sberbank",
+      "category": "foreign_operating_india",
+      "rbi_source": "https://www.rbi.org.in/scripts/bs_viewcontent.aspx?Id=3657",
+      "headers": [],
+      "header_status": "NOT_YET_VERIFIED",
+      "special_status": null,
+      "user_screenshot_observed": false
+    },
+    {
+      "bank_name": "SBM Bank (India) Limited",
+      "category": "foreign_operating_india",
+      "rbi_source": "https://www.rbi.org.in/scripts/bs_viewcontent.aspx?Id=3657",
+      "headers": [],
+      "header_status": "NOT_YET_VERIFIED",
+      "special_status": null,
+      "user_screenshot_observed": false
+    },
+    {
+      "bank_name": "Shinhan Bank",
+      "category": "foreign_operating_india",
+      "rbi_source": "https://www.rbi.org.in/scripts/bs_viewcontent.aspx?Id=3657",
+      "headers": [],
+      "header_status": "NOT_YET_VERIFIED",
+      "special_status": null,
+      "user_screenshot_observed": false
+    },
+    {
+      "bank_name": "Societe Generale",
+      "category": "foreign_operating_india",
+      "rbi_source": "https://www.rbi.org.in/scripts/bs_viewcontent.aspx?Id=3657",
+      "headers": [],
+      "header_status": "NOT_YET_VERIFIED",
+      "special_status": null,
+      "user_screenshot_observed": false
+    },
+    {
+      "bank_name": "Sonali Bank PLC",
+      "category": "foreign_operating_india",
+      "rbi_source": "https://www.rbi.org.in/scripts/bs_viewcontent.aspx?Id=3657",
+      "headers": [],
+      "header_status": "NOT_YET_VERIFIED",
+      "special_status": null,
+      "user_screenshot_observed": false
+    },
+    {
+      "bank_name": "Standard Chartered Bank",
+      "category": "foreign_operating_india",
+      "rbi_source": "https://www.rbi.org.in/scripts/bs_viewcontent.aspx?Id=3657",
+      "headers": [],
+      "header_status": "NOT_YET_VERIFIED",
+      "special_status": null,
+      "user_screenshot_observed": false
+    },
+    {
+      "bank_name": "Sumitomo Mitsui Banking Corporation",
+      "category": "foreign_operating_india",
+      "rbi_source": "https://www.rbi.org.in/scripts/bs_viewcontent.aspx?Id=3657",
+      "headers": [],
+      "header_status": "NOT_YET_VERIFIED",
+      "special_status": null,
+      "user_screenshot_observed": false
+    },
+    {
+      "bank_name": "United Overseas Bank Limited",
+      "category": "foreign_operating_india",
+      "rbi_source": "https://www.rbi.org.in/scripts/bs_viewcontent.aspx?Id=3657",
+      "headers": [],
+      "header_status": "NOT_YET_VERIFIED",
+      "special_status": null,
+      "user_screenshot_observed": false
+    },
+    {
+      "bank_name": "UBS AG",
+      "category": "foreign_operating_india",
+      "rbi_source": "https://www.rbi.org.in/scripts/bs_viewcontent.aspx?Id=3657",
+      "headers": [],
+      "header_status": "NOT_YET_VERIFIED",
+      "special_status": null,
+      "user_screenshot_observed": false
+    },
+    {
+      "bank_name": "Woori Bank",
+      "category": "foreign_operating_india",
+      "rbi_source": "https://www.rbi.org.in/scripts/bs_viewcontent.aspx?Id=3657",
+      "headers": [],
+      "header_status": "NOT_YET_VERIFIED",
+      "special_status": null,
+      "user_screenshot_observed": false
+    }
+  ],
+  "counts": {
+    "rbi_roster_banks": 121,
+    "banks_with_bank_published_header_evidence": 3,
+    "published_header_entries": 8,
+    "unknown_header_banks": 118
+  },
+  "ingestion": {
+    "currentTraiExport": false
+  }
+}

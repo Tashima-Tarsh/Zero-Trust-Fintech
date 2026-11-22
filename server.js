@@ -20,6 +20,7 @@ const {initializeQuantumSignal,createQuantumSignalRouter}=require('./financial/q
 const {initProofBridgeSchema,createProofBridgeRouter}=require('./financial/proofbridge');
 const {initDebitCredentialSchema,createDebitCredentialRouter}=require('./financial/debit-credential');
 const {createCheckoutDiagnostics}=require('./financial/checkout-diagnostics');
+const {lookupBankSender,coverage:bankSmsCoverage}=require('./financial/bank-sms-header-registry');
 const {initializeClaimObserver,observeClaim} = require('./financial/untrusted-utr-claims');
 const {
   buildNPCIIntentUri,
@@ -292,6 +293,13 @@ app.get(['/api/runtime/checkout','/api/runtime/merchant-checkout'],(req,res)=>{
  res.set('Cache-Control','no-store, no-cache, must-revalidate');
  return res.sendFile(path.join(__dirname,'public',
   req.path.endsWith('merchant-checkout')?'merchant-checkout.html':'checkout.html'));
+});
+// Header matching identifies a published sender label only; it MUST NOT
+// change checkout state or ledger and does not authenticate SMS transport.
+app.get('/api/bank-sms/coverage',(req,res)=>res.set('Cache-Control','no-store').json(bankSmsCoverage()));
+app.get('/api/bank-sms/lookup',(req,res)=>{
+ const sender=typeof req.query.sender==='string'?req.query.sender:'';
+ return res.set('Cache-Control','no-store').json(lookupBankSender(sender));
 });
 const checkoutDiagnostics=createCheckoutDiagnostics({db});
 app.use('/api/checkout',checkoutDiagnostics.router);
@@ -663,7 +671,9 @@ app.post('/api/settlement/confirm', requireAdminAuth, async (req, res) => {
 async function generateSession(baseAmount = 100, description = '', customVpa = null) {
   const sessionId = crypto.randomBytes(16).toString('hex');
   const now = Date.now();
-  const expiresAt = now + (180 * 1000); // 3 minutes TTL
+  // P2P browser-only payment window is capped at 90 seconds from issuance.
+  // Server time is authoritative; this is a freshness limit, not debit proof.
+  const expiresAt = now + (90 * 1000);
   const qrRefreshAt = now + (15 * 1000); // 15 seconds dynamic refresh
   const orderId = 'PAY_' + crypto.randomBytes(5).toString('hex').toUpperCase();
   const txnRef = 'SRV' + crypto.randomBytes(12).toString('hex').toUpperCase();
