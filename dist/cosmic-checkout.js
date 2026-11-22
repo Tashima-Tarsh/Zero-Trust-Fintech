@@ -748,6 +748,8 @@
 
 
    saveSessionState();
+   if(mode==='generic'&&query.get('paymentrequest')==='1')
+    window.DISHAP2PPaymentRequestProbe?.attach?.(session,{window,document});
    setMoney(session.amount);
    get('serviceIdentifier').textContent='Service ID · '+(session.serviceNumber||'Not assigned');
    setPaymentKind();
