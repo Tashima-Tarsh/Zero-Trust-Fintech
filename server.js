@@ -1460,7 +1460,8 @@ const authChallenges=createChallengeStore(()=>db.pgPool);
  app.use('/api/p2p/prepayment',verifyLimiter,createP2pPrepaymentRouter({
   getSession:id=>db.findSessionByOrderId(id),
   getVaultChallenge:id=>authChallenges.get(id),
-  getVerifiedDeviceAttestation:async()=>null
+  getVerifiedDeviceAttestation:async()=>null,
+  passkeyOnlyUntil:Date.parse(process.env.DISHA_P2P_PASSKEY_ONLY_UNTIL||'')
  }));
 
 
