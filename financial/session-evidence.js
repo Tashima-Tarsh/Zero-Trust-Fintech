@@ -223,7 +223,7 @@ function createSessionEvidenceRouter({ getPool, getSession, allowedPackages = AL
   router.post('/authorize', async (req, res) => {
     const b = req.body || {}, pool = getPool();
     if (!pool) return respondError(res, fail('POSTGRES_REQUIRED', 503));
-    if (b.consent !== true || !validId(b.orderId) || !/^[a-f0-9]{24,64}$/i.test(b.token || '') ||
+    if (b.consent !== true || !validId(b.orderId) || !/^(?:[a-f0-9]{24,64}|[A-Za-z0-9_-]{43})$/i.test(b.token || '') ||
         !safeEqual(req.get('x-csrf-token'), b.token) || !validDevice(b.deviceId) ||
         typeof b.publicKeyPem !== 'string' || b.publicKeyPem.length > 4000) {
       return respondError(res, fail('CONSENT_OR_DEVICE_REQUIRED', 403));
