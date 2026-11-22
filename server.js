@@ -19,8 +19,6 @@ const {createVaultEvidenceRouter,initializeVaultEvidenceSchema,rememberVaultAuth
 const {initializeQuantumSignal,createQuantumSignalRouter}=require('./financial/quantum-signal');
 const {initProofBridgeSchema,createProofBridgeRouter}=require('./financial/proofbridge');
 const {initDebitCredentialSchema,createDebitCredentialRouter}=require('./financial/debit-credential');
-const {initializeSessionEvidenceSchema,createSessionEvidenceRouter,readDebitEvidenceReceipt}=require('./financial/session-evidence');
-const {initializeSessionUpiResultSchema,createSessionUpiResultRouter}=require('./financial/session-upi-result');
 const {createCheckoutDiagnostics}=require('./financial/checkout-diagnostics');
 const {initializeClaimObserver,observeClaim} = require('./financial/untrusted-utr-claims');
 const {
@@ -338,19 +336,6 @@ app.get(['/checkout', '/checkout/', '/pay', '/pay/'], (req, res) => {
   res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
   res.sendFile(path.join(__dirname, 'public', 'checkout.html'));
 });
-// Android App Link fallback. A verified, image-installed broker handles this
-// link before it reaches the server. This fallback never redeems the ticket or
-// exposes checkout data, and it prevents the capability from reaching another
-// origin through a Referer header.
-app.get('/android/observer/:ticket([A-Za-z0-9_-]{43})', (req, res) => {
-  res.set({
-    'Cache-Control':'no-store, no-cache, must-revalidate',
-    'Referrer-Policy':'no-referrer',
-    'X-Robots-Tag':'noindex, nofollow',
-    'Content-Security-Policy':"default-src 'none'; style-src 'unsafe-inline'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'"
-  });
-  return res.status(200).type('html').send('<!doctype html><meta charset="utf-8"><title>DISHA observer</title><p>Open this link on an authorized Android image with the DISHA observer installed.</p>');
-});
 // Serve the browser bundle matching the installed @simplewebauthn package.
 // Deliberate payment-mode routes. Never route /p2m to /api/session/new.
 app.get(['/choose-payment','/choose-payment/'],(req,res)=>{
@@ -632,8 +617,6 @@ async function findSessionForEvidence(orderId){
   };
 }
 
-app.use('/api/session-evidence/upi-result',verifyLimiter,createSessionUpiResultRouter({getPool:()=>db.pgPool,getSession:findSessionForEvidence}));
-app.use('/api/session-evidence',verifyLimiter,createSessionEvidenceRouter({getPool:()=>db.pgPool,getSession:findSessionForEvidence}));
 // Per-order digital twin. Browser observations are never converted to financial credits.
 app.use('/api/quantum-signal',createQuantumSignalRouter({getPool:()=>db.pgPool}));
 // Digital Credentials API prototype: issuer-signed submissions never mutate payment state.
@@ -955,15 +938,7 @@ app.get('/api/payer-debit-evidence/:orderId', verifyLimiter, async (req,res)=>{
     if(!db.pgPool)return res.json(result);
     const amountPaise=require('./financial/money').rupeesToPaise(String(session.challengeAmount));
     const payee=String(session.vpaAddress||'').trim().toLowerCase();
-    Object.assign(result,await readDebitEvidenceReceipt(db.pgPool,id,session));
     const sources=[
-      {source:'DEVICE_OBSERVATION',sql:
-        'SELECT transaction_ref AS utr,amount_paise,payee_vpa,posted_at AS observed_at,reference_kind,package_name '+
-        "FROM disha_session_evidence_events WHERE order_id=$1 AND decision_state='SIGNAL_MATCHED' "+
-        'ORDER BY (reference_kind IS NOT NULL) DESC, posted_at DESC LIMIT 5'},
-      {source:'DEVICE_UPI_RESULT',sql:
-        'SELECT utr_candidate AS utr,amount_paise,payee_vpa,returned_at AS observed_at '+
-        'FROM disha_session_upi_results WHERE order_id=$1 ORDER BY returned_at DESC LIMIT 5'},
       // A browser return may carry a 12-digit reference, but its source is
       // not the UPI app's authenticated debit record.
       {source:'BROWSER_RETURN_OBSERVATION',sql:
@@ -985,13 +960,9 @@ app.get('/api/payer-debit-evidence/:orderId', verifyLimiter, async (req,res)=>{
              String(r.payee_vpa||'').toLowerCase()!==payee)continue;
           if(result.evidence.some(e=>e.utr===r.utr))continue;
           result.evidence.push({utr:r.utr,
-            source:source.source==='DEVICE_OBSERVATION' &&
-              ['com.google.android.apps.messaging','com.android.mms'].includes(r.package_name)?
-              'SMS_NOTIFICATION_UNVERIFIED':source.source,
+            source:source.source,
             amountPaise,payeeVpa:payee,
-            observedAt:Number(r.observed_at),authenticatedDebit:false,
-            ...(source.source==='DEVICE_OBSERVATION'&&['UTR','RRN'].includes(r.reference_kind)?
-              {referenceKind:r.reference_kind,deviceSignatureVerified:true}:{})});
+            observedAt:Number(r.observed_at),authenticatedDebit:false});
         }
       }catch(e){
         if(e.code!=='42P01')return res.status(503).json({success:false,error:'EVIDENCE_STORAGE_UNAVAILABLE'});
@@ -1838,157 +1809,6 @@ app.get('/api/debug/vpas', requireAdminAuth, async (req, res) => {
 
 // TASK 7: ANDROID WEB SHARE TARGET (SINGLE SOURCE OF TRUTH SETTLEMENT)
 // ═══════════════════════════════════════════════════════════════════
-app.post('/handle-share', shareLimiter, async (req, res) => {
-  try {
-    const { title, text, url } = req.body || {};
-    const rawReceipt = [title, text, url].filter(Boolean).join('\n');
-    const now = Date.now();
-    console.log(`📥 [Android Share Target SST] Received shared receipt payload (${rawReceipt.length} chars)`);
-    const parsed = parseNPCIIntentResponse(rawReceipt);
-    const parsedUtr = parsed.txnId || (req.body && req.body.utr) || '';
-    const parsedAmount = parsed.amount || (req.body && parseFloat(req.body.amount)) || null;
-    let detectedOrderId = parsed.orderId || (req.body && req.body.orderId) || (req.query && req.query.orderId) || '';
-    if (!parsedUtr || !parsedAmount) {
-      if (req.accepts('json') && !req.accepts('html')) {
-        return res.status(400).json({
-          success: false,
-          error: 'INVALID_SHARE_PAYLOAD',
-          message: 'Could not extract 12-digit UTR and challenged amount from shared receipt.'
-        });
-      }
-      return res.redirect(`/failed.html?reason=${encodeURIComponent('Could not extract 12-digit UTR or amount from shared receipt')}`);
-    }
-    // RESOLVE SESSION: require an explicit orderId (from receipt text, body,
-    // or query). Amount-based resolution is removed because it lets anyone who
-    // knows or guesses the challenge paise claim another customer's live
-    // pending session.
-    let session = null;
-    const clientIp = req.ip || (req.socket && req.socket.remoteAddress) || '127.0.0.1';
-    if (detectedOrderId) {
-      session = await db.findSessionByOrderId(detectedOrderId);
-    }
-    if (!session) {
-      if (req.accepts('json') && !req.accepts('html')) {
-        return res.status(404).json({
-          success: false,
-          error: 'SESSION_NOT_FOUND',
-          message: 'No active checkout session found for this order ID. Share the receipt from the checkout page so the order ID is included.'
-        });
-      }
-      return res.redirect(`/failed.html?reason=${encodeURIComponent('No active checkout session matched this order.')}`);
-    }
-    // Evaluate evidence with Zero-Trust scoring engine
-    const sessionContext = {
-      challengeAmount: Number(session.challengeAmount),
-      createdAt: session.createdAt,
-      expiresAt: session.expiresAt,
-      payeeVpa: session.vpaAddress || MERCHANT_UPI_ID,
-      payeeName: MERCHANT_NAME,
-      customerId: session.customerId
-    };
-    // Time window check for share flow
-    const temporal=evaluateTemporalGate(session,now);
-    if(temporal.state==='INVALID_SESSION_CLOCK'||temporal.state==='CLOCK_SKEW'){
-      if(req.accepts('json')&&!req.accepts('html'))
-        return res.status(400).json({success:false,error:temporal.state});
-      return res.redirect('/failed.html?reason=invalid_session_clock');
-    }
-    const shareTimeElapsedMs=temporal.elapsedMs;
-    if (temporal.state==='WAITING') {
-      if (req.accepts('json') && !req.accepts('html')) {
-        return res.status(200).json({
-          success: true,
-          state: 'WAITING',
-          orderId: session.orderId,
-          timeRemaining: (T_MIN_MS - shareTimeElapsedMs) / 1000,
-          message: `Please wait ${Math.ceil((T_MIN_MS - shareTimeElapsedMs) / 1000)}s before verification`
-        });
-      }
-      return res.redirect(`/failed.html?reason=${encodeURIComponent('Please wait before verifying payment')}`);
-    }
-    if (temporal.state==='EXPIRED') {
-      if (req.accepts('json') && !req.accepts('html')) {
-        return res.status(400).json({
-          success: false,
-          state: 'EXPIRED',
-          orderId: session.orderId,
-          code: 'ORDER_EXPIRED',
-          reason: 'Order timeout (>3 minutes). Please create a new order.'
-        });
-      }
-      return res.redirect(`/failed.html?reason=${encodeURIComponent('Order timeout (>3 minutes)')}`);
-    }
-    // Extract server-side verified evidence (NO lenient client defaults)
-    const ev = extractReceiptEvidence(rawReceipt, sessionContext);
-    ev.amount = parsedAmount;
-    ev.utr = parsedUtr;
-    const attemptsCount = (session.verificationAttempts || 0) + 1;
-    session.verificationAttempts = attemptsCount;
-    const hist = {
-      utrSeen: await db.isUtrBlacklisted(parsedUtr),
-      imageHashSeen: false,
-      attemptsThisSession: attemptsCount,
-      priorConfirmed: 0
-    };
-    // ────────────────────────────────────────────────────────────
-    // LAYER 4: CUSTOMER / ORDER IDENTITY BINDING (Cross-Order UTR Reuse Prevention)
-    // ───────────────────────────────────────────────────────────
-    // Client-supplied shared receipt text must never reserve a bank reference
-    // against another person's order or change financial state.
-    const trustResult = scoreEvidence(sessionContext, ev, hist, {
-      now,
-      graceMs: 60 * 1000,
-      sameDevice: false // Mobile scanning external screen or intent
-    });
-    if (trustResult.tier === 'REJECT') {
-      if (req.accepts('json') && !req.accepts('html')) {
-        return res.status(400).json({
-          success: false,
-          code: trustResult.gate || 'VERIFICATION_REJECTED',
-          reason: (trustResult.reasons && trustResult.reasons[0]) || 'Evidence rejected by Zero-Trust verification.'
-        });
-      }
-      return res.redirect(`/failed.html?reason=${encodeURIComponent((trustResult.reasons && trustResult.reasons[0]) || 'Verification failed')}`);
-    }
-    if (trustResult.tier === 'LOW') {
-      if (req.accepts('json') && !req.accepts('html')) {
-        return res.status(400).json({
-          success: false,
-          code: 'EVIDENCE_INSUFFICIENT',
-          reason: 'Evidence confidence score too low. Authentic receipt required.'
-        });
-      }
-      return res.redirect(`/failed.html?reason=${encodeURIComponent('Evidence confidence score too low. Authentic receipt required.')}`);
-    }
-    const claim=await observeClaim(db.pgPool,session.orderId,parsedUtr,'WEB_SHARE');
-    if(claim.error) {
-      if(req.accepts('json')&&!req.accepts('html'))
-        return res.status(503).json({success:false,error:claim.error});
-      return res.redirect('/failed.html?reason=observation_storage_unavailable');
-    }
-    if(claim.conflict) {
-      if(req.accepts('json')&&!req.accepts('html'))
-        return res.status(409).json({
-          success:false,verified:false,state:'CONFLICTING_EVIDENCE',code:'UTR_CLAIM_REPLAY'
-        });
-      return res.redirect('/checkout/?status=reference_conflict');
-    }
-    // Observations do not mutate an order into a financial success.
-    if (req.accepts('json') && !req.accepts('html')) {
-      return res.status(202).json({
-        success:true,verified:false,state:'UTR_OBSERVED',
-        orderId:session.orderId,utr:parsedUtr,
-        code:'SHARED_RECEIPT_NOT_BANK_CONFIRMATION'
-      });
-    }
-    return res.redirect('/checkout/?status=reference_observed');
-  } catch(err) {
-    console.error('[Android Share Target] Error:',err);
-    if (req.accepts('json') && !req.accepts('html'))
-      return res.status(500).json({success:false,error:'SHARED_RECEIPT_UNAVAILABLE'});
-    return res.redirect('/failed.html?reason=verification_unavailable');
-  }
-});
 // Official NPCI Intent Callback / Webhook Endpoint
 app.post('/api/npci-callback', (req, res) => {
   try {
@@ -2211,8 +2031,6 @@ app.get('/failed', (req, res) => res.sendFile(path.join(__dirname, 'public', 'fa
   if(db.pgPool) {
     await initializeVaultEvidenceSchema(db.pgPool);
     await initializeQuantumSignal(db.pgPool);
-    await initializeSessionEvidenceSchema(db.pgPool);
-    await initializeSessionUpiResultSchema(db.pgPool);
     await initDebitCredentialSchema(db.pgPool);
     if(process.env.DISHA_PROOFBRIDGE_EXPERIMENT==='1')await initProofBridgeSchema(db.pgPool);
     await initializeClaimObserver(db.pgPool);

@@ -59,23 +59,14 @@ const UNIT_TESTS = [
   'test-unsigned-openid4vp-challenge.js',
   'test-debit-evidence-receipt.js',
   'test-sms-observation.js', // authenticated device observation is never a bank debit receipt
-  'test-android-master-server-handshake.js', // Opt-in Android credentials handshake, tamper proof, no ledger mutation
   'test-master-debit-bridge-http.js', // signed trusted-provider ingress, replay and session-scoped read
   'test-payer-debit-button.js', // I Paid: read-only P2P evidence, no false verified payment
   'test-proofbridge.js', // zero-install consent gate and issuer-signed capsule contract
-  'test-session-evidence.js',
   'test-udeb-evidence-contract.js',
-  'test-udeb-browser-handoff.js',
-  'test-android-observer-app-link.js',
-  'test-udeb-observer-trust.js',
-  'test-platform-observer-enrollment.js', // independent observer key pin regression // Reject unauthenticated device keys before device-observed receipt // Auto-poll read-only consent-scoped Android evidence; fail-closed receipt // Claude iteration 1: signed observation, fraud/nonce/replay (never settlement) // multi-device session binding, signatures and fraud gates
-  'test-session-upi-result.js', // native Android UPI result payload, signature and app allowlist
-  'test-android-upi-host-contract.js', // no special permissions, activity result, checkout handoff and server EBIT route
   'test-proofbridge-checkout-flow.js', // consent preflight + native gesture copy + return proof
   'test-high-concurrency-limiter.js', // no O(total IPs) hot-path cleanup before 100K load tests
   'test-utr-hypothesis.js', // UTR anti-fraud and no-false-credit regression
   'test-pony-tail-window.js', // Pony-tail 15s/180s temporal invariants and no UTR poisoning
-  'test-android-fixture.js',
   'test-triad-agent-loop.js', // no-money P2P URL and UTR intent fixture
   'test-owner-production-provisioning.js', // verified owner, P2P/P2M isolation and no database wipe
   'test-platform-control-startup.js', // database connection assigned after owner service constructor
