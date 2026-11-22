@@ -43,7 +43,7 @@ internal object SessionObservation {
     private data class Lease(
         val order: String, val token: String, val nonce: String, val device: String,
         val consentedAt: Long, val expiresAt: Long, val elapsedDeadline: Long,
-        val sourcePackage: String, val real: Boolean, val origin: String
+        val sourcePackage: String, val allowedPackages: Set<String>, val real: Boolean, val origin: String
     )
 
     fun start(ownPackage: String, realBinding: JSONObject? = null, pairingTicket: String? = null): Boolean {
@@ -76,14 +76,19 @@ internal object SessionObservation {
                         .put("deviceId", device).put("publicKeyPem", pem)
                         .put("sourcePackage", source), token, origin).require(201)
                     check(response.getString("orderId") == order && response.getString("deviceId") == device)
-                    check(response.getJSONArray("allowedPackages").let { it.length() == 1 && it.getString(0) == source })
+                    val allowed = response.getJSONArray("allowedPackages").let { packages ->
+                        (0 until packages.length()).map { packages.getString(it) }.toSet()
+                    }
+                    check(source in allowed && allowed.all {
+                        it == source || it in DebitSmsNotification.sources
+                    })
                     val expires = response.getLong("expiresAt")
                     val serverTime = response.getLong("serverTime")
                     val ttl = expires - serverTime
                     check(ttl in 1..180000)
                     Lease(order, token, response.getString("nonce"), device,
                         maxOf(response.getLong("consentedAt"), serverTime), expires, started + ttl,
-                        source, realBinding != null, origin)
+                        source, allowed, realBinding != null, origin)
                 }
                 if (signedOff != generation || !listenerConnected) {
                     revoke(lease)
@@ -124,7 +129,7 @@ internal object SessionObservation {
         if (!listenerConnected || SystemClock.elapsedRealtime() >= lease.elapsedDeadline ||
             notification.postTime !in lease.consentedAt until lease.expiresAt) return
         // Never inspect notification extras from a different app.
-        if (notification.packageName != lease.sourcePackage) {
+        if (notification.packageName !in lease.allowedPackages) {
             Log.i("DISHA_SESSION_OBSERVATION", "Ignored wrong notification package")
             return
         }
@@ -140,7 +145,7 @@ internal object SessionObservation {
             // A messaging-app notification is not an authenticated bank SMS.
             // Its visible preview requires the same explicit, complete debit
             // facts as a payer-app alert and remains unverified server-side.
-            val result = if (DebitSmsNotification.sources.contains(lease.sourcePackage))
+            val result = if (DebitSmsNotification.sources.contains(notification.packageName))
                 DebitSmsNotification.parse(extras.getCharSequence(Notification.EXTRA_TITLE), body)
             else DebitNotification.parse(extras.getCharSequence(Notification.EXTRA_TITLE), body)
             val fields = result.evidence
@@ -148,7 +153,8 @@ internal object SessionObservation {
                 report(result.status)
                 return
             }
-            submit(lease, notification.postTime, fields.amountPaise, fields.payee, fields.reference, fields.kind)
+            submit(lease, notification.postTime, fields.amountPaise, fields.payee, fields.reference, fields.kind,
+                notification.packageName)
             return
         }
         if (posted.channelId != CHANNEL) return
@@ -165,16 +171,16 @@ internal object SessionObservation {
     }
 
     private fun submit(lease: Lease, postedAt: Long, amount: String, payee: String, reference: String,
-        referenceKind: String? = null) {
+        referenceKind: String? = null, sourcePackage: String = lease.sourcePackage) {
         // Only the event ID is derived. The transaction reference is copied from its source.
         val eventId = MessageDigest.getInstance("SHA-256")
-            .digest("${lease.order}:$reference".toByteArray(Charsets.UTF_8))
+            .digest("${lease.order}:$sourcePackage:$reference".toByteArray(Charsets.UTF_8))
             .joinToString("") { "%02x".format(it) }
         val evidence = JSONObject()
             .put("protocol", if (lease.real) "DISHA-DEBIT-UTR-OBSERVATION-V1" else "DISHA-SESSION-EVIDENCE-V1")
             .put("eventId", eventId)
             .put("orderId", lease.order).put("nonce", lease.nonce).put("deviceId", lease.device)
-            .put("packageName", lease.sourcePackage).put("postedAt", postedAt)
+            .put("packageName", sourcePackage).put("postedAt", postedAt)
             .put("amountPaise", amount).put("payeeVpa", payee)
             .put("transactionRef", reference).put("status", "SUCCESS")
         if (referenceKind != null) evidence.put("referenceKind", referenceKind)
