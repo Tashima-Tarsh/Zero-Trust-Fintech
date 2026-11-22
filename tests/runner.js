@@ -60,7 +60,8 @@ const UNIT_TESTS = [
   'test-debit-evidence-receipt.js',
   'test-master-debit-bridge-http.js', // signed trusted-provider ingress, replay and session-scoped read
   'test-bank-sms-header-registry.js',
-  'test-upi-response-verifier.js', // fail-closed provider signature verification, no ledger write
+  'test-upi-response-verifier.js',
+  'test-upi-app-evidence-router.js', // authenticated payment handler callback, read-only signature checks // fail-closed provider signature verification, no ledger write
   'test-p2p-paymentrequest-experiment.js', // gated P2P PaymentRequest capability and response, no ledger mutation
   'test-p2p-ninety-second-evidence-gate.js', // server timer, copy-only display and no false payments // Sourced headers: never promote claimed sender to debit proof
   'test-payer-debit-button.js', // I Paid: read-only P2P evidence, no false verified payment
