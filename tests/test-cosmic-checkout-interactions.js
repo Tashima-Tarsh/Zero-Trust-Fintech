@@ -126,6 +126,23 @@ const active=app=>app.stages.find(s=>!s.hidden)?.dataset.stage;
  assert.match(untrustedDevice.nodes.debitEvidenceDialogStatus.textContent,/bank debit remains unverified/i);
  assert.ok(untrustedDevice.nodes.debitEvidenceDialogFields.children.some(n=>n.textContent==='000000000999'));
  assert.equal(active(untrustedDevice),'qr','unverified device observation cannot mark checkout paid');
+ const smsObserved=mount('PENDING','generic',{
+  receiptError:'TRUSTED_DEVICE_NOT_CONFIGURED',
+  evidence:[{source:'SMS_NOTIFICATION_UNVERIFIED',deviceSignatureVerified:true,referenceKind:'UTR',
+    utr:'000000000998',amountPaise:'50000',payeeVpa:'merchant@oksbi'}]
+ });
+ await flush();await smsObserved.nodes.payerDebitCheck.events.click();
+ assert.equal(smsObserved.nodes.debitEvidenceTitle.textContent,'Unverified Android debit observation');
+ assert.ok(smsObserved.nodes.debitEvidenceDialogFields.children.some(n=>n.textContent==='SMS_NOTIFICATION_UNVERIFIED'));
+ assert.equal(active(smsObserved),'qr','SMS sender label cannot verify payment');
+ const smsReceipt=mount('PENDING','generic',{debitEvidenceReceipt:{
+   ...qualified.data.debitEvidenceReceipt,source:'com.google.android.apps.messaging',
+   sourceTrust:'SMS_NOTIFICATION_SENDER_UNVERIFIED'
+ }});
+ await flush();await smsReceipt.nodes.payerDebitCheck.events.click();
+ assert.ok(smsReceipt.nodes.debitEvidenceDialogFields.children.some(n=>
+   /Unverified SMS sender/.test(n.textContent||'')));
+ assert.equal(active(smsReceipt),'qr','even pinned device cannot authenticate SMS sender');
  const crossOrder=mount('PENDING','generic',{debitEvidenceReceipt:{...qualified.data.debitEvidenceReceipt,orderId:'OTHER_ORDER'}});
  await flush();await crossOrder.nodes.payerDebitCheck.events.click();
  assert.match(crossOrder.nodes.debitEvidenceDialogStatus.textContent,/could not be validated/);
