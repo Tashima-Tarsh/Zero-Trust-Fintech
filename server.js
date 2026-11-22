@@ -22,6 +22,7 @@ const {initDebitCredentialSchema,createDebitCredentialRouter}=require('./financi
 const {createCheckoutDiagnostics}=require('./financial/checkout-diagnostics');
 const {lookupBankSender,coverage:bankSmsCoverage}=require('./financial/bank-sms-header-registry');
 const {createUpiAppEvidenceRouter}=require('./financial/upi-app-evidence-router');
+const {initUpiAppEvidenceReplay,makeReplayGuard}=require('./financial/upi-app-evidence-replay');
 const {initializeClaimObserver,observeClaim} = require('./financial/untrusted-utr-claims');
 const {
   buildNPCIIntentUri,
@@ -305,6 +306,7 @@ app.get('/api/bank-sms/lookup',(req,res)=>{
 // Experimental, read-only payer application response authentication.
 app.use('/api/upi-app-evidence',verifyLimiter,createUpiAppEvidenceRouter({
  getSession:id=>db.findSessionByOrderId(id),
+ consumeReplay:makeReplayGuard(()=>db.pgPool),
  getTrustedKeys:()=>{try{
   const parsed=JSON.parse(process.env.DISHA_GOOGLE_PAY_TRUSTED_PUBLIC_KEYS_JSON||'{}');
   return parsed&&typeof parsed==='object'&&!Array.isArray(parsed)?parsed:{};
@@ -2026,6 +2028,7 @@ app.get('/failed', (req, res) => res.sendFile(path.join(__dirname, 'public', 'fa
   if(db.pgPool) {
     await initializeVaultEvidenceSchema(db.pgPool);
     await initializeQuantumSignal(db.pgPool);
+    await initUpiAppEvidenceReplay(db.pgPool);
     await initDebitCredentialSchema(db.pgPool);
     if(process.env.DISHA_PROOFBRIDGE_EXPERIMENT==='1')await initProofBridgeSchema(db.pgPool);
     await initializeClaimObserver(db.pgPool);
