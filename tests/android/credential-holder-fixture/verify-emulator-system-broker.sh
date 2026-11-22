@@ -40,5 +40,15 @@ dummy="$(printf 'A%.0s' {1..43})"
 adb shell am start -W -a android.intent.action.VIEW -c android.intent.category.BROWSABLE -d "https://disha8-2.thenitishkr.in/android/observer/$dummy" -p ai.disha.credentialfixture | tee "$out/explicit-intent.txt"
 grep -Eq 'Status: ok|Status: OK' "$out/explicit-intent.txt"
 adb shell pm get-app-links ai.disha.credentialfixture | tee "$out/domain-verification.txt" || true
+# A controlled Android ACTION_SEND probes the native Sharesheet receiver. This
+# cannot establish an authenticated checkout or prove real UPI app sharing.
+adb shell am start -W -a android.intent.action.SEND -t text/plain \
+  --es android.intent.extra.TEXT 'RRN: 000000000190 Amount: INR 1.00' \
+  -n ai.disha.credentialfixture/.PlatformSharedReceiptActivity \
+  | tee "$out/share-receiver-intent.txt"
+grep -Eq 'Status: ok|Status: OK' "$out/share-receiver-intent.txt"
+grep -F 'PlatformSharedReceiptActivity' "$out/share-receiver-intent.txt"
+echo "PASS: explicitly targeted original-text Sharesheet receiver dispatch"
+
 echo "PASS: emulator-original-system-app install and explicitly targeted HTTPS VIEW dispatch"
 echo "NOT PROVEN: domain verified Chrome dispatch, biometric/PIN, notification consent, trusted device attestation or real debit receipt"
