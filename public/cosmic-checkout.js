@@ -598,7 +598,7 @@
     if(status)status.textContent='Payer and device checks verified for this checkout.';
     renderQr();
     const payLaunch=get('p2pPaymentRequestLaunch');
-    if(query.get('timedprovider')==='1'){
+    if(query.get('paymentrequest')!=='1'){
      // Preflight after the existing authenticated trust verdict, never before.
      // PaymentRequest.show() still runs only on the separate Pay button click.
      if(payLaunch)payLaunch.disabled=true;
@@ -811,7 +811,7 @@
 
 
    saveSessionState();
-   if(mode==='generic'&&(query.get('paymentrequest')==='1'||query.get('timedprovider')==='1'))
+   if(mode==='generic')
     window.DISHAP2PPaymentRequestProbe?.attach?.(session,{window,document,
      isAuthorized:()=>p2pTrusted(),
      prepareTimed:async()=>{
