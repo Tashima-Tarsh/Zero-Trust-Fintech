@@ -40,6 +40,7 @@ function mount(status='PENDING',checkout='merchant',overrides={}){
    if(url.includes('/api/payer-debit-evidence/'))return {ok:true,json:async()=>({
     success:true,debitVerified:false,paymentVerified:false,paymentStateChanged:false,
     orderId:'ORD_TEST_1234',debitEvidenceReceipt:data.debitEvidenceReceipt,
+    receiptError:data.receiptError,
     evidence:data.evidence??(data.signal?.utrCandidate?[{utr:data.signal.utrCandidate,source:'BROWSER_RETURN_OBSERVATION',
       amountPaise:'50000',payeeVpa:'merchant@oksbi',authenticatedDebit:false}]:[]),
     state:data.signal?.utrCandidate?'UTR_CANDIDATE_OBSERVED_UNVERIFIED':'NO_AUTHENTICATED_PAYER_DEBIT_EVIDENCE'})};
@@ -115,6 +116,16 @@ const active=app=>app.stages.find(s=>!s.hidden)?.dataset.stage;
  assert.equal(qualified.nodes.debitEvidenceTitle.textContent,'DISHA Debit Evidence Receipt');
  assert.ok(qualified.nodes.debitEvidenceDialogFields.children.some(node=>node.textContent==='000000000123'));
  assert.equal(active(qualified),'qr');
+ const untrustedDevice=mount('PENDING','generic',{
+   receiptError:'TRUSTED_DEVICE_NOT_CONFIGURED',
+   evidence:[{source:'DEVICE_OBSERVATION',deviceSignatureVerified:true,referenceKind:'RRN',
+    utr:'000000000999',amountPaise:'50000',payeeVpa:'merchant@oksbi'}]
+ });
+ await flush();await untrustedDevice.nodes.payerDebitCheck.events.click();
+ assert.equal(untrustedDevice.nodes.debitEvidenceTitle.textContent,'Unverified Android debit observation');
+ assert.match(untrustedDevice.nodes.debitEvidenceDialogStatus.textContent,/bank debit remains unverified/i);
+ assert.ok(untrustedDevice.nodes.debitEvidenceDialogFields.children.some(n=>n.textContent==='000000000999'));
+ assert.equal(active(untrustedDevice),'qr','unverified device observation cannot mark checkout paid');
  const crossOrder=mount('PENDING','generic',{debitEvidenceReceipt:{...qualified.data.debitEvidenceReceipt,orderId:'OTHER_ORDER'}});
  await flush();await crossOrder.nodes.payerDebitCheck.events.click();
  assert.match(crossOrder.nodes.debitEvidenceDialogStatus.textContent,/could not be validated/);
