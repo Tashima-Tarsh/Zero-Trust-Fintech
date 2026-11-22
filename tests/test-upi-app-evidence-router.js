@@ -47,6 +47,27 @@ test('server verifies signed app response against OWN session fields; no financi
   assert.equal(expired.code,200);
  }finally{server.close();}
 });
+test('session lookup must be bound to exact order ID, not merely a matching token',async()=>{
+ let replayCalls=0;
+ const app=express();app.use(express.json());
+ app.use('/api/upi-app-evidence',createUpiAppEvidenceRouter({
+  getSession:async()=>({...session,orderId:'DIFFERENT_ORDER'}),
+  getTrustedKeys:()=>keys,consumeReplay:async()=>{replayCalls++;return true}
+ }));
+ const server=app.listen(0,'127.0.0.1');
+ await new Promise(resolve=>server.listening?resolve():server.once('listening',resolve));
+ try{
+  const response=await fetch('http://127.0.0.1:'+server.address().port+'/api/upi-app-evidence/verify',{
+   method:'POST',headers:{'Content-Type':'application/json'},
+   body:JSON.stringify({orderId:session.orderId,token:session.sessionId,...signed()})
+  });
+  const body=await response.json();
+  assert.equal(response.status,401);
+  assert.equal(body.state,'SESSION_AUTH_REQUIRED');
+  assert.equal(body.debitVerified,false);
+  assert.equal(replayCalls,0);
+ }finally{server.close()}
+});
 test('repeated signed success fails closed when replay storage denies or is unavailable',async()=>{
  const variants=[
   {consumeReplay:async()=>false,code:409,state:'DUPLICATE_APP_RESPONSE'},
