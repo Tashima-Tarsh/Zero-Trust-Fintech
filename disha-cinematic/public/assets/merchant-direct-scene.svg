@@ -1,0 +1,57 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 436" role="img" aria-labelledby="title desc">
+<title id="title">Customer pays a merchant directly</title><desc id="desc">A friendly merchant and customer connected by a direct UPI payment; the aggregator route is bypassed.</desc>
+<defs>
+ <linearGradient id="apron" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#77acff"/><stop offset=".55" stop-color="#2956a5"/><stop offset="1" stop-color="#142e6e"/></linearGradient>
+ <linearGradient id="shirt" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#fffefa"/><stop offset="1" stop-color="#a7c1de"/></linearGradient>
+ <linearGradient id="skin" x1=".1" y1=".1" x2="1" y2=".9"><stop stop-color="#fbd9b3"/><stop offset=".57" stop-color="#e9a376"/><stop offset="1" stop-color="#b96b56"/></linearGradient>
+ <linearGradient id="hair" x1="0" x2="1" y1="0" y2="1"><stop stop-color="#4a2b2f"/><stop offset=".52" stop-color="#211f32"/><stop offset="1" stop-color="#0c182e"/></linearGradient>
+ <linearGradient id="desk" x1="0" y1="0" x2="0" y2="1"><stop stop-color="#577ba9"/><stop offset="1" stop-color="#1b345b"/></linearGradient>
+ <linearGradient id="green" x1="0" x2="1"><stop stop-color="#2edaac"/><stop offset=".5" stop-color="#a7ffcb"/><stop offset="1" stop-color="#45e2ab"/></linearGradient>
+ <linearGradient id="glow" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#3b72d5" stop-opacity=".45"/><stop offset="1" stop-color="#203c71" stop-opacity=".06"/></linearGradient>
+ <filter id="shadow"><feGaussianBlur in="SourceAlpha" stdDeviation="10"/><feOffset dy="10"/><feComponentTransfer><feFuncA type="linear" slope=".3"/></feComponentTransfer><feMerge><feMergeNode/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+ <filter id="softglow"><feGaussianBlur stdDeviation="9"/></filter>
+ <marker id="arrow" markerWidth="9" markerHeight="9" refX="5" refY="4.5" orient="auto"><path d="M8 4.5L1 0V9Z" fill="#6ff5bd"/></marker>
+</defs>
+<ellipse cx="391" cy="364" rx="330" ry="48" fill="#3d8ace" opacity=".13" filter="url(#softglow)"/>
+<!-- merchant shop and counter -->
+<rect x="33" y="141" width="226" height="168" rx="17" fill="url(#glow)" stroke="#a5cdff" stroke-opacity=".18"/>
+<path d="M32 159l21-36h181l26 36Z" fill="#b5c6e9"/><path d="M53 123h39l-14 36H32Zm78 0h39l-1 36h-38Zm79 0h24l26 36h-41Z" fill="#596fbb"/>
+<rect x="55" y="178" width="181" height="99" rx="8" fill="#1a315a"/>
+<rect x="65" y="190" width="26" height="40" rx="4" fill="#cfb386"/><rect x="102" y="199" width="36" height="31" rx="5" fill="#b98164"/><rect x="149" y="187" width="27" height="43" rx="4" fill="#d5b08c"/>
+<!-- merchant shadow, torso and face -->
+<ellipse cx="170" cy="350" rx="126" ry="17" fill="#06142e" opacity=".36"/>
+<path d="M95 336c-5-47 3-78 34-91 22-10 73-11 97 9 20 18 27 45 24 82Z" fill="url(#shirt)"/>
+<path d="M119 336v-76c20-23 75-24 91 3l2 73Z" fill="url(#apron)"/><path d="M118 263l16-16 13 89h-12Zm78 0l-16-16-13 89h12Z" fill="#142c61"/>
+<path d="M131 213c-7-18-4-42 3-53 14-23 58-25 75-6 13 14 10 43 0 58-16 24-60 27-78 1Z" fill="url(#skin)"/>
+<path d="M134 197c-27-6-18-36-11-50 10-17 17-12 25-23 18-20 50-13 62-4 16 10 21 31 14 48-6 7-13 6-16-5l-12-14c-20 21-47 19-62 20Z" fill="url(#hair)"/>
+<path d="M151 210c20 29 45 25 59 1-2 19-15 32-32 34-18 0-26-12-27-35Z" fill="#4b292d"/>
+<path d="M155 207q8 5 15 0m17 0q8 5 15 0" stroke="#4e3434" stroke-width="3" stroke-linecap="round"/>
+<path d="M169 223q9 7 20 0" stroke="#ffdfc3" stroke-width="2.5" fill="none"/>
+<path d="M101 269c-16 12-17 37-8 48l40 10 18-21-36-19Z" fill="url(#shirt)"/>
+<path d="M208 270c20 13 23 29 15 43l-36 12-15-18 30-19Z" fill="url(#shirt)"/>
+<rect x="129" y="287" width="89" height="58" rx="7" fill="#152842" stroke="#85c1f1" stroke-width="3" filter="url(#shadow)"/><rect x="164" y="343" width="31" height="6" rx="3" fill="#9bd8fb"/>
+<rect x="39" y="347" width="227" height="26" rx="9" fill="url(#desk)" stroke="#c7e1ff" stroke-opacity=".35" filter="url(#shadow)"/>
+<!-- customer hair and body -->
+<ellipse cx="637" cy="349" rx="114" ry="17" fill="#06142e" opacity=".33"/>
+<path d="M592 151c-21 21-39 82-25 109 12 23 45 27 65 20 36 23 76-13 66-46-7-24-16-58-43-80Z" fill="url(#hair)"/>
+<path d="M555 350c-5-69 29-108 69-117l40 2c40 14 61 57 60 115Z" fill="url(#shirt)"/>
+<path d="M583 264c22-20 66-28 85-4l6 89h-114Z" fill="#e9effc"/>
+<path d="M604 174c-10-16-6-46 7-58 16-18 47-16 61-4 19 19 19 42 10 66l-14 16-59-3Z" fill="url(#hair)"/>
+<path d="M603 185c0-37 14-50 37-53 26 4 39 18 34 50-5 21-20 45-40 47-19-2-28-21-31-44Z" fill="url(#skin)"/>
+<path d="M610 178c3-22 23-26 28-37 11 13 20 15 39 17l-3-24-33-15-32 19Z" fill="url(#hair)"/>
+<path d="M613 186q6 4 12 0m24 0q6 4 12 0" stroke="#644141" stroke-linecap="round" stroke-width="3"/>
+<path d="M629 211q12 9 24-1" stroke="#af5355" stroke-linecap="round" stroke-width="2.5"/>
+<circle cx="673" cy="203" r="7" fill="none" stroke="#f9d76a" stroke-width="3"/>
+<path d="M581 290c-14 9-11 31 5 35l50-4-5-20-33-6Z" fill="url(#skin)"/>
+<path d="M689 287c15 13 7 34-10 37l-43-5 8-19 27-7Z" fill="url(#skin)"/>
+<g transform="translate(634 267) rotate(-12)" filter="url(#shadow)"><rect width="48" height="75" rx="8" fill="#1b355e" stroke="#a7d5ef" stroke-width="3"/><rect x="5" y="7" width="38" height="52" rx="3" fill="#4e85bb"/><circle cx="24" cy="66" r="3" fill="#effaff"/></g>
+<!-- direct payment connection -->
+<path d="M563 294C490 374 332 373 253 294" fill="none" stroke="#2fe8ac" stroke-width="22" stroke-opacity=".18" filter="url(#softglow)"/>
+<path d="M563 294C490 374 332 373 253 294" fill="none" stroke="url(#green)" stroke-width="6" stroke-linecap="round" marker-end="url(#arrow)"/>
+<g filter="url(#shadow)"><rect x="340" y="275" width="130" height="53" rx="16" fill="#112d48" stroke="#6ee6b8" stroke-opacity=".6"/><circle cx="367" cy="300" r="12" fill="#58e4ab"/><path d="m361 300 5 5 8-11" stroke="#143e34" stroke-width="3" fill="none" stroke-linecap="round" stroke-linejoin="round"/><text x="389" y="306" font-family="Arial,sans-serif" font-size="15" font-weight="700" fill="#edfff8">Direct UPI</text></g>
+<!-- excluded aggregator -->
+<g opacity=".95"><rect x="335" y="77" width="146" height="64" rx="13" fill="#132844" stroke="#849cb9" stroke-opacity=".6"/><text x="408" y="100" text-anchor="middle" font-size="11" font-family="Arial,sans-serif" fill="#adbcd3" letter-spacing="1.1">INTERMEDIARY</text><text x="408" y="120" text-anchor="middle" font-size="14" font-family="Arial,sans-serif" font-weight="700" fill="#d1deef">Aggregator</text><path d="M354 87l110 46m0-46-110 46" stroke="#fa829d" stroke-width="4" stroke-linecap="round"/></g>
+<path d="M352 139C314 160 287 176 280 198M465 139c40 14 61 36 72 59" fill="none" stroke="#9cbbdf" stroke-dasharray="4 9" stroke-width="2" opacity=".6"/>
+<g filter="url(#shadow)"><rect x="369" y="188" width="80" height="73" rx="19" fill="#0e533f" stroke="#62eab2" stroke-width="2"/><text x="410" y="242" text-anchor="middle" font-family="Arial,sans-serif" font-size="46" font-weight="700" fill="#e2fff2">₹</text></g>
+<g font-family="Arial,sans-serif" font-size="13" font-weight="700" fill="#e7f3ff" text-anchor="middle"><rect x="109" y="381" width="123" height="32" rx="12" fill="#152f56" stroke="#a5d6fd" stroke-opacity=".5"/><text x="170" y="402">MERCHANT</text><rect x="571" y="381" width="127" height="32" rx="12" fill="#152f56" stroke="#a5d6fd" stroke-opacity=".5"/><text x="635" y="402">CUSTOMER</text></g>
+</svg>

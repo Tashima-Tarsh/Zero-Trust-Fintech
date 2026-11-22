@@ -1,0 +1,27 @@
+name: Production ProofBridge no-money smoke
+on:
+  push:
+    branches:
+      - ops/proofbridge-production-smoke
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: proofbridge-prod-smoke-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  live-proofbridge:
+    runs-on: ubuntu-latest
+    timeout-minutes: 7
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Check live P2P receiving account, consent ticket and evidence status without payment
+        env:
+          DISHA_SMOKE_URL: https://disha8-2.thenitishkr.in
+        run: node tests/production-proofbridge-smoke.js

@@ -1,0 +1,25 @@
+'use strict';
+const assert=require('node:assert/strict');
+const fs=require('node:fs'),path=require('node:path');
+const read=p=>fs.readFileSync(path.join(__dirname,'..',p),'utf8');
+const html=read('public/checkout.html'),js=read('public/cosmic-checkout.js');
+const server=read('server.js'),proof=read('financial/proofbridge.js');
+assert.match(html,/id="payerDebitCheck"[^>]*disabled/);
+assert.match(js,/\/api\/payer-debit-evidence\//);
+assert.match(js,/No authenticated debit receipt/);
+assert.match(js,/original bank debit is NOT authenticated/i);
+assert.match(server,/app\.get\('\/api\/payer-debit-evidence\/:orderId'/);
+assert.match(server,/debitVerified:false/);
+assert.match(server,/paymentVerified:false/);
+assert.match(server,/paymentStateChanged:false/);
+assert.match(server,/UTR_CANDIDATE_OBSERVED_UNVERIFIED/);
+assert.match(proof,/const confirmedDebit=false/);
+assert.match(proof,/paymentVerified:false/);
+assert.match(proof,/debitVerified:false/);
+
+assert.equal((html.match(/I Paid — Check Debit Evidence/g)||[]).length,1,'Single action button');
+assert.doesNotMatch(html,/id="debitProofCheckButton"/,'No legacy duplicate payer button');
+assert.doesNotMatch(html,/id="debitProofCheck"/,'No duplicate payer evidence panel');
+assert.doesNotMatch(js,/configureDebitProofCheck/,'No duplicate listener');
+assert.match(server,/BROWSER_RETURN_OBSERVATION/,'Return observations are included in evidence lookup');
+console.log('PAYER_DEBIT_BUTTON_PASS: read-only payer evidence, no false verification');

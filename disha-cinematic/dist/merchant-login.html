@@ -1,0 +1,101 @@
+<!doctype html>
+<html lang="en">
+<head>
+<link rel="icon" type="image/png" href="/assets/disha-8-2-wordmark-cropped.png?v=brand20261118"><link rel="apple-touch-icon" href="/assets/disha-8-2-wordmark-cropped.png?v=brand20261118">
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="theme-color" content="#101e31">
+<title>Welcome back | DISHA 8.2</title>
+
+<link rel="stylesheet" href="/merchant-auth.css?v=photographic-clerk-20261118">
+<script src="/api/runtime-assets/frontend-monitor.js?v=owner-monitor-1" defer></script>
+</head>
+<body>
+<main class="auth-shell" data-mode="signin" aria-label="Merchant authentication">
+ <aside class="auth-story" aria-label="DISHA merchant platform">
+  <div class="auth-brand-wrap">
+   <a class="auth-brand" href="/" aria-label="DISHA 8.2 home"><span class="auth-logo-stage"><img class="auth-logo" src="/assets/disha-8-2-wordmark-cropped.png" alt="DISHA 8.2" width="320" height="58" fetchpriority="high"><span class="auth-logo-shine" aria-hidden="true"></span></span></a>
+  </div>
+  <div class="auth-story-middle">
+   <div class="auth-eyebrow">DISHA / DIRECT MERCHANT PAYMENTS</div>
+   <h2>Your payments,<br>in its <em>right place.</em></h2>
+   <p class="auth-story-description">A clearer view of your business, receiving accounts and payment activity. Your operations, under your control.</p>
+   <div class="payment-journey" aria-hidden="true" style="margin:clamp(16px,2.5vh,30px) 0 8px;max-width:940px">
+    <svg class="journey-flow" viewBox="0 0 940 220" fill="none" role="presentation" style="width:100%;height:auto;border-radius:14px;background:radial-gradient(ellipse at center,#285bbb36,transparent 68%)">
+     <g stroke="#6196e8" stroke-width="1.5" opacity=".9">
+      <path d="M80 110 H860" stroke-dasharray="4 8"/>
+     </g>
+     <g>
+      <circle cx="120" cy="110" r="42" fill="#1a2f5e" stroke="#6196e8" stroke-width="2"/>
+      <rect x="104" y="92" width="32" height="36" rx="5" stroke="#dae5fc" stroke-width="2" fill="none"/>
+      <path d="M110 102h20M110 112h14" stroke="#dae5fc" stroke-width="2" stroke-linecap="round"/>
+      <text x="120" y="185" fill="#b3bbff" font-size="11" text-anchor="middle" font-family="Inter,sans-serif" font-weight="700">1 · ORDER</text>
+     </g>
+     <g>
+      <circle cx="360" cy="110" r="42" fill="#1a2f5e" stroke="#6196e8" stroke-width="2"/>
+      <rect x="344" y="84" width="32" height="52" rx="7" stroke="#dae5fc" stroke-width="2" fill="none"/>
+      <path d="m352 106 5 5 9-11" stroke="#5cddaf" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+      <text x="360" y="185" fill="#b3bbff" font-size="11" text-anchor="middle" font-family="Inter,sans-serif" font-weight="700">2 · UPI PAY</text>
+     </g>
+     <g>
+      <circle cx="600" cy="110" r="42" fill="#2a1f4d" stroke="#9bbaff" stroke-width="2"/>
+      <rect x="584" y="88" width="32" height="40" rx="8" stroke="#c9bfff" stroke-width="2" fill="none"/>
+      <circle cx="600" cy="106" r="8" stroke="#c9bfff" stroke-width="2" fill="none"/>
+      <path d="M600 98v5m0 8v5m-8-8h5m6 0h5" stroke="#c9bfff" stroke-width="2" stroke-linecap="round"/>
+      <text x="600" y="185" fill="#b3bbff" font-size="11" text-anchor="middle" font-family="Inter,sans-serif" font-weight="700">3 · EVIDENCE</text>
+     </g>
+     <g>
+      <circle cx="820" cy="110" r="42" fill="#3d2417" stroke="#e89b6b" stroke-width="2"/>
+      <rect x="804" y="90" width="32" height="34" rx="5" stroke="#f0c9a8" stroke-width="2" fill="none"/>
+      <path d="M810 118v-8m6 8V98m6 12v-5" stroke="#f0c9a8" stroke-width="2.5" stroke-linecap="round"/>
+      <text x="820" y="185" fill="#b3bbff" font-size="11" text-anchor="middle" font-family="Inter,sans-serif" font-weight="700">4 · RECORD</text>
+     </g>
+    </svg>
+   </div>
+  </div>
+  <div class="auth-story-footer"><span><span class="status-dot"></span>Independent merchant infrastructure</span><span>DISHA / 8.2</span></div>
+ </aside>
+ <section class="auth-action" aria-label="Merchant sign in">
+  <div class="auth-content">
+   <div class="auth-right-brand" aria-hidden="true"><img src="/assets/disha-8-2-wordmark-cropped.png" alt="" width="230" height="56"></div>
+   <div class="auth-kicker">APPROVED MERCHANT IDENTITY</div><p style="color:#b8b5c1;font-size:12px;line-height:1.5;margin:4px 0 15px">Private access for approved merchants. <a href="/request-access" style="color:#f6aa81;text-decoration:underline">Request access</a> if your business is new.</p>
+   <p style="font-size:13px;margin:0 0 14px"><a href="/login?owner=1" style="color:#b56425;text-decoration:underline;font-weight:700">Super Admin sign-in →</a></p>
+   <div class="auth-slot-wrap"><div id="auth-slot" aria-live="polite"><div class="status" id="auth-status">Connecting securely to Clerk…</div></div></div>
+   
+  </div>
+  <div class="auth-bottom"><span>© 2026 DISHA 8.2</span><span>Approved access · Clerk authentication</span></div>
+ </section>
+</main>
+<script src="/auth-config.js"></script>
+
+<script>
+(async function(){
+const status=document.getElementById('auth-status');
+const ownerLogin=/(?:^|[?&])owner=1(?:&|$)/.test(location.search||'');
+const destination=ownerLogin?'/owner#requests':'/dashboard';
+const paymentDestination=(!ownerLogin&&/(?:^|[?&])mode=P2M(?:&|$)/i.test(location.search||''))
+ ?'/dashboard?mode=P2M#create':destination;
+try{
+const key=window.DISHA_CLERK_PUBLISHABLE_KEY;
+if(!key || window.DISHA_CLERK_CONFIG_READY===false)throw Error('Secure merchant sign-in is unavailable. Please contact platform support.');
+const part=key.split('_')[2];
+if(!part)throw Error('Invalid sign-in configuration');
+const domain=atob(part.replace(/-/g,'+').replace(/_/g,'/')).replace(/(?:\$|\0+)$/, '');
+if(!/^[a-z0-9.-]+$/i.test(domain))throw Error('Invalid authentication domain');
+function script(url,clerk=false){
+return new Promise((resolve,reject)=>{
+const s=document.createElement('script');s.src=url;s.crossOrigin='anonymous';
+if(clerk)s.dataset.clerkPublishableKey=key;
+s.onload=resolve;s.onerror=()=>reject(Error('Authentication service unavailable'));document.head.appendChild(s);
+});}
+await script('https://'+domain+'/npm/@clerk/ui@1/dist/ui.browser.js');
+await script('https://'+domain+'/npm/@clerk/clerk-js@6/dist/clerk.browser.js',true);
+await window.Clerk.load({ui:{ClerkUI:window.__internal_ClerkUICtor}});
+if(window.Clerk.isSignedIn){location.replace(paymentDestination);return}
+status.remove();
+window.Clerk.mountSignIn(document.getElementById('auth-slot'),{
+routing:'hash',forceRedirectUrl:paymentDestination,fallbackRedirectUrl:paymentDestination,signUpUrl:'/request-access'
+});
+}catch(err){console.error('[Merchant authentication] Startup failed:',err);status.textContent=err.message||'Unable to start authentication';status.style.color='#ba3749';}
+})();
+</script>
+</body></html>

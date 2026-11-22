@@ -1,0 +1,70 @@
+name: DISHA 8.2 CI
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  lint-and-test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+
+      - name: Install root dependencies
+        run: npm ci
+
+      - name: Run lint (syntax check)
+        run: npm run lint
+
+      - name: Build frontend deployment mirrors
+        run: npm run build
+
+      - name: Verify checked-in mirrors match canonical frontend
+        run: git diff --exit-code -- dist disha-cinematic
+
+      - name: Start checkout server (port 3000)
+        run: npm start &
+        env:
+          PORT: 3000
+          NODE_ENV: test
+          ADMIN_API_KEY: test-admin-key
+
+      - name: Wait for checkout server to be healthy
+        run: |
+          for i in $(seq 1 30); do
+            r3000=$(curl -s http://localhost:3000/health 2>/dev/null || true)
+            if [ -n "$r3000" ]; then
+              echo "Checkout server healthy"
+              break
+            fi
+            echo "Waiting for checkout server... attempt $i"
+            sleep 2
+          done
+          if [ -z "$r3000" ]; then
+            echo "Checkout server not healthy in time"
+            exit 1
+          fi
+
+      - name: Run test suite
+        run: npm test
+
+      - name: Upload test artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: disha-test-screenshots
+          path: |
+            test-artifacts/verify-touch-*.png
+            test-artifacts/verify-*.png
+          retention-days: 7

@@ -1,0 +1,318 @@
+/* DISHA 8.2 — original metallic brand / first-party illustration / native Clerk */
+:root{color-scheme:light;font-family:Inter,"Segoe UI",Arial,sans-serif;color:#131c3c;background:#fff;-webkit-font-smoothing:antialiased;font-synthesis:none}
+*,*:before,*:after{box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{margin:0;min-width:320px;min-height:100vh}
+img{display:block;max-width:100%}
+a{color:inherit;text-decoration:none}
+button,input{font:inherit}
+.auth-shell{
+ display:grid;grid-template-columns:minmax(0,57fr) minmax(0,43fr);
+ width:100%;min-height:100svh;margin:0 auto;max-width:1800px;align-items:stretch;
+}
+.auth-story{
+ position:relative;isolation:isolate;display:flex;flex-direction:column;
+ min-height:100svh;min-width:0;overflow:hidden;
+ padding:clamp(28px,2.7vw,50px) clamp(32px,4.1vw,74px) 26px;
+ color:#fff;
+ background:radial-gradient(ellipse at 89% 27%,#5430c650,transparent 38%),
+ radial-gradient(ellipse at 18% 87%,#2756d45c,transparent 52%),
+ linear-gradient(128deg,#08173a,#101f4f 58%,#15256c 100%);
+}
+.auth-story:before{
+ content:"";position:absolute;inset:0;pointer-events:none;z-index:-1;
+ background-image:linear-gradient(#91b9f209 1px,transparent 1px),
+ linear-gradient(90deg,#91b9f209 1px,transparent 1px);background-size:32px 32px;
+}
+.auth-story:after{
+ content:"";position:absolute;width:940px;height:940px;right:-440px;top:-550px;
+ border-radius:50%;border:1px solid #4c9cfd4d;box-shadow:0 0 0 78px #606ad80d,0 0 0 159px #3c68df0e;
+ pointer-events:none;z-index:-1;
+}
+.auth-brand-wrap{position:relative;z-index:2;flex:none}
+.auth-brand{display:inline-flex;align-items:center;width:clamp(180px,19vw,282px);min-height:54px}
+.auth-logo-stage{
+ position:relative;width:100%;display:block;animation:logoReveal .95s cubic-bezier(.2,1,.3,1) both;
+ filter:drop-shadow(0 8px 22px #0007);
+}
+.auth-logo{width:100%;height:auto;object-fit:contain}
+.auth-logo-shine{
+ position:absolute;inset:0;pointer-events:none;
+ background:linear-gradient(103deg,transparent 30%,#ffffffa0 46%,transparent 61%);
+ -webkit-mask-image:url('/assets/disha-8-2-wordmark-cropped.png');
+ mask-image:url('/assets/disha-8-2-wordmark-cropped.png');
+ -webkit-mask-size:contain;mask-size:contain;
+ -webkit-mask-repeat:no-repeat;mask-repeat:no-repeat;
+ -webkit-mask-position:center;mask-position:center;
+ transform:translateX(-150%);animation:logoShine 8s ease-in-out 1s infinite;
+}
+.auth-story-middle{
+ display:flex;flex-direction:column;justify-content:center;flex:1;min-width:0;
+ padding:clamp(24px,3.4vh,42px) 0 23px;max-width:100%;
+}
+.auth-eyebrow{font-size:10px;letter-spacing:.21em;font-weight:770;color:#b3bbff;text-transform:uppercase}
+.auth-story h2{
+ margin:17px 0 18px;max-width:760px;font-size:clamp(38px,4.25vw,71px);
+ line-height:1.075;letter-spacing:-.061em;font-weight:780;color:#fff;
+ overflow-wrap:normal;word-break:normal;
+}
+.auth-story h2 em{font-style:normal;color:#b1b9ff}
+.auth-story-description{font-size:clamp(13px,1.15vw,18px);line-height:1.62;max-width:620px;color:#c4d1eb;margin:0}
+.payment-journey{position:relative;margin:clamp(16px,2.5vh,30px) 0 8px;max-width:940px;width:100%;min-width:0}
+.journey-flow{
+ display:block;position:relative;width:100%;overflow:hidden;border-radius:14px;
+ background:radial-gradient(ellipse at center,#285bbb36,transparent 68%);
+}
+.journey-image{
+ width:100%;height:auto;object-fit:contain;max-height:425px;
+ -webkit-mask-image:linear-gradient(90deg,transparent 0%,#000 3%,#000 97%,transparent 100%);
+ mask-image:linear-gradient(90deg,transparent 0%,#000 3%,#000 97%,transparent 100%);
+ animation:journeyFloat 7.5s ease-in-out infinite;
+}
+.journey-features{
+ display:grid;grid-template-columns:repeat(3,minmax(0,1fr));
+ gap:10px;align-items:center;min-width:0;margin-top:10px;
+}
+.journey-features span{
+ display:block;min-width:0;overflow-wrap:normal;font-size:clamp(10px,.82vw,13px);
+ color:#dae5fc;font-weight:630;letter-spacing:-.015em;
+ padding:8px 8px 8px 13px;border-left:2px solid #6196e8;
+}
+.auth-story-footer{
+ display:flex;gap:15px;justify-content:space-between;align-items:center;
+ font-size:11px;color:#acbbd9;padding-top:14px;flex:none;
+}
+.status-dot{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:8px;background:#5cddaf}
+.auth-action{
+ min-width:0;min-height:100svh;display:flex;flex-direction:column;align-items:center;
+ justify-content:center;padding:clamp(30px,4vw,66px);
+ background:#fff;color:#121a36;
+}
+.auth-content{
+ position:relative;min-width:0;max-width:500px;width:100%;
+ padding:0;margin:auto;background:transparent;
+ border:0;box-shadow:none;border-radius:0;
+}
+.auth-right-brand{width:clamp(175px,18vw,235px);margin:0 auto 30px}
+.auth-right-brand img{width:100%;height:auto;filter:drop-shadow(0 1px 1px #2d3c7860)}
+.auth-kicker{
+ font-size:10px;letter-spacing:.19em;font-weight:760;color:#647097;
+ margin:0 0 15px;
+}
+.auth-content h1{
+ font-size:clamp(27px,2.25vw,38px);font-weight:740;line-height:1.2;
+ letter-spacing:-.05em;margin:0 0 11px;color:#111a3d;max-width:100%;
+}
+.auth-description{font-size:13px;line-height:1.65;margin:0 0 27px;color:#63708a;max-width:100%}
+.auth-slot-wrap{position:relative;width:100%;min-width:0;max-width:100%;overflow:visible}
+#auth-slot{width:100%;max-width:100%;min-width:0;min-height:260px;display:flex;align-items:flex-start;justify-content:center}
+#auth-slot>.status{padding:25px 0;color:#66728c;font-size:13px}
+#auth-slot :is(.cl-rootBox,.cl-cardBox,.cl-card,.cl-main){
+ width:100%!important;min-width:0!important;max-width:100%!important;
+}
+#auth-slot .cl-cardBox,#auth-slot .cl-card{
+ background:transparent!important;border:0!important;box-shadow:none!important;
+}
+#auth-slot .cl-card{padding:0!important}
+#auth-slot .cl-header{display:none!important}
+#auth-slot .cl-formFieldInput{min-width:0!important;max-width:100%!important}
+#auth-slot .cl-formButtonPrimary{width:100%!important}
+#auth-slot .cl-footerActionText,#auth-slot .cl-footerActionLink{overflow-wrap:anywhere}
+.password-guidance{
+ font-size:12px;line-height:1.6;color:#60718c;margin:12px 0 0;
+}
+.password-guidance.invalid{color:#a43a45}
+.password-guidance.valid{color:#176e58}
+.auth-bottom{
+ display:flex;flex-wrap:wrap;justify-content:space-between;gap:12px;
+ color:#9ca4b3;font-size:10px;width:100%;max-width:500px;
+ margin-top:auto;padding:30px 0 0;line-height:1.5;
+}
+:focus-visible{outline:3px solid #9cb8fa;outline-offset:3px}
+@keyframes logoReveal{
+ from{opacity:0;transform:translateY(13px) scale(.975);filter:blur(7px)}
+ to{opacity:1;transform:none;filter:none}
+}
+@keyframes logoShine{
+ 0%,15%,60%,100%{transform:translateX(-150%);opacity:0}
+ 24%{opacity:.44}35%{transform:translateX(150%);opacity:.68}44%{opacity:0}
+}
+@keyframes journeyFloat{
+ 0%,100%{transform:translateY(0)}50%{transform:translateY(-5px)}
+}
+@media(max-width:1250px){
+ .auth-story{padding-inline:clamp(25px,3.1vw,47px)}
+ .auth-story h2{font-size:clamp(35px,4vw,56px)}
+ .auth-action{padding-inline:clamp(27px,3vw,43px)}
+ .journey-features span{font-size:10px}
+}
+@media(max-width:1100px){
+ .auth-shell{grid-template-columns:minmax(0,55fr) minmax(0,45fr)}
+ .auth-story{padding:26px 27px 22px}
+ .auth-story h2{font-size:clamp(33px,4.1vw,48px)}
+ .auth-story-description{font-size:13px}
+ .auth-action{padding:25px}
+ .auth-right-brand{margin-bottom:24px}
+}
+@media(max-width:800px){
+ .auth-shell{display:flex;flex-direction:column}
+ .auth-story{min-height:0;padding:20px 30px 16px}
+ .auth-story-middle{display:grid;grid-template-columns:minmax(0,.91fr) minmax(0,1.1fr);column-gap:14px;row-gap:8px;padding:16px 0 0}
+ .auth-eyebrow{grid-row:1;grid-column:1;align-self:end;font-size:9px}
+ .auth-story h2{grid-row:2;grid-column:1;font-size:clamp(30px,5vw,41px);margin:0;align-self:center}
+ .auth-story-description{grid-row:3;grid-column:1;align-self:start;font-size:12px}
+ .payment-journey{grid-row:1/4;grid-column:2;margin:0;align-self:center}
+ .journey-image{max-height:235px}
+ .journey-features{display:none}
+ .auth-story-footer{font-size:10px;padding-top:4px}
+ .auth-action{min-height:0;padding:34px 30px 24px}
+ .auth-content{max-width:480px;margin:0 auto}
+ .auth-bottom{max-width:480px;margin-top:20px}
+}
+@media(max-width:620px){
+ .auth-story{padding:17px 20px 14px}
+ .auth-story-middle{display:block;padding:17px 0 0}
+ .auth-story h2{font-size:clamp(30px,7.1vw,41px);margin:10px 0 9px}
+ .auth-story-description{font-size:12px;line-height:1.5}
+ .payment-journey{margin:11px auto 3px;max-width:490px}
+ .journey-image{max-height:220px}
+ .auth-story-footer{font-size:9px}
+ .auth-action{padding:27px 20px 22px}
+ .auth-content h1{font-size:30px}
+ .auth-right-brand{margin-bottom:24px;width:188px}
+ .auth-description{margin-bottom:23px}
+}
+@media(max-width:480px){
+ .auth-story{padding:14px 15px 11px}
+ .auth-brand{width:185px;min-height:40px}
+ .auth-eyebrow{font-size:9px}
+ .auth-story h2{font-size:clamp(28px,8vw,36px);margin:7px 0 8px}
+ .auth-story-description{font-size:11px}
+ .journey-image{max-height:170px}
+ .payment-journey{margin:9px 0 0}
+ .auth-story-footer span:last-child{display:none}
+ .auth-action{padding:24px 18px 22px}
+ .auth-content h1{font-size:28px}
+ .auth-description{font-size:12px}
+ .auth-bottom{font-size:9px}
+}
+@media(max-width:360px){
+ .auth-story h2{font-size:29px}
+ .auth-action{padding:22px 14px}
+ .auth-story-footer{font-size:9px}
+}
+@media(prefers-reduced-motion:reduce){
+ *,*:before,*:after{scroll-behavior:auto!important;animation:none!important;transition:none!important}
+ .auth-logo-stage{opacity:1!important;transform:none!important}
+ .auth-logo-shine{display:none}
+}
+
+/* DISHA merchant authentication: licensed network artwork + unmodified Clerk UI */
+@media screen{
+ html,body{width:100%;height:100%;overflow:hidden;overscroll-behavior:none}
+ body{min-height:0}
+ .auth-shell{width:100%;max-width:none;min-height:0;height:100vh;height:100dvh;overflow:hidden}
+ .auth-story,.auth-action{min-height:0;height:100%;overflow:hidden}
+ .auth-story{padding:clamp(12px,2.6dvh,32px) clamp(15px,3vw,58px) clamp(10px,2dvh,24px);
+   background-image:linear-gradient(90deg,#08132bcc 0%,#091b4a86 52%,#111e5b66 100%),url('/assets/merchant-network-galaxy.jpg'),
+   radial-gradient(ellipse at 76% 36%,#4640a3 0%,transparent 62%),linear-gradient(130deg,#061332,#0e2557);
+   background-position:center,center,center,center;background-repeat:no-repeat;background-size:cover,cover,cover,cover}
+ .auth-story:before{opacity:.25}
+ .auth-story-middle{min-height:0;padding:clamp(7px,1.8dvh,22px) 0;justify-content:center}
+ .auth-story h2{font-size:clamp(30px,min(4.15vw,7dvh),68px);margin:clamp(5px,1.4dvh,14px) 0}
+ .auth-story-description{font-size:clamp(11px,1.45dvh,17px);line-height:1.5;max-width:610px;text-shadow:0 1px 5px #031332}
+ .auth-network-art{flex:1;min-height:clamp(35px,13dvh,155px);max-height:29dvh;margin-top:clamp(6px,1.4dvh,15px);
+   border-radius:17px;background:linear-gradient(135deg,#0716310a,#16296713);
+   border:1px solid #c1ddff24}
+ .auth-story-footer{font-size:clamp(9px,1.4dvh,12px)}
+ .auth-action{padding:clamp(12px,3dvh,40px) clamp(14px,3vw,54px);background:#fff}
+ .auth-content{margin:auto;min-height:0;max-height:100%;display:flex;flex-direction:column;align-items:stretch}
+ .auth-kicker{margin:0 0 clamp(6px,1.5dvh,15px);font-size:11px}
+ .auth-right-brand{display:none}
+ .auth-slot-wrap{min-height:0;flex:0 1 auto;overflow:auto;overscroll-behavior:contain;scrollbar-width:thin}
+ #auth-slot{min-height:0;align-items:flex-start}
+ #auth-slot .cl-header{display:flex!important}
+ #auth-slot :is(.cl-rootBox,.cl-cardBox,.cl-card,.cl-main){max-width:100%!important}
+ #auth-slot .cl-cardBox,#auth-slot .cl-card{background:transparent!important;border:0!important;box-shadow:none!important}
+ .auth-bottom{flex-shrink:0;margin-top:clamp(5px,1dvh,14px);padding:0;gap:6px;font-size:10px}
+ .auth-logo-stage{animation:none;filter:none}
+ .auth-logo-shine{display:none}
+}
+@media(max-width:800px) and (min-width:601px){
+ .auth-shell{display:grid;grid-template-columns:minmax(0,45fr) minmax(0,55fr)}
+ .auth-story{padding:clamp(10px,2dvh,22px) 19px}
+ .auth-story-middle{display:flex;flex-direction:column}
+ .auth-story h2{font-size:clamp(27px,4.2vw,38px)}
+ .auth-story-description{font-size:12px}
+ .auth-network-art{min-height:70px;max-height:26dvh}
+ .auth-action{padding:15px 19px}
+}
+@media(max-width:600px){
+ .auth-shell{display:grid;grid-template-rows:minmax(0,29fr) minmax(0,71fr);grid-template-columns:1fr}
+ .auth-story,.auth-action{height:100%;min-height:0}
+ .auth-story{padding:clamp(6px,1dvh,12px) 17px}
+ .auth-brand{width:clamp(124px,30vw,168px);min-height:0}
+ .auth-story-middle{display:flex;flex-direction:column;justify-content:center;padding:2px 0}
+ .auth-eyebrow{display:none}
+ .auth-story h2{font-size:clamp(22px,6vw,33px);margin:2px 0 5px;line-height:1.03}
+ .auth-story-description{font-size:11px;line-height:1.25;max-width:100%}
+ .auth-network-art{display:none}
+ .auth-story-footer{display:none}
+ .auth-action{padding:clamp(8px,2dvh,18px) clamp(14px,5vw,26px)}
+ .auth-kicker{margin-bottom:5px;font-size:9px}
+ .auth-bottom{padding:5px 0 0;font-size:9px}
+}
+@media(max-height:620px) and (min-width:601px){
+ .auth-network-art{min-height:30px;max-height:13dvh}
+ .auth-story h2{font-size:clamp(26px,6dvh,44px)}
+ .auth-story-description{font-size:11px}
+ .auth-brand{width:170px;min-height:0}
+}
+@media(max-height:550px) and (max-width:600px){
+ .auth-shell{grid-template-rows:minmax(0,18fr) minmax(0,82fr)}
+ .auth-story-description{display:none}
+ .auth-story h2{font-size:clamp(18px,5vw,25px);margin:0}
+ .auth-bottom{display:none}
+}
+
+/* Verified ship-ready merchant authentication presentation (native Clerk UI). */
+@media screen {
+ .auth-story{
+   background-color:#060b22;
+   background-image:
+     linear-gradient(90deg,rgba(4,9,29,.82) 0%,rgba(6,12,37,.51) 53%,rgba(6,10,29,.35) 100%),
+     url('/assets/disha-universe-background.svg');
+   background-size:cover,cover;
+   background-position:center,center;
+   background-repeat:no-repeat;
+ }
+ .auth-story::before{opacity:.23}
+ .auth-story::after{display:none}
+ .auth-story-middle{justify-content:center}
+ .auth-story-description{max-width:550px;color:#eef2ff}
+ .auth-logo-stage{filter:none!important}
+ .auth-logo{max-height:54px;object-position:left center;filter:drop-shadow(0 2px 6px #020617)}
+ .auth-network-art{display:none!important}
+ /* Clerk owns its card, headings, prompts, fields and sign-up navigation. */
+ #auth-slot .cl-header{display:block!important}
+ #auth-slot .cl-headerTitle,#auth-slot .cl-headerSubtitle{display:block}
+ #auth-slot .cl-card{overflow:visible}
+ .auth-slot-wrap{scrollbar-gutter:stable}
+}
+@media(max-width:600px){
+ .auth-story{background-position:center 54%,center 54%}
+ .auth-story-middle{justify-content:center}
+ .auth-action{overflow:hidden}
+ .auth-slot-wrap{max-height:100%;overflow:auto}
+}
+
+/* User-selected Mars Perseverance artwork, locally hosted; Clerk remains unmodified. */
+@media screen{
+ .auth-story{background-image:linear-gradient(90deg,#13102780 0%,#130a2635 55%,#0d103877 100%),url('/assets/disha-login-mars.webp')!important;
+ background-position:center,center;background-size:cover,cover;background-repeat:no-repeat}
+ .auth-story:after{opacity:0!important}
+ .auth-story-middle{justify-content:flex-end!important}
+ .auth-story-middle .payment-journey{opacity:.65}
+ .auth-action{overflow-y:auto!important}
+}
+@media(max-width:600px){.auth-story{background-position:center 45%;background-size:cover}.auth-story-middle{justify-content:flex-end!important}}

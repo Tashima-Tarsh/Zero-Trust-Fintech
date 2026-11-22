@@ -1,0 +1,7 @@
+User-agent: *
+Allow: /
+
+Disallow: /api/
+Disallow: /ws/
+
+Sitemap: https://disha8-2.thenitishkr.in/sitemap.xml

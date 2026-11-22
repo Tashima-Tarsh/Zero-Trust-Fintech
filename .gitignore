@@ -1,0 +1,39 @@
+# Dependencies
+node_modules/
+**/node_modules/
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.pytest_cache/
+*.egg-info/
+build/
+
+# Logs & Environment
+*.log
+.env
+.env.local
+.env.*.local
+*.local.ps1
+*.local.js
+test-artifacts/
+**/test-artifacts/
+*.db
+*.db-shm
+*.db-wal
+
+# OS & Editor
+.DS_Store
+Thumbs.db
+.vscode/*
+!.vscode/settings.json
+!.vscode/extensions.json
+!.vscode/mcp.json
+.idea/
+.claude/
+scratch/
+
+# Android credential fixture local diagnostics (may include device identifiers)
+tests/android/credential-holder-fixture/local-diagnostics/

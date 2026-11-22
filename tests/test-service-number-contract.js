@@ -1,0 +1,12 @@
+'use strict';
+const assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path');
+const read=p=>fs.readFileSync(path.join(__dirname,'..',p),'utf8');
+const server=read('server.js'),merchant=read('merchant-api.js'),checkout=read('public/cosmic-checkout.js');
+assert.match(server,/const txnRef = 'SRV'/,'Public service sessions must use service references');
+assert.match(server,/serviceNumber: session.txnRef/,'Public API exposes service number');
+assert.match(merchant,/const paymentReference='SRV'/,'Merchant payments generate unique service numbers');
+assert.match(merchant,/service_number:paymentReference/,'Merchant API provides service number');
+assert.match(merchant,/\^\[A-Za-z0-9\]\{1,35\}\$/,'Reopened P2M checkout must retain issued transaction reference');
+assert.match(checkout,/session\.serviceNumber/,'Service number displayed on customer checkout and receipt');
+assert.match(checkout,/Service '\+session\.serviceNumber/);
+console.log('SERVICE_NUMBER_PASS: API and checkout expose service numbers without mutating historical internal IDs');

@@ -1,0 +1,107 @@
+name: PostgreSQL financial invariants
+
+on:
+  pull_request:
+    paths:
+      - 'db.js'
+      - 'financial/**'
+      - 'merchant-api.js'
+      - 'server.js'
+      - 'platform-control.js'
+      - 'utils/upi-intent.js'
+      - 'utils/pony-tail-window.js'
+      - 'migrations/**'
+      - 'tests/test-postgres-*.js'
+      - 'tests/test-live-upi-contract.js'
+      - 'utils/trust-score.js'
+      - 'tests/test-postgres-utr-evidence-http.js'
+      - 'tests/test-postgres-vault-evidence-http.js'
+      - 'tests/test-postgres-quantum-signal-http.js'
+      - 'tests/test-vault-browser-evidence.js'
+      - 'tests/test-postgres-merchant-saas.js'
+      - 'migrations/001_financial_core.sql'
+      - 'tests/test-postgres-financial-core.js'
+      - 'tests/test-postgres-checkout-store.js'
+      - 'tests/test-postgres-legacy-sessions.js'
+      - 'tests/test-postgres-checkout-bootstrap.js'
+      - 'tests/test-postgres-migration.js'
+      - 'tests/test-postgres-switch.js'
+      - 'tests/test-postgres-http.js'
+      - 'tests/test-postgres-webauthn-store.js'
+      - 'scripts/migrate-sqlite-to-postgres.js'
+      - 'financial/postgres-store.js'
+      - 'migrations/002_postgres_checkout.sql'
+      - 'schema.sql'
+      - 'tests/test-financial-money.js'
+      - '.github/workflows/postgres-financial-core.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'financial/**'
+      - 'merchant-api.js'
+      - 'server.js'
+      - 'platform-control.js'
+      - 'db.js'
+      - 'utils/upi-intent.js'
+      - 'migrations/**'
+      - 'tests/test-postgres-*.js'
+      - 'tests/test-financial-money.js'
+      - 'tests/test-live-upi-contract.js'
+      - '.github/workflows/postgres-financial-core.yml'
+
+jobs:
+  postgres-transaction-invariants:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: disha_test
+          POSTGRES_PASSWORD: test_only_not_production
+          POSTGRES_DB: disha_financial_ci
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U disha_test -d disha_financial_ci"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 12
+    env:
+      TEST_DATABASE_URL: postgresql://disha_test:test_only_not_production@127.0.0.1:5432/disha_financial_ci
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - name: Install root dependencies
+        run: npm ci
+      - name: Verify exact paise math
+        run: node tests/test-financial-money.js
+      - name: Prove PostgreSQL transaction invariants
+        run: node tests/test-postgres-financial-core.js
+      - name: Exercise PostgreSQL checkout state
+        run: node tests/test-postgres-checkout-store.js
+      - name: Verify legacy PostgreSQL sessions table upgrade
+        run: node tests/test-postgres-legacy-sessions.js
+      - name: Reproduce and repair missing Railway checkout fields before serving sessions
+        run: node tests/test-postgres-checkout-bootstrap.js
+      - name: Rehearse SQLite-to-PostgreSQL migration
+        run: node tests/test-postgres-migration.js
+      - name: Verify PostgreSQL-only cutover switch
+        run: node tests/test-postgres-switch.js
+      - name: Prove durable single-use WebAuthn challenges
+        run: node tests/test-postgres-webauthn-store.js
+      - name: Test real checkout HTTP against PostgreSQL
+        run: node tests/test-postgres-http.js
+      - name: Prove untrusted UTR cannot create financial postings
+        run: node tests/test-postgres-utr-evidence-http.js
+      - name: Test authenticated tenant merchant SaaS end to end
+        run: node tests/test-postgres-merchant-saas.js
+      - name: Prove authenticated statement reconciliation and no false ledger credits
+        run: node tests/test-postgres-reconciliation-http.js
+      - name: Prove Vault evidence handoff cannot fabricate payment success
+        run: node tests/test-postgres-vault-evidence-http.js
+      - name: Prove Quantum Signal twin isolation against real PostgreSQL
+        run: node tests/test-postgres-quantum-signal-http.js

@@ -1,0 +1,27 @@
+plugins {
+    id 'com.android.application'
+}
+
+android {
+    namespace 'ai.disha.testupi'
+    compileSdk 35
+
+    defaultConfig {
+        applicationId 'ai.disha.testupi'
+        minSdk 26
+        targetSdk 35
+        versionCode 1
+        versionName '1.0-test-only'
+    }
+
+    sourceSets {
+        main {
+            java.srcDirs += [file("../../../../android/intent-bridge/src/main/java")]
+        }
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+}
