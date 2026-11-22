@@ -749,7 +749,21 @@
 
    saveSessionState();
    if(mode==='generic'&&query.get('paymentrequest')==='1')
-    window.DISHAP2PPaymentRequestProbe?.attach?.(session,{window,document});
+    window.DISHAP2PPaymentRequestProbe?.attach?.(session,{window,document,
+     onPaymentResponse:async paymentResponse=>{
+      const output=document.getElementById('p2pPaymentRequestStatus');
+      if(!session.token||Date.now()>=session.expiresAt){
+       if(output)output.textContent=JSON.stringify({state:'SESSION_AUTH_UNAVAILABLE',debitVerified:false});
+       return;
+      }
+      const requestBody={orderId:session.orderId,token:session.token,
+       methodName:paymentResponse.methodName,details:paymentResponse.details};
+      const reply=await fetch('/api/upi-app-evidence/verify',{method:'POST',credentials:'same-origin',
+       headers:{'Content-Type':'application/json','X-CSRF-Token':session.token},
+       body:JSON.stringify(requestBody)});
+      const result=await reply.json();
+      if(output)output.textContent=JSON.stringify(result);
+     }});
    setMoney(session.amount);
    get('serviceIdentifier').textContent='Service ID · '+(session.serviceNumber||'Not assigned');
    setPaymentKind();
