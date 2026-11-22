@@ -30,7 +30,7 @@ import kotlinx.coroutines.launch
 import org.json.JSONObject
 import kotlin.random.Random
 
-class SessionObservationActivity : ComponentActivity() {
+open class SessionObservationActivity : ComponentActivity() {
     private lateinit var access: TextView
     private lateinit var result: TextView
     private lateinit var notifications: NotificationManager
@@ -38,8 +38,14 @@ class SessionObservationActivity : ComponentActivity() {
     private var authentication: CancellationSignal? = null
     private var referencePrefix = Random.nextInt(10000000, 100000000).toString()
 
+    protected open val brokerOnly = false
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        if (brokerOnly) {
+            showBrokerCheckout()
+            return
+        }
         referencePrefix = savedInstanceState?.getString("referencePrefix") ?: referencePrefix
         notifications = getSystemService(NotificationManager::class.java)
         notifications.createNotificationChannel(
@@ -92,6 +98,38 @@ class SessionObservationActivity : ComponentActivity() {
         button("Post malformed synthetic notification") { publish("invalid", "fixture@invalid", "0002") }
         button("Post amount mismatch") { publish("200", "fixture@invalid", "0003") }
         button("Post payee mismatch") { publish("100", "other@invalid", "0004") }
+        lifecycleScope.launch { SessionObservation.status.collect { result.text = it } }
+    }
+
+    private fun showBrokerCheckout() {
+        val flags = applicationInfo.flags
+        val ticket = PlatformObservationBrokerPolicy.ticket(
+            intent.action, intent.dataString,
+            flags and android.content.pm.ApplicationInfo.FLAG_SYSTEM != 0,
+            flags and android.content.pm.ApplicationInfo.FLAG_UPDATED_SYSTEM_APP != 0
+        )
+        val items = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(24, 24, 24, 24)
+        }
+        setContentView(items)
+        access = TextView(this).also(items::addView)
+        result = TextView(this).also(items::addView)
+        if (ticket == null) {
+            result.text = "An original system installation and a valid DISHA checkout link are required"
+            return
+        }
+        fun action(label: String, run: () -> Unit) {
+            items.addView(Button(this).apply {
+                text = label
+                setOnClickListener { run() }
+            })
+        }
+        action("Review Android notification access") {
+            startActivity(Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS))
+        }
+        action("Authenticate and review checkout consent") { authenticateForObservation(ticket) }
+        action("Stop and revoke observation") { SessionObservation.stop() }
         lifecycleScope.launch { SessionObservation.status.collect { result.text = it } }
     }
 
