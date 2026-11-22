@@ -239,7 +239,7 @@ async function main() {
     assert.deepEqual(await readDebitEvidenceReceipt(lab.pool, clean.orderId, checkout), firstLookup,
       'Read-only callbacks return the same receipt without side effects');
     assert.deepEqual(Object.keys(firstLookup.debitEvidenceReceipt).sort(),
-      ['orderId','state','source','sourceTrust','amountPaise','reference','referenceKind','observedAt','receiptReference'].sort());
+      ['orderId','state','source','sourceTrust','amountPaise','reference','referenceKind','observedAt','receiptReference','sources','observedSources','proofStatus'].sort());
     assert.equal(firstLookup.debitEvidenceReceipt.reference,'000000000105');
     assert.equal(firstLookup.debitEvidenceReceipt.referenceKind,'RRN');
     assert.equal(firstLookup.debitEvidenceReceipt.sourceTrust,'PAYER_APP_NOTIFICATION_UNVERIFIED');
