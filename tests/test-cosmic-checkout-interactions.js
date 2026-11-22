@@ -70,7 +70,8 @@ const active=app=>app.stages.find(s=>!s.hidden)?.dataset.stage;
  assert.equal(running.nodes.vaultProceed.hidden,false,'Android Chrome P2P must show Copy UPI ID');
  assert.equal(running.nodes.vaultProceed.href,'#','P2P must not dispatch an Android intent');
  assert.equal(running.nodes.vaultProceed.textContent,'Copy UPI ID');
- assert.equal(running.nodes.vaultProceed.getAttribute('aria-disabled'),'false');
+ assert.equal(running.nodes.vaultProceed.getAttribute('aria-disabled'),'true',
+  'P2P copy must remain disabled before fresh verified payer and device attestation');
  assert.equal(running.nodes.qrTapToPay.getAttribute('aria-disabled'),'true');
  assert.equal(running.data.prompt,0);
  running.events.focus();await flush();
