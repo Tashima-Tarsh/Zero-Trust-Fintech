@@ -137,7 +137,6 @@ internal object SessionObservation {
         if (submitting || posted.flags and Notification.FLAG_GROUP_SUMMARY != 0) return
         val extras = posted.extras
         if (lease.real) {
-            if (status.value.startsWith("DEBIT_UTR_OBSERVED")) return
             val body = listOfNotNull(extras.getCharSequence(Notification.EXTRA_TEXT),
                 extras.getCharSequence(Notification.EXTRA_BIG_TEXT))
                 .plus(extras.getCharSequenceArray(Notification.EXTRA_TEXT_LINES)?.toList().orEmpty())
