@@ -21,6 +21,7 @@ const {initProofBridgeSchema,createProofBridgeRouter}=require('./financial/proof
 const {initDebitCredentialSchema,createDebitCredentialRouter}=require('./financial/debit-credential');
 const {createCheckoutDiagnostics}=require('./financial/checkout-diagnostics');
 const {lookupBankSender,coverage:bankSmsCoverage}=require('./financial/bank-sms-header-registry');
+const {initSmsDebitRelay,createSmsDebitRelayRouter}=require('./financial/sms-debit-relay');
 const {createUpiAppEvidenceRouter}=require('./financial/upi-app-evidence-router');
 const {createP2pPrepaymentRouter}=require('./financial/p2p-prepayment-router');
 const {initUpiAppEvidenceReplay,makeReplayGuard}=require('./financial/upi-app-evidence-replay');
@@ -304,6 +305,17 @@ app.get('/api/bank-sms/lookup',(req,res)=>{
  const sender=typeof req.query.sender==='string'?req.query.sender:'';
  return res.set('Cache-Control','no-store').json(lookupBankSender(sender));
 });
+// Signed transport identity does NOT authenticate the originating bank SMS.
+app.use('/api/sms-debit-relay',verifyLimiter,createSmsDebitRelayRouter({
+ getPool:()=>db.pgPool,
+ getSession:id=>db.findSessionByOrderId(id),
+ getTrustedKeys:()=>{
+  try{
+   const keys=JSON.parse(process.env.DISHA_SMS_RELAY_TRUSTED_PUBLIC_KEYS_JSON||'{}');
+   return keys&&typeof keys==='object'&&!Array.isArray(keys)?keys:{};
+  }catch(_){return {}}
+ }
+}));
 // Experimental, read-only payer application response authentication.
 app.use('/api/upi-app-evidence',verifyLimiter,createUpiAppEvidenceRouter({
  getSession:id=>db.findSessionByOrderId(id),
@@ -937,6 +949,10 @@ app.get('/api/payer-debit-evidence/:orderId', verifyLimiter, async (req,res)=>{
     const amountPaise=require('./financial/money').rupeesToPaise(String(session.challengeAmount));
     const payee=String(session.vpaAddress||'').trim().toLowerCase();
     const sources=[
+      {source:'SIGNED_SMS_TRANSPORT_CANDIDATE_UNVERIFIED',sql:
+        'SELECT utr_candidate AS utr,amount_paise,payee_vpa,observed_at '+
+        "FROM disha_sms_debit_candidates WHERE order_id=$1 AND utr_candidate IS NOT NULL "+
+        'ORDER BY received_at DESC LIMIT 5'},
       // A browser return may carry a 12-digit reference, but its source is
       // not the UPI app's authenticated debit record.
       {source:'BROWSER_RETURN_OBSERVATION',sql:
@@ -966,6 +982,8 @@ app.get('/api/payer-debit-evidence/:orderId', verifyLimiter, async (req,res)=>{
         if(e.code!=='42P01')return res.status(503).json({success:false,error:'EVIDENCE_STORAGE_UNAVAILABLE'});
       }
     }
+    // A recognized bank sender header and signed relay transport are NOT bank proof.
+    // Even when amount and payee match, authenticatedDebit stays false.
     if(!queried)return res.status(503).json({success:false,error:'EVIDENCE_STORAGE_UNAVAILABLE'});
     if(result.evidence.length)result.state='UTR_CANDIDATE_OBSERVED_UNVERIFIED';
     return res.json(result);
@@ -2039,6 +2057,7 @@ app.get('/failed', (req, res) => res.sendFile(path.join(__dirname, 'public', 'fa
     await initializeVaultEvidenceSchema(db.pgPool);
     await initializeQuantumSignal(db.pgPool);
     await initUpiAppEvidenceReplay(db.pgPool);
+    await initSmsDebitRelay(db.pgPool);
     await initDebitCredentialSchema(db.pgPool);
     if(process.env.DISHA_PROOFBRIDGE_EXPERIMENT==='1')await initProofBridgeSchema(db.pgPool);
     await initializeClaimObserver(db.pgPool);
