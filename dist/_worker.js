@@ -4,22 +4,9 @@ export default {
   async fetch(request, env) {
     const url = new URL(request.url);
 
-    // Ponytail consistency: authenticated P2P checkout and its runtime assets
-    // must come from the same Railway deployment as /api/session/* and the
-    // signed payment-response endpoints. Cloudflare's independently deployed
-    // static assets can otherwise display an older shell/script after a merge.
-    // Legacy /checkout and /p2p remain static Pages fallbacks.
-    const localCheckout=url.pathname==="/api/runtime/merchant-checkout"
-      ?"/merchant-checkout.html":null;
-    if (localCheckout) {
-      const staticUrl = new URL(localCheckout + url.search, request.url);
-      const response = await env.ASSETS.fetch(new Request(staticUrl, request));
-      const headers = new Headers(response.headers);
-      headers.set("cache-control", "no-store");
-      headers.set("x-disha-edge", "cloudflare-pages-checkout");
-      return new Response(response.body, {status:response.status,headers});
-    }
-
+    // Canonical /api/runtime/checkout, /api/runtime/merchant-checkout and
+    // /api/runtime-assets/* all pass to the same Railway deployment below.
+    // Legacy /checkout, /p2p and /p2m/checkout keep their static Pages fallback.
     // The selected payment account type determines which static checkout loads.
     // P2M never falls through to /checkout or /api/session/new.
     const paymentPages={
