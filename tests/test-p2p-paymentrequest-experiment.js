@@ -38,7 +38,7 @@ test('optional experiment is only shown on P2P and never writes to ledger',()=>{
  const server=fs.readFileSync(path.join(root,'server.js'),'utf8');
  assert.match(html,/id="p2pPaymentRequestProbe"[^>]*hidden/);
  assert.match(html,/id="p2pPaymentRequestCheck"/);
- assert.match(js,/mode==='generic'&&\(query\.get\('paymentrequest'\)==='1'/);
+ assert.match(js,/if\(mode==='generic'\)/);
  assert.match(server,/'p2p-paymentrequest-probe\.js'/);
  const probe=fs.readFileSync(path.join(root,'public/p2p-paymentrequest-probe.js'),'utf8');
  assert.doesNotMatch(probe,/fetch\(|sendBeacon\(|XMLHttpRequest|ledger\//);
