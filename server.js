@@ -27,6 +27,9 @@ const {initPayerPartnerDebit,createPayerPartnerDebitRouter}=require('./financial
 const {createP2pPrepaymentRouter}=require('./financial/p2p-prepayment-router');
 const {initUpiAppEvidenceReplay,makeReplayGuard}=require('./financial/upi-app-evidence-replay');
 const {initTimedStore,makeTimedStore,createTimedPaymentRouter}=require('./financial/timed-payment-bridge');
+const {initializeOutbox,deliverNext,validatedDestination}=require('./financial/payer-evidence-outbox');
+const sellerEvidencePilot=process.env.DISHA_SELLER_EVIDENCE_PILOT==='1';
+const pilotOrderId=process.env.DISHA_SELLER_EVIDENCE_PILOT_ORDER_ID||'';
 const {initializeClaimObserver,observeClaim} = require('./financial/untrusted-utr-claims');
 const {
   buildNPCIIntentUri,
@@ -354,7 +357,7 @@ app.use('/api/upi-app-evidence/timed',verifyLimiter,createTimedPaymentRouter({
   const keys=JSON.parse(process.env.DISHA_GOOGLE_PAY_TRUSTED_PUBLIC_KEYS_JSON||'{}');
   return keys&&typeof keys==='object'&&!Array.isArray(keys)?keys:{};
  }catch(_){return {}}},
- store:makeTimedStore(()=>db.pgPool)
+ store:makeTimedStore(()=>db.pgPool,{shouldQueueSeller:id=>sellerEvidencePilot&&id===pilotOrderId})
 }));
 const checkoutDiagnostics=createCheckoutDiagnostics({db});
 app.use('/api/checkout',checkoutDiagnostics.router);
@@ -2102,6 +2105,32 @@ app.get('/failed', (req, res) => res.sendFile(path.join(__dirname, 'public', 'fa
     await initTimedStore(db.pgPool);
     await initPayerPartnerDebit(db.pgPool);
     await initSmsDebitRelay(db.pgPool);
+    if(sellerEvidencePilot){
+      if(!/^[A-Za-z0-9_-]{6,150}$/.test(pilotOrderId))
+        throw Error('SELLER_PILOT_ORDER_ID_REQUIRED');
+      // The pilot is bound to one explicit order to prevent cross-merchant
+      // webhook delivery until DISHA has a trusted seller routing registry.
+      const dest=validatedDestination({
+       url:process.env.DISHA_SELLER_EVIDENCE_WEBHOOK_URL,
+       secret:process.env.DISHA_SELLER_EVIDENCE_WEBHOOK_SECRET
+      });
+      await initializeOutbox(db.pgPool);
+      let delivering=false;
+      const deliver=async()=>{
+       if(delivering)return;
+       delivering=true;
+       try{await deliverNext({pool:db.pgPool,
+         destination:async orderId=>{
+          if(orderId!==pilotOrderId)throw Error('SELLER_ORDER_DESTINATION_MISMATCH');
+          return dest;
+         }});
+       }catch(_){/* Subsequent worker tick retries; no private payload logging. */}
+       finally{delivering=false}
+      };
+      const deliveryTimer=setInterval(()=>{void deliver()},15000);
+      deliveryTimer.unref?.();
+      void deliver();
+    }
     await initDebitCredentialSchema(db.pgPool);
     if(process.env.DISHA_PROOFBRIDGE_EXPERIMENT==='1')await initProofBridgeSchema(db.pgPool);
     await initializeClaimObserver(db.pgPool);
