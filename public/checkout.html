@@ -69,6 +69,11 @@
         <p id="proofbridgeStatus" class="inline-note" role="status" aria-live="polite">Consent required to continue.</p>
       </section>
       <p id="proofbridgeEvidence" class="inline-note" aria-live="polite" hidden></p>
+      <section id="p2pPrepaymentGate" class="glass-panel" hidden aria-label="Required payer and device verification" style="padding:14px;margin:12px 0">
+        <strong>Required before payment: verify payer and Android device</strong>
+        <p id="p2pPrepaymentStatus" class="inline-note" role="status" aria-live="polite">Payment locked until server-verified passkey and device integrity checks pass.</p>
+        <button id="p2pPrepaymentAuthenticate" type="button" class="action-primary glass-btn">Verify fingerprint / device PIN and integrity</button>
+      </section>
       <!-- Glass Proceed button -->
       <a id="vaultProceed" role="button" href="#" aria-disabled="true" class="action-primary glass-btn" hidden>Proceed to UPI</a>
       <p id="vaultStatus" class="inline-note" aria-live="polite"></p>
