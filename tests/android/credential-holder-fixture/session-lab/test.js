@@ -170,9 +170,20 @@ async function main() {
     assert.deepEqual(await readDebitEvidenceReceipt(lab.pool, clean.orderId, checkout), firstLookup,
       'Read-only callbacks return the same receipt without side effects');
     assert.deepEqual(Object.keys(firstLookup.debitEvidenceReceipt).sort(),
-      ['orderId','state','source','amountPaise','reference','referenceKind','observedAt','receiptReference'].sort());
+      ['orderId','state','source','sourceTrust','amountPaise','reference','referenceKind','observedAt','receiptReference'].sort());
     assert.equal(firstLookup.debitEvidenceReceipt.reference,'000000000105');
     assert.equal(firstLookup.debitEvidenceReceipt.referenceKind,'RRN');
+    assert.equal(firstLookup.debitEvidenceReceipt.sourceTrust,'PAYER_APP_NOTIFICATION_UNVERIFIED');
+    const smsSource='com.google.android.apps.messaging';
+    const smsLease=await enroll({sourcePackage:smsSource,amountPaise:'100',payeeVpa:'fixture@invalid'});
+    const smsEvent=observed(smsLease,{packageName:smsSource,transactionRef:'000000000136'});
+    await expect(submit(smsLease,smsEvent),202,'SIGNAL_MATCHED');
+    const smsReceipt=await readDebitEvidenceReceipt(lab.pool,smsLease.orderId,checkout);
+    assert.equal(smsReceipt.debitEvidenceReceipt?.source,smsSource);
+    assert.equal(smsReceipt.debitEvidenceReceipt?.sourceTrust,'SMS_NOTIFICATION_SENDER_UNVERIFIED');
+    assert.equal(smsReceipt.debitEvidenceReceipt?.reference,'000000000136');
+    assert.equal(smsReceipt.debitEvidenceReceipt?.state,'DEBIT_EVIDENCE_OBSERVED');
+
     assert.deepEqual(await readDebitEvidenceReceipt(lab.pool, clean.orderId,{...checkout,expiresAt:0}),{});
     assert.deepEqual(await readDebitEvidenceReceipt(lab.pool, second.orderId,checkout),{});
     if (previousPin===undefined) delete process.env.DISHA_UDEB_PINNED_DEVICE_KEY_SHA256;

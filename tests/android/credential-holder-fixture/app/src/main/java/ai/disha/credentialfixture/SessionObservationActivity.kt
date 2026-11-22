@@ -148,7 +148,7 @@ class SessionObservationActivity : ComponentActivity() {
             result.text = "Grant notification access in Android Settings, then authenticate again"
             return
         }
-        val installed = DebitNotification.sources.filter {
+        val installed = (DebitNotification.sources + DebitSmsNotification.sources).filter {
             try {
                 packageManager.getApplicationInfo(it, 0).enabled
             } catch (_: PackageManager.NameNotFoundException) {
@@ -171,11 +171,11 @@ class SessionObservationActivity : ComponentActivity() {
         val payee = EditText(this).apply { hint = "Expected payee VPA"; inputType = InputType.TYPE_TEXT_VARIATION_EMAIL_ADDRESS }
         fields.addView(TextView(this).apply {
             text = if (pairingTicket == null)
-                "New notifications from the chosen app are checked for debit wording, amount, payee VPA " +
+                "New notifications from the chosen payer or messaging app are checked for debit wording, amount, payee VPA " +
                 "and an explicitly labelled UTR or RRN. Matching fields and a signature go to the local lab."
             else "The selected app's new debit notifications are checked against the live DISHA " +
                 "checkout order, amount and payee. Minimal signed fields go over HTTPS to DISHA. " +
-                "Raw notification content stays on your phone. No bank payment is verified."
+                "Raw notification content stays on your phone. SMS sender names are unverified; no bank payment is verified."
         })
         fields.addView(source)
         if (pairingTicket == null) {
