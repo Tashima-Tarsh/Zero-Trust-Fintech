@@ -598,7 +598,7 @@
     if(status)status.textContent='Payer and device checks verified for this checkout.';
     renderQr();
     const payLaunch=get('p2pPaymentRequestLaunch');
-    if(query.get('timedprovider')==='1'){
+    if(query.get('paymentrequest')!=='1'){
      // Preflight after the existing authenticated trust verdict, never before.
      // PaymentRequest.show() still runs only on the separate Pay button click.
      if(payLaunch)payLaunch.disabled=true;
@@ -606,9 +606,15 @@
     }else if(payLaunch&&window.isSecureContext!==false&&typeof window.PaymentRequest==='function'){
      payLaunch.disabled=false;
     }
-   }catch(_){
+   }catch(error){
     p2pTrustedUntil=0;
-    if(status)status.textContent='Payment locked: payer authentication or trusted device checks unavailable.';
+    const reason=error?.message==='WEBAUTHN_UNAVAILABLE'?'WEBAUTHN_UNAVAILABLE':
+      error?.message==='PREPAYMENT_TRUST_DENIED'?'PREPAYMENT_TRUST_DENIED':
+      error?.name==='NotAllowedError'?'AUTHENTICATION_CANCELLED_OR_DENIED':
+      error?.name==='SecurityError'?'AUTHENTICATION_SECURITY_ERROR':
+      'AUTHENTICATION_OR_DEVICE_TRUST_FAILED';
+    trace(reason);
+    if(status)status.textContent='Payment locked: '+reason+'. Retry device verification.';
     renderQr();
    }finally{trustButton.disabled=expired()}
   });
@@ -811,7 +817,7 @@
 
 
    saveSessionState();
-   if(mode==='generic'&&(query.get('paymentrequest')==='1'||query.get('timedprovider')==='1'))
+   if(mode==='generic')
     window.DISHAP2PPaymentRequestProbe?.attach?.(session,{window,document,
      isAuthorized:()=>p2pTrusted(),
      prepareTimed:async()=>{
