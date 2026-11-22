@@ -281,7 +281,7 @@ const RUNTIME_ASSETS=new Set([
  'premium.css','saas-white.css','merchant-mars.css','merchant-celestial.css',
  'merchant-reference.css','merchant-vpa-import.js','cosmic-checkout.js',
  'cosmic-checkout-model.js','cosmic-checkout.css','checkout-moonlight.css',
- 'one-touch-vault.js','quantum-signal-client.js','p2p-paymentrequest-probe.js','sms-sensor-evidence-probe.js'
+ 'one-touch-vault.js','quantum-signal-client.js','p2p-paymentrequest-probe.js'
 ]);
 app.get('/api/runtime-assets/:asset',(req,res)=>{
  const asset=req.params.asset;
