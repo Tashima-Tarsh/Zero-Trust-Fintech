@@ -227,8 +227,8 @@ open class SessionObservationActivity : ComponentActivity() {
                 "New notifications from the chosen payer or messaging app are checked for debit wording, amount, payee VPA " +
                 "and an explicitly labelled UTR or RRN. Matching fields and a signature go to the local lab."
             else "The selected app's new debit notifications are checked against the live DISHA " +
-                "checkout order, amount and payee. Minimal signed fields go over HTTPS to DISHA. " +
-                "Raw notification content stays on your phone. SMS sender names are unverified; no bank payment is verified."
+                "checkout order, amount and payee. Matching signed fields and the original notification preview go over HTTPS " +
+                "to the authenticated checkout, where they can be displayed. You can stop observation at any time."
         })
         fields.addView(source)
         if (pairingTicket == null) {
