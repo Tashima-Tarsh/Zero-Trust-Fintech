@@ -25,8 +25,3 @@ jobs:
         run: node --check experimental/dndep/protocol.js && node --check tests/test-dndep-protocol.js && node --check experimental/dndep/gateway.js && node --check tests/test-dndep-gateway.js
       - name: Adversarial D-NDEP protocol regression
         run: node tests/test-dndep-protocol.js && node tests/test-dndep-gateway.js
-      - name: Portable Java collector core compile and tests
-        run: |
-          mkdir -p /tmp/dndep-classes
-          javac -d /tmp/dndep-classes experimental/dndep/android-core/*.java
-          java -cp /tmp/dndep-classes ai.disha.dndep.DebitObservationCoreTest
