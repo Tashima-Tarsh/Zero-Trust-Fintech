@@ -26,7 +26,9 @@ import android.widget.TextView
 import androidx.activity.ComponentActivity
 import androidx.core.app.NotificationManagerCompat
 import androidx.lifecycle.lifecycleScope
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import org.json.JSONObject
 import kotlin.random.Random
 
@@ -130,6 +132,19 @@ open class SessionObservationActivity : ComponentActivity() {
         }
         action("Authenticate and review checkout consent") { authenticateForObservation(ticket) }
         action("Stop and revoke observation") { SessionObservation.stop() }
+        val provisioning = TextView(this).apply { setTextIsSelectable(true) }
+        action("Show observer public key fingerprint") {
+            lifecycleScope.launch {
+                provisioning.text = withContext(Dispatchers.IO) {
+                    try {
+                        "Observer public key SHA-256\n${SessionObservation.observerPublicKeyFingerprint()}"
+                    } catch (_: Exception) {
+                        "Observer public key unavailable"
+                    }
+                }
+            }
+        }
+        items.addView(provisioning)
         lifecycleScope.launch { SessionObservation.status.collect { result.text = it } }
     }
 
