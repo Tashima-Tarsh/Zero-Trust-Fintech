@@ -48,8 +48,10 @@ function canonicalEvidence(input, allowedPackages = ALLOWED_PACKAGES) {
   if (!input || typeof input !== 'object' || Array.isArray(input)) throw fail('EVIDENCE_FIELDS_INVALID');
   const keys = ['protocol','eventId','orderId','nonce','deviceId','packageName','postedAt',
     'amountPaise','payeeVpa','transactionRef','status'];
-  const observed = input.protocol === 'DISHA-DEBIT-UTR-OBSERVATION-V1';
+  const observed = ['DISHA-DEBIT-UTR-OBSERVATION-V1','DISHA-DEBIT-UTR-OBSERVATION-V2'].includes(input.protocol);
+  const withOriginalText = input.protocol === 'DISHA-DEBIT-UTR-OBSERVATION-V2';
   if (observed) keys.push('referenceKind');
+  if (withOriginalText) keys.push('sourceText');
   if (Object.keys(input).length !== keys.length || !keys.every(k => Object.hasOwn(input, k))) {
     throw fail('EVIDENCE_FIELDS_INVALID');
   }
@@ -64,6 +66,8 @@ function canonicalEvidence(input, allowedPackages = ALLOWED_PACKAGES) {
       !['SUCCESS','FAILED','PENDING','UNKNOWN'].includes(e.status)) {
     throw fail('EVIDENCE_FIELDS_INVALID');
   }
+  if (withOriginalText && (typeof e.sourceText !== 'string' || e.sourceText.length < 1 || e.sourceText.length > 4608))
+    throw fail('EVIDENCE_FIELDS_INVALID');
   if (observed && (!ALLOWED_PACKAGES.has(e.packageName) || e.status !== 'SUCCESS' ||
       !e.amountPaise || !e.payeeVpa || !/^[0-9]{12}$/.test(e.transactionRef || '') ||
       !['UTR','RRN'].includes(e.referenceKind))) throw fail('EVIDENCE_FIELDS_INVALID');
@@ -122,7 +126,7 @@ function evaluateEvidence(e, session, now = Date.now()) {
   const expiry = Number(session.expires_at);
   const consentedAt = Number(session.consented_at);
   if (e.orderId !== session.order_id || e.nonce !== session.nonce) return { state: 'CROSS_SESSION', accepted: false };
-  const isObservation = e.protocol === 'DISHA-DEBIT-UTR-OBSERVATION-V1';
+  const isObservation = ['DISHA-DEBIT-UTR-OBSERVATION-V1','DISHA-DEBIT-UTR-OBSERVATION-V2'].includes(e.protocol);
   if (now >= expiry || e.postedAt > expiry ||
       e.postedAt < consentedAt - (isObservation ? 0 : 30000) ||
       e.postedAt > now + (isObservation ? 0 : 120000)) {
@@ -212,6 +216,7 @@ async function initializeSessionEvidenceSchema(pool) {
     );
     DROP INDEX IF EXISTS disha_session_evidence_txn_replay;
     ALTER TABLE disha_session_evidence_events ADD COLUMN IF NOT EXISTS reference_kind TEXT;
+    ALTER TABLE disha_session_evidence_events ADD COLUMN IF NOT EXISTS source_text TEXT;
     -- One RRN can legitimately appear in both a payer-app alert and an SMS.
     -- Cross-order reuse is checked under a transaction-scoped advisory lock.
     DROP INDEX IF EXISTS disha_session_observed_ref_unique;
@@ -501,7 +506,7 @@ function createSessionEvidenceRouter({ getPool, getSession, allowedPackages = AL
            !(await scopedObserver(c,b.evidence.orderId,b.token))) ||
           !safeEqual(sha256(b.token || ''), consent.token_hash))
         throw fail('SESSION_TOKEN_INVALID',401);
-      const observed = b.evidence.protocol === 'DISHA-DEBIT-UTR-OBSERVATION-V1';
+      const observed = ['DISHA-DEBIT-UTR-OBSERVATION-V1','DISHA-DEBIT-UTR-OBSERVATION-V2'].includes(b.evidence.protocol);
       const boundPackage=consent.source_package||session.observationPackage;
       if (observed !== Boolean(boundPackage) ||
           (observed && b.evidence.packageName !== boundPackage &&
@@ -541,8 +546,8 @@ function createSessionEvidenceRouter({ getPool, getSession, allowedPackages = AL
           b.evidence.postedAt,Date.now(),b.evidence.amountPaise,b.evidence.payeeVpa,
           b.evidence.transactionRef,b.evidence.status,decision.state]);
       if (observed) await c.query(
-        'UPDATE disha_session_evidence_events SET reference_kind=$2 WHERE event_hash=$1',
-        [eventHash, b.evidence.referenceKind]);
+        'UPDATE disha_session_evidence_events SET reference_kind=$2,source_text=$3 WHERE event_hash=$1',
+        [eventHash, b.evidence.referenceKind,b.evidence.sourceText || null]);
       await c.query('UPDATE disha_session_evidence_devices SET last_seen_at=$3 WHERE order_id=$1 AND device_id=$2',
         [b.evidence.orderId,b.evidence.deviceId,Date.now()]);
       const aggregate = (await c.query(
@@ -623,7 +628,7 @@ async function readDebitEvidenceReceipt(pool, id, session, now = Date.now()) {
   const amountPaise = rupeesToPaise(String(session.challengeAmount));
   const payee = String(session.vpaAddress || '').trim().toLowerCase();
   const {rows} = await pool.query(
-    "SELECT e.event_hash,e.package_name,e.transaction_ref,e.reference_kind,e.amount_paise,e.payee_vpa,e.posted_at,e.decision_state,e.device_id,d.public_key_pem "+
+    "SELECT e.event_hash,e.package_name,e.transaction_ref,e.reference_kind,e.amount_paise,e.payee_vpa,e.posted_at,e.decision_state,e.device_id,e.source_text,d.public_key_pem "+
     'FROM disha_session_evidence_events e JOIN disha_session_evidence_consents c ON c.order_id=e.order_id '+
     'JOIN disha_session_evidence_devices d ON d.order_id=e.order_id AND d.device_id=e.device_id '+
     'WHERE e.order_id=$1 AND c.revoked_at IS NULL AND c.expires_at>$2 '+
@@ -668,7 +673,7 @@ async function readDebitEvidenceReceipt(pool, id, session, now = Date.now()) {
     observedAt:Number(row.posted_at),receiptReference:row.event_hash,sources,
     observedSources:rows.map(event => ({packageName:event.package_name,
       referenceKind:event.reference_kind,observedAt:Number(event.posted_at),
-      receiptReference:event.event_hash}))}};
+      receiptReference:event.event_hash,sourceText:event.source_text||null}))}};
 }
 
 module.exports = { readDebitEvidenceReceipt, ALLOWED_PACKAGES, canonicalEvidence, verifyDeviceEvidence,
