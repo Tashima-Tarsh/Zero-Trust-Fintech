@@ -17,7 +17,8 @@ RUN curl -fsSL https://services.gradle.org/distributions/gradle-8.11.1-bin.zip -
     && printf '%s  %s\n' "$digest" /tmp/gradle.zip | sha256sum -c - \
     && unzip -q /tmp/gradle.zip -d /opt && rm /tmp/gradle.zip
 
-RUN useradd --create-home --uid 10001 lab
+RUN useradd --create-home --uid 10001 lab \
+    && install -d -o lab -g lab /home/lab/source
 WORKDIR /home/lab/source
 COPY --chown=lab:lab . .
 USER lab
