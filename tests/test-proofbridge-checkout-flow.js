@@ -37,6 +37,10 @@ function launch(tampered=false,kind='P2P',checkoutMode='merchant'){
   if(url.includes('/api/merchant/public/order/'))return {ok:true,json:async()=>({success:true,order:{
    id,upi_uri:selectedUri,amount:500,payment_type:kind,vpa_address:selectedPayee,
    expires_at:Date.now()+140000,status:'PENDING'}})};
+  if(url.includes('/api/p2p/prepayment/authorize')){
+   assert.equal(options.headers['X-CSRF-Token'],token);
+   return {ok:true,json:async()=>({authorized:true,orderId:id,expiresAt:Date.now()+90000})};
+  }
   if(url.includes('/api/proofbridge/authorize')){
    data.auth++;
    assert.equal(options.headers['X-CSRF-Token'],token);
@@ -60,7 +64,8 @@ function launch(tampered=false,kind='P2P',checkoutMode='merchant'){
   throw Error('Unexpected '+url);
  };
  const window={isSecureContext:true,DISHACosmicCheckoutModel:model,
-  DISHAOneTouchVault:{getPendingOrderId:()=>null,requestEvidence:()=>null},
+  DISHAOneTouchVault:{getPendingOrderId:()=>null,requestEvidence:()=>null,
+   authorize:async()=>({sessionId:'a'.repeat(32)})},
   QRCode:function(_,opts){data.qr=opts.text},addEventListener(k,v){events[k]=v}};
  window.QRCode.CorrectLevel={M:1};
  const navigator={userAgent:'Mozilla/5.0 (Windows NT 10.0; Win64; x64)',clipboard:{
@@ -105,6 +110,10 @@ async function flush(){for(let i=0;i<55;i++)await Promise.resolve()}
  assert.equal(app.stages.find(x=>!x.hidden)?.dataset.stage,'receipt','Real ledger-confirmed state governs final receipt');
 
  const payer=launch(false,'P2P','generic');await flush();
+ // The generic payer lane requires completed server-side trust authorization.
+ await payer.elems.p2pPrepaymentAuthenticate.events.click();await flush();
+ assert.equal(payer.elems.vaultProceed.getAttribute('aria-disabled'),'false');
+
  assert.equal(payer.elems.serviceIdentifier.textContent,'Service ID · SRVTEST123');
  payer.elems.proofbridgeConsent.checked=true;
  payer.elems.proofbridgeConsent.events.change();await flush();
