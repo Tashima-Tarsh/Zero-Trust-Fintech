@@ -170,7 +170,7 @@ internal object SessionObservation {
                 val signature = withContext(Dispatchers.IO) {
                     val signer = Signature.getInstance("SHA256withECDSA")
                     signer.initSign(keyStore().getKey(KEY_ALIAS, null) as PrivateKey)
-                    signer.update(evidence.toString().toByteArray(Charsets.UTF_8))
+                    signer.update(EvidenceCanonicalJson.bytes(evidence))
                     Base64.encodeToString(signer.sign(), Base64.URL_SAFE or Base64.NO_PADDING or Base64.NO_WRAP)
                 }
                 if (active !== lease || SystemClock.elapsedRealtime() >= lease.elapsedDeadline) return@launch
