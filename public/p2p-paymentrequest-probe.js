@@ -1,0 +1,79 @@
+/* Browser-only P2P Chrome PaymentRequest compatibility experiment.
+ * Strictly non-settling. Never passes app-return text to DISHA's ledger. */
+(function(root,factory){'use strict';const api=factory();if(typeof module==='object'&&module.exports)module.exports=api;else root.DISHAP2PPaymentRequestProbe=api;})(typeof globalThis!=='undefined'?globalThis:this,function(){'use strict';
+const METHOD='https://tez.google.com/pay';
+function build(session,origin){
+ if(!session||!['P2P','PERSONAL'].includes(String(session.paymentType||'').toUpperCase()))return null;
+ if(typeof origin!=='string'||!/^https:\/\//.test(origin))return null;
+ if(!/^upi:\/\/pay\?/i.test(session.upiUri||''))return null;
+ let p;try{p=new URL(session.upiUri).searchParams}catch(_){return null}
+ if(p.has('mc'))return null; // No invented merchant classification.
+ const pa=p.get('pa')||'',pn=p.get('pn')||'';
+ const amount=Number(session.amount);
+ if(!/^[a-z0-9._-]{2,100}@[a-z0-9._-]{2,40}$/i.test(pa)||!pn.trim()||
+    !Number.isFinite(amount)||amount<=0||amount>100000||
+    (p.has('cu')&&p.get('cu')!=='INR')||
+    (session.payeeVpa&&session.payeeVpa.toLowerCase()!==pa.toLowerCase()))return null;
+ // This existing Chromium payment method may require merchant-specific fields.
+ // We test its real capability with a personal UPI payload and no fake MCC/TR.
+ return {methods:[{supportedMethods:METHOD,data:{pa,pn,tn:'DISHA P2P compatibility probe'}}],
+  details:{total:{label:'P2P UPI compatibility experiment',amount:{currency:'INR',value:amount.toFixed(2)}}},
+  expected:{pa,amount:amount.toFixed(2),orderId:session.orderId}};
+}
+function inspect(response,expected){
+ if(!response||response.methodName!==METHOD)return {state:'UNEXPECTED_PAYMENT_METHOD',debitVerified:false};
+ const details=response.details&&typeof response.details==='object'?response.details:{};
+ let raw=details.tezResponse;
+ if(typeof raw==='string'){try{raw=JSON.parse(raw)}catch(_){raw=null}}
+ const t=raw&&typeof raw==='object'&&!Array.isArray(raw)?raw:{};
+ const status=typeof t.Status==='string'?t.Status:typeof t.status==='string'?t.status:'MISSING';
+ const pa=typeof t.toVpa==='string'?t.toVpa:'';
+ const am=typeof t.amount==='string'?t.amount:'';
+ return {state:'ANDROID_PAYMENT_RESPONSE_OBSERVED',providerReportedStatus:status,
+  transactionIdPresent:typeof t.txnId==='string'&&t.txnId.length>0,
+  payeeMatched:pa.length>0&&pa.toLowerCase()===expected.pa.toLowerCase(),
+  amountMatched:am===expected.amount,
+  signaturePresent:typeof details.signature==='string'&&details.signature.length>0,
+  signatureVerified:false,debitVerified:false,paymentVerified:false,
+  source:'PAYMENT_APP_RETURN_UNVERIFIED'};
+}
+function attach(session,env){
+ const win=env.window,doc=env.document;
+ const node=doc.getElementById('p2pPaymentRequestProbe');
+ if(!node||!win||!win.location||new URLSearchParams(win.location.search).get('paymentrequest')!=='1')return false;
+ const config=build(session,win.location.origin);
+ if(!config)return false;
+ node.hidden=false;
+ const probe=doc.getElementById('p2pPaymentRequestCheck');
+ const launch=doc.getElementById('p2pPaymentRequestLaunch');
+ const status=doc.getElementById('p2pPaymentRequestStatus');
+ const emit=o=>{status.textContent=JSON.stringify(o)};
+ const inWindow=()=>Number.isFinite(session.expiresAt)&&Date.now()<session.expiresAt;
+ let request=null,used=false;
+ emit({state:'READY_FOR_P2P_CAPABILITY_CHECK',method:METHOD,realPaymentStarted:false});
+ probe.addEventListener('click',async()=>{
+  launch.disabled=true;request=null;
+  if(!inWindow()){emit({state:'SESSION_EXPIRED'});return}
+  if(!win.isSecureContext||typeof win.PaymentRequest!=='function'){emit({state:'PAYMENT_REQUEST_UNAVAILABLE'});return}
+  try{
+   const candidate=new win.PaymentRequest(config.methods,config.details);
+   const available=await candidate.canMakePayment();
+   if(!inWindow()){emit({state:'SESSION_EXPIRED'});return}
+   request=available?candidate:null;launch.disabled=!available;
+   emit({state:available?'P2P_METHOD_HANDLER_FOUND':'NO_P2P_METHOD_HANDLER',realPaymentStarted:false});
+  }catch(e){emit({state:'CAPABILITY_PROBE_FAILED',errorName:e?.name||'Error'})}
+ });
+ launch.addEventListener('click',async()=>{
+  if(!request||used||!inWindow())return;
+  used=true;probe.disabled=true;launch.disabled=true;
+  let response;
+  try{
+   response=await request.show();
+   emit({...inspect(response,config.expected),orderId:session.orderId});
+  }catch(e){emit({state:'P2P_PAYMENT_REQUEST_CANCELLED_OR_FAILED',errorName:e?.name||'Error',debitVerified:false})}
+  finally{if(response)try{await response.complete('unknown')}catch(_){} request=null;}
+ });
+ return true;
+}
+return Object.freeze({METHOD,build,inspect,attach});
+});
