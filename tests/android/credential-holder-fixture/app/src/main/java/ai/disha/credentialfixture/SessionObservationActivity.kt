@@ -64,6 +64,19 @@ class SessionObservationActivity : ComponentActivity() {
             startActivity(Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS))
         }
         button("Set up real debit UTR observation") { authenticateForObservation() }
+        val pairedTicket = intent?.data?.takeIf {
+            it.scheme == "disha-observe" && it.host == "pair"
+        }?.pathSegments?.singleOrNull()?.takeIf {
+            it.matches(Regex("[A-Za-z0-9_-]{43}"))
+        }
+        if (pairedTicket != null) {
+            items.addView(TextView(this).apply {
+                text = "DISHA checkout pairing: authenticate, select one installed payer app, " +
+                    "and explicitly consent. The order and amount come from the DISHA server; " +
+                    "this does NOT confirm any debit."
+            })
+            button("Continue checkout pairing") { authenticateForObservation(pairedTicket) }
+        }
         button("Consent and start synthetic session") {
             if (NotificationManagerCompat.getEnabledListenerPackages(this).contains(packageName) &&
                 SessionObservation.listenerConnected) {
@@ -93,7 +106,7 @@ class SessionObservationActivity : ComponentActivity() {
         super.onSaveInstanceState(outState)
     }
 
-    private fun authenticateForObservation() {
+    private fun authenticateForObservation(pairingTicket: String? = null) {
         if (Build.VERSION.SDK_INT < 30) {
             result.text = "Device authentication is unavailable for this Android version"
             return
@@ -113,7 +126,8 @@ class SessionObservationActivity : ComponentActivity() {
             .authenticate(signal, mainExecutor, object : BiometricPrompt.AuthenticationCallback() {
                 override fun onAuthenticationSucceeded(auth: BiometricPrompt.AuthenticationResult) {
                     authentication = null
-                    if (!isFinishing && !isDestroyed) requestRealObservation(SystemClock.elapsedRealtime() + 60000)
+                    if (!isFinishing && !isDestroyed)
+                        requestRealObservation(SystemClock.elapsedRealtime() + 60000, pairingTicket)
                 }
 
                 override fun onAuthenticationError(code: Int, message: CharSequence) {
@@ -128,7 +142,7 @@ class SessionObservationActivity : ComponentActivity() {
         super.onDestroy()
     }
 
-    private fun requestRealObservation(authDeadline: Long) {
+    private fun requestRealObservation(authDeadline: Long, pairingTicket: String? = null) {
         if (!NotificationManagerCompat.getEnabledListenerPackages(this).contains(packageName) ||
             !SessionObservation.listenerConnected) {
             result.text = "Grant notification access in Android Settings, then authenticate again"
@@ -156,13 +170,18 @@ class SessionObservationActivity : ComponentActivity() {
         val amount = EditText(this).apply { hint = "Expected amount (paise)"; inputType = InputType.TYPE_CLASS_NUMBER }
         val payee = EditText(this).apply { hint = "Expected payee VPA"; inputType = InputType.TYPE_TEXT_VARIATION_EMAIL_ADDRESS }
         fields.addView(TextView(this).apply {
-            text = "New notifications from the chosen app are checked for debit wording, amount, payee VPA " +
-                "and an explicitly labelled UTR or RRN. Matching fields, reference label and value, timestamp, " +
-                "session identifiers and signature go to the local test server. Raw text stays on-device."
+            text = if (pairingTicket == null)
+                "New notifications from the chosen app are checked for debit wording, amount, payee VPA " +
+                "and an explicitly labelled UTR or RRN. Matching fields and a signature go to the local lab."
+            else "The selected app's new debit notifications are checked against the live DISHA " +
+                "checkout order, amount and payee. Minimal signed fields go over HTTPS to DISHA. " +
+                "Raw notification content stays on your phone. No bank payment is verified."
         })
         fields.addView(source)
-        fields.addView(amount)
-        fields.addView(payee)
+        if (pairingTicket == null) {
+            fields.addView(amount)
+            fields.addView(payee)
+        }
         val consent = CheckBox(this).apply {
             text = "Allow DISHA to observe debit notifications for up to three minutes"
         }
@@ -176,12 +195,13 @@ class SessionObservationActivity : ComponentActivity() {
                     !NotificationManagerCompat.getEnabledListenerPackages(this).contains(packageName) ||
                     !SessionObservation.listenerConnected) {
                     result.text = "Authentication expired or Android notification access changed"
-                } else if (!paise.matches(Regex("[1-9][0-9]{0,15}")) ||
-                    !vpa.matches(Regex("[a-zA-Z0-9._-]{2,100}@[a-zA-Z0-9._-]{2,40}"))) {
+                } else if (pairingTicket == null &&
+                    (!paise.matches(Regex("[1-9][0-9]{0,15}")) ||
+                    !vpa.matches(Regex("[a-zA-Z0-9._-]{2,100}@[a-zA-Z0-9._-]{2,40}")))) {
                     result.text = "Enter a valid expected amount and payee VPA"
                 } else if (!SessionObservation.start(packageName, JSONObject()
                         .put("sourcePackage", source.selectedItem.toString())
-                        .put("amountPaise", paise).put("payeeVpa", vpa))) {
+                        .put("amountPaise", paise).put("payeeVpa", vpa), pairingTicket)) {
                     result.text = "Stop the current observation before starting another"
                 }
             }.show()

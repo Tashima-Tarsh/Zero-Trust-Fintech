@@ -45,6 +45,61 @@ async function main() {
       assert.equal(reply.error || reply.decisionState, reason, JSON.stringify(reply));
       return reply;
     };
+    // Production-style cross-app pairing: checkout bearer never reaches Android.
+    // The observer receives a separate 60-second scoped token, and the ticket
+    // may be redeemed exactly once. All observations here remain synthetic.
+    const [createdPairOrder,pairOrder]=await post('/lab/session',{});
+    assert.equal(createdPairOrder,201);
+    const [pairIssued,pair]=await post('/api/session-evidence/pairing/issue',{
+      orderId:pairOrder.orderId,token:pairOrder.token
+    },pairOrder.token);
+    assert.equal(pairIssued,201,JSON.stringify(pair));
+    assert.match(pair.ticket,/^[A-Za-z0-9_-]{43}$/);
+    assert.ok(pair.expiresAt>Date.now() && pair.expiresAt<=Date.now()+60000);
+    const [redeemCode,redeemed]=await post('/api/session-evidence/pairing/redeem',{ticket:pair.ticket});
+    assert.equal(redeemCode,200,JSON.stringify(redeemed));
+    assert.equal(redeemed.orderId,pairOrder.orderId);
+    assert.notEqual(redeemed.observerToken,pairOrder.token,'Android must not obtain checkout bearer');
+    assert.equal((await post('/api/session-evidence/pairing/redeem',{ticket:pair.ticket}))[0],409,
+      'one-time ticket cannot be replayed');
+    const pairedSource='com.google.android.apps.nbu.paisa.user';
+    const [pairAuthCode,pairLease]=await post('/api/session-evidence/authorize',{
+      orderId:redeemed.orderId,token:redeemed.observerToken,deviceId,consent:true,
+      sourcePackage:pairedSource,publicKeyPem:publicKey.export({type:'spki',format:'pem'})
+    },redeemed.observerToken);
+    assert.equal(pairAuthCode,201,JSON.stringify(pairLease));
+    assert.deepEqual(pairLease.allowedPackages,[pairedSource]);
+    const pairedEvent={
+      protocol:'DISHA-DEBIT-UTR-OBSERVATION-V1',eventId:crypto.randomUUID(),
+      orderId:pairOrder.orderId,nonce:pairLease.nonce,deviceId,packageName:pairedSource,
+      postedAt:Date.now(),amountPaise:'100',payeeVpa:'fixture@invalid',
+      transactionRef:'000000000190',status:'SUCCESS',referenceKind:'RRN'
+    };
+    const [pairEventStatus,pairEventResponse]=await post('/api/session-evidence/event',{
+      token:redeemed.observerToken,evidence:pairedEvent,
+      signature:sign(canonicalEvidence(pairedEvent))
+    });
+    assert.equal(pairEventStatus,202,JSON.stringify(pairEventResponse));
+    assert.equal(pairEventResponse.observationState,'DEBIT_UTR_OBSERVED');
+    assert.equal(pairEventResponse.paymentVerified,false);
+    assert.equal(pairEventResponse.debitVerified,false);
+    const scopedStatus=await fetch(origin+'/api/session-evidence/status/'+
+      encodeURIComponent(pairOrder.orderId)+'?token='+encodeURIComponent(redeemed.observerToken));
+    assert.equal(scopedStatus.status,401,'observer token must not access checkout status');
+    await lab.pool.query(
+      'UPDATE disha_android_observation_pairings SET expires_at=$2 WHERE order_id=$1',
+      [pairOrder.orderId,Date.now()-1]);
+    const expiredScopedEvent={...pairedEvent,eventId:crypto.randomUUID(),transactionRef:'000000000191'};
+    const [expiredScopedStatus,expiredScopedBody]=await post('/api/session-evidence/event',{
+      token:redeemed.observerToken,evidence:expiredScopedEvent,
+      signature:sign(canonicalEvidence(expiredScopedEvent))
+    });
+    assert.equal(expiredScopedStatus,401,JSON.stringify(expiredScopedBody),
+      'expired observer capability cannot submit new events');
+    const [badPairStatus]=await post('/api/session-evidence/pairing/issue',{
+      orderId:pairOrder.orderId,token:'bad'
+    },'bad');
+    assert.equal(badPairStatus,401);
     const lease = await enroll();
     const matching = event(lease);
     assert.throws(() => canonicalEvidence(matching), /EVIDENCE_FIELDS_INVALID/);

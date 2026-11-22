@@ -43,10 +43,12 @@ internal object SessionObservation {
     private data class Lease(
         val order: String, val token: String, val nonce: String, val device: String,
         val consentedAt: Long, val expiresAt: Long, val elapsedDeadline: Long,
-        val sourcePackage: String, val real: Boolean
+        val sourcePackage: String, val real: Boolean, val origin: String
     )
 
-    fun start(ownPackage: String, realBinding: JSONObject? = null): Boolean {
+    fun start(ownPackage: String, realBinding: JSONObject? = null, pairingTicket: String? = null): Boolean {
+        if (pairingTicket != null &&
+            (realBinding == null || !pairingTicket.matches(Regex("[A-Za-z0-9_-]{43}")))) return false
         if (!listenerConnected || enrolling || active != null) return false
         enrolling = true
         val signedOff = generation
@@ -55,9 +57,15 @@ internal object SessionObservation {
             try {
                 val lease = withContext(Dispatchers.IO) {
                     val source = realBinding?.getString("sourcePackage") ?: ownPackage
-                    val fixture = post("/lab/session", realBinding ?: JSONObject()).require(201)
+                    val origin = if (pairingTicket != null) PRODUCTION else LOCAL_LAB
+                    val fixture = if (pairingTicket == null) {
+                        post("/lab/session", realBinding ?: JSONObject(), origin = origin).require(201)
+                    } else {
+                        post("/api/session-evidence/pairing/redeem",
+                            JSONObject().put("ticket", pairingTicket), origin = origin).require(200)
+                    }
                     val order = fixture.getString("orderId")
-                    val token = fixture.getString("token")
+                    val token = fixture.getString(if (pairingTicket == null) "token" else "observerToken")
                     val device = UUID.randomUUID().toString()
                     val publicKey = Base64.encodeToString(keyStore().getCertificate(KEY_ALIAS).publicKey.encoded, Base64.NO_WRAP)
                     val pem = "-----BEGIN PUBLIC KEY-----\n" +
@@ -65,7 +73,8 @@ internal object SessionObservation {
                     val started = SystemClock.elapsedRealtime()
                     val response = post("/api/session-evidence/authorize", JSONObject()
                         .put("orderId", order).put("token", token).put("consent", true)
-                        .put("deviceId", device).put("publicKeyPem", pem), token).require(201)
+                        .put("deviceId", device).put("publicKeyPem", pem)
+                        .put("sourcePackage", source), token, origin).require(201)
                     check(response.getString("orderId") == order && response.getString("deviceId") == device)
                     check(response.getJSONArray("allowedPackages").let { it.length() == 1 && it.getString(0) == source })
                     val expires = response.getLong("expiresAt")
@@ -74,7 +83,7 @@ internal object SessionObservation {
                     check(ttl in 1..180000)
                     Lease(order, token, response.getString("nonce"), device,
                         maxOf(response.getLong("consentedAt"), serverTime), expires, started + ttl,
-                        source, realBinding != null)
+                        source, realBinding != null, origin)
                 }
                 if (signedOff != generation || !listenerConnected) {
                     revoke(lease)
@@ -176,7 +185,8 @@ internal object SessionObservation {
                 if (active !== lease || SystemClock.elapsedRealtime() >= lease.elapsedDeadline) return@launch
                 val response = withContext(Dispatchers.IO) {
                     post("/api/session-evidence/event", JSONObject()
-                        .put("token", lease.token).put("evidence", evidence).put("signature", signature))
+                        .put("token", lease.token).put("evidence", evidence).put("signature", signature),
+                        origin = lease.origin)
                 }
                 if (active !== lease) return@launch
                 val decision = response.body.optString("decisionState", response.body.optString("error"))
@@ -211,7 +221,7 @@ internal object SessionObservation {
         val revoked = runCatching {
             withContext(Dispatchers.IO) {
                 post("/api/session-evidence/revoke", JSONObject().put("orderId", lease.order)
-                    .put("token", lease.token), lease.token).require(200).getBoolean("revoked")
+                    .put("token", lease.token), lease.token, lease.origin).require(200).getBoolean("revoked")
             }
         }.getOrDefault(false)
         if (generation == stoppedGeneration && active == null) {
@@ -244,8 +254,13 @@ internal object SessionObservation {
         }
     }
 
-    private fun post(path: String, payload: JSONObject, csrf: String? = null): Reply {
-        val connection = URL("http://127.0.0.1:8766" + path).openConnection() as HttpURLConnection
+    private const val LOCAL_LAB = "http://127.0.0.1:8766"
+    private const val PRODUCTION = "https://disha8-2.thenitishkr.in"
+
+    private fun post(path: String, payload: JSONObject, csrf: String? = null,
+        origin: String = LOCAL_LAB): Reply {
+        check(origin == LOCAL_LAB || origin == PRODUCTION)
+        val connection = URL(origin + path).openConnection() as HttpURLConnection
         try {
             connection.instanceFollowRedirects = false
             connection.requestMethod = "POST"

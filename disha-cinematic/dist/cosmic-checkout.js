@@ -738,8 +738,31 @@
      showDebitEvidence('DEBIT EVIDENCE OBSERVED. Bank debit and payment remain unverified.',receipt);
     }else if(evidence.receiptError||receipt){
      stopDebitEvidenceMonitor();
-     if(!passive)showDebitEvidence('Debit evidence could not be validated. The observation conflicts with this checkout.');
-     if(status)status.textContent='Debit evidence could not be validated.';
+     const trustMissing=['TRUSTED_DEVICE_NOT_CONFIGURED','DEVICE_PROVENANCE_UNTRUSTED']
+      .includes(evidence.receiptError);
+     const explanation=trustMissing?
+      'Android evidence is present but trusted device provenance is not established. Bank debit remains unverified.':
+      'Debit evidence could not be validated because it conflicts with this checkout. No payment is verified.';
+     const candidate=trustMissing&&evidence.paymentVerified===false&&
+       evidence.debitVerified===false&&evidence.evidence?.find(x=>
+       x.source==='DEVICE_OBSERVATION'&&x.deviceSignatureVerified===true&&
+       /^\d{12}$/.test(x.utr||'')&&['UTR','RRN'].includes(x.referenceKind)&&
+       x.amountPaise===String(Math.round(session.amount*100))&&
+       String(x.payeeVpa).toLowerCase()===String(session.payeeVpa).toLowerCase());
+     if(candidate&&typeof evidenceDialog?.showModal==='function'&&!passive){
+      get('debitEvidenceTitle').textContent='Unverified Android debit observation';
+      get('debitEvidenceDialogStatus').textContent=explanation;
+      const fields=get('debitEvidenceDialogFields');fields.replaceChildren();
+      for(const [name,value] of [
+       ['Source',candidate.source],['Amount',format(Number(candidate.amountPaise)/100)],
+       [candidate.referenceKind,candidate.utr],['Trust level','Device signature only; bank and OS provenance unverified']
+      ]){
+       const term=document.createElement('dt'),description=document.createElement('dd');
+       term.textContent=name;description.textContent=value;fields.append(term,description);
+      }
+      if(!evidenceDialog.open)evidenceDialog.showModal();
+     }else if(!passive)showDebitEvidence(explanation);
+     if(status)status.textContent=explanation;
      return;
     }else{
      if(!passive)showDebitEvidence('Debit evidence not available yet');
@@ -775,6 +798,56 @@
    return checkDebitEvidence(false);
   };
   if(debitButton)debitButton.addEventListener('click',startDebitEvidenceMonitor);
+  // User-initiated Android bridge. A 60-second one-time ticket (not the
+  // checkout bearer) moves from Chrome to the installed DISHA observation app.
+  // Both steps require user gestures; no SMS/notification content enters Chrome.
+  if(debitButton&&/Android/i.test(navigator.userAgent)&&
+     typeof document.createElement==='function'&&typeof debitButton.insertAdjacentElement==='function'){
+   const pairButton=document.createElement('button');
+   pairButton.type='button';
+   pairButton.textContent='Connect Android debit observer';
+   pairButton.setAttribute('aria-label','Pair installed DISHA Android observer');
+   const pairHint=document.createElement('p');
+   pairHint.setAttribute('role','status');
+   pairHint.textContent='Requires the DISHA Android observer app and Android notification permission.';
+   const pairLink=document.createElement('a');
+   pairLink.textContent='Open DISHA observer on this phone';
+   pairLink.hidden=true;
+   pairLink.rel='nofollow';
+   debitButton.insertAdjacentElement('afterend',pairHint);
+   pairHint.insertAdjacentElement('beforebegin',pairButton);
+   pairHint.insertAdjacentElement('afterend',pairLink);
+   pairButton.addEventListener('click',async()=>{
+    pairLink.hidden=true;
+    pairLink.removeAttribute('href');
+    const boundSession=session;
+    if(!boundSession?.orderId||!boundSession?.token||expired()){
+     pairHint.textContent='Checkout expired or unavailable.';return;
+    }
+    pairButton.disabled=true;
+    pairHint.textContent='Creating a one-time Android pairing ticket…';
+    try{
+     const response=await fetch('/api/session-evidence/pairing/issue',{
+      method:'POST',credentials:'same-origin',cache:'no-store',
+      headers:{'Content-Type':'application/json','X-CSRF-Token':boundSession.token},
+      body:JSON.stringify({orderId:boundSession.orderId,token:boundSession.token})
+     });
+     const data=await response.json().catch(()=>({}));
+     if(!response.ok||!data.success||!/^[A-Za-z0-9_-]{43}$/.test(data.ticket)||
+        !Number.isSafeInteger(data.expiresAt)||data.expiresAt<=Date.now()||
+        session!==boundSession||expired())throw Error('PAIRING_UNAVAILABLE');
+     // Explicit app package is used for Chrome intent routing. The ticket
+     // expires after 60s, is single-use and holds no checkout credentials.
+     pairLink.href='intent://pair/'+encodeURIComponent(data.ticket)+
+      '#Intent;scheme=disha-observe;package=ai.disha.credentialfixture;end';
+     pairLink.hidden=false;
+     pairHint.textContent='Tap Open DISHA observer within 60 seconds. Authenticate and consent on Android.';
+    }catch(_){
+     pairHint.textContent='Pairing unavailable. No debit has been verified.';
+    }finally{pairButton.disabled=false;}
+   });
+  }
+
   if(evidenceRetry&&debitButton)evidenceRetry.addEventListener('click',()=>void checkDebitEvidence(false));
   window.addEventListener('pagehide',stopDebitEvidenceMonitor);
   const diag=get('checkoutDebugPanel');
