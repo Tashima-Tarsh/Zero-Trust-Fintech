@@ -1,0 +1,52 @@
+name: DISHA isolated system-broker emulator proof
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/disha-system-broker-emulator.yml'
+      - 'tests/android/credential-holder-fixture/verify-emulator-system-broker.sh'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  system-broker-emulator:
+    runs-on: ubuntu-latest
+    timeout-minutes: 55
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.11.1'
+      - name: Build broker-only APK and check its manifest/signature
+        run: |
+          gradle -p tests/android/credential-holder-fixture -PdishaBrokerOnly=true :app:assembleDebug --no-daemon --console=plain
+          bash tests/android/credential-holder-fixture/railway/verify-apk.sh tests/android/credential-holder-fixture/app/build/outputs/apk/debug/app-debug.apk
+      - name: Enable KVM for isolated emulator
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+      - name: Provision broker onto writable Android test system
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 35
+          target: google_apis
+          arch: x86_64
+          profile: pixel_2
+          ram-size: 2048M
+          emulator-options: -writable-system -no-snapshot -no-window -gpu software -noaudio -no-boot-anim -camera-back none
+          disable-animations: true
+          script: bash tests/android/credential-holder-fixture/verify-emulator-system-broker.sh tests/android/credential-holder-fixture/app/build/outputs/apk/debug/app-debug.apk
+      - name: Upload non-secret emulator diagnostic evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: disha-system-broker-emulator-evidence
+          path: test-results/android-system-broker/
+          retention-days: 7
+          if-no-files-found: warn
