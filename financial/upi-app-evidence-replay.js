@@ -16,7 +16,7 @@ async function initUpiAppEvidenceReplay(pool){
 }
 function fingerprint(provider,transactionId,transactionReference){
  if(![provider,transactionId,transactionReference].every(v=>typeof v==='string'&&v.length>0&&v.length<=150))throw Error('INVALID_TRANSACTION_IDENTITY');
- return crypto.createHash('sha256').update(JSON.stringify([provider,transactionId,transactionReference])).digest('hex');
+ return crypto.createHash('sha256').update(JSON.stringify([provider,transactionId])).digest('hex');
 }
 function makeReplayGuard(getPool){
  if(typeof getPool!=='function')throw Error('POOL_GETTER_REQUIRED');
