@@ -29,7 +29,7 @@ Ponytail rule: **correct the smallest broken connection between already-existing
 
 `tests/test-frontend-parity.js` verifies checked-in source mirrors, **not** the assets actually served by Cloudflare Pages and Railway. The earlier `tests/test-checkout-edge-gateway.js` explicitly asserted Pages must serve the runtime checkout when Railway is unavailable; that encoded the opposite of a strict latest-production-code guarantee.
 
-**Minimal patch:** The standard P2P chooser now opens `/api/runtime/checkout`. The Cloudflare worker delegates canonical runtime checkout and `/api/runtime-assets/*` to Railway. Legacy `/checkout`, `/p2p`, `/pay` remain Pages static fallback URLs. Existing merchant static `/api/runtime/merchant-checkout` behavior is preserved.
+**Minimal patch:** The standard P2P chooser now opens `/api/runtime/checkout`. The Cloudflare worker delegates canonical P2P/P2M runtime checkout and `/api/runtime-assets/*` to Railway. Railway's asset allowlist now explicitly includes Android handshake and merchant 3D CSS/JS previously served only by Pages. Legacy `/checkout`, `/p2p`, `/pay` and `/p2m/checkout` remain Pages static fallback URLs. Canonical `/api/runtime/merchant-checkout` also uses Railway so its shell and runtime scripts cannot drift independently.
 
 ### P1 — Merged source/CI cannot alone establish deployment freshness
 
@@ -37,9 +37,9 @@ PR #140 and #141 passing CI proves their source-level assertions ran; it does no
 
 **Minimal patch:** `scripts/audit-checkout-deployment.cjs` performs read-only byte/hash comparisons of live `/api/runtime/checkout`, served scripts, styles, static chooser and legacy checkout against the checked-out source. It reports `MATCH`, `STALE_CONTENT` or `UNREACHABLE`. No real payment is attempted. Local fake-response tests cover all three outcomes.
 
-### P2 — Payer UI still contains legacy labels
+### P2 — Payer UI contained legacy labels and buried the provider payment button
 
-`public/checkout.html` still has `Quantum Fusion`, QR markup, `I Paid — Check Debit Evidence`, and a hidden section labeled `P2P Android payment response experiment`. PR #140 changes the button to `Pay with Google Pay` at runtime in timed mode; it did **not** replace the whole visible checkout shell. Those older controls and labels explain why a user's actual page differs from a simplified example mockup. A separate UX consolidation should only remove old elements after confirming their fallback functions are no longer required.
+`public/checkout.html` still has `Quantum Fusion`, QR markup, `I Paid — Check Debit Evidence`, and a hidden section labeled `P2P Android payment response experiment`. PR #140 changed the button to `Pay with Google Pay` at runtime in timed mode but left the panel below the legacy QR and receipt controls. **Minimal patch:** move the existing signed-return panel immediately below the payer authentication gate; in timed mode show a customer-facing Google Pay heading, hide the redundant recheck button when an eligible method is available and keep existing fallback UI. The older `Quantum Fusion`/QR/I Paid shell remains intentionally available for compatibility; this is not a complete checkout redesign.
 
 ### Operational gates
 
