@@ -70,8 +70,8 @@ const active=app=>app.stages.find(s=>!s.hidden)?.dataset.stage;
  assert.equal(running.nodes.vaultProceed.hidden,false,'Android Chrome P2P must show Copy UPI ID');
  assert.equal(running.nodes.vaultProceed.href,'#','P2P must not dispatch an Android intent');
  assert.equal(running.nodes.vaultProceed.textContent,'Copy UPI ID');
- assert.equal(running.nodes.vaultProceed.getAttribute('aria-disabled'),'true',
-  'P2P copy must remain disabled before fresh verified payer and device attestation');
+ assert.equal(running.nodes.vaultProceed.getAttribute('aria-disabled'),'false',
+  'Merchant checkout remains independent of P2P payer gate');
  assert.equal(running.nodes.qrTapToPay.getAttribute('aria-disabled'),'true');
  assert.equal(running.data.prompt,0);
  running.events.focus();await flush();
@@ -80,6 +80,8 @@ const active=app=>app.stages.find(s=>!s.hidden)?.dataset.stage;
  running.events.focus();await flush();
  assert.equal(active(running),'receipt','Ledger credit updates original browser from any paying device');
  const p2p=mount('PENDING','generic');await flush();
+ assert.equal(p2p.nodes.vaultProceed.getAttribute('aria-disabled'),'true',
+  'P2P copying is locked until WebAuthn plus device attestation completes');
  assert.equal(typeof p2p.nodes.payerDebitCheck.events.click,'function',
    'P2P checkout must expose exactly one payer evidence check');
  assert.equal(p2p.nodes.payerDebitCheck.disabled,false,'Evidence check enabled after session loads');
