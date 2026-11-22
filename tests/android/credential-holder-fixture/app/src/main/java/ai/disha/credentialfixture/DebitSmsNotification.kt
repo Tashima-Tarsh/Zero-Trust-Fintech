@@ -18,7 +18,7 @@ internal object DebitSmsNotification {
         """(?i)(?:amount|debited(?:\s+by)?)\s*[:=-]?\s*(?:₹|INR|Rs\.?)\s*(\d{1,12})(?:\.(\d{1,2}))?(?![\d.])"""
     )
     private val payee = Regex(
-        """(?i)(?:payee(?:\s+UPI\s+ID|\s+VPA)?|to\s+UPI(?:\s+ID)?)\s*[:=]?\s*([a-z0-9._-]{2,100}@[a-z0-9._-]{2,40})(?![a-z0-9._-])"""
+        """(?i)(?:payee(?:\s+UPI\s+ID|\s+VPA)?|to\s+UPI(?:\s+ID)?)\s*[:=]?\s*([a-z0-9._-]{2,100}@[a-z0-9._-]{2,40})(?![a-z0-9._@-])"""
     )
 
     fun parse(title: CharSequence?, body: CharSequence?): DebitNotification.Result {
