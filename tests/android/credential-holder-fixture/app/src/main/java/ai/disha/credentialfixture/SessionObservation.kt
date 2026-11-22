@@ -191,7 +191,7 @@ internal object SessionObservation {
                 val response = withContext(Dispatchers.IO) {
                     post("/api/session-evidence/event", JSONObject()
                         .put("token", lease.token).put("evidence", evidence).put("signature", signature),
-                        origin = lease.origin)
+                        lease.token, lease.origin)
                 }
                 if (active !== lease) return@launch
                 val decision = response.body.optString("decisionState", response.body.optString("error"))
