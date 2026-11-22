@@ -623,7 +623,7 @@ async function readDebitEvidenceReceipt(pool, id, session, now = Date.now()) {
   const amountPaise = rupeesToPaise(String(session.challengeAmount));
   const payee = String(session.vpaAddress || '').trim().toLowerCase();
   const {rows} = await pool.query(
-    "SELECT e.event_hash,e.package_name,e.transaction_ref,e.reference_kind,e.amount_paise,e.payee_vpa,e.posted_at,e.decision_state,d.public_key_pem "+
+    "SELECT e.event_hash,e.package_name,e.transaction_ref,e.reference_kind,e.amount_paise,e.payee_vpa,e.posted_at,e.decision_state,e.device_id,d.public_key_pem "+
     'FROM disha_session_evidence_events e JOIN disha_session_evidence_consents c ON c.order_id=e.order_id '+
     'JOIN disha_session_evidence_devices d ON d.order_id=e.order_id AND d.device_id=e.device_id '+
     'WHERE e.order_id=$1 AND c.revoked_at IS NULL AND c.expires_at>$2 '+
@@ -645,13 +645,17 @@ async function readDebitEvidenceReceipt(pool, id, session, now = Date.now()) {
       ? 'DEVICE_PROVENANCE_UNTRUSTED' : 'TRUSTED_DEVICE_NOT_CONFIGURED'};
   const sources = [...new Set(rows.map(row => row.package_name))];
   const shared = (await pool.query(
-    'SELECT reference,text_matched,mime_type,source_sha256 FROM disha_session_shared_receipts WHERE order_id=$1',
+    'SELECT r.reference,r.text_matched,r.mime_type,r.source_sha256,r.device_id,d.public_key_pem ' +
+    'FROM disha_session_shared_receipts r JOIN disha_session_evidence_devices d ' +
+    'ON d.order_id=r.order_id AND d.device_id=r.device_id WHERE r.order_id=$1',
     [id])).rows[0];
   const smsSources = new Set(['com.google.android.apps.messaging','com.android.mms']);
   const hasPaymentAlert = sources.some(source => !smsSources.has(source));
   const hasSms = sources.some(source => smsSources.has(source));
   const row = rows[0];
-  const sharedMatched = shared?.text_matched === true && shared.reference === row.transaction_ref;
+  const sharedMatched = shared?.text_matched === true && shared.reference === row.transaction_ref &&
+    isIndependentlyPinnedObserverKey(shared.public_key_pem) &&
+    rows.every(event => event.device_id === shared.device_id);
   const threeProofMatched = hasPaymentAlert && hasSms && sharedMatched;
   return {debitEvidenceReceipt:{orderId:id,state:threeProofMatched?
     'CHECKOUT_DEBIT_OBSERVED':'DEBIT_EVIDENCE_OBSERVED',
