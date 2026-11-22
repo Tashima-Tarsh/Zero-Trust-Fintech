@@ -51,7 +51,7 @@ function attach(session,env){
  const result=doc.createElement('p');result.setAttribute('role','status');
  panel.append(title,note,label,input,button,stop,result);parent.after(panel);
  let motionSamples=0,listening=false;
- const motion=event=>{if(!consent.checked)return;if(event?.accelerationIncludingGravity&&motionSamples<300)motionSamples++};
+ const motion=event=>{if(!consent.checked||Date.now()>=Number(session.expiresAt))return;if(event?.accelerationIncludingGravity&&motionSamples<300){motionSamples++;result.textContent=JSON.stringify(assess(session,input.value,{samples:motionSamples}))}};
  const remove=()=>{if(listening&&win.removeEventListener)win.removeEventListener('devicemotion',motion);listening=false};
  const revoke=()=>{remove();motionSamples=0;input.value='';button.disabled=true;result.textContent='CONSENT_REVOKED';};
  consent.addEventListener('change',()=>{if(!consent.checked)revoke();else button.disabled=false});
