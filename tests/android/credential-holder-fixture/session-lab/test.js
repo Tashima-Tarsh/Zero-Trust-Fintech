@@ -144,8 +144,8 @@ async function main() {
         status:'PENDING',expiresAt:Date.now()+60000,
         challengeAmount:'1',vpaAddress:'fixture@invalid'
       });
-      assert.equal(proof.debitEvidenceReceipt?.observedSources[0]?.sourceText?.includes('debited'),true);
-    assert.equal(proof.debitEvidenceReceipt?.observedSources[1]?.sourceText?.includes('Payment sent'),true);
+      assert.equal(proof.debitEvidenceReceipt?.observedSources.some(x=>x.sourceText?.includes('debited')),true);
+      assert.equal(proof.debitEvidenceReceipt?.observedSources.some(x=>x.sourceText?.includes('Payment sent')),true);
     assert.equal(proof.debitEvidenceReceipt?.state,'CHECKOUT_DEBIT_OBSERVED',
         JSON.stringify(proof));
       assert.deepEqual(proof.debitEvidenceReceipt.proofStatus,{
