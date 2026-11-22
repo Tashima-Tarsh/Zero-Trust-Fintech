@@ -59,6 +59,7 @@ const UNIT_TESTS = [
   'test-unsigned-openid4vp-challenge.js',
   'test-debit-evidence-receipt.js',
   'test-master-debit-bridge-http.js', // signed trusted-provider ingress, replay and session-scoped read
+  'test-bank-sms-header-registry.js', // Sourced headers: never promote claimed sender to debit proof
   'test-payer-debit-button.js', // I Paid: read-only P2P evidence, no false verified payment
   'test-proofbridge.js', // zero-install consent gate and issuer-signed capsule contract
   'test-proofbridge-checkout-flow.js', // consent preflight + native gesture copy + return proof
