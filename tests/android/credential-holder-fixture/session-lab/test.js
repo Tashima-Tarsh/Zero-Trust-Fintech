@@ -3,7 +3,7 @@
 const assert = require('node:assert/strict');
 const crypto = require('node:crypto');
 const { once } = require('node:events');
-const { canonicalEvidence, readDebitEvidenceReceipt } = require('../../../../financial/session-evidence');
+const { canonicalEvidence, canonicalSharedReceipt, readDebitEvidenceReceipt } = require('../../../../financial/session-evidence');
 const { createSessionLab, PACKAGE } = require('./server');
 
 async function main() {
@@ -96,6 +96,61 @@ async function main() {
     assert.equal((await lab.pool.query(
       'SELECT COUNT(*)::int AS count FROM disha_session_evidence_events WHERE order_id=$1 AND transaction_ref=$2',
       [pairOrder.orderId,pairedEvent.transactionRef])).rows[0].count,2);
+
+    // Original text bytes travel through a signed envelope on the SAME
+    // checkout. All these inputs are synthetic, not real UPI app evidence.
+    const originalReceipt=Buffer.from('Paid ₹1.00\nPayee: fixture@invalid\nRRN: 000000000190');
+    const receiptEnvelope={
+      protocol:'DISHA-SHARED-RECEIPT-V1',orderId:pairOrder.orderId,
+      nonce:pairLease.nonce,deviceId,mimeType:'text/plain',postedAt:Date.now(),
+      sha256:crypto.createHash('sha256').update(originalReceipt).digest('hex'),
+      byteLength:originalReceipt.length
+    };
+    const receiptHeaders={
+      'content-type':'application/octet-stream','x-csrf-token':redeemed.observerToken,
+      'x-disha-receipt-envelope':Buffer.from(canonicalSharedReceipt(receiptEnvelope)).toString('base64url'),
+      'x-disha-receipt-signature':sign(canonicalSharedReceipt(receiptEnvelope))
+    };
+    const stored=await fetch(origin+'/api/session-evidence/shared-receipt',{
+      method:'POST',headers:receiptHeaders,body:originalReceipt
+    });
+    const storedResult=await stored.json();
+    assert.equal(stored.status,202,JSON.stringify(storedResult));
+    assert.equal(storedResult.contentMatched,true);
+    const ownReceipt=await fetch(origin+'/api/session-evidence/shared-receipt/'+pairOrder.orderId+
+      '?token='+pairOrder.token);
+    assert.equal(ownReceipt.status,200);
+    const receiptRead=await ownReceipt.json();
+    assert.equal(receiptRead.state,'RECEIVED');
+    assert.equal(Buffer.from(receiptRead.originalBase64,'base64').toString('utf8'),
+      originalReceipt.toString('utf8'),'original shared receipt must be byte-exact');
+    assert.equal((await fetch(origin+'/api/session-evidence/shared-receipt/'+pairOrder.orderId+
+      '?token='+redeemed.observerToken)).status,401,'observer token cannot read original receipt');
+    const tampered=await fetch(origin+'/api/session-evidence/shared-receipt',{
+      method:'POST',headers:receiptHeaders,body:Buffer.from('Tampered')
+    });
+    assert.equal(tampered.status,422,'original bytes must match signed hash');
+    const duplicate=await fetch(origin+'/api/session-evidence/shared-receipt',{
+      method:'POST',headers:receiptHeaders,body:originalReceipt
+    });
+    assert.equal(duplicate.status,409,'shared receipt cannot be replayed');
+    const previousPin=process.env.DISHA_UDEB_PINNED_DEVICE_KEY_SHA256;
+    try {
+      process.env.DISHA_UDEB_PINNED_DEVICE_KEY_SHA256=
+        crypto.createHash('sha256').update(publicKey.export({type:'spki',format:'der'})).digest('hex');
+      const proof=await readDebitEvidenceReceipt(lab.pool,pairOrder.orderId,{
+        status:'PENDING',expiresAt:Date.now()+60000,
+        challengeAmount:'1',vpaAddress:'fixture@invalid'
+      });
+      assert.equal(proof.debitEvidenceReceipt?.state,'CHECKOUT_DEBIT_OBSERVED',
+        JSON.stringify(proof));
+      assert.deepEqual(proof.debitEvidenceReceipt.proofStatus,{
+        paymentNotification:'MATCHED',debitSms:'MATCHED',sharedReceipt:'MATCHED'
+      });
+    } finally {
+      if (previousPin===undefined)delete process.env.DISHA_UDEB_PINNED_DEVICE_KEY_SHA256;
+      else process.env.DISHA_UDEB_PINNED_DEVICE_KEY_SHA256=previousPin;
+    }
 
     const scopedStatus=await fetch(origin+'/api/session-evidence/status/'+
       encodeURIComponent(pairOrder.orderId)+'?token='+encodeURIComponent(redeemed.observerToken));
