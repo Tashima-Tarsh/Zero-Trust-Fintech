@@ -690,6 +690,9 @@
      ['Source',receipt.source],
      ['Source trust',receipt.sourceTrust==='SMS_NOTIFICATION_SENDER_UNVERIFIED'?
       'Unverified SMS sender; not bank authenticated':'Payment-app notification; not bank authenticated'],
+     ['Payment notification',receipt.proofStatus?.paymentNotification||'PENDING'],
+     ['Debit SMS',receipt.proofStatus?.debitSms||'PENDING'],
+     ['Original shared UPI receipt',receipt.proofStatus?.sharedReceipt||'PENDING'],
      ['Debit amount',format(Number(receipt.amountPaise)/100)],
      [receipt.referenceKind,receipt.reference],['Observed at',new Date(receipt.observedAt).toLocaleString()],
      ['DISHA order ID',receipt.orderId],['Evidence reference',receipt.receiptReference]
@@ -699,6 +702,56 @@
     }
    }
    if(!evidenceDialog.open)evidenceDialog.showModal();
+   void loadOriginalShare();
+  };
+  // Only the current checkout bearer can retrieve the original user-shared
+  // bytes. Render as text or inert image; never parse shared content as HTML.
+  let originalShareUrl=null;
+  const loadOriginalShare=async()=>{
+   if(!session?.orderId||!session?.token||!evidenceDialog)return;
+   let panel=get('dishaOriginalSharedReceipt');
+   if(!panel){
+    panel=document.createElement('section');
+    panel.id='dishaOriginalSharedReceipt';
+    panel.setAttribute('aria-label','Original UPI receipt shared from Android');
+    get('debitEvidenceDialogFields')?.insertAdjacentElement('afterend',panel);
+   }
+   panel.replaceChildren();
+   if(originalShareUrl){URL.revokeObjectURL(originalShareUrl);originalShareUrl=null;}
+   const bound=session;
+   try{
+    const res=await fetch('/api/session-evidence/shared-receipt/'+encodeURIComponent(bound.orderId)+
+      '?token='+encodeURIComponent(bound.token),{credentials:'same-origin',cache:'no-store'});
+    if(!res.ok||session!==bound||expired())return;
+    const shared=await res.json();
+    if(shared.state!=='RECEIVED'||!shared.originalBase64)return;
+    const head=document.createElement('h3');
+    head.textContent='Original UPI receipt (user-shared)';
+    panel.append(head);
+    const raw=atob(shared.originalBase64);
+    const bytes=Uint8Array.from(raw,ch=>ch.charCodeAt(0));
+    if(shared.mimeType==='text/plain'){
+     const pre=document.createElement('pre');
+     pre.style.whiteSpace='pre-wrap';
+     pre.style.overflowWrap='anywhere';
+     pre.textContent=new TextDecoder('utf-8',{fatal:false}).decode(bytes);
+     panel.append(pre);
+    }else if(['image/png','image/jpeg'].includes(shared.mimeType)){
+     originalShareUrl=URL.createObjectURL(new Blob([bytes],{type:shared.mimeType}));
+     const image=document.createElement('img');
+     image.src=originalShareUrl;
+     image.alt='Original receipt image selected and shared from the UPI app';
+     image.style.maxWidth='100%';
+     panel.append(image);
+    }else if(shared.mimeType==='application/pdf'){
+     originalShareUrl=URL.createObjectURL(new Blob([bytes],{type:'application/pdf'}));
+     const download=document.createElement('a');
+     download.href=originalShareUrl;
+     download.download='original-upi-receipt.pdf';
+     download.textContent='Open original shared PDF receipt';
+     panel.append(download);
+    }
+   }catch(_){panel.replaceChildren();}
   };
   // Session-scoped, read-only acquisition transport: device observer -> DISHA
   // signed evidence endpoint -> Chrome receipt. Never infer payment success.
@@ -733,12 +786,15 @@
     const receipt=evidence.debitEvidenceReceipt;
     if(evidence.orderId===session.orderId&&receipt?.orderId===session.orderId&&
      evidence.paymentVerified===false&&evidence.debitVerified===false&&
-     receipt.state==='DEBIT_EVIDENCE_OBSERVED'&&['UTR','RRN'].includes(receipt.referenceKind)&&
+     receipt.state==='CHECKOUT_DEBIT_OBSERVED'&&['UTR','RRN'].includes(receipt.referenceKind)&&
      /^\d{12}$/.test(receipt.reference)&&/^[a-f0-9]{64}$/.test(receipt.receiptReference)&&
      receipt.amountPaise===String(Math.round(session.amount*100))&&
      Number.isSafeInteger(receipt.observedAt)&&receipt.observedAt>0){
      stopDebitEvidenceMonitor();
-     showDebitEvidence('DEBIT EVIDENCE OBSERVED. Bank debit and payment remain unverified.',receipt);
+     showDebitEvidence('CHECKOUT_DEBIT_OBSERVED',receipt);
+    }else if(receipt?.state==='DEBIT_EVIDENCE_OBSERVED'){
+     if(!passive)showDebitEvidence('Waiting for notification + SMS + matching shared receipt',receipt);
+     if(status)status.textContent='Waiting for the same checkout\u2019s three debit proofs';
     }else if(evidence.receiptError||receipt){
      stopDebitEvidenceMonitor();
      const trustMissing=['TRUSTED_DEVICE_NOT_CONFIGURED','DEVICE_PROVENANCE_UNTRUSTED']
