@@ -75,7 +75,7 @@ function attach(session,env){
  const emit=o=>{status.textContent=JSON.stringify(o)};
  const inWindow=()=>Number.isFinite(session.expiresAt)&&Date.now()<session.expiresAt;
  let request=null,used=false,cleanup=()=>{};
- launch.disabled=!(inWindow()&&win.isSecureContext&&typeof win.PaymentRequest==='function');
+ launch.disabled=!(inWindow()&&win.isSecureContext&&typeof win.PaymentRequest==='function'&&env.isAuthorized?.()===true);
  emit({state:'READY_FOR_USER_INITIATED_PAYMENT',method:METHOD,realPaymentStarted:false});
  probe.addEventListener('click',async()=>{
   launch.disabled=true;request=null;
@@ -85,12 +85,13 @@ function attach(session,env){
    const candidate=new win.PaymentRequest(config.methods,config.details);
    const available=await candidate.canMakePayment();
    if(!inWindow()){emit({state:'SESSION_EXPIRED'});return}
-   request=available?candidate:null;launch.disabled=!available;
+   request=available?candidate:null;launch.disabled=!available||env.isAuthorized?.()!==true;
    emit({state:available?'P2P_METHOD_HANDLER_FOUND':'NO_P2P_METHOD_HANDLER',realPaymentStarted:false});
   }catch(e){emit({state:'CAPABILITY_PROBE_FAILED',errorName:e?.name||'Error'})}
  });
  launch.addEventListener('click',async()=>{
   if(used||!inWindow())return;
+  if(env.isAuthorized?.()!==true){emit({state:'PREPAYMENT_AUTH_REQUIRED',realPaymentStarted:false});return;}
   if(!win.isSecureContext||typeof win.PaymentRequest!=='function'){
    emit({state:'PAYMENT_REQUEST_UNAVAILABLE'});return;
   }
