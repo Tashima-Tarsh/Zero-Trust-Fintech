@@ -182,8 +182,9 @@ function createSessionEvidenceRouter({ getPool, getSession, allowedPackages = AL
         !safeEqual(req.get('x-csrf-token'),b.token)) return respondError(res,fail('SESSION_TOKEN_INVALID',401));
     try {
       const session=await getSession(b.orderId),now=Date.now();
-      if (!session || !safeEqual(session.sessionId,b.token) ||
-          session.status!=='PENDING' || now>=Number(session.expiresAt))
+      if (!session || !safeEqual(session.sessionId,b.token))
+        throw fail('SESSION_TOKEN_INVALID',401);
+      if (session.status!=='PENDING' || now>=Number(session.expiresAt))
         throw fail('SESSION_INVALID_OR_EXPIRED',409);
       const ticket=crypto.randomBytes(32).toString('base64url');
       const expires=Math.min(Number(session.expiresAt),now+60000);
