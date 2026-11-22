@@ -64,7 +64,8 @@ const UNIT_TESTS = [
   'test-payer-debit-button.js', // I Paid: read-only P2P evidence, no false verified payment
   'test-proofbridge.js', // zero-install consent gate and issuer-signed capsule contract
   'test-session-evidence.js',
-  'test-three-source-observation.js', // same RRN across payer/SMS sources, conflicts and pinning
+  'test-three-source-observation.js',
+  'test-shared-receipt-contract.js', // same RRN across payer/SMS sources, conflicts and pinning
   'test-udeb-evidence-contract.js',
   'test-udeb-browser-handoff.js',
   'test-android-observer-app-link.js',
