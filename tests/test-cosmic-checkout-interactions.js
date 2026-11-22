@@ -89,8 +89,8 @@ const active=app=>app.stages.find(s=>!s.hidden)?.dataset.stage;
  assert.ok(pairButton,'Android checkout offers explicit observer pairing');
  await pairButton.events.click();await flush();
  const pairLink=p2p.created.find(element=>element.textContent==='Open DISHA observer on this phone');
- assert.ok(pairLink?.href?.includes('scheme=disha-observe;package=ai.disha.credentialfixture'),
-  'one-time ticket is handed to explicit DISHA Android app');
+ assert.match(pairLink?.href||'',/^https:\/\/disha8-2\.thenitishkr\.in\/android\/observer\/[A-Za-z0-9_-]{43}$/,
+  'one-time ticket is handed to the canonical verified Android App Link');
  assert.ok(!pairLink.href.includes('a'.repeat(48)),
   'app handoff must not include checkout bearer token');
 
