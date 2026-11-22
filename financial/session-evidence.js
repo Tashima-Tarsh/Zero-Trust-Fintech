@@ -29,6 +29,21 @@ const ALLOWED_PACKAGES = new Set([
   'com.android.mms'
 ]);
 
+// Independently provisioned observer keys, not checkout-enrolled software identity.
+// This is a trust allowlist; it does not on its own attest to notification provenance.
+function isIndependentlyPinnedObserverKey(publicKey) {
+  const pins = new Set((process.env.DISHA_UDEB_PINNED_DEVICE_KEY_SHA256 || '')
+    .split(',').map(value => value.trim().toLowerCase())
+    .filter(value => /^[a-f0-9]{64}$/.test(value)));
+  if (!pins.size) return false;
+  try {
+    const key = publicKey instanceof crypto.KeyObject && publicKey.type === 'public'
+      ? publicKey : crypto.createPublicKey(publicKey);
+    const spki = key.export({type:'spki',format:'der'});
+    return pins.has(sha256(spki));
+  } catch (_) { return false; }
+}
+
 function canonicalEvidence(input, allowedPackages = ALLOWED_PACKAGES) {
   if (!input || typeof input !== 'object' || Array.isArray(input)) throw fail('EVIDENCE_FIELDS_INVALID');
   const keys = ['protocol','eventId','orderId','nonce','deviceId','packageName','postedAt',
@@ -257,6 +272,14 @@ function createSessionEvidenceRouter({ getPool, getSession, allowedPackages = AL
         throw fail('SESSION_INVALID_OR_EXPIRED',409);
       const selectedPackage=isScoped ? b.sourcePackage : (session.observationPackage||null);
       if (isScoped && !ALLOWED_PACKAGES.has(selectedPackage)) throw fail('SOURCE_PACKAGE_INVALID',422);
+      // Optional experimental platform mode: reject an unapproved observer at
+      // enrollment instead of allowing it to submit and failing only at receipt.
+      // Default OFF preserves the existing Android fixture research workflow.
+      // An independent OEM/admin channel must provision the pinned SPKI digest.
+      if (process.env.DISHA_PLATFORM_OBSERVER_ENFORCE === '1' && selectedPackage &&
+          !isIndependentlyPinnedObserverKey(publicKey)) {
+        throw fail('PLATFORM_OBSERVER_KEY_UNTRUSTED', 403);
+      }
       const amountPaise = rupeesToPaise(String(session.challengeAmount));
       const payee = String(session.vpaAddress || '').toLowerCase();
       if (!/^[1-9][0-9]{0,15}$/.test(amountPaise) || !validVpa(payee)) throw fail('SESSION_BINDING_INVALID', 409);
@@ -478,15 +501,13 @@ async function readDebitEvidenceReceipt(pool, id, session, now = Date.now()) {
   // NOT proof of Android package identity. Only an independently provisioned,
   // pinned observer key is eligible for the stronger observation receipt.
   // Pins must be supplied by an authorized OEM/admin channel, never a checkout.
-  const pins = new Set((process.env.DISHA_UDEB_PINNED_DEVICE_KEY_SHA256||'')
-    .split(',').map(v=>v.trim().toLowerCase()).filter(v=>/^[a-f0-9]{64}$/.test(v)));
-  if(!pins.size)return {receiptError:'TRUSTED_DEVICE_NOT_CONFIGURED'};
-  let verifiedObserverKey=false;
-  try {
-    const spki=crypto.createPublicKey(row.public_key_pem).export({type:'spki',format:'der'});
-    verifiedObserverKey=pins.has(sha256(spki));
-  } catch (_) {}
-  if(!verifiedObserverKey)return {receiptError:'DEVICE_PROVENANCE_UNTRUSTED'};
+  if (!(process.env.DISHA_UDEB_PINNED_DEVICE_KEY_SHA256||'').split(',')
+      .some(value => /^[a-f0-9]{64}$/.test(value.trim().toLowerCase()))) {
+    return {receiptError:'TRUSTED_DEVICE_NOT_CONFIGURED'};
+  }
+  if (!isIndependentlyPinnedObserverKey(row.public_key_pem)) {
+    return {receiptError:'DEVICE_PROVENANCE_UNTRUSTED'};
+  }
   return {debitEvidenceReceipt:{orderId:id,state:'DEBIT_EVIDENCE_OBSERVED',
     source:row.package_name,sourceTrust:row.package_name==='com.google.android.apps.messaging'||
       row.package_name==='com.android.mms'?'SMS_NOTIFICATION_SENDER_UNVERIFIED':'PAYER_APP_NOTIFICATION_UNVERIFIED',
@@ -495,4 +516,5 @@ async function readDebitEvidenceReceipt(pool, id, session, now = Date.now()) {
 }
 
 module.exports = { readDebitEvidenceReceipt, ALLOWED_PACKAGES, canonicalEvidence, verifyDeviceEvidence,
-  evaluateEvidence, aggregateSessionDecision, initializeSessionEvidenceSchema, createSessionEvidenceRouter };
+  evaluateEvidence, aggregateSessionDecision, initializeSessionEvidenceSchema, createSessionEvidenceRouter,
+  isIndependentlyPinnedObserverKey };
