@@ -226,6 +226,62 @@ internal object SessionObservation {
         }
     }
 
+    /** Receives only a user-selected Share Intent while an already authenticated,
+     * explicitly consented checkout lease is live. The source app is NOT authenticated. */
+    fun submitSharedReceipt(mimeType: String, original: ByteArray): Boolean {
+        val lease = active ?: return false
+        if (!lease.real || !listenerConnected ||
+            SystemClock.elapsedRealtime() >= lease.elapsedDeadline ||
+            mimeType !in setOf("text/plain", "image/png", "image/jpeg", "application/pdf") ||
+            original.isEmpty() || original.size > 512000) return false
+        val capturedAt = System.currentTimeMillis()
+        val digest = MessageDigest.getInstance("SHA-256").digest(original)
+            .joinToString("") { "%02x".format(it) }
+        val envelope = JSONObject()
+            .put("protocol", "DISHA-SHARED-RECEIPT-V1")
+            .put("orderId", lease.order).put("nonce", lease.nonce)
+            .put("deviceId", lease.device).put("mimeType", mimeType)
+            .put("postedAt", capturedAt).put("sha256", digest)
+            .put("byteLength", original.size)
+        scope.launch {
+            try {
+                val reply = withContext(Dispatchers.IO) {
+                    val canonical = SharedReceiptCanonicalJson.bytes(envelope)
+                    val signer = Signature.getInstance("SHA256withECDSA")
+                    signer.initSign(keyStore().getKey(KEY_ALIAS, null) as PrivateKey)
+                    signer.update(canonical)
+                    val signature = Base64.encodeToString(signer.sign(),
+                        Base64.URL_SAFE or Base64.NO_PADDING or Base64.NO_WRAP)
+                    val encoded = Base64.encodeToString(canonical,
+                        Base64.URL_SAFE or Base64.NO_PADDING or Base64.NO_WRAP)
+                    val connection = URL(lease.origin + "/api/session-evidence/shared-receipt")
+                        .openConnection() as HttpURLConnection
+                    try {
+                        connection.instanceFollowRedirects = false
+                        connection.requestMethod = "POST"
+                        connection.connectTimeout = 4000
+                        connection.readTimeout = 4000
+                        connection.doOutput = true
+                        connection.setRequestProperty("Content-Type", "application/octet-stream")
+                        connection.setRequestProperty("x-csrf-token", lease.token)
+                        connection.setRequestProperty("x-disha-receipt-envelope", encoded)
+                        connection.setRequestProperty("x-disha-receipt-signature", signature)
+                        connection.outputStream.use { it.write(original) }
+                        val code = connection.responseCode
+                        val stream = if (code in 200..299) connection.inputStream else connection.errorStream
+                        Reply(code, JSONObject(stream.bufferedReader().use { it.readText() }))
+                    } finally { connection.disconnect() }
+                }
+                if (active !== lease) return@launch
+                report(if (reply.code == 202 && reply.body.optBoolean("success"))
+                    "SHARED_RECEIPT_CAPTURED" else "Shared receipt rejected")
+            } catch (_: Exception) {
+                if (active === lease) report("Shared receipt transfer failed")
+            }
+        }
+        return true
+    }
+
     private suspend fun revoke(lease: Lease) {
         val stoppedGeneration = generation
         val revoked = runCatching {
