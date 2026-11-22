@@ -122,6 +122,8 @@ async function initializeSessionEvidenceSchema(pool) {
     );
     CREATE INDEX IF NOT EXISTS disha_android_observation_pairings_order
       ON disha_android_observation_pairings(order_id,expires_at);
+    CREATE UNIQUE INDEX IF NOT EXISTS disha_android_observation_one_unclaimed
+      ON disha_android_observation_pairings(order_id) WHERE claimed_at IS NULL;
     ALTER TABLE disha_session_evidence_consents ADD COLUMN IF NOT EXISTS source_package TEXT;
     CREATE TABLE IF NOT EXISTS disha_session_evidence_devices (
       order_id TEXT NOT NULL REFERENCES disha_session_evidence_consents(order_id) ON DELETE CASCADE,
@@ -189,6 +191,9 @@ function createSessionEvidenceRouter({ getPool, getSession, allowedPackages = AL
       const ticket=crypto.randomBytes(32).toString('base64url');
       const expires=Math.min(Number(session.expiresAt),now+60000);
       await pool.query('DELETE FROM disha_android_observation_pairings WHERE expires_at<$1',[now-60000]);
+      // Rotate any unclaimed ticket; multiple app links must not remain live.
+      await pool.query('DELETE FROM disha_android_observation_pairings WHERE order_id=$1 AND claimed_at IS NULL',
+        [b.orderId]);
       await pool.query(
         'INSERT INTO disha_android_observation_pairings(ticket_hash,order_id,created_at,expires_at) VALUES($1,$2,$3,$4)',
         [sha256(ticket),b.orderId,now,expires]);
