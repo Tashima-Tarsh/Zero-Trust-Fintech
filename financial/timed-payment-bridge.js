@@ -5,6 +5,7 @@ const crypto=require('node:crypto');
 const express=require('express');
 const {verifyUPIResponse,GOOGLE_METHOD}=require('../lib/upi-response-verifier');
 const money=require('./money');
+const {enqueueVerifiedProviderEvent}=require('./payer-evidence-outbox');
 const TTL_MS=120000;
 function validId(v){return typeof v==='string'&&/^[A-Za-z0-9_-]{6,150}$/.test(v)}
 function same(a,b){
@@ -28,7 +29,7 @@ function expectedSession(session,orderId,token,now){
   return {error:'SESSION_FIELDS_INVALID',status:409};
  return {amount:money.paiseToRupees(amount),pa:session.vpaAddress};
 }
-function makeTimedStore(getPool){
+function makeTimedStore(getPool,{shouldQueueSeller=()=>false}={}){
  if(typeof getPool!=='function')throw Error('POOL_GETTER_REQUIRED');
  const pool=()=>{const value=getPool();if(!value||typeof value.query!=='function')throw Error('TIMED_STORE_UNAVAILABLE');return value};
  return Object.freeze({
@@ -44,7 +45,7 @@ function makeTimedStore(getPool){
    try{
     await client.query('BEGIN');
     const r=await client.query(
-     'SELECT order_id,extract(epoch from expires_at)*1000 AS expires_ms,used_at FROM disha_upi_timed_challenges WHERE reference=$1 FOR UPDATE',[reference]);
+     'SELECT order_id,amount_rupees,payee_vpa,extract(epoch from expires_at)*1000 AS expires_ms,used_at FROM disha_upi_timed_challenges WHERE reference=$1 FOR UPDATE',[reference]);
     const row=r.rows[0];
     if(!row||row.order_id!==orderId||row.used_at!==null||Number(row.expires_ms)<=now){
      await client.query('ROLLBACK');return false;
@@ -56,6 +57,12 @@ function makeTimedStore(getPool){
      [fingerprint,orderId,'GOOGLE_PAY']);
     if(inserted.rowCount!==1){await client.query('ROLLBACK');return false}
     await client.query('UPDATE disha_upi_timed_challenges SET used_at=NOW() WHERE reference=$1',[reference]);
+    if(shouldQueueSeller(orderId)===true){
+     await enqueueVerifiedProviderEvent(client,{
+      orderId,amount:row.amount_rupees,payeeVpa:row.payee_vpa,
+      transactionId:txnId,receivedAt:now
+     });
+    }
     await client.query('COMMIT');return true;
    }catch(e){try{await client.query('ROLLBACK')}catch(_){}throw e}
    finally{client.release()}
