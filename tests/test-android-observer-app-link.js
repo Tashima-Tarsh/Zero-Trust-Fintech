@@ -14,7 +14,7 @@ const links = JSON.parse(fs.readFileSync(path.join(root, 'public/.well-known/ass
 assert.match(manifest, /android:autoVerify="true"/);
 assert.match(manifest, /android:scheme="https"/);
 assert.match(manifest, /android:host="disha8-2\.thenitishkr\.in"/);
-assert.match(manifest, /android:pathPrefix="\/android\/observer"/);
+assert.match(manifest, /android:pathPrefix="\/android\/observer\/"/);
 assert.match(policy, /https:\/\/disha8-2\\\.thenitishkr\\\.in\/android\/observer/);
 assert.match(checkout, /https:\/\/disha8-2\.thenitishkr\.in\/android\/observer\//);
 assert.doesNotMatch(checkout, /intent:\/\/pair\//);
