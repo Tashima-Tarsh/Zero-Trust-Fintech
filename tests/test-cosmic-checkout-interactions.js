@@ -4,15 +4,22 @@ const source=fs.readFileSync(path.join(__dirname,'../public/cosmic-checkout.js')
 const model=require('../public/cosmic-checkout-model.js');
 const uri='upi://pay?pa=merchant@oksbi&pn=Merchant&am=500.00&cu=INR&tn=Invoice';
 function mount(status='PENDING',checkout='merchant',overrides={}){
- const nodes={},events={},stages=['initial','methods','qr','checking','receipt'].map(stage=>({dataset:{stage},hidden:stage!=='qr'}));
+ const nodes={},events={},created=[],stages=['initial','methods','qr','checking','receipt'].map(stage=>({dataset:{stage},hidden:stage!=='qr'}));
  const node=k=>nodes[k]||(nodes[k]={textContent:'',href:'#',disabled:true,hidden:true,dataset:{},attrs:{},events:{},
   addEventListener(k,v){this.events[k]=v},setAttribute(k,v){this.attrs[k]=v},getAttribute(k){return this.attrs[k]},
   removeAttribute(k){delete this.attrs[k]},replaceChildren(){this.children=[]},
-  append(...children){this.children.push(...children)},classList:{toggle(){}}});
+  append(...children){this.children.push(...children)},insertAdjacentElement(_where,other){(this.inserted??=[]).push(other)},classList:{toggle(){}}});
  node('debitEvidenceDialog').showModal=function(){this.open=true};
  const data={status,utr:null,qr:null,prompt:0,proof:null,
   signal:{success:true,utrCandidate:'123456789012',eventState:'UTR_CANDIDATE_UNVERIFIED'},...overrides};
- const document={body:{dataset:{checkout}},visibilityState:'visible',getElementById:node,createElement:()=>({}),
+ const document={body:{dataset:{checkout}},visibilityState:'visible',getElementById:node,createElement:()=>{
+   const element={textContent:'',hidden:false,events:{},attrs:{},
+    setAttribute(k,v){this.attrs[k]=v},removeAttribute(k){delete this.attrs[k]},
+    addEventListener(k,v){this.events[k]=v},
+    insertAdjacentElement(_where,other){(this.inserted??=[]).push(other)}
+   };
+   created.push(element);return element;
+  },
   querySelectorAll:q=>q==='[data-stage]'?stages:[],addEventListener:(k,v)=>events[k]=v};
  const location={href:'https://checkout.example/merchant-checkout.html?orderId=ORD_TEST_1234&token='+('a'.repeat(48)),
   search:'?orderId=ORD_TEST_1234&token='+('a'.repeat(48))};
@@ -27,6 +34,9 @@ function mount(status='PENDING',checkout='merchant',overrides={}){
     orderId:'ORD_TEST_1234',challengeAmount:500,expiresAt:Date.now()+180000,status:'PENDING',
     merchantType:'PERSONAL',vpaAddress:'merchant@oksbi',txnRef:'SERVICE_TEST'
    },upiLink:uri})};
+   if(url.includes('/api/session-evidence/pairing/issue'))return {ok:true,json:async()=>({
+    success:true,ticket:'p'.repeat(43),expiresAt:Date.now()+60000
+   })};
    if(url.includes('/api/payer-debit-evidence/'))return {ok:true,json:async()=>({
     success:true,debitVerified:false,paymentVerified:false,paymentStateChanged:false,
     orderId:'ORD_TEST_1234',debitEvidenceReceipt:data.debitEvidenceReceipt,
@@ -46,7 +56,7 @@ function mount(status='PENDING',checkout='merchant',overrides={}){
    userAgent:'Mozilla/5.0 (Linux; Android 15) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/157.0.0.0 Mobile Safari/537.36'},
    URL,URLSearchParams,Date,Intl,console,fetch,setInterval:()=>1,clearInterval(){},
    sessionStorage:{getItem:()=>null,setItem(){}}});
- return {nodes,events,stages,data};
+ return {nodes,events,stages,data,created};
 }
 async function flush(){for(let i=0;i<35;i++)await Promise.resolve()}
 const active=app=>app.stages.find(s=>!s.hidden)?.dataset.stage;
@@ -74,6 +84,15 @@ const active=app=>app.stages.find(s=>!s.hidden)?.dataset.stage;
  assert.equal(typeof p2p.nodes.payerDebitCheck.events.click,'function',
    'P2P checkout must expose exactly one payer evidence check');
  assert.equal(p2p.nodes.payerDebitCheck.disabled,false,'Evidence check enabled after session loads');
+ const pairButton=p2p.created.find(element=>element.textContent==='Connect Android debit observer');
+ assert.ok(pairButton,'Android checkout offers explicit observer pairing');
+ await pairButton.events.click();await flush();
+ const pairLink=p2p.created.find(element=>element.textContent==='Open DISHA observer on this phone');
+ assert.ok(pairLink?.href?.includes('scheme=disha-observe;package=ai.disha.credentialfixture'),
+  'one-time ticket is handed to explicit DISHA Android app');
+ assert.ok(!pairLink.href.includes('a'.repeat(48)),
+  'app handoff must not include checkout bearer token');
+
  await p2p.nodes.payerDebitCheck.events.click();await flush();
  assert.match(p2p.nodes.payerDebitCheckStatus.textContent,/NOT authenticated/i,
    'Browser return UTR must never certify bank debit');
