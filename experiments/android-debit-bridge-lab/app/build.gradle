@@ -1,0 +1,12 @@
+plugins { id 'com.android.application' }
+android {
+    namespace 'in.thenitishkr.disha.debitbridgelab'
+    compileSdk 36
+    defaultConfig {
+        applicationId 'in.thenitishkr.disha.debitbridgelab'
+        minSdk 26
+        targetSdk 35
+        versionCode 1
+        versionName '0.1-lab'
+    }
+}

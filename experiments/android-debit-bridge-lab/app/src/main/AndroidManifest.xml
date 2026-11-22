@@ -1,0 +1,12 @@
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+  <application android:label="DISHA Debit Bridge LAB" android:allowBackup="false" android:usesCleartextTraffic="false">
+    <activity android:name=".SyntheticDebitHandlerActivity" android:exported="true">
+      <intent-filter>
+        <action android:name="org.chromium.intent.action.PAY"/>
+        <category android:name="android.intent.category.DEFAULT"/>
+      </intent-filter>
+      <meta-data android:name="org.chromium.default_payment_method_name"
+        android:value="https://disha8-2.thenitishkr.in/labs/disha-debit-bridge-method"/>
+    </activity>
+  </application>
+</manifest>
