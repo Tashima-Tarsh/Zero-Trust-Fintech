@@ -16,7 +16,8 @@ function signed(overrides={}){
 }
 test('server verifies signed app response against OWN session fields; no financial mutation',async()=>{
  const app=express();app.use(express.json());app.use('/api/upi-app-evidence',
- createUpiAppEvidenceRouter({getSession:async()=>session,getTrustedKeys:()=>keys}));
+ createUpiAppEvidenceRouter({getSession:async()=>session,getTrustedKeys:()=>keys,
+ consumeReplay:async()=>true}));
  const server=app.listen(0,'127.0.0.1');
  await new Promise(resolve=>server.listening?resolve():server.once('listening',resolve));
  const base='http://127.0.0.1:'+server.address().port+'/api/upi-app-evidence/verify';
@@ -29,6 +30,7 @@ test('server verifies signed app response against OWN session fields; no financi
   const valid=await send(basic);
   assert.equal(valid.code,200);
   assert.equal(valid.value.signatureVerified,true);
+  assert.equal(valid.value.replayProtected,true);
   assert.equal(valid.value.providerReportedSuccess,true);
   assert.equal(valid.value.debitVerified,false);
   assert.equal(valid.value.paymentVerified,false);
