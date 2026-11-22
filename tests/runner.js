@@ -22,7 +22,8 @@ const UNIT_TESTS = [
   'test-payment-classification-ui.js',
   'test-payment-mode-separation.js',
   'test-p2p-session-type.js',
-  'test-p2p-prepayment-trust-policy.js', // verified payer & integrity verdict contract
+  'test-p2p-prepayment-trust-policy.js',
+  'test-p2p-prepayment-router.js', // server enforcement, forged browser verdict and expiry // verified payer & integrity verdict contract
   'test-try-checkout-form.js',
   'test-frontend-local-imagery.js',
   'test-owner-runtime-delivery.js',
