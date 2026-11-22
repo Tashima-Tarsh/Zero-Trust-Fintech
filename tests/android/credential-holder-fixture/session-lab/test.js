@@ -70,10 +70,11 @@ async function main() {
     assert.equal(pairAuthCode,201,JSON.stringify(pairLease));
     assert.deepEqual(pairLease.allowedPackages,[pairedSource,'com.google.android.apps.messaging','com.android.mms']);
     const pairedEvent={
-      protocol:'DISHA-DEBIT-UTR-OBSERVATION-V1',eventId:crypto.randomUUID(),
+      protocol:'DISHA-DEBIT-UTR-OBSERVATION-V2',eventId:crypto.randomUUID(),
       orderId:pairOrder.orderId,nonce:pairLease.nonce,deviceId,packageName:pairedSource,
       postedAt:Date.now(),amountPaise:'100',payeeVpa:'fixture@invalid',
-      transactionRef:'000000000190',status:'SUCCESS',referenceKind:'RRN'
+      transactionRef:'000000000190',status:'SUCCESS',referenceKind:'RRN',
+      sourceText:'Payment sent\\nAmount: ₹1.00\\nRRN: 000000000190'
     };
     const [pairEventStatus,pairEventResponse]=await post('/api/session-evidence/event',{
       token:redeemed.observerToken,evidence:pairedEvent,
@@ -86,7 +87,8 @@ async function main() {
     // One checkout can receive payer-app and messaging notification evidence
     // bearing the same real-world RRN without a false duplicate-reference error.
     const pairedSmsEvent={...pairedEvent,eventId:crypto.randomUUID(),
-      packageName:'com.google.android.apps.messaging'};
+      packageName:'com.google.android.apps.messaging',
+      sourceText:'Your account was debited by INR 1.00; RRN: 000000000190'};
     const [smsStatus,smsResult]=await post('/api/session-evidence/event',{
       token:redeemed.observerToken,evidence:pairedSmsEvent,
       signature:sign(canonicalEvidence(pairedSmsEvent))
@@ -142,7 +144,9 @@ async function main() {
         status:'PENDING',expiresAt:Date.now()+60000,
         challengeAmount:'1',vpaAddress:'fixture@invalid'
       });
-      assert.equal(proof.debitEvidenceReceipt?.state,'CHECKOUT_DEBIT_OBSERVED',
+      assert.equal(proof.debitEvidenceReceipt?.observedSources[0]?.sourceText?.includes('debited'),true);
+    assert.equal(proof.debitEvidenceReceipt?.observedSources[1]?.sourceText?.includes('Payment sent'),true);
+    assert.equal(proof.debitEvidenceReceipt?.state,'CHECKOUT_DEBIT_OBSERVED',
         JSON.stringify(proof));
       assert.deepEqual(proof.debitEvidenceReceipt.proofStatus,{
         paymentNotification:'MATCHED',debitSms:'MATCHED',sharedReceipt:'MATCHED'
