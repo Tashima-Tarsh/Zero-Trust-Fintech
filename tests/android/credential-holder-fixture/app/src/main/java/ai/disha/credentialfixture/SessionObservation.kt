@@ -239,6 +239,10 @@ internal object SessionObservation {
         Log.i("DISHA_SESSION_OBSERVATION", message)
     }
 
+    fun observerPublicKeyFingerprint(): String {
+        return PlatformObservationBrokerPolicy.publicKeyFingerprint(keyStore().getCertificate(KEY_ALIAS).publicKey)
+    }
+
     @Synchronized
     private fun keyStore(): KeyStore {
         val store = KeyStore.getInstance("AndroidKeyStore").apply { load(null) }
