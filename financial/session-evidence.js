@@ -83,6 +83,41 @@ function verifyDeviceEvidence(evidence, signature, publicKey, allowedPackages = 
   return sha256(bytes);
 }
 
+const RECEIPT_MIME = new Set(['text/plain','image/png','image/jpeg','application/pdf']);
+const RECEIPT_FIELDS = ['protocol','orderId','nonce','deviceId','mimeType','postedAt','sha256','byteLength'];
+function canonicalSharedReceipt(input) {
+  if (!input || typeof input !== 'object' || Array.isArray(input) ||
+      Object.keys(input).length !== RECEIPT_FIELDS.length ||
+      !RECEIPT_FIELDS.every(key => Object.hasOwn(input,key))) throw fail('SHARED_RECEIPT_FIELDS_INVALID');
+  const value = Object.fromEntries(RECEIPT_FIELDS.map(key => [key,input[key]]));
+  if (value.protocol !== 'DISHA-SHARED-RECEIPT-V1' || !validId(value.orderId) ||
+      !/^[a-f0-9]{40}$/.test(value.nonce) || !validDevice(value.deviceId) ||
+      !RECEIPT_MIME.has(value.mimeType) || !Number.isSafeInteger(value.postedAt) ||
+      value.postedAt <= 0 || !/^[a-f0-9]{64}$/.test(value.sha256) ||
+      !Number.isSafeInteger(value.byteLength) || value.byteLength < 1 ||
+      value.byteLength > 512000) throw fail('SHARED_RECEIPT_FIELDS_INVALID');
+  return JSON.stringify(value);
+}
+function matchSharedReceiptText(bytes, mimeType, amountPaise) {
+  if (mimeType !== 'text/plain') return {matched:false,reason:'RECEIPT_IMAGE_REQUIRES_EXTRACTION'};
+  const text = bytes.toString('utf8');
+  // Only explicitly labelled references qualify; a random 12-digit number does not.
+  const labels = [...text.matchAll(/\b(UTR|RRN)\s*(?:no\.?|number|:|#|-)*\s*(\d{12})(?!\d)/gi)];
+  const refs = [...new Set(labels.map(match => match[2]))];
+  const amounts = [...text.matchAll(/(?:₹|INR\s*|Rs\.?\s*)(\d{1,12}(?:,\d{3})*)(?:\.(\d{1,2}))?/gi)]
+    .map(match => {
+      const rupees = match[1].replace(/,/g,'');
+      return (BigInt(rupees)*100n + BigInt((match[2] || '').padEnd(2,'0'))).toString();
+    });
+  const uniqueAmounts = [...new Set(amounts)];
+  return {matched:refs.length===1 && uniqueAmounts.length===1 &&
+      uniqueAmounts[0]===amountPaise,
+    reference:refs.length===1?refs[0]:null,
+    reason:refs.length!==1?'REFERENCE_MISSING_OR_AMBIGUOUS':
+      uniqueAmounts.length!==1?'AMOUNT_MISSING_OR_AMBIGUOUS':
+      uniqueAmounts[0]!==amountPaise?'AMOUNT_MISMATCH':null};
+}
+
 function evaluateEvidence(e, session, now = Date.now()) {
   const expiry = Number(session.expires_at);
   const consentedAt = Number(session.consented_at);
@@ -150,6 +185,16 @@ async function initializeSessionEvidenceSchema(pool) {
       enrolled_at BIGINT NOT NULL,
       last_seen_at BIGINT,
       PRIMARY KEY(order_id, device_id)
+    );
+    CREATE TABLE IF NOT EXISTS disha_session_shared_receipts (
+      order_id TEXT PRIMARY KEY REFERENCES disha_session_evidence_consents(order_id) ON DELETE CASCADE,
+      device_id TEXT NOT NULL,
+      source_sha256 TEXT NOT NULL UNIQUE,
+      mime_type TEXT NOT NULL,
+      source_bytes BYTEA NOT NULL,
+      observed_at BIGINT NOT NULL,
+      reference TEXT,
+      text_matched BOOLEAN NOT NULL DEFAULT FALSE
     );
     CREATE TABLE IF NOT EXISTS disha_session_evidence_events (
       event_hash TEXT PRIMARY KEY,
@@ -349,6 +394,92 @@ function createSessionEvidenceRouter({ getPool, getSession, allowedPackages = AL
     } catch (e) { console.error('[session-evidence] authorize failed:', e && (e.code || e.message) || 'unknown'); return respondError(res, e); }
   });
 
+  // User-selected Android Sharesheet content. The broker signs a hash and
+  // session-bound envelope; the original bytes remain opaque user-supplied data.
+  // This endpoint does NOT infer the originating UPI app from an ACTION_SEND.
+  router.post('/shared-receipt', express.raw({type:'application/octet-stream',limit:'512kb'}), async(req,res) => {
+    const pool=getPool(), raw=req.body;
+    if (!pool) return respondError(res,fail('POSTGRES_REQUIRED',503));
+    if (!Buffer.isBuffer(raw) || raw.length < 1 || raw.length > 512000)
+      return respondError(res,fail('SHARED_RECEIPT_BYTES_INVALID',422));
+    let envelope, message;
+    try {
+      const encoded=req.get('x-disha-receipt-envelope');
+      if (typeof encoded!=='string' || !/^[A-Za-z0-9_-]{40,1600}$/.test(encoded))
+        throw fail('SHARED_RECEIPT_FIELDS_INVALID');
+      envelope=JSON.parse(Buffer.from(encoded,'base64url').toString('utf8'));
+      message=canonicalSharedReceipt(envelope);
+      if (envelope.byteLength!==raw.length || sha256(raw)!==envelope.sha256)
+        throw fail('SHARED_RECEIPT_HASH_MISMATCH');
+      const signature=req.get('x-disha-receipt-signature');
+      if (typeof signature!=='string'||!/^[A-Za-z0-9_-]{80,200}$/.test(signature))
+        throw fail('DEVICE_SIGNATURE_INVALID',401);
+    } catch(e) {return respondError(res,e.status?e:fail('SHARED_RECEIPT_FIELDS_INVALID'));}
+    const c=await pool.connect();let tx=false;
+    try {
+      await c.query('BEGIN');tx=true;
+      const consent=(await c.query(
+        'SELECT * FROM disha_session_evidence_consents WHERE order_id=$1 FOR UPDATE',
+        [envelope.orderId])).rows[0];
+      const now=Date.now();
+      if (!consent || consent.revoked_at || now>=Number(consent.expires_at) ||
+          envelope.nonce!==consent.nonce || envelope.postedAt<Number(consent.consented_at) ||
+          envelope.postedAt>now+10000 || envelope.postedAt>=Number(consent.expires_at))
+        throw fail('SESSION_EXPIRED',410);
+      const token=req.get('x-csrf-token');
+      if (typeof token!=='string'||!safeEqual(sha256(token),consent.token_hash)||
+          !(await scopedObserver(c,envelope.orderId,token))) throw fail('SESSION_TOKEN_INVALID',401);
+      const device=(await c.query(
+        'SELECT public_key_pem FROM disha_session_evidence_devices WHERE order_id=$1 AND device_id=$2',
+        [envelope.orderId,envelope.deviceId])).rows[0];
+      if (!device) throw fail('DEVICE_NOT_ENROLLED',403);
+      const signature=Buffer.from(req.get('x-disha-receipt-signature'),'base64url');
+      if (!crypto.verify('sha256',Buffer.from(message),crypto.createPublicKey(device.public_key_pem),signature))
+        throw fail('DEVICE_SIGNATURE_INVALID',401);
+      const session=await getSession(envelope.orderId);
+      if (!session || session.status!=='PENDING' || now>=Number(session.expiresAt))
+        throw fail('SESSION_EXPIRED',410);
+      const parsed=matchSharedReceiptText(raw,envelope.mimeType,
+        rupeesToPaise(String(session.challengeAmount)));
+      const reference=parsed.reference;
+      await c.query(
+        'INSERT INTO disha_session_shared_receipts(order_id,device_id,source_sha256,mime_type,source_bytes,observed_at,reference,text_matched) VALUES($1,$2,$3,$4,$5,$6,$7,$8)',
+        [envelope.orderId,envelope.deviceId,envelope.sha256,envelope.mimeType,raw,
+          envelope.postedAt,reference,parsed.matched]);
+      await c.query('COMMIT');tx=false;
+      return res.status(202).set('Cache-Control','no-store').json({
+        success:true,state:'SHARED_RECEIPT_CAPTURED',
+        contentMatched:parsed.matched,reason:parsed.reason||null
+      });
+    } catch(e) {
+      if(tx)await c.query('ROLLBACK').catch(()=>{});
+      if(e.code==='23505')return respondError(res,fail('SHARED_RECEIPT_REPLAY',409));
+      return respondError(res,e);
+    } finally {c.release();}
+  });
+
+  // Only the checkout bearer can retrieve original receipt bytes.
+  router.get('/shared-receipt/:orderId',async(req,res)=>{
+    const pool=getPool();
+    if(!pool)return respondError(res,fail('POSTGRES_REQUIRED',503));
+    try{
+      const session=await getSession(req.params.orderId);
+      if(!session||!safeEqual(session.sessionId,req.query.token)||
+          session.status!=='PENDING'||Date.now()>=Number(session.expiresAt))
+        throw fail('SESSION_TOKEN_INVALID',401);
+      const row=(await pool.query(
+        'SELECT r.mime_type,r.source_bytes,r.source_sha256,r.text_matched,r.reference '+
+        'FROM disha_session_shared_receipts r JOIN disha_session_evidence_consents c ON c.order_id=r.order_id '+
+        'WHERE r.order_id=$1 AND c.revoked_at IS NULL AND c.expires_at>$2',
+        [req.params.orderId,Date.now()])).rows[0];
+      if(!row)return res.set('Cache-Control','no-store').json({success:true,state:'NOT_RECEIVED'});
+      return res.set('Cache-Control','no-store').json({success:true,state:'RECEIVED',
+        mimeType:row.mime_type,sourceSha256:row.source_sha256,
+        originalBase64:Buffer.from(row.source_bytes).toString('base64'),
+        textMatched:row.text_matched,reference:row.reference});
+    } catch(e){return respondError(res,e);}
+  });
+
   router.post('/event', async (req, res) => {
     const b = req.body || {}, pool = getPool();
     if (!pool) return respondError(res, fail('POSTGRES_REQUIRED', 503));
@@ -526,4 +657,4 @@ async function readDebitEvidenceReceipt(pool, id, session, now = Date.now()) {
 
 module.exports = { readDebitEvidenceReceipt, ALLOWED_PACKAGES, canonicalEvidence, verifyDeviceEvidence,
   evaluateEvidence, aggregateSessionDecision, initializeSessionEvidenceSchema, createSessionEvidenceRouter,
-  isIndependentlyPinnedObserverKey };
+  isIndependentlyPinnedObserverKey, canonicalSharedReceipt, matchSharedReceiptText };
