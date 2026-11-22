@@ -75,7 +75,7 @@ test('expired timelines discard motion and lifecycle signals',()=>{
 test('direct Android payment launch does not require a separate capability button',()=>{
  const script=fs.readFileSync(path.join(root,'public/p2p-paymentrequest-probe.js'),'utf8');
  assert.match(script,/READY_FOR_USER_INITIATED_PAYMENT/);
- assert.match(script,/launch\.disabled=timed\|\|!\(inWindow\(\)&&win\.isSecureContext/);
+ assert.match(script,/launch\.disabled=!\(inWindow\(\)&&win\.isSecureContext/);
  assert.match(script,/if\(!request\)\{/);
  assert.match(script,/new win\.PaymentRequest\(config\.methods,config\.details\)/);
  assert.match(script,/response=await request\.show\(\)/);
@@ -112,7 +112,7 @@ test('single user payment gesture launches and automatically invokes response ca
  assert.equal(completeCalls,1);
 });
 
-test('unsigned or absent prepayment authorization cannot launch PaymentRequest',async()=>{
+test('optional device trust does not block payment initiation or claim debit',async()=>{
  const nodes={};let launches=0;
  function node(id){return nodes[id]||(nodes[id]={hidden:true,disabled:true,textContent:'',
   events:{},addEventListener(k,fn){this.events[k]=fn},removeEventListener(){}})}
@@ -121,8 +121,8 @@ test('unsigned or absent prepayment authorization cannot launch PaymentRequest',
   addEventListener(){},removeEventListener(){}};
  const doc={getElementById:node,addEventListener(){},removeEventListener(){}};
  assert.equal(lib.attach(session,{window:win,document:doc,isAuthorized:()=>false}),true);
- assert.equal(node('p2pPaymentRequestLaunch').disabled,true);
+ assert.equal(node('p2pPaymentRequestLaunch').disabled,false);
  await node('p2pPaymentRequestLaunch').events.click();
- assert.equal(launches,0);
- assert.match(node('p2pPaymentRequestStatus').textContent,/PREPAYMENT_AUTH_REQUIRED/);
+ assert.equal(launches,1);
+ assert.match(node('p2pPaymentRequestStatus').textContent,/P2P_PAYMENT_REQUEST_CANCELLED_OR_FAILED/);
 });
