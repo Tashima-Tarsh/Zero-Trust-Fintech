@@ -26,6 +26,7 @@ const {createUpiAppEvidenceRouter}=require('./financial/upi-app-evidence-router'
 const {initPayerPartnerDebit,createPayerPartnerDebitRouter}=require('./financial/payer-partner-debit-bridge');
 const {createP2pPrepaymentRouter}=require('./financial/p2p-prepayment-router');
 const {initUpiAppEvidenceReplay,makeReplayGuard}=require('./financial/upi-app-evidence-replay');
+const {initTimedStore,makeTimedStore,createTimedPaymentRouter}=require('./financial/timed-payment-bridge');
 const {initializeClaimObserver,observeClaim} = require('./financial/untrusted-utr-claims');
 const {
   buildNPCIIntentUri,
@@ -345,6 +346,15 @@ app.use('/api/upi-app-evidence',verifyLimiter,createUpiAppEvidenceRouter({
   const parsed=JSON.parse(process.env.DISHA_GOOGLE_PAY_TRUSTED_PUBLIC_KEYS_JSON||'{}');
   return parsed&&typeof parsed==='object'&&!Array.isArray(parsed)?parsed:{};
  }catch(_){return {}}}
+}));
+// 120-second checkout-scoped signed return; isolated from settlement and ledger.
+app.use('/api/upi-app-evidence/timed',verifyLimiter,createTimedPaymentRouter({
+ getSession:id=>db.findSessionByOrderId(id),
+ getTrustedKeys:()=>{try{
+  const keys=JSON.parse(process.env.DISHA_GOOGLE_PAY_TRUSTED_PUBLIC_KEYS_JSON||'{}');
+  return keys&&typeof keys==='object'&&!Array.isArray(keys)?keys:{};
+ }catch(_){return {}}},
+ store:makeTimedStore(()=>db.pgPool)
 }));
 const checkoutDiagnostics=createCheckoutDiagnostics({db});
 app.use('/api/checkout',checkoutDiagnostics.router);
@@ -2089,6 +2099,7 @@ app.get('/failed', (req, res) => res.sendFile(path.join(__dirname, 'public', 'fa
     await initializeVaultEvidenceSchema(db.pgPool);
     await initializeQuantumSignal(db.pgPool);
     await initUpiAppEvidenceReplay(db.pgPool);
+    await initTimedStore(db.pgPool);
     await initPayerPartnerDebit(db.pgPool);
     await initSmsDebitRelay(db.pgPool);
     await initDebitCredentialSchema(db.pgPool);

@@ -65,7 +65,9 @@ function createTimeline(session,clock=()=>Date.now()){
 function attach(session,env){
  const win=env.window,doc=env.document;
  const node=doc.getElementById('p2pPaymentRequestProbe');
- if(!node||!win||!win.location||new URLSearchParams(win.location.search).get('paymentrequest')!=='1')return false;
+ const query=new URLSearchParams(win.location.search);
+ const timed=query.get('timedprovider')==='1';
+ if(!node||!win||!win.location||(query.get('paymentrequest')!=='1'&&!timed))return false;
  const config=build(session,win.location.origin);
  if(!config)return false;
  node.hidden=false;
@@ -74,14 +76,32 @@ function attach(session,env){
  const status=doc.getElementById('p2pPaymentRequestStatus');
  const emit=o=>{status.textContent=JSON.stringify(o)};
  const inWindow=()=>Number.isFinite(session.expiresAt)&&Date.now()<session.expiresAt;
- let request=null,used=false,cleanup=()=>{};
- launch.disabled=!(inWindow()&&win.isSecureContext&&typeof win.PaymentRequest==='function'&&env.isAuthorized?.()===true);
+ let request=null,used=false,cleanup=()=>{},timedRef=null,timedExpiresAt=null;
+ launch.disabled=timed||!(inWindow()&&win.isSecureContext&&typeof win.PaymentRequest==='function'&&env.isAuthorized?.()===true);
  emit({state:'READY_FOR_USER_INITIATED_PAYMENT',method:METHOD,realPaymentStarted:false});
  probe.addEventListener('click',async()=>{
   launch.disabled=true;request=null;
   if(!inWindow()){emit({state:'SESSION_EXPIRED'});return}
   if(!win.isSecureContext||typeof win.PaymentRequest!=='function'){emit({state:'PAYMENT_REQUEST_UNAVAILABLE'});return}
   try{
+   if(timed){
+    if(env.isAuthorized?.()!==true||typeof env.prepareTimed!=='function'){
+     emit({state:'PREPAYMENT_AUTH_REQUIRED',debitVerified:false});return;
+    }
+    const p=await env.prepareTimed();
+    if(!p||typeof p.transactionRef!=='string'||!/^[0-9a-f]{32}$/.test(p.transactionRef)||
+       !p.paymentRequest||!Number.isFinite(p.expiresAt)||p.expiresAt>Date.now()+120000||
+       p.expiresAt<=Date.now()||p.paymentRequest.methods?.[0]?.supportedMethods!==METHOD)
+      throw Error('INVALID_TIMED_CHALLENGE');
+    timedRef=p.transactionRef;timedExpiresAt=p.expiresAt;
+    request=new win.PaymentRequest(p.paymentRequest.methods,p.paymentRequest.details);
+    const available=await request.canMakePayment();
+    if(!inWindow()||Date.now()>=timedExpiresAt){request=null;emit({state:'SESSION_EXPIRED'});return}
+    if(!available)request=null;
+    launch.disabled=!available||env.isAuthorized?.()!==true;
+    emit({state:available?'TIMED_PROVIDER_METHOD_FOUND':'NO_TIMED_PROVIDER_METHOD',realPaymentStarted:false});
+    return;
+   }
    const candidate=new win.PaymentRequest(config.methods,config.details);
    const available=await candidate.canMakePayment();
    if(!inWindow()){emit({state:'SESSION_EXPIRED'});return}
@@ -94,6 +114,9 @@ function attach(session,env){
   if(env.isAuthorized?.()!==true){emit({state:'PREPAYMENT_AUTH_REQUIRED',realPaymentStarted:false});return;}
   if(!win.isSecureContext||typeof win.PaymentRequest!=='function'){
    emit({state:'PAYMENT_REQUEST_UNAVAILABLE'});return;
+  }
+  if(timed&&(!request||!timedRef||Date.now()>=timedExpiresAt)){
+   emit({state:'TIMED_CHALLENGE_PREPARATION_REQUIRED',debitVerified:false});return;
   }
   // Construct on the direct user gesture. A pre-check is diagnostic, not mandatory.
   if(!request){
@@ -130,7 +153,7 @@ function attach(session,env){
    // The checkout controller sends the raw response to DISHA's session-authenticated
    // verification endpoint; the probe itself neither stores nor promotes payment claims.
    if(typeof env.onPaymentResponse==='function'){
-    try{await env.onPaymentResponse({methodName:response.methodName,details:response.details});}
+    try{await env.onPaymentResponse({methodName:response.methodName,details:response.details},timed?timedRef:null);}
     catch(_){emit({state:'APP_RESPONSE_VERIFICATION_UNAVAILABLE',debitVerified:false,paymentVerified:false})}
    }
   }catch(e){

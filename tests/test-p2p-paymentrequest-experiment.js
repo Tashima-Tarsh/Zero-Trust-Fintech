@@ -38,7 +38,7 @@ test('optional experiment is only shown on P2P and never writes to ledger',()=>{
  const server=fs.readFileSync(path.join(root,'server.js'),'utf8');
  assert.match(html,/id="p2pPaymentRequestProbe"[^>]*hidden/);
  assert.match(html,/id="p2pPaymentRequestCheck"/);
- assert.match(js,/mode==='generic'&&query\.get\('paymentrequest'\)==='1'/);
+ assert.match(js,/mode==='generic'&&\(query\.get\('paymentrequest'\)==='1'/);
  assert.match(server,/'p2p-paymentrequest-probe\.js'/);
  const probe=fs.readFileSync(path.join(root,'public/p2p-paymentrequest-probe.js'),'utf8');
  assert.doesNotMatch(probe,/fetch\(|sendBeacon\(|XMLHttpRequest|ledger\//);
@@ -75,7 +75,7 @@ test('expired timelines discard motion and lifecycle signals',()=>{
 test('direct Android payment launch does not require a separate capability button',()=>{
  const script=fs.readFileSync(path.join(root,'public/p2p-paymentrequest-probe.js'),'utf8');
  assert.match(script,/READY_FOR_USER_INITIATED_PAYMENT/);
- assert.match(script,/launch\.disabled=!\(inWindow\(\)&&win\.isSecureContext/);
+ assert.match(script,/launch\.disabled=timed\|\|!\(inWindow\(\)&&win\.isSecureContext/);
  assert.match(script,/if\(!request\)\{/);
  assert.match(script,/new win\.PaymentRequest\(config\.methods,config\.details\)/);
  assert.match(script,/response=await request\.show\(\)/);
