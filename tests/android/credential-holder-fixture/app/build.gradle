@@ -4,6 +4,9 @@ plugins {
 }
 android {
     namespace 'ai.disha.credentialfixture'
+    if (providers.gradleProperty('dishaBrokerOnly').orNull == 'true') {
+        sourceSets.main.manifest.srcFile('src/broker/AndroidManifest.xml')
+    }
     compileSdk 35
     defaultConfig {
         applicationId 'ai.disha.credentialfixture'
