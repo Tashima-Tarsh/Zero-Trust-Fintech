@@ -71,3 +71,12 @@ test('expired timelines discard motion and lifecycle signals',()=>{
  assert.equal(timeline.snapshot(null).events.length,0);
  assert.equal(timeline.snapshot(null).motionSamples,0);
 });
+
+test('direct Android payment launch does not require a separate capability button',()=>{
+ const script=fs.readFileSync(path.join(root,'public/p2p-paymentrequest-probe.js'),'utf8');
+ assert.match(script,/READY_FOR_USER_INITIATED_PAYMENT/);
+ assert.match(script,/launch\.disabled=!\(inWindow\(\)&&win\.isSecureContext/);
+ assert.match(script,/if\(!request\)\{/);
+ assert.match(script,/new win\.PaymentRequest\(config\.methods,config\.details\)/);
+ assert.match(script,/response=await request\.show\(\)/);
+});
