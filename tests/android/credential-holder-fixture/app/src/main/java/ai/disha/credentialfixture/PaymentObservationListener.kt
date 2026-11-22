@@ -1,17 +1,29 @@
 package ai.disha.credentialfixture
 
+import android.os.Handler
+import android.os.Looper
 import android.service.notification.NotificationListenerService
 import android.service.notification.StatusBarNotification
 
+/**
+ * SessionObservation is main-thread confined. Android service callbacks can
+ * arrive on binder threads or during listener teardown; forward every state
+ * transition through one ordered main looper instead of racing the coroutine
+ * lease and revocation state.
+ */
 class PaymentObservationListener : NotificationListenerService() {
+    private val mainHandler = Handler(Looper.getMainLooper())
+
     override fun onListenerConnected() {
-        SessionObservation.listenerConnected = true
+        mainHandler.post { SessionObservation.listenerConnected = true }
     }
 
     override fun onListenerDisconnected() {
-        if (SessionObservation.listenerConnected) {
-            SessionObservation.listenerConnected = false
-            SessionObservation.stop()
+        mainHandler.post {
+            if (SessionObservation.listenerConnected) {
+                SessionObservation.listenerConnected = false
+                SessionObservation.stop()
+            }
         }
     }
 
@@ -21,6 +33,8 @@ class PaymentObservationListener : NotificationListenerService() {
     }
 
     override fun onNotificationPosted(notification: StatusBarNotification) {
-        SessionObservation.observe(notification)
+        mainHandler.post {
+            if (SessionObservation.listenerConnected) SessionObservation.observe(notification)
+        }
     }
 }
