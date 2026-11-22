@@ -14,22 +14,22 @@ function Invoke-Adb([string[]]$ArgsList) {
  & $Adb -s $Serial @ArgsList
  if($LASTEXITCODE -ne 0) { throw "adb failed: $($ArgsList -join ' ')" }
 }
-Invoke-Adb @('get-state')
+Invoke-Adb -ArgsList @('get-state')
 switch($Mode){
  'Status' {
-  Invoke-Adb @('shell','getprop','sys.boot_completed')
-  Invoke-Adb @('shell','getprop','ro.build.version.release')
-  Invoke-Adb @('shell','pm','path','com.android.chrome')
+  Invoke-Adb -ArgsList @('shell','getprop','sys.boot_completed')
+  Invoke-Adb -ArgsList @('shell','getprop','ro.build.version.release')
+  Invoke-Adb -ArgsList @('shell','pm','path','com.android.chrome')
  }
  'Open' {
-  Invoke-Adb @('reverse',"tcp:$Port","tcp:$Port")
-  Invoke-Adb @('shell','am','start','-a','android.intent.action.VIEW',
+  Invoke-Adb -ArgsList @('reverse',"tcp:$Port","tcp:$Port")
+  Invoke-Adb -ArgsList @('shell','am','start','-a','android.intent.action.VIEW',
    '-d',"http://localhost:$Port/labs/sms-transport.html",'com.android.chrome')
   Write-Host "Open Chrome lab, grant test consent and press Start. Do NOT make a payment."
  }
  'Debit' {
   $body='INR 499.01 debited from account XX1234 via UPI. Ref 123456789012. Test synthetic only.'
-  Invoke-Adb @('emu','sms','send','+15551230001',$body)
+  Invoke-Adb -ArgsList @('emu','sms','send','+15551230001',$body)
   Write-Host 'Injected SYNTHETIC bank-like SMS. Observe Chrome lab; no bank transfer occurred.'
  }
  'Otp' {
@@ -37,7 +37,7 @@ switch($Mode){
   if($Domain -notmatch '^[a-zA-Z0-9.-]+$'){throw 'Invalid domain'}
   # WebOTP expects an origin-bound last line. This is a synthetic test SMS.
   $body="DISHA SMS transport experiment only. Code: $Code" + "`n" + "@$Domain #$Code"
-  Invoke-Adb @('emu','sms','send','+15551230002',$body)
+  Invoke-Adb -ArgsList @('emu','sms','send','+15551230002',$body)
   Write-Host 'Injected synthetic origin-bound WebOTP SMS. Accept OS prompt if shown.'
  }
 }
