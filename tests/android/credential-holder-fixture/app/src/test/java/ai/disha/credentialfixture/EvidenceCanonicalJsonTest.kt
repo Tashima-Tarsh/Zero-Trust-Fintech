@@ -42,6 +42,17 @@ class EvidenceCanonicalJsonTest {
             assertEquals(expected, EvidenceCanonicalJson.bytes(source(real)).toString(Charsets.UTF_8))
         }
     }
+    @Test fun signedV2CarriesExactObservedText() {
+        val original = "Payment sent\nRRN: 000000000105"
+        val v2 = source(true).put("protocol","DISHA-DEBIT-UTR-OBSERVATION-V2")
+            .put("sourceText",original)
+        val prior = EvidenceCanonicalJson.bytes(source(true)).toString(Charsets.UTF_8)
+            .replace("DISHA-DEBIT-UTR-OBSERVATION-V1","DISHA-DEBIT-UTR-OBSERVATION-V2")
+            .dropLast(1)
+        val expected = prior + ",\"sourceText\":" + JSONObject.quote(original) + "}"
+        assertEquals(expected,EvidenceCanonicalJson.bytes(v2).toString(Charsets.UTF_8))
+    }
+
     @Test fun refusesExtraAndMissingFields() {
         assertThrows(IllegalArgumentException::class.java) {
             EvidenceCanonicalJson.bytes(source(true).put("attacker", true))
