@@ -602,7 +602,8 @@
      // Preflight after the existing authenticated trust verdict, never before.
      // PaymentRequest.show() still runs only on the separate Pay button click.
      if(payLaunch)payLaunch.disabled=true;
-     get('p2pPaymentRequestCheck')?.click();
+     const capabilityButton=get('p2pPaymentRequestCheck');
+     if(typeof capabilityButton?.click==='function')capabilityButton.click();
     }else if(payLaunch&&window.isSecureContext!==false&&typeof window.PaymentRequest==='function'){
      payLaunch.disabled=false;
     }
