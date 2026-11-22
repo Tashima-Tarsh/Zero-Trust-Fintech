@@ -500,7 +500,7 @@ async function readDebitEvidenceReceipt(pool, id, session, now = Date.now()) {
   // pinned observer key is eligible for the stronger observation receipt.
   // Pins must be supplied by an authorized OEM/admin channel, never a checkout.
   if (!(process.env.DISHA_UDEB_PINNED_DEVICE_KEY_SHA256||'').split(',')
-      .some(value => /^[a-f0-9]{64}$/.test(value.trim()))) {
+      .some(value => /^[a-f0-9]{64}$/.test(value.trim().toLowerCase()))) {
     return {receiptError:'TRUSTED_DEVICE_NOT_CONFIGURED'};
   }
   if (!isIndependentlyPinnedObserverKey(row.public_key_pem)) {
