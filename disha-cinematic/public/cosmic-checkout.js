@@ -746,7 +746,7 @@
      const candidate=trustMissing&&evidence.paymentVerified===false&&
        evidence.debitVerified===false&&evidence.evidence?.find(x=>
        x.source==='DEVICE_OBSERVATION'&&x.deviceSignatureVerified===true&&
-       /^\\d{12}$/.test(x.utr||'')&&['UTR','RRN'].includes(x.referenceKind)&&
+       /^\d{12}$/.test(x.utr||'')&&['UTR','RRN'].includes(x.referenceKind)&&
        x.amountPaise===String(Math.round(session.amount*100))&&
        String(x.payeeVpa).toLowerCase()===String(session.payeeVpa).toLowerCase());
      if(candidate&&typeof evidenceDialog?.showModal==='function'&&!passive){
