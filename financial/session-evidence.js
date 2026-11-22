@@ -167,8 +167,11 @@ async function initializeSessionEvidenceSchema(pool) {
     );
     DROP INDEX IF EXISTS disha_session_evidence_txn_replay;
     ALTER TABLE disha_session_evidence_events ADD COLUMN IF NOT EXISTS reference_kind TEXT;
-    CREATE UNIQUE INDEX IF NOT EXISTS disha_session_observed_ref_unique
-      ON disha_session_evidence_events(transaction_ref)
+    -- One RRN can legitimately appear in both a payer-app alert and an SMS.
+    -- Cross-order reuse is checked under a transaction-scoped advisory lock.
+    DROP INDEX IF EXISTS disha_session_observed_ref_unique;
+    CREATE UNIQUE INDEX IF NOT EXISTS disha_session_observed_source_unique
+      ON disha_session_evidence_events(order_id,package_name,transaction_ref)
       WHERE reference_kind IS NOT NULL AND decision_state = 'SIGNAL_MATCHED';
     CREATE INDEX IF NOT EXISTS disha_session_evidence_txn_lookup
       ON disha_session_evidence_events(transaction_ref)
@@ -339,7 +342,9 @@ function createSessionEvidenceRouter({ getPool, getSession, allowedPackages = AL
         success:true, orderId:b.orderId, nonce:activeNonce, deviceId:b.deviceId,
         amountPaise, payeeVpa:payee, paymentType, merchantReference, merchantCategoryCode,
         expiresAt:activeExpiry, consentedAt:activeConsentTime, serverTime:now,
-        allowedPackages:selectedPackage ? [selectedPackage] : [...allowedPackages]
+        allowedPackages:selectedPackage ?
+          [...new Set([selectedPackage,'com.google.android.apps.messaging','com.android.mms'])] :
+          [...allowedPackages]
       });
     } catch (e) { console.error('[session-evidence] authorize failed:', e && (e.code || e.message) || 'unknown'); return respondError(res, e); }
   });
@@ -368,7 +373,8 @@ function createSessionEvidenceRouter({ getPool, getSession, allowedPackages = AL
       const observed = b.evidence.protocol === 'DISHA-DEBIT-UTR-OBSERVATION-V1';
       const boundPackage=consent.source_package||session.observationPackage;
       if (observed !== Boolean(boundPackage) ||
-          (observed && b.evidence.packageName !== boundPackage) ||
+          (observed && b.evidence.packageName !== boundPackage &&
+            !['com.google.android.apps.messaging','com.android.mms'].includes(b.evidence.packageName)) ||
           (!observed && !allowedPackages.has(b.evidence.packageName))) {
         throw fail('EVIDENCE_FIELDS_INVALID');
       }
@@ -377,6 +383,8 @@ function createSessionEvidenceRouter({ getPool, getSession, allowedPackages = AL
         observed ? ALLOWED_PACKAGES : allowedPackages);
       let decision = evaluateEvidence(b.evidence, consent);
       if (decision.accepted && b.evidence.transactionRef) {
+        // Serialize reference reuse checks across concurrent checkouts.
+        await c.query('SELECT pg_advisory_xact_lock(hashtext($1))',[b.evidence.transactionRef]);
         const previousRef = (await c.query(
           'SELECT order_id,amount_paise,payee_vpa FROM disha_session_evidence_events WHERE transaction_ref=$1 ORDER BY received_at ASC LIMIT 1 FOR UPDATE',
           [b.evidence.transactionRef])).rows[0];
