@@ -32,7 +32,7 @@ function createUpiAppEvidenceRouter({getSession,getTrustedKeys,clock=()=>Date.no
   try{amount=money.rupeesToPaise(String(session.challengeAmount))}catch(_){
    return res.status(409).json({state:'SESSION_AMOUNT_INVALID',debitVerified:false,paymentVerified:false});
   }
-  const expected={pa:session.vpaAddress,amount:(Number(amount)/100).toFixed(2),txnRef:session.txnRef};
+  const expected={pa:session.vpaAddress,amount:money.paiseToRupees(amount),txnRef:session.txnRef};
   let keys;
   try{keys=getTrustedKeys()}catch(_){keys={}}
   const evidence=verifyUPIResponse({provider:methodName==='https://tez.google.com/pay'?'GOOGLE_PAY':'OTHER_UPI',
