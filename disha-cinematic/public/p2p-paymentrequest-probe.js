@@ -95,6 +95,15 @@ function attach(session,env){
   launch.disabled=true;request=null;
   if(!inWindow()){emit({state:'SESSION_EXPIRED'});return}
   if(!win.isSecureContext||typeof win.PaymentRequest!=='function'){emit({state:'PAYMENT_REQUEST_UNAVAILABLE'});return}
+  if(timed){
+   const platform=win.navigator?.userAgentData?.platform;
+   const userAgent=win.navigator?.userAgent;
+   if(platform?platform!=='Android':userAgent&&!/Android/i.test(userAgent)){
+    emit({state:'ANDROID_REQUIRED',message:'Open this checkout in Chrome on an Android phone with Google Pay installed.'});
+    return;
+   }
+  }
+  let preparingPayment=false;
   try{
    if(timed){
     if(env.isAuthorized?.()!==true){
@@ -110,6 +119,7 @@ function attach(session,env){
     if(typeof env.prepareTimed!=='function'){
      emit({state:'TIMED_PROVIDER_UNAVAILABLE',debitVerified:false});return;
     }
+    preparingPayment=true;
     const p=await env.prepareTimed();
     if(!p||typeof p.transactionRef!=='string'||!/^[0-9a-f]{32}$/.test(p.transactionRef)||
        !p.paymentRequest||!Number.isFinite(p.expiresAt)||p.expiresAt>Date.now()+120000||
@@ -136,7 +146,8 @@ function attach(session,env){
   }catch(e){
    if(timed&&probe)probe.hidden=false;
    emit({state:'CAPABILITY_PROBE_FAILED',errorName:e?.name||'Error',
-    message:timed?'Could not prepare Google Pay. You can retry or use Copy UPI ID.':undefined});
+    message:timed?(preparingPayment?'Could not prepare the verified Google Pay payment. Retry the compatibility check.':
+     'Chrome could not check the Google Pay app. Open the checkout directly in Chrome on Android and retry.'):undefined});
   }
  });
  launch.addEventListener('click',async()=>{
