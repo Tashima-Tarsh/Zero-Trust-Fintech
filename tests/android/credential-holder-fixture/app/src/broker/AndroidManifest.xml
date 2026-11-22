@@ -23,6 +23,18 @@
                     android:pathPrefix="/android/observer/"/>
             </intent-filter>
         </activity>
+        <!-- Appears in Android Sharesheet only when the broker is already installed in the image.
+             MIME registration does not authenticate the source app or shared content. -->
+        <activity android:name=".PlatformSharedReceiptActivity" android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.SEND"/>
+                <category android:name="android.intent.category.DEFAULT"/>
+                <data android:mimeType="text/plain"/>
+                <data android:mimeType="image/png"/>
+                <data android:mimeType="image/jpeg"/>
+                <data android:mimeType="application/pdf"/>
+            </intent-filter>
+        </activity>
         <service android:name=".PaymentObservationListener"
             android:permission="android.permission.BIND_NOTIFICATION_LISTENER_SERVICE"
             android:exported="false">
