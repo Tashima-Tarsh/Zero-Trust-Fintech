@@ -15,8 +15,14 @@ internal object EvidenceCanonicalJson {
     )
 
     fun bytes(evidence: JSONObject): ByteArray {
-        val real = evidence.getString("protocol") == "DISHA-DEBIT-UTR-OBSERVATION-V1"
-        val keys = if (real) baseKeys + "referenceKind" else baseKeys
+        val protocol = evidence.getString("protocol")
+        val real = protocol == "DISHA-DEBIT-UTR-OBSERVATION-V1" ||
+            protocol == "DISHA-DEBIT-UTR-OBSERVATION-V2"
+        val keys = when {
+            protocol == "DISHA-DEBIT-UTR-OBSERVATION-V2" -> baseKeys + "referenceKind" + "sourceText"
+            real -> baseKeys + "referenceKind"
+            else -> baseKeys
+        }
         require(evidence.length() == keys.size && keys.all(evidence::has)) {
             "EVIDENCE_FIELDS_INVALID"
         }
