@@ -9,7 +9,7 @@ test('all checkout mirrors use identical authenticated timed provider wiring',()
  contents.forEach(c=>assert.equal(c,contents[0]));
  for(const code of contents){
   const auth=code.indexOf('p2pTrustedUntil=verdict.expiresAt;');
-  const auto=code.indexOf("if(query.get('timedprovider')==='1'){",auth);
+  const auto=code.indexOf("if(query.get('paymentrequest')!=='1'){",auth);
   const challenge=code.indexOf("get('p2pPaymentRequestCheck')?.click();",auto);
   assert.ok(auth>=0&&auto>auth&&challenge>auto);
   assert.match(code,/if\(payLaunch\)payLaunch\.disabled=true;/);
@@ -32,9 +32,9 @@ test('visible signed provider choice follows mandatory payer authentication',()=
  assert.match(code,/probe.hidden=true/);
  assert.match(code,/probe.hidden=available/);
 });
-test('signed response flow is opt-in and Chrome pay still requires gesture',()=>{
+test('signed response flow is default on P2P and Chrome pay still requires gesture',()=>{
  const code=fs.readFileSync(path.join(root,'public/p2p-paymentrequest-probe.js'),'utf8');
- assert.match(code,/query\.get\('timedprovider'\)==='1'/);
+ assert.match(code,/query\.get\('paymentrequest'\)!=='1'/);
  assert.match(code,/launch\.addEventListener\('click',async\(\)=>\{/);
  assert.match(code,/response=await request\.show\(\)/);
  assert.match(code,/if\(env\.isAuthorized\?\.\(\)!==true\)/);
@@ -49,7 +49,7 @@ test('signed response flow is opt-in and Chrome pay still requires gesture',()=>
 });
 test('signed return UI stays isolated from the merchant checkout',()=>{
  const code=fs.readFileSync(path.join(root,'public/cosmic-checkout.js'),'utf8');
- assert.match(code,/if\(mode==='generic'&&\(query\.get\('paymentrequest'\)==='1'\|\|query\.get\('timedprovider'\)==='1'\)\)/);
+ assert.match(code,/if\(mode==='generic'\)/);
  const merchant=fs.readFileSync(path.join(root,'public/merchant-checkout.html'),'utf8');
  assert.doesNotMatch(merchant,/p2pPaymentRequestLaunch|timedprovider=1/);
 });
