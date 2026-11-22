@@ -19,10 +19,17 @@ function makeGateway({serverPrivateKey,serverPublicKey,lookupCheckout,challengeS
     typeof resolveObserver!=='function'||typeof sourceReplayStore?.claim!=='function'||
     typeof receiptStore?.put!=='function'||typeof receiptStore?.get!=='function')
     throw Error('PRODUCTION_TRUST_AND_PERSISTENCE_REQUIRED');
+  // Fail closed when checkout state, lifetime, or identifiers are not trustworthy.
+  // A caller holding an old bearer must not revive an expired or modified order.
+  function activeCheckout(session,orderId) {
+    return session && session.orderId===orderId && session.status==='PENDING' &&
+      Number.isSafeInteger(session.expiresAt) && now()<session.expiresAt &&
+      typeof session.amountPaise==='string' && typeof session.payeeVpa==='string';
+  }
   async function authenticate(orderId,bearer) {
     if(typeof bearer!=='string'||!bearer||typeof orderId!=='string')return null;
     const session=await lookupCheckout(orderId);
-    if(!session||!timingEqual(session.bearerHash,
+    if(!activeCheckout(session,orderId)||!timingEqual(session.bearerHash,
         crypto.createHash('sha256').update(bearer).digest('hex')))return null;
     return session;
   }
@@ -44,6 +51,9 @@ function makeGateway({serverPrivateKey,serverPublicKey,lookupCheckout,challengeS
       const stored=await challengeStore.get(orderId);
       if(!stored||!stored.challenge||stored.challenge.orderId!==orderId)
         return invalid('CHALLENGE_NOT_FOUND');
+      if(stored.challenge.amountPaise!==s.amountPaise ||
+         stored.challenge.payeeVpa!==s.payeeVpa)
+        return invalid('CHECKOUT_BINDING_CHANGED');
       let verifiedClaim=null;
       const r=verify({
         challenge:stored.challenge,serverSignature:stored.serverSignature,
@@ -59,7 +69,8 @@ function makeGateway({serverPrivateKey,serverPublicKey,lookupCheckout,challengeS
       if(!claimed)return invalid('REPLAYED');
       // Persist only sanitized receipt fields, never raw SMS or notification body.
       const receipt=Object.freeze({orderId,challengeDigest:digest(canonicalChallenge(stored.challenge)),
-        status:'DEBIT_EVIDENCE_OBSERVED',sourceKind:r.sourceKind,receiptHash:r.receiptHash,
+        status:'DEBIT_EVIDENCE_OBSERVED',amountPaise:s.amountPaise,payeeVpa:s.payeeVpa,
+        sourceKind:r.sourceKind,receiptHash:r.receiptHash,
         paymentVerified:false,debitVerified:false,ledgerMutated:false});
       await receiptStore.put(orderId,receipt);
       return {ok:true,receipt};
@@ -68,7 +79,8 @@ function makeGateway({serverPrivateKey,serverPublicKey,lookupCheckout,challengeS
       const s=await authenticate(orderId,bearer);
       if(!s)return invalid('CHECKOUT_UNAUTHORIZED');
       const r=await receiptStore.get(orderId);
-      return r?{ok:true,receipt:r}:invalid('OBSERVATION_NOT_AVAILABLE');
+      return r && r.orderId===s.orderId && r.amountPaise===s.amountPaise &&
+        r.payeeVpa===s.payeeVpa ? {ok:true,receipt:r} : invalid('OBSERVATION_NOT_AVAILABLE');
     }
   });
 }
