@@ -1,0 +1,12 @@
+[
+  {
+    "relation": ["delegate_permission/common.handle_all_urls"],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "ai.disha.credentialfixture",
+      "sha256_cert_fingerprints": [
+        "DD:4B:49:55:AB:05:36:3D:63:64:BC:8D:70:43:B4:25:49:8C:EB:63:9E:FA:FE:46:B4:88:D3:D9:CD:17:96:A0"
+      ]
+    }
+  }
+]

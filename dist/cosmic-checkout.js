@@ -839,10 +839,10 @@
      if(!response.ok||!data.success||!/^[A-Za-z0-9_-]{43}$/.test(data.ticket)||
         !Number.isSafeInteger(data.expiresAt)||data.expiresAt<=Date.now()||
         session!==boundSession||expired())throw Error('PAIRING_UNAVAILABLE');
-     // Explicit app package is used for Chrome intent routing. The ticket
+     // A verified HTTPS App Link reaches an image-installed broker. The ticket
      // expires after 60s, is single-use and holds no checkout credentials.
-     pairLink.href='intent://pair/'+encodeURIComponent(data.ticket)+
-      '#Intent;scheme=disha-observe;package=ai.disha.credentialfixture;end';
+     pairLink.href='https://disha8-2.thenitishkr.in/android/observer/'+
+      encodeURIComponent(data.ticket);
      pairLink.hidden=false;
      pairHint.textContent='Tap Open DISHA observer within 60 seconds. Authenticate and consent on Android.';
     }catch(_){

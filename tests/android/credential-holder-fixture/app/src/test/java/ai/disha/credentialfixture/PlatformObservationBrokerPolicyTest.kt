@@ -26,4 +26,10 @@ class PlatformObservationBrokerPolicyTest {
             assertNull(PlatformObservationBrokerPolicy.ticket(view, invalid, true, false))
         }
     }
+
+    @Test fun neverAcceptsCustomSchemeFallback() {
+        assertNull(PlatformObservationBrokerPolicy.ticket(
+            view, "disha-observe://pair/$token", true, false
+        ))
+    }
 }

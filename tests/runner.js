@@ -66,6 +66,7 @@ const UNIT_TESTS = [
   'test-session-evidence.js',
   'test-udeb-evidence-contract.js',
   'test-udeb-browser-handoff.js',
+  'test-android-observer-app-link.js',
   'test-udeb-observer-trust.js',
   'test-platform-observer-enrollment.js', // independent observer key pin regression // Reject unauthenticated device keys before device-observed receipt // Auto-poll read-only consent-scoped Android evidence; fail-closed receipt // Claude iteration 1: signed observation, fraud/nonce/replay (never settlement) // multi-device session binding, signatures and fraud gates
   'test-session-upi-result.js', // native Android UPI result payload, signature and app allowlist

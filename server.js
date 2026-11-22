@@ -338,6 +338,19 @@ app.get(['/checkout', '/checkout/', '/pay', '/pay/'], (req, res) => {
   res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
   res.sendFile(path.join(__dirname, 'public', 'checkout.html'));
 });
+// Android App Link fallback. A verified, image-installed broker handles this
+// link before it reaches the server. This fallback never redeems the ticket or
+// exposes checkout data, and it prevents the capability from reaching another
+// origin through a Referer header.
+app.get('/android/observer/:ticket([A-Za-z0-9_-]{43})', (req, res) => {
+  res.set({
+    'Cache-Control':'no-store, no-cache, must-revalidate',
+    'Referrer-Policy':'no-referrer',
+    'X-Robots-Tag':'noindex, nofollow',
+    'Content-Security-Policy':"default-src 'none'; style-src 'unsafe-inline'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'"
+  });
+  return res.status(200).type('html').send('<!doctype html><meta charset="utf-8"><title>DISHA observer</title><p>Open this link on an authorized Android image with the DISHA observer installed.</p>');
+});
 // Serve the browser bundle matching the installed @simplewebauthn package.
 // Deliberate payment-mode routes. Never route /p2m to /api/session/new.
 app.get(['/choose-payment','/choose-payment/'],(req,res)=>{
