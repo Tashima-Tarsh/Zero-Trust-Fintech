@@ -68,7 +68,7 @@ async function main() {
       sourcePackage:pairedSource,publicKeyPem:publicKey.export({type:'spki',format:'pem'})
     },redeemed.observerToken);
     assert.equal(pairAuthCode,201,JSON.stringify(pairLease));
-    assert.deepEqual(pairLease.allowedPackages,[pairedSource]);
+    assert.deepEqual(pairLease.allowedPackages,[pairedSource,'com.google.android.apps.messaging','com.android.mms']);
     const pairedEvent={
       protocol:'DISHA-DEBIT-UTR-OBSERVATION-V1',eventId:crypto.randomUUID(),
       orderId:pairOrder.orderId,nonce:pairLease.nonce,deviceId,packageName:pairedSource,
@@ -83,6 +83,20 @@ async function main() {
     assert.equal(pairEventResponse.observationState,'DEBIT_UTR_OBSERVED');
     assert.equal(pairEventResponse.paymentVerified,false);
     assert.equal(pairEventResponse.debitVerified,false);
+    // One checkout can receive payer-app and messaging notification evidence
+    // bearing the same real-world RRN without a false duplicate-reference error.
+    const smsEvent={...pairedEvent,eventId:crypto.randomUUID(),
+      packageName:'com.google.android.apps.messaging'};
+    const [smsStatus,smsResult]=await post('/api/session-evidence/event',{
+      token:redeemed.observerToken,evidence:smsEvent,
+      signature:sign(canonicalEvidence(smsEvent))
+    });
+    assert.equal(smsStatus,202,JSON.stringify(smsResult));
+    assert.equal(smsResult.observationState,'DEBIT_UTR_OBSERVED');
+    assert.equal((await lab.pool.query(
+      'SELECT COUNT(*)::int AS count FROM disha_session_evidence_events WHERE order_id=$1 AND transaction_ref=$2',
+      [pairOrder.orderId,pairedEvent.transactionRef])).rows[0].count,2);
+
     const scopedStatus=await fetch(origin+'/api/session-evidence/status/'+
       encodeURIComponent(pairOrder.orderId)+'?token='+encodeURIComponent(redeemed.observerToken));
     assert.equal(scopedStatus.status,401,'observer token must not access checkout status');
