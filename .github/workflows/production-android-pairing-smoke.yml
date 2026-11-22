@@ -3,6 +3,11 @@ on:
   push:
     branches:
       - verify/production-android-pairing-20261122
+  pull_request:
+    branches:
+      - main
+    paths:
+      - '.github/workflows/production-android-pairing-smoke.yml'
   workflow_dispatch:
 permissions:
   contents: read
