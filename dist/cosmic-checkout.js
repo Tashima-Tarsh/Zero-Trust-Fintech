@@ -700,6 +700,16 @@
      const term=document.createElement('dt'),description=document.createElement('dd');
      term.textContent=label;description.textContent=value;fields.append(term,description);
     }
+    for(const item of receipt.observedSources||[]){
+     if(typeof item.sourceText!=='string'||!item.sourceText)continue;
+     const term=document.createElement('dt'),description=document.createElement('dd');
+     const messaging=['com.google.android.apps.messaging','com.android.mms'].includes(item.packageName);
+     term.textContent=messaging?'Actual observed SMS preview':'Actual observed payment-app notification';
+     description.textContent=item.sourceText;
+     description.style.whiteSpace='pre-wrap';
+     description.style.overflowWrap='anywhere';
+     fields.append(term,description);
+    }
    }
    if(!evidenceDialog.open)evidenceDialog.showModal();
    void loadOriginalShare();
