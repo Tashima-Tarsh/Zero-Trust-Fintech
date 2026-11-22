@@ -37,7 +37,9 @@ function isIndependentlyPinnedObserverKey(publicKey) {
     .filter(value => /^[a-f0-9]{64}$/.test(value)));
   if (!pins.size) return false;
   try {
-    const spki = crypto.createPublicKey(publicKey).export({type:'spki',format:'der'});
+    const key = publicKey instanceof crypto.KeyObject && publicKey.type === 'public'
+      ? publicKey : crypto.createPublicKey(publicKey);
+    const spki = key.export({type:'spki',format:'der'});
     return pins.has(sha256(spki));
   } catch (_) { return false; }
 }
