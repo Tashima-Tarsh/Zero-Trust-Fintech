@@ -62,6 +62,7 @@ const UNIT_TESTS = [
   'test-debit-evidence-receipt.js',
   'test-master-debit-bridge-http.js', // signed trusted-provider ingress, replay and session-scoped read
   'test-bank-sms-header-registry.js',
+  'test-sms-debit-relay.js', // signed SMS candidate ingestion, replay, wrong amount, no financial promotion
   'test-upi-response-verifier.js',
   'test-upi-app-evidence-router.js',
   'test-upi-app-evidence-replay.js', // atomic PostgreSQL replay, concurrent rejects and fail-closed storage // authenticated payment handler callback, read-only signature checks // fail-closed provider signature verification, no ledger write
