@@ -23,7 +23,10 @@ const ALLOWED_PACKAGES = new Set([
   'com.google.android.apps.nbu.paisa.user',
   'com.phonepe.app',
   'net.one97.paytm',
-  'in.org.npci.upiapp'
+  'in.org.npci.upiapp',
+  // These are notifications POSTED BY messaging apps, not trusted bank SMS.
+  'com.google.android.apps.messaging',
+  'com.android.mms'
 ]);
 
 function canonicalEvidence(input, allowedPackages = ALLOWED_PACKAGES) {
@@ -485,7 +488,9 @@ async function readDebitEvidenceReceipt(pool, id, session, now = Date.now()) {
   } catch (_) {}
   if(!verifiedObserverKey)return {receiptError:'DEVICE_PROVENANCE_UNTRUSTED'};
   return {debitEvidenceReceipt:{orderId:id,state:'DEBIT_EVIDENCE_OBSERVED',
-    source:row.package_name,amountPaise,reference:row.transaction_ref,referenceKind:row.reference_kind,
+    source:row.package_name,sourceTrust:row.package_name==='com.google.android.apps.messaging'||
+      row.package_name==='com.android.mms'?'SMS_NOTIFICATION_SENDER_UNVERIFIED':'PAYER_APP_NOTIFICATION_UNVERIFIED',
+    amountPaise,reference:row.transaction_ref,referenceKind:row.reference_kind,
     observedAt:Number(row.posted_at),receiptReference:row.event_hash}};
 }
 
