@@ -113,7 +113,8 @@ async function flush(){for(let i=0;i<55;i++)await Promise.resolve()}
  // The generic payer lane requires completed server-side trust authorization.
  await payer.elems.p2pPrepaymentAuthenticate.events.click();await flush();
  assert.match(payer.elems.p2pPrepaymentStatus.textContent,/checks verified/);
- assert.equal(payer.elems.proofbridgeProceed.disabled,false);
+ assert.equal(payer.elems.proofbridgeProceed.disabled,true,
+  'Prepayment trust alone cannot bypass ProofBridge consent');
 
  assert.equal(payer.elems.serviceIdentifier.textContent,'Service ID · SRVTEST123');
  payer.elems.proofbridgeConsent.checked=true;
