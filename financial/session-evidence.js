@@ -112,6 +112,17 @@ async function initializeSessionEvidenceSchema(pool) {
       expires_at BIGINT NOT NULL,
       revoked_at BIGINT
     );
+    CREATE TABLE IF NOT EXISTS disha_android_observation_pairings (
+      ticket_hash TEXT PRIMARY KEY,
+      order_id TEXT NOT NULL,
+      observer_token_hash TEXT UNIQUE,
+      created_at BIGINT NOT NULL,
+      expires_at BIGINT NOT NULL,
+      claimed_at BIGINT
+    );
+    CREATE INDEX IF NOT EXISTS disha_android_observation_pairings_order
+      ON disha_android_observation_pairings(order_id,expires_at);
+    ALTER TABLE disha_session_evidence_consents ADD COLUMN IF NOT EXISTS source_package TEXT;
     CREATE TABLE IF NOT EXISTS disha_session_evidence_devices (
       order_id TEXT NOT NULL REFERENCES disha_session_evidence_consents(order_id) ON DELETE CASCADE,
       device_id TEXT NOT NULL,
@@ -153,6 +164,62 @@ function createSessionEvidenceRouter({ getPool, getSession, allowedPackages = AL
     .set('Cache-Control', 'no-store')
     .json({ success: false, error: err.status ? err.code : 'SESSION_EVIDENCE_UNAVAILABLE' });
 
+  // A checkout may issue one 60-second, high-entropy ticket. The ticket is
+  // the ONLY secret put in an Android app handoff URL. The Android observer gets
+  // a separate short-lived capability, never the checkout bearer.
+  const validTicket = value => typeof value === 'string' && /^[A-Za-z0-9_-]{43}$/.test(value);
+  const scopedObserver = async (pool, orderId, token) => {
+    if (!pool || !validId(orderId) || !validTicket(token)) return false;
+    const rows = (await pool.query(
+      'SELECT 1 FROM disha_android_observation_pairings WHERE order_id=$1 AND observer_token_hash=$2 AND claimed_at IS NOT NULL AND expires_at>$3 LIMIT 1',
+      [orderId, sha256(token), Date.now()])).rows;
+    return rows.length === 1;
+  };
+  router.post('/pairing/issue', async (req,res) => {
+    const b=req.body||{},pool=getPool();
+    if (!pool) return respondError(res,fail('POSTGRES_REQUIRED',503));
+    if (!validId(b.orderId) || typeof b.token !== 'string' ||
+        !safeEqual(req.get('x-csrf-token'),b.token)) return respondError(res,fail('SESSION_TOKEN_INVALID',401));
+    try {
+      const session=await getSession(b.orderId),now=Date.now();
+      if (!session || !safeEqual(session.sessionId,b.token) ||
+          session.status!=='PENDING' || now>=Number(session.expiresAt))
+        throw fail('SESSION_INVALID_OR_EXPIRED',409);
+      const ticket=crypto.randomBytes(32).toString('base64url');
+      const expires=Math.min(Number(session.expiresAt),now+60000);
+      await pool.query('DELETE FROM disha_android_observation_pairings WHERE expires_at<$1',[now-60000]);
+      await pool.query(
+        'INSERT INTO disha_android_observation_pairings(ticket_hash,order_id,created_at,expires_at) VALUES($1,$2,$3,$4)',
+        [sha256(ticket),b.orderId,now,expires]);
+      return res.status(201).set('Cache-Control','no-store').json({success:true,ticket,expiresAt:expires});
+    } catch(e){return respondError(res,e);}
+  });
+  router.post('/pairing/redeem', async(req,res)=>{
+    const b=req.body||{},pool=getPool();
+    if (!pool) return respondError(res,fail('POSTGRES_REQUIRED',503));
+    if (!validTicket(b.ticket)) return respondError(res,fail('PAIRING_TICKET_INVALID',400));
+    const c=await pool.connect();let tx=false;
+    try {
+      await c.query('BEGIN');tx=true;
+      const now=Date.now();
+      const claimed=(await c.query(
+        'UPDATE disha_android_observation_pairings SET claimed_at=$2 WHERE ticket_hash=$1 AND claimed_at IS NULL AND expires_at>$2 RETURNING order_id,expires_at',
+        [sha256(b.ticket),now])).rows[0];
+      if (!claimed) throw fail('PAIRING_TICKET_EXPIRED_OR_USED',409);
+      const session=await getSession(claimed.order_id);
+      if (!session || session.status!=='PENDING' || now>=Number(session.expiresAt))
+        throw fail('SESSION_INVALID_OR_EXPIRED',409);
+      const observerToken=crypto.randomBytes(32).toString('base64url');
+      await c.query('UPDATE disha_android_observation_pairings SET observer_token_hash=$2 WHERE ticket_hash=$1',
+        [sha256(b.ticket),sha256(observerToken)]);
+      await c.query('COMMIT');tx=false;
+      return res.set('Cache-Control','no-store').json({
+        success:true,orderId:claimed.order_id,observerToken,expiresAt:Number(claimed.expires_at)
+      });
+    } catch(e){if(tx)await c.query('ROLLBACK').catch(()=>{});return respondError(res,e);}
+    finally {c.release();}
+  });
+
   router.post('/authorize', async (req, res) => {
     const b = req.body || {}, pool = getPool();
     if (!pool) return respondError(res, fail('POSTGRES_REQUIRED', 503));
@@ -170,8 +237,13 @@ function createSessionEvidenceRouter({ getPool, getSession, allowedPackages = AL
     } catch (_) { return respondError(res, fail('DEVICE_KEY_INVALID', 400)); }
     try {
       const session = await getSession(b.orderId);
-      if (!session || !safeEqual(session.sessionId, b.token) || session.status !== 'PENDING' ||
-          Date.now() >= Number(session.expiresAt)) throw fail('SESSION_INVALID_OR_EXPIRED', 409);
+      const isScoped = !safeEqual(session?.sessionId,b.token) &&
+        await scopedObserver(pool,b.orderId,b.token);
+      if (!session || (!safeEqual(session.sessionId,b.token) && !isScoped) ||
+          session.status !== 'PENDING' || Date.now() >= Number(session.expiresAt))
+        throw fail('SESSION_INVALID_OR_EXPIRED',409);
+      const selectedPackage=isScoped ? b.sourcePackage : (session.observationPackage||null);
+      if (isScoped && !ALLOWED_PACKAGES.has(selectedPackage)) throw fail('SOURCE_PACKAGE_INVALID',422);
       const amountPaise = rupeesToPaise(String(session.challengeAmount));
       const payee = String(session.vpaAddress || '').toLowerCase();
       if (!/^[1-9][0-9]{0,15}$/.test(amountPaise) || !validVpa(payee)) throw fail('SESSION_BINDING_INVALID', 409);
@@ -199,16 +271,17 @@ function createSessionEvidenceRouter({ getPool, getSession, allowedPackages = AL
           if (existing.revoked_at || Number(existing.expires_at) <= now ||
               !safeEqual(existing.token_hash, sha256(b.token)) ||
               existing.amount_paise !== amountPaise || existing.payee_vpa !== payee ||
-              existing.payment_type !== paymentType) throw fail('SESSION_EVIDENCE_BINDING_CONFLICT', 409);
+              existing.payment_type !== paymentType ||
+              (existing.source_package||null)!==(selectedPackage||null)) throw fail('SESSION_EVIDENCE_BINDING_CONFLICT', 409);
           activeNonce = existing.nonce;
           activeExpiry = Number(existing.expires_at);
           activeConsentTime = Number(existing.consented_at);
         } else {
           await c.query(
             `INSERT INTO disha_session_evidence_consents
-              (order_id,token_hash,nonce,amount_paise,payee_vpa,payment_type,consented_at,expires_at,revoked_at)
-             VALUES($1,$2,$3,$4,$5,$6,$7,$8,NULL)`,
-            [b.orderId, sha256(b.token), nonce, amountPaise, payee, paymentType, now, expiresAt]);
+              (order_id,token_hash,nonce,amount_paise,payee_vpa,payment_type,consented_at,expires_at,revoked_at,source_package)
+             VALUES($1,$2,$3,$4,$5,$6,$7,$8,NULL,$9)`,
+            [b.orderId, sha256(b.token), nonce, amountPaise, payee, paymentType, now, expiresAt, selectedPackage]);
         }
         const enrolled = (await c.query(
           'SELECT public_key_pem FROM disha_session_evidence_devices WHERE order_id=$1 AND device_id=$2',
@@ -230,7 +303,7 @@ function createSessionEvidenceRouter({ getPool, getSession, allowedPackages = AL
         success:true, orderId:b.orderId, nonce:activeNonce, deviceId:b.deviceId,
         amountPaise, payeeVpa:payee, paymentType, merchantReference, merchantCategoryCode,
         expiresAt:activeExpiry, consentedAt:activeConsentTime, serverTime:now,
-        allowedPackages:session.observationPackage ? [session.observationPackage] : [...allowedPackages]
+        allowedPackages:selectedPackage ? [selectedPackage] : [...allowedPackages]
       });
     } catch (e) { console.error('[session-evidence] authorize failed:', e && (e.code || e.message) || 'unknown'); return respondError(res, e); }
   });
@@ -250,11 +323,16 @@ function createSessionEvidenceRouter({ getPool, getSession, allowedPackages = AL
         [b.evidence.orderId, b.evidence.deviceId])).rows[0];
       if (!device) throw fail('DEVICE_NOT_ENROLLED', 403);
       const session = await getSession(b.evidence.orderId);
-      if (!session || session.status !== 'PENDING' || !safeEqual(session.sessionId, b.token) ||
-          !safeEqual(sha256(b.token || ''), consent.token_hash)) throw fail('SESSION_TOKEN_INVALID', 401);
+      if (!session || session.status !== 'PENDING' ||
+          Date.now() >= Number(session.expiresAt) ||
+          (!safeEqual(session.sessionId,b.token) &&
+           !(await scopedObserver(c,b.evidence.orderId,b.token))) ||
+          !safeEqual(sha256(b.token || ''), consent.token_hash))
+        throw fail('SESSION_TOKEN_INVALID',401);
       const observed = b.evidence.protocol === 'DISHA-DEBIT-UTR-OBSERVATION-V1';
-      if (observed !== Boolean(session.observationPackage) ||
-          (observed && b.evidence.packageName !== session.observationPackage) ||
+      const boundPackage=consent.source_package||session.observationPackage;
+      if (observed !== Boolean(boundPackage) ||
+          (observed && b.evidence.packageName !== boundPackage) ||
           (!observed && !allowedPackages.has(b.evidence.packageName))) {
         throw fail('EVIDENCE_FIELDS_INVALID');
       }
@@ -329,7 +407,8 @@ function createSessionEvidenceRouter({ getPool, getSession, allowedPackages = AL
     }
     try {
       const session = await getSession(b.orderId);
-      if (!session || !safeEqual(session.sessionId, b.token)) throw fail('SESSION_TOKEN_INVALID', 401);
+      if (!session || (!safeEqual(session.sessionId,b.token) &&
+          !(await scopedObserver(pool,b.orderId,b.token)))) throw fail('SESSION_TOKEN_INVALID',401);
       await pool.query('UPDATE disha_session_evidence_consents SET revoked_at=$2 WHERE order_id=$1',
         [b.orderId, Date.now()]);
       return res.set('Cache-Control','no-store').json({success:true,revoked:true});
