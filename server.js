@@ -21,6 +21,7 @@ const {initProofBridgeSchema,createProofBridgeRouter}=require('./financial/proof
 const {initDebitCredentialSchema,createDebitCredentialRouter}=require('./financial/debit-credential');
 const {createCheckoutDiagnostics}=require('./financial/checkout-diagnostics');
 const {lookupBankSender,coverage:bankSmsCoverage}=require('./financial/bank-sms-header-registry');
+const {createUpiAppEvidenceRouter}=require('./financial/upi-app-evidence-router');
 const {initializeClaimObserver,observeClaim} = require('./financial/untrusted-utr-claims');
 const {
   buildNPCIIntentUri,
@@ -301,6 +302,14 @@ app.get('/api/bank-sms/lookup',(req,res)=>{
  const sender=typeof req.query.sender==='string'?req.query.sender:'';
  return res.set('Cache-Control','no-store').json(lookupBankSender(sender));
 });
+// Experimental, read-only payer application response authentication.
+app.use('/api/upi-app-evidence',verifyLimiter,createUpiAppEvidenceRouter({
+ getSession:id=>db.findSessionByOrderId(id),
+ getTrustedKeys:()=>{try{
+  const parsed=JSON.parse(process.env.DISHA_GOOGLE_PAY_TRUSTED_PUBLIC_KEYS_JSON||'{}');
+  return parsed&&typeof parsed==='object'&&!Array.isArray(parsed)?parsed:{};
+ }catch(_){return {}}}
+}));
 const checkoutDiagnostics=createCheckoutDiagnostics({db});
 app.use('/api/checkout',checkoutDiagnostics.router);
 const platformControl = createPlatformControl({db,getAuth});
