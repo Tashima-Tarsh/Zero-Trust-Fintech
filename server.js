@@ -290,6 +290,7 @@ const RUNTIME_ASSETS=new Set([
  'premium.css','saas-white.css','merchant-mars.css','merchant-celestial.css',
  'merchant-reference.css','merchant-vpa-import.js','cosmic-checkout.js',
  'cosmic-checkout-model.js','cosmic-checkout.css','checkout-moonlight.css',
+ 'disha-vault-3d.css','disha-vault-3d.js',
  'one-touch-vault.js','quantum-signal-client.js','android-checkout-handshake.js',
  'p2p-paymentrequest-probe.js','copy-return-observer.js'
 ]);
