@@ -37,6 +37,31 @@ function inspect(response,expected){
   signatureVerified:false,debitVerified:false,paymentVerified:false,
   source:'PAYMENT_APP_RETURN_UNVERIFIED'};
 }
+// Automatic, transient Android-browser evidence timeline. No SMS input or uploads.
+// Tracks actual navigation/visibility/sensor observations during a single payment attempt.
+function createTimeline(session,clock=()=>Date.now()){
+ const started=clock(),end=Math.min(Number(session.expiresAt)||started,started+180000);
+ const events=[];let motionSamples=0,closed=false;
+ const record=(type)=>{
+  const now=clock();
+  if(closed||now>end||events.length>=48)return false;
+  if(!['PAYMENT_LAUNCHED','DOCUMENT_HIDDEN','DOCUMENT_VISIBLE','WINDOW_BLUR','WINDOW_FOCUS','PAGE_RETURN','PAYMENT_RESPONSE','PAYMENT_ERROR'].includes(type))return false;
+  events.push({type,elapsedMs:Math.max(0,now-started)});return true;
+ };
+ const motion=()=>{
+  if(closed||clock()>end||motionSamples>=300)return;
+  motionSamples++;
+ };
+ const snapshot=(result)=>Object.freeze({
+  state:'ANDROID_TIMEBOUND_SIGNAL_CORRELATION',windowMs:Math.max(0,end-started),
+  orderId:session.orderId,events:events.slice(),motionSamples,
+  responseObserved:!!result&&result.state==='ANDROID_PAYMENT_RESPONSE_OBSERVED',
+  responseFieldsMatched:!!result&&result.payeeMatched===true&&result.amountMatched===true,
+  signatureVerified:false,debitVerified:false,paymentVerified:false
+ });
+ const close=()=>{closed=true};
+ return Object.freeze({record,motion,snapshot,close});
+}
 function attach(session,env){
  const win=env.window,doc=env.document;
  const node=doc.getElementById('p2pPaymentRequestProbe');
@@ -49,7 +74,7 @@ function attach(session,env){
  const status=doc.getElementById('p2pPaymentRequestStatus');
  const emit=o=>{status.textContent=JSON.stringify(o)};
  const inWindow=()=>Number.isFinite(session.expiresAt)&&Date.now()<session.expiresAt;
- let request=null,used=false;
+ let request=null,used=false,cleanup=()=>{};
  emit({state:'READY_FOR_P2P_CAPABILITY_CHECK',method:METHOD,realPaymentStarted:false});
  probe.addEventListener('click',async()=>{
   launch.disabled=true;request=null;
@@ -67,13 +92,42 @@ function attach(session,env){
   if(!request||used||!inWindow())return;
   used=true;probe.disabled=true;launch.disabled=true;
   let response;
+  const timeline=createTimeline(session);
+  const onVisibility=()=>timeline.record(doc.visibilityState==='hidden'?'DOCUMENT_HIDDEN':'DOCUMENT_VISIBLE');
+  const onBlur=()=>timeline.record('WINDOW_BLUR');
+  const onFocus=()=>timeline.record('WINDOW_FOCUS');
+  const onPageShow=()=>timeline.record('PAGE_RETURN');
+  const onMotion=e=>{if(e?.accelerationIncludingGravity)timeline.motion()};
+  doc.addEventListener?.('visibilitychange',onVisibility);
+  win.addEventListener?.('blur',onBlur);
+  win.addEventListener?.('focus',onFocus);
+  win.addEventListener?.('pageshow',onPageShow);
+  win.addEventListener?.('devicemotion',onMotion);
+  cleanup=()=>{
+   doc.removeEventListener?.('visibilitychange',onVisibility);
+   win.removeEventListener?.('blur',onBlur);
+   win.removeEventListener?.('focus',onFocus);
+   win.removeEventListener?.('pageshow',onPageShow);
+   win.removeEventListener?.('devicemotion',onMotion);
+   timeline.close();
+  };
+  timeline.record('PAYMENT_LAUNCHED');
   try{
    response=await request.show();
-   emit({...inspect(response,config.expected),orderId:session.orderId});
-  }catch(e){emit({state:'P2P_PAYMENT_REQUEST_CANCELLED_OR_FAILED',errorName:e?.name||'Error',debitVerified:false})}
-  finally{if(response)try{await response.complete('unknown')}catch(_){} request=null;}
+   timeline.record('PAYMENT_RESPONSE');
+   const observation=inspect(response,config.expected);
+   emit({...observation,automaticSignals:timeline.snapshot(observation)});
+  }catch(e){
+   timeline.record('PAYMENT_ERROR');
+   emit({state:'P2P_PAYMENT_REQUEST_CANCELLED_OR_FAILED',errorName:e?.name||'Error',
+    automaticSignals:timeline.snapshot(null),debitVerified:false});
+  }finally{
+   cleanup();
+   if(response)try{await response.complete('unknown')}catch(_){}
+   request=null;
+  }
  });
  return true;
 }
-return Object.freeze({METHOD,build,inspect,attach});
+return Object.freeze({METHOD,build,inspect,createTimeline,attach});
 });
