@@ -260,30 +260,6 @@ if (process.env.NODE_ENV === 'production') {
     next();
   });
 }
-// UDEB production-origin read-only capability and user-initiated transport probes.
-// Deliberately not a payment verification endpoint or Android evidence source.
-app.get('/api/experiments/udeb', (req, res) => {
-  res.set('Cache-Control', 'no-store, no-cache, must-revalidate');
-  res.set('X-Robots-Tag', 'noindex, nofollow');
-  return res.type('html').sendFile(path.join(__dirname, 'tests', 'browser', 'udeb-production-console.html'));
-});
-app.get('/api/experiments/udeb-console.js', (req, res) => {
-  res.set('Cache-Control', 'no-store, no-cache, must-revalidate');
-  res.set('X-Robots-Tag', 'noindex, nofollow');
-  return res.type('js').sendFile(path.join(__dirname, 'tests', 'browser', 'udeb-production-console.js'));
-});
-app.get('/api/experiments/udeb-capabilities', (req, res) => {
-  res.set('Cache-Control', 'no-store');
-  return res.json({
-    contractVersion: 'DISHA-UDEB-OBSERVATION-V1',
-    verifierReferenceSourcePresent: true,
-    verifierConnectedToPaymentLedger: false,
-    androidSystemRetrieverDeployed: false,
-    stockChromeEvidenceBridgeDeployed: false,
-    realDebitAcquisitionVerified: false,
-    paymentStateChanged: false
-  });
-});
 // Isolated production-origin Android Chrome PaymentRequest research endpoint.
 // GET-only lab, no DISHA checkout integration, payment mutation, storage or callback.
 // Cloudflare Pages proxies /api/* to this same Railway backend.

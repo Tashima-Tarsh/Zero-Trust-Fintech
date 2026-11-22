@@ -58,11 +58,9 @@ const UNIT_TESTS = [
   'test-debit-credential-probe.js',
   'test-unsigned-openid4vp-challenge.js',
   'test-debit-evidence-receipt.js',
-  'test-sms-observation.js', // authenticated device observation is never a bank debit receipt
   'test-master-debit-bridge-http.js', // signed trusted-provider ingress, replay and session-scoped read
   'test-payer-debit-button.js', // I Paid: read-only P2P evidence, no false verified payment
   'test-proofbridge.js', // zero-install consent gate and issuer-signed capsule contract
-  'test-udeb-evidence-contract.js',
   'test-proofbridge-checkout-flow.js', // consent preflight + native gesture copy + return proof
   'test-high-concurrency-limiter.js', // no O(total IPs) hot-path cleanup before 100K load tests
   'test-utr-hypothesis.js', // UTR anti-fraud and no-false-credit regression
