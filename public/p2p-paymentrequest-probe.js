@@ -74,6 +74,11 @@ function attach(session,env){
  const probe=doc.getElementById('p2pPaymentRequestCheck');
  const launch=doc.getElementById('p2pPaymentRequestLaunch');
  const status=doc.getElementById('p2pPaymentRequestStatus');
+ if(timed){
+  // Keep the legacy P2P experiment untouched; only label the opt-in signed path.
+  if(probe)probe.textContent='Recheck Google Pay availability';
+  if(launch)launch.textContent='Pay with Google Pay';
+ }
  const emit=o=>{status.textContent=JSON.stringify(o)};
  const inWindow=()=>Number.isFinite(session.expiresAt)&&Date.now()<session.expiresAt;
  let request=null,used=false,cleanup=()=>{},timedRef=null,timedExpiresAt=null;
@@ -99,7 +104,10 @@ function attach(session,env){
     if(!inWindow()||Date.now()>=timedExpiresAt){request=null;emit({state:'SESSION_EXPIRED'});return}
     if(!available)request=null;
     launch.disabled=!available||env.isAuthorized?.()!==true;
-    emit({state:available?'TIMED_PROVIDER_METHOD_FOUND':'NO_TIMED_PROVIDER_METHOD',realPaymentStarted:false});
+    emit({state:available?'TIMED_PROVIDER_METHOD_FOUND':'NO_TIMED_PROVIDER_METHOD',
+     message:available?'Google Pay payment method available · ready for Pay click':
+      'Supported Google Pay method unavailable for this checkout',
+     realPaymentStarted:false,debitVerified:false});
     return;
    }
    const candidate=new win.PaymentRequest(config.methods,config.details);

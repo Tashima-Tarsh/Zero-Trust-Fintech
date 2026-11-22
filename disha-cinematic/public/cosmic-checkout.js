@@ -598,7 +598,14 @@
     if(status)status.textContent='Payer and device checks verified for this checkout.';
     renderQr();
     const payLaunch=get('p2pPaymentRequestLaunch');
-    if(payLaunch&&window.isSecureContext!==false&&typeof window.PaymentRequest==='function')payLaunch.disabled=false;
+    if(query.get('timedprovider')==='1'){
+     // Preflight after the existing authenticated trust verdict, never before.
+     // PaymentRequest.show() still runs only on the separate Pay button click.
+     if(payLaunch)payLaunch.disabled=true;
+     get('p2pPaymentRequestCheck')?.click();
+    }else if(payLaunch&&window.isSecureContext!==false&&typeof window.PaymentRequest==='function'){
+     payLaunch.disabled=false;
+    }
    }catch(_){
     p2pTrustedUntil=0;
     if(status)status.textContent='Payment locked: payer authentication or trusted device checks unavailable.';
@@ -831,7 +838,12 @@
        headers:{'Content-Type':'application/json','X-CSRF-Token':session.token},
        body:JSON.stringify(requestBody)});
       const result=await reply.json();
-      if(output)output.textContent=JSON.stringify(result);
+      if(output){
+       output.textContent=reply.ok&&timedRef&&result.state==='PROVIDER_REPORTED_SUCCESS'&&
+         result.signatureVerified===true&&result.providerReportedSuccess===true
+         ? 'Google Pay reported success · signed response accepted by DISHA (bank debit not independently verified)'
+         :JSON.stringify(result);
+      }
      }});
    const trustPanel=get('p2pPrepaymentGate');
    if(trustPanel)trustPanel.hidden=mode!=='generic';
