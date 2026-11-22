@@ -134,7 +134,7 @@ async function main() {
       method:'POST',headers:receiptHeaders,body:originalReceipt
     });
     assert.equal(duplicate.status,409,'shared receipt cannot be replayed');
-    const previousPin=process.env.DISHA_UDEB_PINNED_DEVICE_KEY_SHA256;
+    const threeProofPreviousPin=process.env.DISHA_UDEB_PINNED_DEVICE_KEY_SHA256;
     try {
       process.env.DISHA_UDEB_PINNED_DEVICE_KEY_SHA256=
         crypto.createHash('sha256').update(publicKey.export({type:'spki',format:'der'})).digest('hex');
@@ -148,8 +148,8 @@ async function main() {
         paymentNotification:'MATCHED',debitSms:'MATCHED',sharedReceipt:'MATCHED'
       });
     } finally {
-      if (previousPin===undefined)delete process.env.DISHA_UDEB_PINNED_DEVICE_KEY_SHA256;
-      else process.env.DISHA_UDEB_PINNED_DEVICE_KEY_SHA256=previousPin;
+      if (threeProofPreviousPin===undefined)delete process.env.DISHA_UDEB_PINNED_DEVICE_KEY_SHA256;
+      else process.env.DISHA_UDEB_PINNED_DEVICE_KEY_SHA256=threeProofPreviousPin;
     }
 
     const scopedStatus=await fetch(origin+'/api/session-evidence/status/'+
