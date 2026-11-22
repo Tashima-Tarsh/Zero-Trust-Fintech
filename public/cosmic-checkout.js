@@ -738,8 +738,13 @@
      showDebitEvidence('DEBIT EVIDENCE OBSERVED. Bank debit and payment remain unverified.',receipt);
     }else if(evidence.receiptError||receipt){
      stopDebitEvidenceMonitor();
-     if(!passive)showDebitEvidence('Debit evidence could not be validated. The observation conflicts with this checkout.');
-     if(status)status.textContent='Debit evidence could not be validated.';
+     const trustMissing=['TRUSTED_DEVICE_NOT_CONFIGURED','DEVICE_PROVENANCE_UNTRUSTED']
+      .includes(evidence.receiptError);
+     const explanation=trustMissing?
+      'Android evidence is present but trusted device provenance is not established. Bank debit remains unverified.':
+      'Debit evidence conflicts with this checkout or cannot be validated. No payment is verified.';
+     if(!passive)showDebitEvidence(explanation);
+     if(status)status.textContent=explanation;
      return;
     }else{
      if(!passive)showDebitEvidence('Debit evidence not available yet');
