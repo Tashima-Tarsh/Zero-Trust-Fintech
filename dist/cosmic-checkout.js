@@ -802,7 +802,7 @@
      Number.isSafeInteger(receipt.observedAt)&&receipt.observedAt>0){
      stopDebitEvidenceMonitor();
      showDebitEvidence('CHECKOUT_DEBIT_OBSERVED',receipt);
-    }else if(receipt?.state==='DEBIT_EVIDENCE_OBSERVED'){
+    }else if(receipt?.orderId===session.orderId && receipt?.state==='DEBIT_EVIDENCE_OBSERVED'){
      if(!passive)showDebitEvidence('Waiting for notification + SMS + matching shared receipt',receipt);
      if(status)status.textContent='Waiting for the same checkout\u2019s three debit proofs';
     }else if(evidence.receiptError||receipt){
