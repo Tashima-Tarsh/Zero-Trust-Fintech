@@ -48,22 +48,28 @@ vm.runInContext(worker.replace('export default','globalThis.edge ='),context,{fi
   assert.equal(res.status,200,route+' must remain static even if Railway is down');
   assert.match(await res.text(),/<html/i);
  }
+ // The legacy public /checkout remains static when Railway is offline.
+ // Canonical authenticated P2P checkout and runtime JS/CSS must NOT silently
+ // fall back to an older independently deployed Pages asset.
+ const merchantStatic=await context.edge.fetch(
+  new Request('https://disha8-2.thenitishkr.in/api/runtime/merchant-checkout?paymentRef=EXAMPLE'),env);
+ assert.equal(merchantStatic.status,200);
  for(const url of [
   '/api/runtime/checkout?amount=1',
-  '/api/runtime/merchant-checkout?paymentRef=PAY_EXAMPLE&token=aaa',
   '/api/runtime-assets/cosmic-checkout.js?v=ci',
   '/api/runtime-assets/cosmic-checkout-model.js',
   '/api/runtime-assets/cosmic-checkout.css',
   '/api/runtime-assets/checkout-moonlight.css',
-  '/api/runtime-assets/android-checkout-handshake.js'
+  '/api/runtime-assets/android-checkout-handshake.js',
+  '/api/runtime-assets/p2p-paymentrequest-probe.js'
  ]){
   const result=await context.edge.fetch(new Request('https://disha8-2.thenitishkr.in'+url),env);
-  assert.equal(result.status,200,'Static checkout asset failed '+url);
+  assert.equal(result.status,502,'Canonical runtime should expose backend outage, not stale Pages code: '+url);
  }
- assert.equal(upstream,0,'Checkout HTML, CSS, and JS must work without Railway');
- assert.equal(assets,11);
+ assert.equal(assets,5,'Four offline legacy shells and merchant static shell stay on Pages');
+ assert.equal(upstream,7,'Seven canonical runtime requests must use Railway');
  const api=await context.edge.fetch(new Request('https://disha8-2.thenitishkr.in/api/merchant/public/order/example'),env);
  assert.equal(api.status,502,'Dynamic merchant payment order depends on Railway backend');
- assert.equal(upstream,1);
- console.log('CHECKOUT_EDGE_ISOLATION_PASS: static checkout never relies on Railway availability; dynamic APIs proxy as expected');
+ assert.equal(upstream,8);
+ console.log('CHECKOUT_EDGE_CONSISTENCY_PASS: canonical P2P HTML/JS from Railway; legacy static fallback preserved');
 })().catch(error=>{console.error(error);process.exitCode=1});
