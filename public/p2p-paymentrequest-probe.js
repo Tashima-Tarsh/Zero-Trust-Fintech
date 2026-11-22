@@ -81,7 +81,7 @@ function attach(session,env){
   const intro=node.querySelector?.('p.inline-note');
   if(heading)heading.textContent='Pay securely with Google Pay';
   if(intro)intro.textContent='Verify your device, then pay in your existing Google Pay app.';
-  if(probe){probe.textContent='Recheck Google Pay availability';probe.hidden=true}
+  if(probe){probe.textContent='Check Google Pay compatibility';probe.hidden=false}
   if(launch)launch.textContent='Pay with Google Pay';
  }
  const emit=o=>{status.textContent=timed&&o?.message?o.message:
@@ -97,8 +97,18 @@ function attach(session,env){
   if(!win.isSecureContext||typeof win.PaymentRequest!=='function'){emit({state:'PAYMENT_REQUEST_UNAVAILABLE'});return}
   try{
    if(timed){
-    if(env.isAuthorized?.()!==true||typeof env.prepareTimed!=='function'){
-     emit({state:'PREPAYMENT_AUTH_REQUIRED',debitVerified:false});return;
+    if(env.isAuthorized?.()!==true){
+     // Capability-only probe: never creates a signed payment challenge or unlocks Pay.
+     const candidate=new win.PaymentRequest(config.methods,config.details);
+     const available=await candidate.canMakePayment();
+     emit({state:available?'GOOGLE_PAY_HANDLER_FOUND':'GOOGLE_PAY_HANDLER_NOT_FOUND',
+      message:available?'Google Pay handler detected. Payment requires verified device trust.':
+       'No compatible Google Pay handler detected for this personal UPI checkout.',
+      debitVerified:false,paymentVerified:false});
+     return;
+    }
+    if(typeof env.prepareTimed!=='function'){
+     emit({state:'TIMED_PROVIDER_UNAVAILABLE',debitVerified:false});return;
     }
     const p=await env.prepareTimed();
     if(!p||typeof p.transactionRef!=='string'||!/^[0-9a-f]{32}$/.test(p.transactionRef)||
