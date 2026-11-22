@@ -210,11 +210,15 @@ function createSessionEvidenceRouter({ getPool, getSession, allowedPackages = AL
       if (!session || session.status!=='PENDING' || now>=Number(session.expiresAt))
         throw fail('SESSION_INVALID_OR_EXPIRED',409);
       const observerToken=crypto.randomBytes(32).toString('base64url');
-      await c.query('UPDATE disha_android_observation_pairings SET observer_token_hash=$2 WHERE ticket_hash=$1',
-        [sha256(b.ticket),sha256(observerToken)]);
+      // Ticket expires after 60 seconds; the scoped observation capability
+      // survives only until the checkout ends (at most 180s after redemption).
+      // claimed_at remains set, so extending this row cannot revive the ticket.
+      const observerExpiry=Math.min(Number(session.expiresAt),now+180000);
+      await c.query('UPDATE disha_android_observation_pairings SET observer_token_hash=$2,expires_at=$3 WHERE ticket_hash=$1',
+        [sha256(b.ticket),sha256(observerToken),observerExpiry]);
       await c.query('COMMIT');tx=false;
       return res.set('Cache-Control','no-store').json({
-        success:true,orderId:claimed.order_id,observerToken,expiresAt:Number(claimed.expires_at)
+        success:true,orderId:claimed.order_id,observerToken,expiresAt:observerExpiry
       });
     } catch(e){if(tx)await c.query('ROLLBACK').catch(()=>{});return respondError(res,e);}
     finally {c.release();}
