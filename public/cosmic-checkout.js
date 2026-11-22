@@ -742,7 +742,7 @@
       .includes(evidence.receiptError);
      const explanation=trustMissing?
       'Android evidence is present but trusted device provenance is not established. Bank debit remains unverified.':
-      'Debit evidence conflicts with this checkout or cannot be validated. No payment is verified.';
+      'Debit evidence could not be validated because it conflicts with this checkout. No payment is verified.';
      if(!passive)showDebitEvidence(explanation);
      if(status)status.textContent=explanation;
      return;
