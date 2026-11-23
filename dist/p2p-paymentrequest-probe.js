@@ -145,9 +145,17 @@ function attach(session,env){
    emit({state:available?'P2P_METHOD_HANDLER_FOUND':'NO_P2P_METHOD_HANDLER',realPaymentStarted:false});
   }catch(e){
    if(timed&&probe)probe.hidden=false;
+   // canMakePayment() is optional preflight. Chromium may throw RangeError for
+   // unsupported payment-method data; do not treat that as proof of no handler.
+   // Restore direct launch after a failed diagnostic, without claiming payment success.
+   request=null;
+   if(!timed)launch.disabled=used||!inWindow()||!win.isSecureContext||
+    typeof win.PaymentRequest!=='function';
    emit({state:'CAPABILITY_PROBE_FAILED',errorName:e?.name||'Error',
+    directLaunchAvailable:!timed&&!launch.disabled,
     message:timed?(preparingPayment?'Could not prepare the verified Google Pay payment. Retry the compatibility check.':
-     'Chrome could not check the Google Pay app. Open the checkout directly in Chrome on Android and retry.'):undefined});
+     'Chrome could not check the Google Pay app. Open the checkout directly in Chrome on Android and retry.'):
+     'Compatibility check failed; direct P2P launch remains available while the session is valid.'});
   }
  });
  launch.addEventListener('click',async()=>{
