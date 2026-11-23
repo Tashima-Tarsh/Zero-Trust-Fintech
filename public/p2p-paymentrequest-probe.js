@@ -96,9 +96,9 @@ function attach(session,env){
   });
   node.insertBefore(gpay,probe||node.firstChild);
  }
- if(probe)probe.style.cssText+=';max-width:100%;white-space:normal;overflow-wrap:anywhere';
- if(launch)launch.style.cssText+=';max-width:100%;white-space:normal;overflow-wrap:anywhere';
- if(status)status.style.cssText+=';max-width:100%;white-space:normal;overflow-wrap:anywhere';
+ if(probe?.style)probe.style.cssText+=';max-width:100%;white-space:normal;overflow-wrap:anywhere';
+ if(launch?.style)launch.style.cssText+=';max-width:100%;white-space:normal;overflow-wrap:anywhere';
+ if(status?.style)status.style.cssText+=';max-width:100%;white-space:normal;overflow-wrap:anywhere';
  if(timed){
   // Keep legacy diagnostics behind ?paymentrequest=1, but show customer copy
   // for the signed Google Pay method on the actual P2P chooser route.
