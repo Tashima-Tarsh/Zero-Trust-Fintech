@@ -74,6 +74,31 @@ function attach(session,env){
  const probe=doc.getElementById('p2pPaymentRequestCheck');
  const launch=doc.getElementById('p2pPaymentRequestLaunch');
  const status=doc.getElementById('p2pPaymentRequestStatus');
+ // A Chrome PaymentRequest handler probe is not Google Pay app discovery.
+ // Offer a separate, explicit Android app intent for a valid personal UPI URI.
+ const isAndroid=/Android/i.test(win.navigator?.userAgent||'')||
+   win.navigator?.userAgentData?.platform==='Android';
+ if(isAndroid){
+  const gpay=doc.createElement('button');
+  gpay.type='button';gpay.id='p2pOpenGooglePay';gpay.textContent='Open Google Pay';
+  gpay.style.cssText='display:block;width:100%;max-width:100%;box-sizing:border-box;min-height:48px;margin:12px 0;white-space:normal;overflow-wrap:anywhere';
+  const uri=new URL(session.upiUri);
+  const intent='intent://pay?'+uri.searchParams.toString()+
+   '#Intent;scheme=upi;package=com.google.android.apps.nbu.paisa.user;end';
+  gpay.disabled=!(Number.isFinite(session.expiresAt)&&Date.now()<session.expiresAt);
+  gpay.addEventListener('click',()=>{
+   if(!Number.isFinite(session.expiresAt)||Date.now()>=session.expiresAt){
+    status.textContent='Session expired. Start a new checkout.';gpay.disabled=true;return;
+   }
+   // App launch is not payment evidence; never update ledger from this click.
+   status.textContent='Opening Google Pay. Return to DISHA after payment; confirmation remains pending.';
+   win.location.href=intent;
+  });
+  node.insertBefore(gpay,probe||node.firstChild);
+ }
+ if(probe)probe.style.cssText+=';max-width:100%;white-space:normal;overflow-wrap:anywhere';
+ if(launch)launch.style.cssText+=';max-width:100%;white-space:normal;overflow-wrap:anywhere';
+ if(status)status.style.cssText+=';max-width:100%;white-space:normal;overflow-wrap:anywhere';
  if(timed){
   // Keep legacy diagnostics behind ?paymentrequest=1, but show customer copy
   // for the signed Google Pay method on the actual P2P chooser route.
