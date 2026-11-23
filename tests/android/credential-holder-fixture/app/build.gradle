@@ -1,0 +1,32 @@
+plugins {
+    id 'com.android.application'
+    id 'org.jetbrains.kotlin.android'
+}
+android {
+    namespace 'ai.disha.credentialfixture'
+    compileSdk 35
+    defaultConfig {
+        applicationId 'ai.disha.credentialfixture'
+        minSdk 26
+        targetSdk 35
+        versionCode 1
+        versionName '0.1-fixture-only'
+    }
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+    kotlinOptions { jvmTarget = '17' }
+}
+dependencies {
+    testImplementation 'junit:junit:4.13.2'
+    testImplementation 'org.json:json:20240303'
+    implementation 'androidx.activity:activity-ktx:1.9.3'
+    implementation 'androidx.lifecycle:lifecycle-runtime-ktx:2.8.7'
+    implementation 'com.google.android.gms:play-services-base:18.5.0'
+    implementation 'androidx.credentials:credentials:1.5.0'
+    implementation 'androidx.credentials.registry:registry-provider:1.0.0-alpha05'
+    implementation 'androidx.credentials.registry:registry-provider-play-services:1.0.0-alpha05'
+    implementation 'androidx.credentials.registry:registry-digitalcredentials-openid:1.0.0-alpha05'
+    implementation 'androidx.credentials.registry:registry-digitalcredentials-sdjwtvc:1.0.0-alpha05'
+}
