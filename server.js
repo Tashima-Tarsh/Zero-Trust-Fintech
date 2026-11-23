@@ -17,6 +17,8 @@ const { createPlatformControl } = require('./platform-control');
 const {createReconciliationRouter,initializeReconciliationSchema,reconcileCredit,reconcileCreditInternal,reconcileCreditWithUtrClaim} = require('./financial/reconciliation-webhook');
 const {createVaultEvidenceRouter,initializeVaultEvidenceSchema,rememberVaultAuthorization} = require('./financial/vault-evidence');
 const {initializeQuantumSignal,createQuantumSignalRouter}=require('./financial/quantum-signal');
+const {initializeSessionEvidenceSchema,createSessionEvidenceRouter}=require('./financial/session-evidence');
+const {initializeSessionUpiResultSchema,createSessionUpiResultRouter}=require('./financial/session-upi-result');
 const {initProofBridgeSchema,createProofBridgeRouter}=require('./financial/proofbridge');
 const {initDebitCredentialSchema,createDebitCredentialRouter}=require('./financial/debit-credential');
 const {createCheckoutDiagnostics}=require('./financial/checkout-diagnostics');
@@ -661,6 +663,14 @@ async function findSessionForEvidence(orderId){
   };
 }
 
+// Explicit opt-in: native, consented user-device evidence; no financial settlement mutation.
+const nativeEvidenceEnabled=process.env.DISHA_NATIVE_EVIDENCE_EXPERIMENT==='1';
+if(nativeEvidenceEnabled){
+  app.use('/api/session-evidence/upi-result',verifyLimiter,
+    createSessionUpiResultRouter({getPool:()=>db.pgPool,getSession:findSessionForEvidence}));
+  app.use('/api/session-evidence',verifyLimiter,
+    createSessionEvidenceRouter({getPool:()=>db.pgPool,getSession:findSessionForEvidence}));
+}
 // Per-order digital twin. Browser observations are never converted to financial credits.
 app.use('/api/quantum-signal',createQuantumSignalRouter({getPool:()=>db.pgPool}));
 // Digital Credentials API prototype: issuer-signed submissions never mutate payment state.
@@ -2104,6 +2114,10 @@ app.get('/failed', (req, res) => res.sendFile(path.join(__dirname, 'public', 'fa
   if(db.pgPool) {
     await initializeVaultEvidenceSchema(db.pgPool);
     await initializeQuantumSignal(db.pgPool);
+    if(nativeEvidenceEnabled){
+      await initializeSessionEvidenceSchema(db.pgPool);
+      await initializeSessionUpiResultSchema(db.pgPool);
+    }
     await initUpiAppEvidenceReplay(db.pgPool);
     await initTimedStore(db.pgPool);
     await initPayerPartnerDebit(db.pgPool);

@@ -101,9 +101,9 @@ public final class UpiResultHostActivity extends ComponentActivity {
                     deviceId = UUID.randomUUID().toString().replace("-", "_");
                     getSharedPreferences(PREFS, MODE_PRIVATE).edit().putString(deviceKey, deviceId).apply();
                 }
-                String publicPem = "-----BEGIN PUBLIC KEY-----\\n" +
+                String publicPem = "-----BEGIN PUBLIC KEY-----\n" +
                     Base64.encodeToString(pair.getPublic().getEncoded(), Base64.NO_WRAP) +
-                    "\\n-----END PUBLIC KEY-----";
+                    "\n-----END PUBLIC KEY-----";
                 JSONObject request = new JSONObject();
                 request.put("consent", true);
                 request.put("orderId", orderId);
