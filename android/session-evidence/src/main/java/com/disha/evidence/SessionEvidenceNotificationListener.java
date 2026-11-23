@@ -48,6 +48,11 @@ public final class SessionEvidenceNotificationListener extends NotificationListe
     /** Invoke only after explicit checkout consent and confirmation of OS access. */
     public static void enroll(Context context, String apiBase, String orderId,
                               String sessionToken, String deviceId) {
+        // A late enrollment response must not re-enable observation after stop/revoke.
+        if (!SessionEvidenceAccess.hasNotificationAccess(context)) return;
+        final String enrollmentId = UUID.randomUUID().toString();
+        if (!getPrefs(context).edit().putBoolean("enabled", false)
+                .putString("pendingEnrollment", enrollmentId).commit()) return;
         IO.execute(() -> {
             try {
                 KeyPair pair = getOrCreateKeyPair();
@@ -62,7 +67,10 @@ public final class SessionEvidenceNotificationListener extends NotificationListe
                 body.put("publicKeyPem", publicPem);
                 JSONObject response = post(apiBase + "/api/session-evidence/authorize",
                     body.toString(), sessionToken);
-                getPrefs(context).edit().putString("apiBase", apiBase).putString("orderId", orderId)
+                if (!enrollmentId.equals(getPrefs(context).getString("pendingEnrollment", "")) ||
+                    !SessionEvidenceAccess.hasNotificationAccess(context)) return;
+                getPrefs(context).edit().remove("pendingEnrollment")
+                    .putString("apiBase", apiBase).putString("orderId", orderId)
                     .putString("token", sessionToken).putString("nonce", response.getString("nonce"))
                     .putString("deviceId", deviceId).putLong("expiresAt", response.getLong("expiresAt"))
                     .putBoolean("enabled", true).apply();
@@ -125,6 +133,9 @@ public final class SessionEvidenceNotificationListener extends NotificationListe
     private void sendEvidence(String apiBase, String orderId, String token, String nonce,
                               String deviceId, String packageName, long postedAt,
                               String amount, String payee, String reference, String status) {
+        // Drop queued events when consent is revoked before dispatch.
+        if (!getPrefs(this).getBoolean("enabled", false) ||
+            !orderId.equals(getPrefs(this).getString("orderId", ""))) return;
         try {
             String eventId = UUID.randomUUID().toString().replace("-", "_");
             String canonical = "{"

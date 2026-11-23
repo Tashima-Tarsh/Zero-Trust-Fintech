@@ -14,5 +14,8 @@ assert.doesNotMatch(host,/BEGIN PUBLIC KEY-----\\\\n/);
 const revoke=listener.slice(listener.indexOf('public static void revokeSession('),listener.indexOf('public static void stopSession('));
 assert(revoke.indexOf('p.edit().clear().commit();')>0);
 assert(revoke.indexOf('p.edit().clear().commit();')<revoke.indexOf('IO.execute('));
+assert.match(listener,/pendingEnrollment/);
+assert.match(listener,/enrollmentId\.equals\(getPrefs\(context\)\.getString\("pendingEnrollment"/);
+assert.match(listener,/Drop queued events when consent is revoked before dispatch/);
 assert.match(listener,/public static void stopSession\(Context context\) \{\s*getPrefs\(context\)\.edit\(\)\.clear\(\)\.commit\(\);/);
 console.log('PASS: opt-in backend registration, PEM formatting and immediate local revocation');
